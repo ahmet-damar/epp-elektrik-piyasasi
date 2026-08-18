@@ -60,3 +60,20 @@ Kaynak: EPP_SRS_Teknik-Gereksinim_v1.5.
 ## ADLANDIRMA
 - snake_case, Türkçe karaktersiz kolon adı
 - il referansı: `il_kodu` (plaka, dim_il.il_kodu'ya FK) — 'il_id' DEĞİL
+
+## ROW LEVEL SECURITY (RLS) ve ROL AYRICALIKLARI
+- Tüm uygulama tablolarında Row Level Security (RLS) etkinleştirilecektir. Bu, deny-by-default davranışı sağlar: politika oluşturulmadan hiçbir role erişim verilmez.
+- Supabase sistem tablolarına dokunulmayacaktır.
+- `service_role` ve `postgres` rollerine dokunulmaz; yalnızca browser-facing roller (anon, authenticated) üzerindeki otomatik ayrıcalıklar geri alınır.
+
+Uygulama için oluşturulan SQL dosyası: `db/schema.sql` — içerik özet:
+- `REVOKE ALL ON SCHEMA public FROM anon, authenticated;`
+- `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;`
+- `REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;`
+- `REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon, authenticated;`
+- Her uygulama tablosu için `ALTER TABLE public.<table> ENABLE ROW LEVEL SECURITY;`
+
+Notlar:
+- RLS etkinleştirmek yalnızca deny-by-default sağlar; uygulama ihtiyaçlarına göre her tablo için uygun POLICY (USING/TO) eklenmelidir.
+- Yeni tablo eklendiğinde `db/schema.sql` güncellenmeli ve ilgili politika tanımları sağlanmalıdır.
+- Bu değişiklikler tarayıcıya doğrudan erişim veren rollerin (anon/authenticated) otomatik izinlerini kaldırır; frontend erişimi için açık, güvenli politikalar oluşturulmalıdır.
