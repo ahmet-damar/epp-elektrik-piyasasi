@@ -380,3 +380,29 @@ GRANT SELECT, INSERT, UPDATE ON TABLE fact_tuketim, fact_uretim, fact_abone, fac
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE source_asset, ingestion_batch TO admin;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE fact_tuketim, fact_uretim, fact_abone, fact_serbest_tuketici, fact_hava_aylik TO admin;
 GRANT SELECT, INSERT ON TABLE audit_log TO admin;
+
+BEGIN;
+
+REVOKE ALL ON SCHEMA public FROM anon, authenticated;
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon, authenticated;
+
+ALTER TABLE public.source_asset ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ingestion_batch ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fact_tuketim ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fact_uretim ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fact_abone ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fact_serbest_tuketici ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fact_hava_aylik ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.dim_tarih ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.dim_il ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.dim_kaynak ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.dim_tuketici_grubu ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.dim_lisans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.job_status ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sistem_parametre ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.kpi_esik ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
+
+COMMIT;
