@@ -3,29 +3,38 @@ EPP — Türkiye Elektrik Piyasası Paneli (Streamlit)
 Çalıştırma:  streamlit run app/dashboard.py
 Veri: data/tr_ocak2026.py (gerçek EPDK Ocak 2026, 81 il)
 """
+
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import streamlit as st
 
 # data/ klasörünü yola ekle
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "data"))
-from tr_ocak2026 import TABLO11, TABLO3_URETIM, TABLO2_KAYNAK, YENILENEBILIR  # noqa: E402
+from tr_ocak2026 import TABLO2_KAYNAK, TABLO3_URETIM, TABLO11
+
+resolve_database_or_fallback: Callable[[], tuple[Any | None, str]] | None
 
 try:
     from worker.db import resolve_database_or_fallback
-except Exception:  # pragma: no cover - geliştirme ortamında uyumsuz olabilir
+except ImportError:  # pragma: no cover - geliştirme ortamında uyumsuz olabilir
     resolve_database_or_fallback = None
 
-st.set_page_config(page_title="EPP — Türkiye Elektrik Piyasası", layout="wide", page_icon="⚡")
+st.set_page_config(
+    page_title="EPP — Türkiye Elektrik Piyasası", layout="wide", page_icon="⚡"
+)
 
 if resolve_database_or_fallback is not None:
     db_handle, db_source = resolve_database_or_fallback()
     if db_handle is None:
-        st.warning("Supabase/PostgreSQL erişimi bulunamadı. Yerel dosya verisiyle çalışmaya devam ediliyor.")
+        st.warning(
+            "Supabase/PostgreSQL erişimi bulunamadı. Yerel dosya verisiyle çalışmaya devam ediliyor."
+        )
     else:
         st.info(f"Veri kaynağı: {db_source}")
 
@@ -40,12 +49,14 @@ def veri_hazirla():
             (il, "Kamu ve Özel Hizmetler", "dagitim", kamu),
             (il, "Mesken", "dagitim", mesken),
             (il, "Sanayi", "dagitim", san_dag),
-            (il, "Sanayi", "iletim", san_ilt),   # P0-2: ayrı satır
+            (il, "Sanayi", "iletim", san_ilt),  # P0-2: ayrı satır
             (il, "Tarımsal", "dagitim", tarim),
         ]
     tuk = pd.DataFrame(rows, columns=["il", "grup", "baglanti", "mwh"])
     uret_il = pd.DataFrame(TABLO3_URETIM.items(), columns=["il", "uretim_mwh"])
-    kaynak = pd.DataFrame(TABLO2_KAYNAK, columns=["kaynak", "uretim_mwh", "yenilenebilir"])
+    kaynak = pd.DataFrame(
+        TABLO2_KAYNAK, columns=["kaynak", "uretim_mwh", "yenilenebilir"]
+    )
     return tuk, uret_il, kaynak
 
 
@@ -79,10 +90,13 @@ yen_pay = kaynak.loc[kaynak["yenilenebilir"], "uretim_mwh"].sum() / top_uret * 1
 san_iletim = tuk[(tuk["grup"] == "Sanayi") & (tuk["baglanti"] == "iletim")]["mwh"].sum()
 
 k1, k2, k3, k4 = st.columns(4)
-k1.metric("Seçili Tüketim", f"{top_tuk/1e6:,.2f} TWh" if top_tuk > 1e6 else f"{top_tuk/1000:,.0f} GWh")
-k2.metric("Türkiye Üretim", f"{top_uret/1e6:,.1f} TWh")
+k1.metric(
+    "Seçili Tüketim",
+    f"{top_tuk / 1e6:,.2f} TWh" if top_tuk > 1e6 else f"{top_tuk / 1000:,.0f} GWh",
+)
+k2.metric("Türkiye Üretim", f"{top_uret / 1e6:,.1f} TWh")
 k3.metric("Yenilenebilir Payı", f"%{yen_pay:.1f}")
-k4.metric("Öz-Yeterlilik", f"%{top_uret/tuk['mwh'].sum()*100:.0f}")
+k4.metric("Öz-Yeterlilik", f"%{top_uret / tuk['mwh'].sum() * 100:.0f}")
 
 st.divider()
 
@@ -91,7 +105,9 @@ c1, c2 = st.columns(2)
 
 with c1:
     st.subheader("En Yüksek Tüketimli 15 İl (GWh)")
-    il_top = (tuk.groupby("il")["mwh"].sum() / 1000).sort_values(ascending=False).head(15)
+    il_top = (
+        (tuk.groupby("il")["mwh"].sum() / 1000).sort_values(ascending=False).head(15)
+    )
     st.bar_chart(il_top, horizontal=True, color="#B07D2B")
 
 with c2:
@@ -110,8 +126,10 @@ with c4:
     st.subheader("P0-2 · Sanayi İletim/Dağıtım Ayrımı (TWh)")
     san = tuk[tuk["grup"] == "Sanayi"].groupby("baglanti")["mwh"].sum() / 1e6
     st.bar_chart(san, color="#7030A0")
-    st.info(f"İletim: {san.get('iletim', 0):.2f} TWh · Dağıtım: {san.get('dagitim', 0):.2f} TWh "
-            f"→ Toplam {san.sum():.2f} TWh (Tablo 11 ile birebir)")
+    st.info(
+        f"İletim: {san.get('iletim', 0):.2f} TWh · Dağıtım: {san.get('dagitim', 0):.2f} TWh "
+        f"→ Toplam {san.sum():.2f} TWh (Tablo 11 ile birebir)"
+    )
 
 # ---------------- VERİ TABLOSU ----------------
 with st.expander("📋 Ham veriyi göster"):

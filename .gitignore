@@ -26,3 +26,4 @@ node_modules/
 # İşletim sistemi
 .DS_Store
 Thumbs.db
+*.log

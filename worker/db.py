@@ -36,7 +36,7 @@ def create_supabase_client() -> Any | None:
 
     try:
         from supabase import create_client
-    except Exception:
+    except ImportError:
         return None
 
     return create_client(supabase_url, anon_key)
@@ -49,12 +49,12 @@ def get_db_connection() -> Any | None:
 
     try:
         import psycopg
-    except Exception:
+    except ImportError:
         return None
 
     try:
         return psycopg.connect(database_url)
-    except Exception:
+    except psycopg.Error:
         return None
 
 
@@ -67,4 +67,7 @@ def resolve_database_or_fallback() -> tuple[Any | None, str]:
     if client is not None:
         return client, "Supabase via anon key"
 
-    return None, "No database connection configured; continuing with local fallback data."
+    return (
+        None,
+        "No database connection configured; continuing with local fallback data.",
+    )
