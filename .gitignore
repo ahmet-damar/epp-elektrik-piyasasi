@@ -11,6 +11,13 @@ venv/
 # Ortam
 .env
 .env.local
+.env.*
+!.env.example
+
+# Supabase / node
+.supabase/
+supabase/.temp/
+node_modules/
 
 # IDE
 .vscode/
@@ -19,3 +26,4 @@ venv/
 # İşletim sistemi
 .DS_Store
 Thumbs.db
+*.log

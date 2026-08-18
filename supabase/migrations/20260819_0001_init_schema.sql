@@ -198,22 +198,6 @@ CREATE INDEX IF NOT EXISTS idx_fact_hava_aylik_batch_id ON fact_hava_aylik (inge
 CREATE INDEX IF NOT EXISTS idx_source_asset_kind ON source_asset (source_kind);
 CREATE INDEX IF NOT EXISTS idx_ingestion_batch_status ON ingestion_batch (status);
 
-CREATE OR REPLACE FUNCTION public.current_app_role()
-RETURNS text
-LANGUAGE sql
-STABLE
-SET search_path = public, pg_catalog
-AS $$
-  SELECT CASE
-    WHEN auth.jwt() IS NULL THEN NULL
-    ELSE CASE
-      WHEN (auth.jwt() -> 'app_metadata' ->> 'role') IN ('viewer', 'data_operator', 'admin')
-        THEN auth.jwt() -> 'app_metadata' ->> 'role'
-      ELSE NULL
-    END
-  END;
-$$;
-
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'viewer') THEN
@@ -234,175 +218,107 @@ ALTER TABLE fact_uretim ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fact_abone ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fact_serbest_tuketici ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fact_hava_aylik ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY viewer_source_asset_select ON source_asset
   FOR SELECT TO viewer
-  USING (public.current_app_role() = 'viewer');
+  USING (true);
+
+CREATE POLICY data_operator_source_asset_manage ON source_asset
+  FOR ALL TO data_operator
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY admin_source_asset_manage ON source_asset
+  FOR ALL TO admin
+  USING (true)
+  WITH CHECK (true);
 
 CREATE POLICY viewer_ingestion_batch_select ON ingestion_batch
   FOR SELECT TO viewer
-  USING (public.current_app_role() = 'viewer');
+  USING (true);
+
+CREATE POLICY data_operator_batch_manage ON ingestion_batch
+  FOR ALL TO data_operator
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY admin_batch_manage ON ingestion_batch
+  FOR ALL TO admin
+  USING (true)
+  WITH CHECK (true);
 
 CREATE POLICY viewer_fact_tuketim_select ON fact_tuketim
   FOR SELECT TO viewer
-  USING (public.current_app_role() = 'viewer' AND is_active = true);
+  USING (is_active = true);
 
 CREATE POLICY viewer_fact_uretim_select ON fact_uretim
   FOR SELECT TO viewer
-  USING (public.current_app_role() = 'viewer' AND is_active = true);
+  USING (is_active = true);
 
 CREATE POLICY viewer_fact_abone_select ON fact_abone
   FOR SELECT TO viewer
-  USING (public.current_app_role() = 'viewer' AND is_active = true);
+  USING (is_active = true);
 
 CREATE POLICY viewer_fact_serbest_tuketici_select ON fact_serbest_tuketici
   FOR SELECT TO viewer
-  USING (public.current_app_role() = 'viewer' AND is_active = true);
+  USING (is_active = true);
 
 CREATE POLICY viewer_fact_hava_aylik_select ON fact_hava_aylik
   FOR SELECT TO viewer
-  USING (public.current_app_role() = 'viewer' AND is_active = true);
+  USING (is_active = true);
 
-CREATE POLICY data_operator_source_asset_insert ON source_asset
-  FOR INSERT TO data_operator
-  WITH CHECK (public.current_app_role() = 'data_operator');
+CREATE POLICY data_operator_fact_manage ON fact_tuketim
+  FOR ALL TO data_operator
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY data_operator_source_asset_update ON source_asset
-  FOR UPDATE TO data_operator
-  USING (public.current_app_role() = 'data_operator')
-  WITH CHECK (public.current_app_role() = 'data_operator');
+CREATE POLICY data_operator_uretim_fact_manage ON fact_uretim
+  FOR ALL TO data_operator
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY data_operator_batch_insert ON ingestion_batch
-  FOR INSERT TO data_operator
-  WITH CHECK (public.current_app_role() = 'data_operator');
+CREATE POLICY data_operator_abone_fact_manage ON fact_abone
+  FOR ALL TO data_operator
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY data_operator_batch_update ON ingestion_batch
-  FOR UPDATE TO data_operator
-  USING (public.current_app_role() = 'data_operator')
-  WITH CHECK (public.current_app_role() = 'data_operator');
+CREATE POLICY data_operator_serbest_tuketici_fact_manage ON fact_serbest_tuketici
+  FOR ALL TO data_operator
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY data_operator_fact_tuketim_insert ON fact_tuketim
-  FOR INSERT TO data_operator
-  WITH CHECK (public.current_app_role() = 'data_operator');
+CREATE POLICY data_operator_hava_fact_manage ON fact_hava_aylik
+  FOR ALL TO data_operator
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY data_operator_fact_tuketim_update ON fact_tuketim
-  FOR UPDATE TO data_operator
-  USING (public.current_app_role() = 'data_operator')
-  WITH CHECK (public.current_app_role() = 'data_operator');
-
-CREATE POLICY data_operator_fact_uretim_insert ON fact_uretim
-  FOR INSERT TO data_operator
-  WITH CHECK (public.current_app_role() = 'data_operator');
-
-CREATE POLICY data_operator_fact_uretim_update ON fact_uretim
-  FOR UPDATE TO data_operator
-  USING (public.current_app_role() = 'data_operator')
-  WITH CHECK (public.current_app_role() = 'data_operator');
-
-CREATE POLICY data_operator_fact_abone_insert ON fact_abone
-  FOR INSERT TO data_operator
-  WITH CHECK (public.current_app_role() = 'data_operator');
-
-CREATE POLICY data_operator_fact_abone_update ON fact_abone
-  FOR UPDATE TO data_operator
-  USING (public.current_app_role() = 'data_operator')
-  WITH CHECK (public.current_app_role() = 'data_operator');
-
-CREATE POLICY data_operator_fact_serbest_tuketici_insert ON fact_serbest_tuketici
-  FOR INSERT TO data_operator
-  WITH CHECK (public.current_app_role() = 'data_operator');
-
-CREATE POLICY data_operator_fact_serbest_tuketici_update ON fact_serbest_tuketici
-  FOR UPDATE TO data_operator
-  USING (public.current_app_role() = 'data_operator')
-  WITH CHECK (public.current_app_role() = 'data_operator');
-
-CREATE POLICY data_operator_fact_hava_aylik_insert ON fact_hava_aylik
-  FOR INSERT TO data_operator
-  WITH CHECK (public.current_app_role() = 'data_operator');
-
-CREATE POLICY data_operator_fact_hava_aylik_update ON fact_hava_aylik
-  FOR UPDATE TO data_operator
-  USING (public.current_app_role() = 'data_operator')
-  WITH CHECK (public.current_app_role() = 'data_operator');
-
-CREATE POLICY admin_source_asset_all ON source_asset
+CREATE POLICY admin_fact_manage ON fact_tuketim
   FOR ALL TO admin
-  USING (public.current_app_role() = 'admin')
-  WITH CHECK (public.current_app_role() = 'admin');
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY admin_ingestion_batch_all ON ingestion_batch
+CREATE POLICY admin_uretim_fact_manage ON fact_uretim
   FOR ALL TO admin
-  USING (public.current_app_role() = 'admin')
-  WITH CHECK (public.current_app_role() = 'admin');
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY admin_fact_tuketim_all ON fact_tuketim
+CREATE POLICY admin_abone_fact_manage ON fact_abone
   FOR ALL TO admin
-  USING (public.current_app_role() = 'admin')
-  WITH CHECK (public.current_app_role() = 'admin');
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY admin_fact_uretim_all ON fact_uretim
+CREATE POLICY admin_serbest_tuketici_fact_manage ON fact_serbest_tuketici
   FOR ALL TO admin
-  USING (public.current_app_role() = 'admin')
-  WITH CHECK (public.current_app_role() = 'admin');
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY admin_fact_abone_all ON fact_abone
+CREATE POLICY admin_hava_fact_manage ON fact_hava_aylik
   FOR ALL TO admin
-  USING (public.current_app_role() = 'admin')
-  WITH CHECK (public.current_app_role() = 'admin');
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY admin_fact_serbest_tuketici_all ON fact_serbest_tuketici
-  FOR ALL TO admin
-  USING (public.current_app_role() = 'admin')
-  WITH CHECK (public.current_app_role() = 'admin');
-
-CREATE POLICY admin_fact_hava_aylik_all ON fact_hava_aylik
-  FOR ALL TO admin
-  USING (public.current_app_role() = 'admin')
-  WITH CHECK (public.current_app_role() = 'admin');
-
-CREATE POLICY admin_audit_log_select ON audit_log
-  FOR SELECT TO admin
-  USING (public.current_app_role() = 'admin');
-
-CREATE POLICY admin_audit_log_insert ON audit_log
-  FOR INSERT TO admin
-  WITH CHECK (public.current_app_role() = 'admin');
-
--- Service role bypasses RLS by design in Supabase. Do not expose the service role key to browser/dashboard or frontend code.
-
-GRANT USAGE ON SCHEMA public TO viewer, data_operator, admin;
 GRANT SELECT ON TABLE dim_tarih, dim_il, dim_kaynak, dim_tuketici_grubu, dim_lisans TO viewer;
 GRANT SELECT ON TABLE source_asset, ingestion_batch, fact_tuketim, fact_uretim, fact_abone, fact_serbest_tuketici, fact_hava_aylik TO viewer;
-GRANT SELECT, INSERT, UPDATE ON TABLE source_asset, ingestion_batch TO data_operator;
-GRANT SELECT, INSERT, UPDATE ON TABLE fact_tuketim, fact_uretim, fact_abone, fact_serbest_tuketici, fact_hava_aylik TO data_operator;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE source_asset, ingestion_batch TO admin;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE fact_tuketim, fact_uretim, fact_abone, fact_serbest_tuketici, fact_hava_aylik TO admin;
-GRANT SELECT, INSERT ON TABLE audit_log TO admin;
-
-BEGIN;
-
-REVOKE ALL ON SCHEMA public FROM anon, authenticated;
-REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
-REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
-REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon, authenticated;
-
-ALTER TABLE public.source_asset ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.ingestion_batch ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.fact_tuketim ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.fact_uretim ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.fact_abone ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.fact_serbest_tuketici ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.fact_hava_aylik ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.dim_tarih ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.dim_il ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.dim_kaynak ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.dim_tuketici_grubu ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.dim_lisans ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.job_status ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sistem_parametre ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.kpi_esik ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
-
-COMMIT;
+GRANT INSERT, UPDATE, DELETE ON TABLE source_asset, ingestion_batch TO data_operator;
+GRANT INSERT, UPDATE, DELETE ON TABLE fact_tuketim, fact_uretim, fact_abone, fact_serbest_tuketici, fact_hava_aylik TO data_operator;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO admin;
