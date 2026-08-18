@@ -11,6 +11,13 @@ venv/
 # Ortam
 .env
 .env.local
+.env.*
+!.env.example
+
+# Supabase / node
+.supabase/
+supabase/.temp/
+node_modules/
 
 # IDE
 .vscode/

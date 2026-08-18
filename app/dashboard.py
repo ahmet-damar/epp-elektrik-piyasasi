@@ -15,7 +15,19 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "data"))
 from tr_ocak2026 import TABLO11, TABLO3_URETIM, TABLO2_KAYNAK, YENILENEBILIR  # noqa: E402
 
+try:
+    from worker.db import resolve_database_or_fallback
+except Exception:  # pragma: no cover - geliştirme ortamında uyumsuz olabilir
+    resolve_database_or_fallback = None
+
 st.set_page_config(page_title="EPP — Türkiye Elektrik Piyasası", layout="wide", page_icon="⚡")
+
+if resolve_database_or_fallback is not None:
+    db_handle, db_source = resolve_database_or_fallback()
+    if db_handle is None:
+        st.warning("Supabase/PostgreSQL erişimi bulunamadı. Yerel dosya verisiyle çalışmaya devam ediliyor.")
+    else:
+        st.info(f"Veri kaynağı: {db_source}")
 
 
 @st.cache_data
