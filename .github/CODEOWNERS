@@ -1,0 +1,10 @@
+# Kritik dizinlerde zorunlu inceleme (branch protection ile birlikte)
+# @kullanici -> kendi GitHub kullanıcı adınız
+*                        @ahmetdamar
+/db/                     @ahmetdamar
+/migrations/             @ahmetdamar
+/worker/parsers/         @ahmetdamar
+/worker/security/        @ahmetdamar
+/.github/workflows/      @ahmetdamar
+/.pre-commit-config.yaml @ahmetdamar
+*.sql                    @ahmetdamar

@@ -1,0 +1,97 @@
+# ============================================================================
+# EPP Security (G-4) — gitleaks · CodeQL · pip/npm audit · Trivy · lisans
+# Tüm araçlar ücretsiz/açık kaynak. ADR-6: uygulama bileşenleri OSI;
+# GitHub/Actions/GHCR yönetilen servis istisnası.
+# ============================================================================
+name: Security
+on:
+  pull_request: { branches: [main] }
+  push: { branches: [main] }
+  schedule: [ { cron: "0 6 * * 1" } ]   # haftalık
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  gitleaks:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    name: CodeQL (SAST)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: { language: [python, javascript-typescript] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          language: ${{ matrix.language }}
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+
+  pip-audit:
+    name: Dependency audit (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pip-audit
+      - run: pip-audit -r worker/requirements.txt --strict
+
+  npm-audit:
+    name: Dependency audit (Web)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: ./web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: "npm", cache-dependency-path: web/package-lock.json }
+      - run: npm ci
+      - run: npm audit --audit-level=high
+
+  trivy:
+    name: Trivy (fs + deps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-results.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        with: { sarif_file: trivy-results.sarif }
+
+  # G-5: Açık kaynak LİSANS uyumu — OSI dışı bulunursa build durur
+  license-check:
+    name: License compliance (OSS only)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r worker/requirements.txt pip-licenses
+      - name: Python lisansları
+        run: |
+          pip-licenses --format=markdown \
+            --fail-on="GPL-3.0-only;LGPL-3.0-only;Proprietary;UNKNOWN" \
+            --allow-only="MIT;BSD;Apache-2.0;Apache Software License;BSD License;MIT License;PSF;ISC;Mozilla Public License 2.0 (MPL 2.0)"
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Web lisansları
+        working-directory: ./web
+        run: |
+          npm ci
+          npx license-checker --production \
+            --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;CC0-1.0;0BSD;Unlicense"

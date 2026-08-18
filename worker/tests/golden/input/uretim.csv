@@ -1,0 +1,6 @@
+il,il_kodu,tarih_id,kaynak,yenilenebilir,kurulu_guc_mw,uretim_mwh
+Eskişehir,26,202601,Doğal Gaz,False,900.0,400000.0
+Eskişehir,26,202601,Rüzgar,True,300.0,120000.0
+Eskişehir,26,202601,Güneş,True,150.0,30000.0
+Eskişehir,26,202601,Hidrolik,True,200.0,80000.0
+Eskişehir,26,202601,Linyit,False,450.0,250000.0

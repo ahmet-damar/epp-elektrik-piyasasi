@@ -1,0 +1,7 @@
+il,il_kodu,tarih_id,grup,baglanti,tuketim_mwh
+Eskişehir,26,202601,Mesken,dagitim,120000.0
+Eskişehir,26,202601,Sanayi,dagitim,90000.0
+Eskişehir,26,202601,Sanayi,iletim,150000.0
+Eskişehir,26,202601,Tarımsal,dagitim,20000.0
+Eskişehir,26,202601,Aydınlatma,dagitim,5000.0
+Eskişehir,26,202601,Kamu ve Özel Hizmetler,dagitim,60000.0

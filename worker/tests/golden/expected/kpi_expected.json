@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "il": "Eskişehir",
+    "tarih_id": 202601,
+    "aciklama": "SENTETİK golden — gerçek EPDK değeri değil"
+  },
+  "KPI-01": 2000.0,
+  "KPI-02": 880000.0,
+  "KPI-03": 26.1,
+  "KPI-06": 0.315,
+  "KPI-08": 445000.0,
+  "KPI-09_mesken": 27.0,
+  "KPI-10_mesken": 0.48,
+  "KPI-13_yoy": 11.2,
+  "KPI-23_hdd": 501,
+  "KPI-24_cdd": 0,
+  "P0-2": {
+    "sanayi_toplam": 240000.0,
+    "sanayi_iletim": 150000.0,
+    "sanayi_dagitim": 90000.0,
+    "beklenen_satir": 6
+  }
+}

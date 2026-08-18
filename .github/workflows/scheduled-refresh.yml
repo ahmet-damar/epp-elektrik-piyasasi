@@ -1,0 +1,27 @@
+# ============================================================================
+# EPP Scheduled Refresh — Open-Meteo hava verisi (source_kind='api')
+# API kaynağı: source_uri + request_hash ile source_asset kaydı (P0-3).
+# ============================================================================
+name: Scheduled Refresh
+on:
+  schedule: [ { cron: "0 4 * * *" } ]   # her gün 04:00 UTC
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  refresh-weather:
+    name: Open-Meteo hava verisi çek
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r worker/requirements.txt
+      - name: Hava verisini çek (source_asset kind=api) ve DB'ye yaz
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: python -m worker.jobs.fetch_weather --incremental
+      - name: Materialized view'ları yenile
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: psql "$DATABASE_URL" -c "select refresh_all_matviews();"

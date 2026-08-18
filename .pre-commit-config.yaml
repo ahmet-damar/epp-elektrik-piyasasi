@@ -1,0 +1,85 @@
+# ============================================================================
+# EPP — pre-commit (Ek D · v1.0)  — Tüm araçlar açık kaynak & ücretsiz
+# Kurulum:
+#   pipx install pre-commit && pre-commit install
+#   pre-commit install --hook-type commit-msg
+#   pre-commit run --all-files
+# ============================================================================
+fail_fast: false
+default_language_version:
+  python: python3.12
+
+repos:
+  # 1) Genel hijyen
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=5120"]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  # 2) SIR TARAMASI (kritik)
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  # 3) Python — Ruff (lint + format)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  # 4) Python — tip kontrolü
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.14.1
+    hooks:
+      - id: mypy
+        additional_dependencies: [pydantic, types-requests]
+        args: ["--ignore-missing-imports"]
+        files: ^worker/
+
+  # 5) Web (TS/JS)
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.18.0
+    hooks:
+      - id: eslint
+        files: \.(ts|tsx|js|jsx)$
+        additional_dependencies: [eslint@9.18.0, typescript@5.7.3]
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        files: \.(ts|tsx|js|jsx|json|css|md|yaml|yml)$
+
+  # 6) SQL (migration) — Postgres
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 3.3.0
+    hooks:
+      - id: sqlfluff-lint
+        args: ["--dialect", "postgres"]
+        files: ^(db|migrations)/.*\.sql$
+
+  # 7) Dockerfile
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.13.1-beta
+    hooks:
+      - id: hadolint-docker
+
+  # 8) Commit mesajı — Conventional Commits
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.1.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
