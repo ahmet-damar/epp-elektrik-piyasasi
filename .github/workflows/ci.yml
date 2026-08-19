@@ -32,6 +32,7 @@ jobs:
       - run: python -m mypy app worker --ignore-missing-imports --explicit-package-bases
       - run: python worker/validate_rls_static.py
       - run: python worker/dogrula.py
+      - run: python -m pytest worker/tests -v
       - run: python -m compileall app worker data
 
   integration:
