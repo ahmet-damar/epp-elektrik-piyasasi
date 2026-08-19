@@ -327,6 +327,10 @@ def aktivasyon_yap(conn: Connection, tablo: str, batch_id: int) -> None:
 
     with conn.transaction(), conn.cursor() as cur:
         cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (tablo,))
+        # bandit B608 bu iki execute'ta bastırıldı: tablo/kolonlar kullanıcı
+        # girdisi değil - tablo yukarıda _DOGAL_ANAHTAR'a (sabit 3 değerlik
+        # whitelist) karşı doğrulandı, kolonlar da aynı whitelist'ten
+        # türetildi. Değerler (batch_id) ayrı parametre olarak geçiyor.
         cur.execute(
             f"""
             UPDATE {tablo}
@@ -335,10 +339,10 @@ def aktivasyon_yap(conn: Connection, tablo: str, batch_id: int) -> None:
               AND ({kolonlar}) IN (
                   SELECT {kolonlar} FROM {tablo} WHERE ingestion_batch_id = %s
               )
-            """,
+            """,  # nosec B608
             (batch_id,),
         )
         cur.execute(
-            f"UPDATE {tablo} SET is_active = true WHERE ingestion_batch_id = %s",
+            f"UPDATE {tablo} SET is_active = true WHERE ingestion_batch_id = %s",  # nosec B608
             (batch_id,),
         )

@@ -89,6 +89,35 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+  bandit:
+    name: Python SAST (bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install bandit
+      - name: Run bandit
+        # Not GHAS-dependent (plain CLI + exit code), fills part of the gap
+        # left by dropping CodeQL. B101 (assert usage) is skipped: it's
+        # pytest's own idiom in worker/tests and an intentional pattern
+        # elsewhere (assert after INSERT...RETURNING, which Postgres
+        # guarantees non-empty) - not a real finding either way. Fails the
+        # job (default non-zero exit) on medium/high severity.
+        run: |
+          bandit -r worker app -x worker/tests -s B101 --severity-level medium -f txt -o bandit-results.txt
+      - name: Publish results to job summary
+        if: always()
+        run: |
+          {
+            echo "## Bandit scan results (worker + app)"
+            echo '```'
+            cat bandit-results.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   license-check:
     name: License compliance (OSS only)
     runs-on: ubuntu-latest
