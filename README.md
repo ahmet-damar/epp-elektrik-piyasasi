@@ -13,7 +13,7 @@ epp/
 │  ├─ dependabot.yml           # bağımlılık güncelleme
 │  └─ workflows/
 │     ├─ ci.yml                # test+lint+kalite kapıları (G-1..G-7)
-│     ├─ security.yml          # gitleaks, CodeQL, audit, Trivy, lisans
+│     ├─ security.yml          # gitleaks, audit, Trivy, lisans
 │     ├─ deploy.yml            # imaj build + GHCR + self-host (SSH)
 │     └─ scheduled-refresh.yml # Open-Meteo hava verisi (API)
 ├─ web/                        # Next.js/TS
@@ -32,7 +32,8 @@ pre-commit run --all-files
 
 ## GitHub Ayarları
 - Branch protection (main): PR + "Quality Gate" required check + signed commits
-- Code security: Secret scanning + Push protection, Dependabot, CodeQL
+- Code security: Secret scanning + Push protection, Dependabot, Trivy (fs+deps)
+  (CodeQL/code-scanning devre dışı — GitHub Advanced Security Free plan private repo'da yok)
 
 ## Gerekli Secrets
 | Secret | Kullanım |

@@ -1,5 +1,7 @@
 ﻿# ============================================================================
-# EPP Security (G-4) — gitleaks · CodeQL · pip/npm audit · Trivy · lisans
+# EPP Security (G-4) — gitleaks · pip/npm audit · Trivy · lisans
+# NOT: CodeQL/SARIF code-scanning devre dışı — GitHub Advanced Security,
+# Free plan private repo'da kullanılamıyor (bkz. Trivy job'ındaki not).
 # ============================================================================
 name: Security
 on:
@@ -24,29 +26,6 @@ jobs:
       - uses: gitleaks/gitleaks-action@dcedce43c6f43de0b836d1fe38946645c9c638dc # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  codeql:
-    name: CodeQL (SAST)
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    permissions:
-      contents: read
-      security-events: write
-      # upload-sarif needs this too, even with security-events: write - it reads
-      # workflow-run metadata during upload. Private-repo-specific requirement;
-      # see github/codeql-action#2117.
-      actions: read
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [python]
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: github/codeql-action/init@988661ebb5e81487b3fb31b2185d2856c0a10679 # v4
-        with:
-          languages: ${{ matrix.language }}
-          queries: security-extended
-      - uses: github/codeql-action/analyze@988661ebb5e81487b3fb31b2185d2856c0a10679 # v4
 
   pip-audit:
     name: Dependency audit (Python)
@@ -78,26 +57,37 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
-      security-events: write
-      # see codeql job comment above - upload-sarif needs this too.
-      actions: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+      - name: Run Trivy
+        # GitHub Advanced Security (code scanning / SARIF upload) isn't available
+        # on a Free-plan private repo, so this runs Trivy directly instead of
+        # uploading SARIF to the code-scanning API: table output, fails the job
+        # (exit-code 1) on HIGH/CRITICAL findings, and gets published below to
+        # the Actions job summary so results are readable without a separate
+        # dashboard.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scanners: vuln,secret,misconfig
           severity: HIGH,CRITICAL
-          format: sarif
-          output: trivy-results.sarif
+          format: table
+          output: trivy-results.txt
+          exit-code: "1"
           # setup-trivy downloads the trivy binary via the GitHub API; without an
           # authenticated token that can hit anonymous rate limits (seen as an
           # opaque "Install Trivy" exit code 1, aquasecurity/trivy-action#516).
           token-setup-trivy: ${{ secrets.GITHUB_TOKEN }}
-      - uses: github/codeql-action/upload-sarif@988661ebb5e81487b3fb31b2185d2856c0a10679 # v4
-        with:
-          sarif_file: trivy-results.sarif
+      - name: Publish results to job summary
+        if: always()
+        run: |
+          {
+            echo "## Trivy scan results (fs + deps)"
+            echo '```'
+            cat trivy-results.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   license-check:
     name: License compliance (OSS only)
