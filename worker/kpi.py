@@ -112,6 +112,32 @@ def kpi_06_hhi(uretim: pd.DataFrame) -> float | None:
     return round(float((paylar**2).sum()), 3)
 
 
+def kpi_04_kaynak_payi(uretim: pd.DataFrame) -> dict[str, float] | None:
+    toplam = float(uretim["uretim_mwh"].sum()) if not uretim.empty else 0.0
+    if toplam == 0:
+        return None
+    paylar = uretim.groupby("kaynak")["uretim_mwh"].sum() / toplam * 100
+    return {str(kaynak): round(float(deger), 1) for kaynak, deger in paylar.items()}
+
+
+def kpi_05_kapasite_faktoru(uretim: pd.DataFrame, saat: float) -> float | None:
+    kurulu = float(uretim["kurulu_guc_mw"].sum()) if not uretim.empty else 0.0
+    if kurulu == 0 or saat <= 0:
+        return None
+    uretim_toplam = float(uretim["uretim_mwh"].sum()) if not uretim.empty else 0.0
+    return round(uretim_toplam / (kurulu * saat) * 100, 1)
+
+
+def kpi_07_lisanssiz_pay(uretim: pd.DataFrame) -> float | None:
+    toplam = float(uretim["uretim_mwh"].sum()) if not uretim.empty else 0.0
+    if toplam == 0:
+        return None
+    if "lisans" not in uretim.columns:
+        return 0.0
+    lisanssiz = float(uretim.loc[uretim["lisans"] == "Lisanssız", "uretim_mwh"].sum())
+    return round(lisanssiz / toplam * 100, 1)
+
+
 # ---------------------------------------------------------------------------
 # Tüketim (Ek B)
 # ---------------------------------------------------------------------------

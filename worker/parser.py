@@ -6,9 +6,12 @@ Parser sabit hücreye güvenmez; değişmez etiketleri (tablo başlığı, sütu
 dosyalarla doğrulanacak" — bu modül henüz gerçek EPDK dosyalarıyla
 doğrulanmadı; yalnızca sentetik test fixture'ları ile test edilmiştir.
 
-Bu ilk sürüm T1 (kurulu güç), T2/T3 (üretim), T9/T10 (abone) ve T11
-(P0-2 kritik: tüketim iletim/dağıtım) tablolarını kapsar. T4-T8, T12, T13
-sonraki iterasyonda eklenecektir.
+Bu sürüm T1/T4 (kurulu güç, lisanslı/lisanssız), T2/T3/T5/T6 (üretim,
+lisanslı/lisanssız), T7/T8/T12 (faturalanan/dağıtım bölgesi tüketim),
+T9/T10 (abone) ve T11 (P0-2 kritik: tüketim iletim/dağıtım) tablolarını
+kapsar. T13 (Serbest tüketici) HENÜZ eklenmedi — doküman bu tablo için
+kolon etiketlerini belirtmiyor (yalnız "tur" boyutundan söz ediyor); gerçek
+dosya/ek belge olmadan kolon çapalarını uydurmak yanlış olur.
 """
 
 from __future__ import annotations
@@ -309,6 +312,71 @@ def tablo11_tuketim_oku(
 
 
 # ---------------------------------------------------------------------------
+# T7/T8/T12 — Faturalanan tüketim (tür/il) + dağıtım bölgesi
+# ---------------------------------------------------------------------------
+# dokumanlar/05_...: "Diğer tüketim tablolarında baglanti='dagitim' varsayılır;
+# iletim yalnız T11'den gelir." → bu tablolarda Sanayi ayrımı YOK, tek satır.
+
+_TUKETIM_GRUP_KOLONLARI = [
+    ("Aydınlatma", "Aydınlatma"),
+    ("Kamu", "Kamu ve Özel Hizmetler"),
+    ("Mesken", "Mesken"),
+    ("Sanayi", "Sanayi"),
+    ("Tarımsal", "Tarımsal"),
+]
+
+
+def tablo_tuketim_oku(
+    ws: Worksheet, tarih_id: int, tablo_etiketi: str, baglanti: str = "dagitim"
+) -> pd.DataFrame:
+    """T7/T8/T12: il × tüketici grubu → tuketim_mwh (Sanayi ayrımsız, tek satır)."""
+    konum = _il_matrisi_oku(ws, tablo_etiketi)
+    if konum is None:
+        return pd.DataFrame(
+            columns=["il", "il_kodu", "tarih_id", "grup", "baglanti", "tuketim_mwh"]
+        )
+    baslik_satir, il_sutun = konum
+
+    kolon_indeksleri = [
+        (_satirda_kolon_bul(ws, baslik_satir, arama_etiketi), grup)
+        for arama_etiketi, grup in _TUKETIM_GRUP_KOLONLARI
+    ]
+
+    satirlar = []
+    for satir_no, il_adi in _veri_satirlarini_gez(ws, baslik_satir, il_sutun):
+        for kolon, grup in kolon_indeksleri:
+            if kolon is None:
+                continue
+            deger = parse_sayi(ws.cell(row=satir_no, column=kolon).value)
+            satirlar.append(
+                {
+                    "il": il_adi,
+                    "il_kodu": il_kodu_bul(il_adi),
+                    "tarih_id": tarih_id,
+                    "grup": grup,
+                    "baglanti": baglanti,
+                    "tuketim_mwh": deger,
+                }
+            )
+    return pd.DataFrame(
+        satirlar,
+        columns=["il", "il_kodu", "tarih_id", "grup", "baglanti", "tuketim_mwh"],
+    )
+
+
+def tablo7_faturalanan_tur_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
+    return tablo_tuketim_oku(ws, tarih_id, "Tablo 7")
+
+
+def tablo8_faturalanan_il_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
+    return tablo_tuketim_oku(ws, tarih_id, "Tablo 8")
+
+
+def tablo12_dagitim_bolgesi_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
+    return tablo_tuketim_oku(ws, tarih_id, "Tablo 12")
+
+
+# ---------------------------------------------------------------------------
 # T9/T10 — Tüketici sayısı (Abone)
 # ---------------------------------------------------------------------------
 
@@ -362,21 +430,27 @@ def tablo_abone_oku(
 # ---------------------------------------------------------------------------
 
 
+_URETIM_KOLONLARI = [
+    "il",
+    "il_kodu",
+    "tarih_id",
+    "kaynak",
+    "yenilenebilir",
+    "lisans",
+]
+
+
 def _kaynak_matrisi_oku(
-    ws: Worksheet, tablo_etiketi: str, tarih_id: int, deger_kolon_adi: str
+    ws: Worksheet,
+    tablo_etiketi: str,
+    tarih_id: int,
+    deger_kolon_adi: str,
+    lisans: str = "Lisanslı",
 ) -> pd.DataFrame:
+    kolonlar = [*_URETIM_KOLONLARI, deger_kolon_adi]
     konum = _il_matrisi_oku(ws, tablo_etiketi)
     if konum is None:
-        return pd.DataFrame(
-            columns=[
-                "il",
-                "il_kodu",
-                "tarih_id",
-                "kaynak",
-                "yenilenebilir",
-                deger_kolon_adi,
-            ]
-        )
+        return pd.DataFrame(columns=kolonlar)
     baslik_satir, il_sutun = konum
 
     kaynak_kolonlari = []
@@ -399,39 +473,46 @@ def _kaynak_matrisi_oku(
                     "tarih_id": tarih_id,
                     "kaynak": kaynak,
                     "yenilenebilir": yenilenebilir,
+                    "lisans": lisans,
                     deger_kolon_adi: deger,
                 }
             )
-    return pd.DataFrame(
-        satirlar,
-        columns=[
-            "il",
-            "il_kodu",
-            "tarih_id",
-            "kaynak",
-            "yenilenebilir",
-            deger_kolon_adi,
-        ],
-    )
+    return pd.DataFrame(satirlar, columns=kolonlar)
 
 
 def tablo1_kurulu_guc_oku(
     ws: Worksheet, tarih_id: int, tablo_etiketi: str = "Tablo 1"
 ) -> pd.DataFrame:
     """T1: il × kaynak → kurulu_guc_mw (lisanslı)."""
-    return _kaynak_matrisi_oku(ws, tablo_etiketi, tarih_id, "kurulu_guc_mw")
+    return _kaynak_matrisi_oku(ws, tablo_etiketi, tarih_id, "kurulu_guc_mw", "Lisanslı")
 
 
 def tablo23_uretim_oku(
     ws: Worksheet, tarih_id: int, tablo_etiketi: str = "Tablo 2"
 ) -> pd.DataFrame:
     """T2/T3: il × kaynak → uretim_mwh (lisanslı)."""
-    return _kaynak_matrisi_oku(ws, tablo_etiketi, tarih_id, "uretim_mwh")
+    return _kaynak_matrisi_oku(ws, tablo_etiketi, tarih_id, "uretim_mwh", "Lisanslı")
+
+
+def tablo4_lisanssiz_kurulu_guc_oku(
+    ws: Worksheet, tarih_id: int, tablo_etiketi: str = "Tablo 4"
+) -> pd.DataFrame:
+    """T4: il × kaynak → kurulu_guc_mw (lisanssız)."""
+    return _kaynak_matrisi_oku(
+        ws, tablo_etiketi, tarih_id, "kurulu_guc_mw", "Lisanssız"
+    )
+
+
+def tablo56_lisanssiz_uretim_oku(
+    ws: Worksheet, tarih_id: int, tablo_etiketi: str = "Tablo 5"
+) -> pd.DataFrame:
+    """T5/T6: il × kaynak → uretim_mwh (lisanssız)."""
+    return _kaynak_matrisi_oku(ws, tablo_etiketi, tarih_id, "uretim_mwh", "Lisanssız")
 
 
 def uretim_birlestir(kurulu_df: pd.DataFrame, uretim_df: pd.DataFrame) -> pd.DataFrame:
-    """T1 (kurulu güç) ve T2/T3 (üretim) çıktısını fact_uretim şekline birleştirir."""
-    ortak = ["il", "il_kodu", "tarih_id", "kaynak", "yenilenebilir"]
+    """Kurulu güç (T1/T4) ve üretim (T2/3/T5/6) çıktısını fact_uretim şekline birleştirir."""
+    ortak = ["il", "il_kodu", "tarih_id", "kaynak", "yenilenebilir", "lisans"]
     return kurulu_df.merge(uretim_df, on=ortak, how="outer")
 
 

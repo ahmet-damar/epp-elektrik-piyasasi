@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 
 import openpyxl
+import pandas as pd
 import pytest
 
 from worker import kpi, parser
@@ -88,6 +89,33 @@ def _sentetik_workbook() -> openpyxl.Workbook:
         ]
     )
 
+    t4 = wb.create_sheet("Tablo 4")
+    t4.append(["Tablo 4 - Lisanssız Kurulu Güç (MWe)"])
+    t4.append(["İLLER", "Güneş", "Rüzgar"])
+    t4.append(["Eskişehir", 50.0, 10.0])
+    t4.append(["TÜRKİYE", 50.0, 10.0])
+
+    t5 = wb.create_sheet("Tablo 5")
+    t5.append(["Tablo 5 - Lisanssız Üretim (MWh)"])
+    t5.append(["İLLER", "Güneş", "Rüzgar"])
+    t5.append(["Eskişehir", 5000.0, 1000.0])
+    t5.append(["TÜRKİYE", 5000.0, 1000.0])
+
+    t7 = wb.create_sheet("Tablo 7")
+    t7.append(["Tablo 7 - Faturalanan Tüketim (Tür)"])
+    t7.append(
+        [
+            "İLLER",
+            "Aydınlatma",
+            "Kamu ve Özel Hizmetler",
+            "Mesken",
+            "Sanayi",
+            "Tarımsal Faaliyetler",
+        ]
+    )
+    t7.append(["Eskişehir", 5000.0, 60000.0, 120000.0, 240000.0, 20000.0])
+    t7.append(["TÜRKİYE", 5000.0, 60000.0, 120000.0, 240000.0, 20000.0])
+
     return wb
 
 
@@ -128,6 +156,35 @@ def test_abone_matrisi(wb: openpyxl.Workbook) -> None:
     assert len(df) == 5
     mesken = df[df["grup"] == "Mesken"].iloc[0]
     assert mesken["abone_sayisi"] == pytest.approx(250000.0)
+
+
+def test_lisanssiz_uretim_ve_birlestirme(wb: openpyxl.Workbook) -> None:
+    kurulu = parser.tablo4_lisanssiz_kurulu_guc_oku(wb["Tablo 4"], 202601, "Tablo 4")
+    uretim_mwh = parser.tablo56_lisanssiz_uretim_oku(wb["Tablo 5"], 202601, "Tablo 5")
+    assert (kurulu["lisans"] == "Lisanssız").all()
+    lisanssiz = parser.uretim_birlestir(kurulu, uretim_mwh)
+    assert len(lisanssiz) == 2
+    gunes = lisanssiz[lisanssiz["kaynak"] == "Güneş"].iloc[0]
+    assert gunes["kurulu_guc_mw"] == pytest.approx(50.0)
+    assert gunes["uretim_mwh"] == pytest.approx(5000.0)
+
+    lisansli_kurulu = parser.tablo1_kurulu_guc_oku(wb["Tablo 1"], 202601, "Tablo 1")
+    lisansli_uretim = parser.tablo23_uretim_oku(wb["Tablo 2"], 202601, "Tablo 2")
+    lisansli = parser.uretim_birlestir(lisansli_kurulu, lisansli_uretim)
+
+    tumu = pd.concat([lisansli, lisanssiz], ignore_index=True)
+    assert kpi.kpi_02_toplam_uretim(tumu) == pytest.approx(886000.0)
+    assert kpi.kpi_07_lisanssiz_pay(tumu) == pytest.approx(
+        round(6000.0 / 886000.0 * 100, 1)
+    )
+
+
+def test_faturalanan_tuketim_tur_tablosu(wb: openpyxl.Workbook) -> None:
+    df = parser.tablo7_faturalanan_tur_oku(wb["Tablo 7"], 202601)
+    assert len(df) == 5  # Sanayi ayrımsız TEK satır (T11'in aksine)
+    assert (df["baglanti"] == "dagitim").all()
+    sanayi = df[df["grup"] == "Sanayi"].iloc[0]
+    assert sanayi["tuketim_mwh"] == pytest.approx(240000.0)
 
 
 def test_ucdan_uca_golden_kpi_ile_esler(wb: openpyxl.Workbook) -> None:

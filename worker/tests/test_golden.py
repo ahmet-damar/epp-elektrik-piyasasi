@@ -85,3 +85,30 @@ def test_bozuk_bilinmeyen_grup_karantinaya_alinir() -> None:
     assert len(sonuc.kabul) == 0
     assert len(sonuc.karantina) == 1
     assert len(sonuc.red) == 0
+
+
+def test_kpi_04_kaynak_payi(hesaplanan: dict) -> None:
+    # kpi_04 golden fixture'da yok (kpi_expected.json kapsamıyor); Ek B formülüyle elle doğrulanır.
+    uretim = kpi.yukle_uretim(INPUT / "uretim.csv").kabul
+    paylar = kpi.kpi_04_kaynak_payi(uretim)
+    assert paylar is not None
+    assert paylar == {
+        "Doğal Gaz": 45.5,
+        "Rüzgar": 13.6,
+        "Güneş": 3.4,
+        "Hidrolik": 9.1,
+        "Linyit": 28.4,
+    }
+    assert sum(paylar.values()) == pytest.approx(100.0, abs=0.2)
+
+
+def test_kpi_05_kapasite_faktoru(hesaplanan: dict) -> None:
+    uretim = kpi.yukle_uretim(INPUT / "uretim.csv").kabul
+    saat_ocak = 31 * 24
+    assert kpi.kpi_05_kapasite_faktoru(uretim, saat_ocak) == pytest.approx(59.1)
+    assert kpi.kpi_05_kapasite_faktoru(uretim, 0) is None
+
+
+def test_kpi_07_lisanssiz_pay_lisans_kolonu_yoksa_sifir(hesaplanan: dict) -> None:
+    uretim = kpi.yukle_uretim(INPUT / "uretim.csv").kabul
+    assert kpi.kpi_07_lisanssiz_pay(uretim) == 0.0
