@@ -60,10 +60,18 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -r requirements.txt -r requirements-dev.txt
-      - name: Apply base schema to test PostgreSQL
-        run: psql "$DATABASE_URL" -f supabase/migrations/20260819_0001_init_schema.sql
+      - name: Apply schema + RLS + dimension seed to test PostgreSQL
+        # 0003 grants anon/authenticated/service_role, which only exist on real
+        # Supabase Postgres; skipped here since plain postgres:16 doesn't have them
+        # and the ingest tests connect as a superuser (RLS doesn't apply to it anyway).
+        run: |
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0001_init_schema.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0002_rls_roles.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0004_seed_dimensions.sql
       - name: Run static RLS validation
         run: python worker/validate_rls_static.py
+      - name: Run ingest pipeline integration tests (P0-4/P0-5)
+        run: python -m pytest worker/tests/test_ingest_integration.py -v
 
   supabase-tooling:
     name: Supabase tooling (npm install + audit)

@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS dim_il (
 
 CREATE TABLE IF NOT EXISTS dim_kaynak (
   kaynak_id SERIAL PRIMARY KEY,
-  kaynak_adi TEXT NOT NULL,
+  kaynak_adi TEXT NOT NULL UNIQUE,
   yenilenebilir_mi BOOLEAN NOT NULL DEFAULT false,
   grup TEXT NOT NULL CHECK (grup IN ('Yenilenebilir', 'Fosil'))
 );
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS dim_tuketici_grubu (
 
 CREATE TABLE IF NOT EXISTS dim_lisans (
   lisans_id SERIAL PRIMARY KEY,
-  tur TEXT NOT NULL CHECK (tur IN ('Lisansli', 'Lisanssiz'))
+  tur TEXT NOT NULL UNIQUE CHECK (tur IN ('Lisansli', 'Lisanssiz'))
 );
 
 CREATE TABLE IF NOT EXISTS source_asset (
