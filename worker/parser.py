@@ -1,21 +1,39 @@
 """EPP — EPDK aylık ek (xlsx) anchor-tabanlı parser (Faz 0).
 
-Kaynak: dokumanlar/05_kaynak_dosya_sozlesmesi.md (Ek F).
-Parser sabit hücreye güvenmez; değişmez etiketleri (tablo başlığı, sütun adı,
-'TÜRKİYE' satırı) arar. NOT (dokumanlar/05_...): "v0.1 — Faz 0'da gerçek 2016+
-dosyalarla doğrulanacak" — bu modül henüz gerçek EPDK dosyalarıyla
-doğrulanmadı; yalnızca sentetik test fixture'ları ile test edilmiştir.
+Kaynak: dokumanlar/05_kaynak_dosya_sozlesmesi.md (Ek F). Parser sabit hücreye
+güvenmez; değişmez etiketleri (tablo başlığı, sütun adı, 'TÜRKİYE' satırı)
+arar.
 
-Bu sürüm T1/T4 (kurulu güç, lisanslı/lisanssız), T2/T3/T5/T6 (üretim,
-lisanslı/lisanssız), T7/T8/T12 (faturalanan/dağıtım bölgesi tüketim),
-T9/T10 (abone) ve T11 (P0-2 kritik: tüketim iletim/dağıtım) tablolarını
-kapsar. T13 (Serbest tüketici) HENÜZ eklenmedi — doküman bu tablo için
-kolon etiketlerini belirtmiyor (yalnız "tur" boyutundan söz ediyor); gerçek
-dosya/ek belge olmadan kolon çapalarını uydurmak yanlış olur.
+Bu sürüm 2026 Ocak EPDK Elektrik Piyasası Sektör Raporu Ek'i (gerçek dosya)
+ile doğrulanmıştır. Doğrulama gerçek dosyayı, dokümandaki varsayımlardan
+farklı olan şu noktaları ortaya çıkardı:
+
+- T1/T4 (kurulu güç): aynı kanonik kaynağa eşlenen BİRDEN FAZLA ham sütun var
+  (Akarsu+Barajlı→Hidrolik, Doğal Gaz+LNG→Doğal Gaz) — toplanmalı, ayrı satır
+  ÜRETİLMEMELİ.
+- Kaynak/il başlık etiketleri tablolar arası tutarsız yazılmış (ör. "İLLER"
+  vs "İL" vs "İl Adı"; "Doğal Gaz" vs "Doğalgaz"; "Taş Kömür" vs "Taş
+  Kömürü"; "Asfaltit Kömür" vs "ASFALTİT").
+- T2/T3, T5/T6, T7/T8, T9/T10 dokümanın ima ettiği gibi il×kategori matrisi
+  DEĞİL: her çift, biri ülke geneli (kaynak/tür bazında, il YOK — T2/T5/T7/T9)
+  diğeri il bazında toplam (kategori kırılımı YOK — T3/T6/T8/T10) olan iki
+  AYRI, tek-boyutlu tablodur. İl × kaynak/kategori kesişimi (fact_uretim'in
+  beklediği grain) aylık raporda mevcut değildir — yalnız kurulu_guc_mw bu
+  detayda var (T1/T4), uretim_mwh değil.
+- T8, T11 ile birebir aynı il×tüketici-grubu verisini tekrarlıyor (T11 ayrıca
+  Sanayi'yi iletim/dağıtım olarak ayırıyor) → T8 ayrıca implemente edilmedi,
+  T11 tek başına yeterli. T7/T9 yalnız ülke geneli mutabakat satırları
+  (fact tablosuna yazılmaz, yalnız mutabakat_kontrol için).
+- T12 (dağıtım şirketi bazlı) ve T13 (serbest tüketici) HENÜZ eklenmedi:
+  T12'nin gerçek boyutu "il" değil "dağıtım şirketi" — şemada böyle bir
+  boyut yok. T13'ün gerçek "tür" değerleri şemadaki
+  fact_serbest_tuketici.tur CHECK'iyle uyuşmuyor. İkisi de veri modeli
+  kararı gerektiriyor, parser'da uydurulmadı.
 """
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 import pandas as pd
@@ -52,6 +70,11 @@ def normalize_label(deger: object) -> str:
         return ""
     metin = str(deger).translate(_TR_SADE).upper()
     return " ".join(metin.split())
+
+
+def _sade_anahtar(deger: object) -> str:
+    """normalize_label + TÜM boşlukları at. 'Doğal Gaz' ile 'Doğalgaz' aynı anahtara düşer."""
+    return normalize_label(deger).replace(" ", "")
 
 
 def parse_sayi(deger: object) -> float | None:
@@ -161,6 +184,20 @@ _IL_PLAKA_HAM: dict[str, int] = {
 IL_PLAKA: dict[str, int] = {
     normalize_label(ad): kod for ad, kod in _IL_PLAKA_HAM.items()
 }
+_IL_ADI_KANONIK: dict[int, str] = {kod: ad for ad, kod in _IL_PLAKA_HAM.items()}
+
+
+def il_adi_kanonik(il_kodu: int | None) -> str | None:
+    if il_kodu is None:
+        return None
+    return _IL_ADI_KANONIK.get(int(il_kodu))
+
+
+# T9/T10'da tüketici sayısı İstanbul için iki dağıtım bölgesine (Anadolu/Avrupa)
+# bölünmüş ayrı satırlar olarak geliyor; ikisi de plaka 34'e karşılık gelir.
+# (_uzun_format_grup_oku bu ikisini il_kodu bazında toplayarak tek satıra indirir.)
+IL_PLAKA[normalize_label("İstanbul (Anadolu)")] = 34
+IL_PLAKA[normalize_label("İstanbul (Avrupa)")] = 34
 
 
 def il_kodu_bul(il_adi: object) -> int | None:
@@ -168,30 +205,59 @@ def il_kodu_bul(il_adi: object) -> int | None:
 
 
 # ---------------------------------------------------------------------------
-# Kaynak Türü Eşleme (dokumanlar/05_kaynak_dosya_sozlesmesi.md)
+# Kaynak Türü Eşleme (dokumanlar/05_kaynak_dosya_sozlesmesi.md + gerçek dosya)
 # ---------------------------------------------------------------------------
+# Anahtar _sade_anahtar (boşluksuz) — "Doğal Gaz"/"Doğalgaz" gibi yazım
+# varyasyonlarını otomatik yakalamak için. Yine de görülen tüm varyantlar
+# açıkça listelenir (sessiz veri kaybını önlemek amacıyla, bkz. modül notu).
 
 KAYNAK_ESLEME: dict[str, tuple[str, bool]] = {
-    normalize_label(etiket): (kanonik, yenilenebilir)
+    _sade_anahtar(etiket): (kanonik, yenilenebilir)
     for etiketler, kanonik, yenilenebilir in [
         (["Akarsu", "Barajlı", "Hidrolik"], "Hidrolik", True),
         (["Rüzgar"], "Rüzgar", True),
-        (["Güneş"], "Güneş", True),
+        (["Güneş", "Güneş (Fotovoltaik)"], "Güneş", True),
         (["Jeotermal"], "Jeotermal", True),
         (["Biyokütle"], "Biyokütle", True),
-        (["Doğal Gaz", "LNG"], "Doğal Gaz", False),
+        (["Doğal Gaz", "Doğalgaz", "LNG"], "Doğal Gaz", False),
         (["İthal Kömür"], "İthal Kömür", False),
         (["Linyit"], "Linyit", False),
-        (["Taş Kömürü"], "Taş Kömürü", False),
-        (["Asfaltit"], "Asfaltit", False),
+        (["Taş Kömür", "Taş Kömürü"], "Taş Kömürü", False),
+        (["Asfaltit", "Asfaltit Kömür"], "Asfaltit", False),
         (["Fuel Oil"], "Fuel Oil", False),
+        (["Motorin"], "Motorin", False),
+        (["Nafta"], "Nafta", False),
     ]
     for etiket in etiketler
 }
 
 
 def kaynak_esle(etiket: object) -> tuple[str, bool] | None:
-    return KAYNAK_ESLEME.get(normalize_label(etiket))
+    return KAYNAK_ESLEME.get(_sade_anahtar(etiket))
+
+
+# ---------------------------------------------------------------------------
+# Tüketici Grubu Eşleme (uzun-format tablolarda hücre değeri olarak gelir)
+# ---------------------------------------------------------------------------
+
+GRUP_ESLEME: dict[str, str] = {
+    _sade_anahtar(etiket): kanonik
+    for etiketler, kanonik in [
+        (["Aydınlatma"], "Aydınlatma"),
+        (
+            ["Kamu ve Özel Hizmetler", "Kamu ve Özel Hizmetler Sektörü ile Diğer"],
+            "Kamu ve Özel Hizmetler",
+        ),
+        (["Mesken"], "Mesken"),
+        (["Sanayi"], "Sanayi"),
+        (["Tarımsal", "Tarımsal Faaliyetler"], "Tarımsal"),
+    ]
+    for etiket in etiketler
+}
+
+
+def grup_esle(etiket: object) -> str | None:
+    return GRUP_ESLEME.get(_sade_anahtar(etiket))
 
 
 # ---------------------------------------------------------------------------
@@ -225,21 +291,24 @@ def _satirda_kolon_bul(
 
 _DURDURMA_ETIKETLERI = {"TURKIYE", "GENEL TOPLAM", "TOPLAM"}
 
+# Gerçek dosyada il-kolonu başlığı tablo tablo farklı yazılmış (İLLER/İL/İl Adı).
+# Substring aramasında "İLLER" ile arasak "İL" içeren başlıkları KAÇIRIRIZ (hedef
+# aranan metinden uzun olamaz) — bu yüzden tam eşleşme ile birkaç varyant deneriz.
+_IL_BASLIK_VARYANTLARI = ("İLLER", "İL", "İl Adı")
 
-def _il_matrisi_oku(
-    ws: Worksheet,
-    tablo_etiketi: str,
-    il_kolon_etiketi: str = "İLLER",
-) -> tuple[int, int] | None:
-    """Tablo çapasını ve altındaki 'İLLER' başlık satırını bulur → (baslik_satir, il_sutun)."""
+
+def _il_matrisi_oku(ws: Worksheet, tablo_etiketi: str) -> tuple[int, int] | None:
+    """Tablo çapasını ve altındaki il başlık satırını bulur → (baslik_satir, il_sutun)."""
     capa = bul_capa(ws, tablo_etiketi)
     if capa is None:
         return None
     tablo_satir, _ = capa
     for satir in range(tablo_satir, tablo_satir + 10):
-        kolon = _satirda_kolon_bul(ws, satir, il_kolon_etiketi)
-        if kolon is not None:
-            return (satir, kolon)
+        for varyant in _IL_BASLIK_VARYANTLARI:
+            hedef = normalize_label(varyant)
+            for col in range(1, 60):
+                if normalize_label(ws.cell(row=satir, column=col).value) == hedef:
+                    return (satir, col)
     return None
 
 
@@ -257,7 +326,7 @@ def _veri_satirlarini_gez(ws: Worksheet, baslik_satir: int, il_sutun: int):
 
 
 # ---------------------------------------------------------------------------
-# T11 — Tüketim (İLETİM/DAĞITIM) — P0-2 KRİTİK
+# T11 — Tüketim (İLETİM/DAĞITIM) — P0-2 KRİTİK (il × grup matrisi)
 # ---------------------------------------------------------------------------
 
 _T11_GRUP_KOLONLARI = [
@@ -276,6 +345,7 @@ def tablo11_tuketim_oku(
     """T11: il × (Aydınlatma, Kamu, Mesken, Sanayi-DAĞITIM, Sanayi-İLETİM, Tarımsal).
 
     P0-2: Sanayi-DAĞITIM ve Sanayi-İLETİM AYRI satır (grup='Sanayi', baglanti farklı).
+    Tek başına yeterli (T8 ile aynı il×grup verisini, ayrıca sanayi ayrımıyla verir).
     """
     konum = _il_matrisi_oku(ws, tablo_etiketi)
     if konum is None:
@@ -312,132 +382,108 @@ def tablo11_tuketim_oku(
 
 
 # ---------------------------------------------------------------------------
-# T7/T8/T12 — Faturalanan tüketim (tür/il) + dağıtım bölgesi
+# T7/T9 (ülke geneli, mutabakat) + T8/T10 (il bazında) — UZUN format
 # ---------------------------------------------------------------------------
-# dokumanlar/05_...: "Diğer tüketim tablolarında baglanti='dagitim' varsayılır;
-# iletim yalnız T11'den gelir." → bu tablolarda Sanayi ayrımı YOK, tek satır.
+# Gerçek yerleşim: (il_adi_veya_bos, Tüketici Grubu, Miktar/Sayı) üç sütun.
+# İl adı yalnız o ilin ilk satırında yazılı (birleştirilmiş hücre stili);
+# sonraki 4 satırda boş → bir önceki il'e ait kabul edilir (ileri doldurma).
+# Ülke geneli tablolarda (T7/T9) tek 'TÜRKİYE' grubu vardır. Her il/TÜRKİYE
+# grubunun sonunda bir alt-toplam satırı var ('Toplam' ya da 'İl Toplam') —
+# bu satır veri değil, atlanır.
 
-_TUKETIM_GRUP_KOLONLARI = [
-    ("Aydınlatma", "Aydınlatma"),
-    ("Kamu", "Kamu ve Özel Hizmetler"),
-    ("Mesken", "Mesken"),
-    ("Sanayi", "Sanayi"),
-    ("Tarımsal", "Tarımsal"),
-]
+_UZUN_FORMAT_ATLA = {"TOPLAM", "IL TOPLAM", "GENEL TOPLAM"}
 
 
-def tablo_tuketim_oku(
-    ws: Worksheet, tarih_id: int, tablo_etiketi: str, baglanti: str = "dagitim"
+def _uzun_format_grup_oku(
+    ws: Worksheet,
+    tablo_etiketi: str,
+    tarih_id: int,
+    deger_kolon_adi: str,
+    baglanti: str | None = None,
 ) -> pd.DataFrame:
-    """T7/T8/T12: il × tüketici grubu → tuketim_mwh (Sanayi ayrımsız, tek satır)."""
-    konum = _il_matrisi_oku(ws, tablo_etiketi)
-    if konum is None:
-        return pd.DataFrame(
-            columns=["il", "il_kodu", "tarih_id", "grup", "baglanti", "tuketim_mwh"]
-        )
-    baslik_satir, il_sutun = konum
+    kolonlar = ["il", "il_kodu", "tarih_id", "grup", deger_kolon_adi]
+    if baglanti is not None:
+        kolonlar.insert(4, "baglanti")
 
-    kolon_indeksleri = [
-        (_satirda_kolon_bul(ws, baslik_satir, arama_etiketi), grup)
-        for arama_etiketi, grup in _TUKETIM_GRUP_KOLONLARI
-    ]
+    capa = bul_capa(ws, tablo_etiketi)
+    if capa is None:
+        return pd.DataFrame(columns=kolonlar)
+    tablo_satir, _ = capa
+
+    baslik_satir = None
+    grup_kolon = None
+    for satir in range(tablo_satir, tablo_satir + 8):
+        kolon = _satirda_kolon_bul(ws, satir, "Tüketici Grubu")
+        if kolon is not None:
+            baslik_satir, grup_kolon = satir, kolon
+            break
+    if baslik_satir is None or grup_kolon is None:
+        return pd.DataFrame(columns=kolonlar)
+    il_kolon = grup_kolon - 1
+    deger_kolon = grup_kolon + 1
 
     satirlar = []
-    for satir_no, il_adi in _veri_satirlarini_gez(ws, baslik_satir, il_sutun):
-        for kolon, grup in kolon_indeksleri:
-            if kolon is None:
-                continue
-            deger = parse_sayi(ws.cell(row=satir_no, column=kolon).value)
-            satirlar.append(
-                {
-                    "il": il_adi,
-                    "il_kodu": il_kodu_bul(il_adi),
+    mevcut_il: str | None = None
+    satir = baslik_satir + 1
+    while True:
+        grup_ham = ws.cell(row=satir, column=grup_kolon).value
+        if grup_ham is None or str(grup_ham).strip() == "":
+            break
+        il_ham = ws.cell(row=satir, column=il_kolon).value
+        if il_ham is not None and str(il_ham).strip() != "":
+            mevcut_il = str(il_ham).strip()
+        if normalize_label(grup_ham) not in _UZUN_FORMAT_ATLA:
+            grup = grup_esle(grup_ham)
+            if grup is not None:
+                deger = parse_sayi(ws.cell(row=satir, column=deger_kolon).value)
+                satir_dict = {
+                    "il": mevcut_il,
+                    "il_kodu": il_kodu_bul(mevcut_il),
                     "tarih_id": tarih_id,
                     "grup": grup,
-                    "baglanti": baglanti,
-                    "tuketim_mwh": deger,
+                    deger_kolon_adi: deger,
                 }
-            )
-    return pd.DataFrame(
-        satirlar,
-        columns=["il", "il_kodu", "tarih_id", "grup", "baglanti", "tuketim_mwh"],
+                if baglanti is not None:
+                    satir_dict["baglanti"] = baglanti
+                satirlar.append(satir_dict)
+        satir += 1
+
+    df = pd.DataFrame(satirlar, columns=kolonlar)
+    if df.empty:
+        return df
+    # İstanbul gibi birden fazla dağıtım bölgesine bölünmüş il'ler aynı il_kodu'na
+    # düşer; "il" metni farklı olduğundan gruplamadan HARİÇ tutulur, tekrar eden
+    # (il_kodu, grup) satırları toplanır, sonra kanonik il adı geri eklenir.
+    grup_kolonlari = [k for k in kolonlar if k not in (deger_kolon_adi, "il")]
+    sonuc = df.groupby(grup_kolonlari, as_index=False, dropna=False)[
+        deger_kolon_adi
+    ].sum(min_count=1)
+    sonuc["il"] = sonuc["il_kodu"].map(
+        lambda k: il_adi_kanonik(k) if pd.notna(k) else "TÜRKİYE"
     )
+    return sonuc[kolonlar]
 
 
 def tablo7_faturalanan_tur_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
-    return tablo_tuketim_oku(ws, tarih_id, "Tablo 7")
+    """T7: ülke geneli, tüketici grubu bazında tüketim (MUTABAKAT içindir; il yok)."""
+    return _uzun_format_grup_oku(ws, "Tablo 7", tarih_id, "tuketim_mwh")
 
 
-def tablo8_faturalanan_il_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
-    return tablo_tuketim_oku(ws, tarih_id, "Tablo 8")
+def tablo9_abone_tur_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
+    """T9: ülke geneli, tüketici grubu bazında abone sayısı (MUTABAKAT içindir; il yok)."""
+    return _uzun_format_grup_oku(ws, "Tablo 9", tarih_id, "abone_sayisi")
 
 
-def tablo12_dagitim_bolgesi_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
-    return tablo_tuketim_oku(ws, tarih_id, "Tablo 12")
-
-
-# ---------------------------------------------------------------------------
-# T9/T10 — Tüketici sayısı (Abone)
-# ---------------------------------------------------------------------------
-
-_ABONE_GRUP_KOLONLARI = [
-    ("Aydınlatma", "Aydınlatma"),
-    ("Kamu", "Kamu ve Özel Hizmetler"),
-    ("Mesken", "Mesken"),
-    ("Sanayi", "Sanayi"),
-    ("Tarımsal", "Tarımsal"),
-]
-
-
-def tablo_abone_oku(
-    ws: Worksheet, tarih_id: int, tablo_etiketi: str = "Tablo 9"
-) -> pd.DataFrame:
-    """T9/T10: il × tüketici grubu → abone_sayisi (baglanti ayrımı YOK, dokumanlar/03)."""
-    konum = _il_matrisi_oku(ws, tablo_etiketi)
-    if konum is None:
-        return pd.DataFrame(
-            columns=["il", "il_kodu", "tarih_id", "grup", "abone_sayisi"]
-        )
-    baslik_satir, il_sutun = konum
-
-    kolon_indeksleri = [
-        (_satirda_kolon_bul(ws, baslik_satir, arama_etiketi), grup)
-        for arama_etiketi, grup in _ABONE_GRUP_KOLONLARI
-    ]
-
-    satirlar = []
-    for satir_no, il_adi in _veri_satirlarini_gez(ws, baslik_satir, il_sutun):
-        for kolon, grup in kolon_indeksleri:
-            if kolon is None:
-                continue
-            deger = parse_sayi(ws.cell(row=satir_no, column=kolon).value)
-            satirlar.append(
-                {
-                    "il": il_adi,
-                    "il_kodu": il_kodu_bul(il_adi),
-                    "tarih_id": tarih_id,
-                    "grup": grup,
-                    "abone_sayisi": deger,
-                }
-            )
-    return pd.DataFrame(
-        satirlar, columns=["il", "il_kodu", "tarih_id", "grup", "abone_sayisi"]
-    )
+def tablo10_abone_il_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
+    """T10: il × tüketici grubu → abone_sayisi. fact_abone'nin BİRİNCİL kaynağı."""
+    return _uzun_format_grup_oku(ws, "Tablo 10", tarih_id, "abone_sayisi")
 
 
 # ---------------------------------------------------------------------------
-# T1 (kurulu güç) + T2/T3 (üretim) — il × kaynak matrisi
+# T1/T4 — Kurulu güç (il × kaynak matrisi, lisanslı/lisanssız)
 # ---------------------------------------------------------------------------
 
-
-_URETIM_KOLONLARI = [
-    "il",
-    "il_kodu",
-    "tarih_id",
-    "kaynak",
-    "yenilenebilir",
-    "lisans",
-]
+_URETIM_KOLONLARI = ["il", "il_kodu", "tarih_id", "kaynak", "yenilenebilir", "lisans"]
 
 
 def _kaynak_matrisi_oku(
@@ -447,6 +493,8 @@ def _kaynak_matrisi_oku(
     deger_kolon_adi: str,
     lisans: str = "Lisanslı",
 ) -> pd.DataFrame:
+    """İl × kaynak matrisi (T1/T4). Aynı kanonik kaynağa eşlenen birden fazla ham
+    sütun (ör. Akarsu+Barajlı→Hidrolik) TOPLANIR; ayrı satır üretilmez."""
     kolonlar = [*_URETIM_KOLONLARI, deger_kolon_adi]
     konum = _il_matrisi_oku(ws, tablo_etiketi)
     if konum is None:
@@ -464,8 +512,16 @@ def _kaynak_matrisi_oku(
 
     satirlar = []
     for satir_no, il_adi in _veri_satirlarini_gez(ws, baslik_satir, il_sutun):
+        toplamlar: dict[
+            str, list
+        ] = {}  # kaynak -> [toplam, yenilenebilir, veri_var_mi]
         for kolon, kaynak, yenilenebilir in kaynak_kolonlari:
             deger = parse_sayi(ws.cell(row=satir_no, column=kolon).value)
+            kayit = toplamlar.setdefault(kaynak, [0.0, yenilenebilir, False])
+            if deger is not None:
+                kayit[0] += deger
+                kayit[2] = True
+        for kaynak, (toplam, yenilenebilir, veri_var_mi) in toplamlar.items():
             satirlar.append(
                 {
                     "il": il_adi,
@@ -474,7 +530,7 @@ def _kaynak_matrisi_oku(
                     "kaynak": kaynak,
                     "yenilenebilir": yenilenebilir,
                     "lisans": lisans,
-                    deger_kolon_adi: deger,
+                    deger_kolon_adi: toplam if veri_var_mi else None,
                 }
             )
     return pd.DataFrame(satirlar, columns=kolonlar)
@@ -487,13 +543,6 @@ def tablo1_kurulu_guc_oku(
     return _kaynak_matrisi_oku(ws, tablo_etiketi, tarih_id, "kurulu_guc_mw", "Lisanslı")
 
 
-def tablo23_uretim_oku(
-    ws: Worksheet, tarih_id: int, tablo_etiketi: str = "Tablo 2"
-) -> pd.DataFrame:
-    """T2/T3: il × kaynak → uretim_mwh (lisanslı)."""
-    return _kaynak_matrisi_oku(ws, tablo_etiketi, tarih_id, "uretim_mwh", "Lisanslı")
-
-
 def tablo4_lisanssiz_kurulu_guc_oku(
     ws: Worksheet, tarih_id: int, tablo_etiketi: str = "Tablo 4"
 ) -> pd.DataFrame:
@@ -503,17 +552,145 @@ def tablo4_lisanssiz_kurulu_guc_oku(
     )
 
 
-def tablo56_lisanssiz_uretim_oku(
-    ws: Worksheet, tarih_id: int, tablo_etiketi: str = "Tablo 5"
+# ---------------------------------------------------------------------------
+# T2/T5 (ülke geneli, kaynak bazında) + T3/T6 (il bazında toplam) — üretim
+# ---------------------------------------------------------------------------
+# Gerçek dosyada üretim (MWh) yalnız İKİ AYRI tek-boyutlu tablo olarak var:
+# kaynak bazında ülke toplamı (il yok) VE il bazında toplam (kaynak yok).
+# İl×kaynak kesişimi (fact_uretim'in grain'i) hiçbir tabloda mevcut değil.
+
+
+def tablo_kaynak_toplam_oku(
+    ws: Worksheet, tablo_etiketi: str, tarih_id: int, deger_kolon_adi: str, lisans: str
 ) -> pd.DataFrame:
-    """T5/T6: il × kaynak → uretim_mwh (lisanssız)."""
-    return _kaynak_matrisi_oku(ws, tablo_etiketi, tarih_id, "uretim_mwh", "Lisanssız")
+    """T2/T5: Kaynak Türü × tek ay değeri (ülke toplamı, il YOK)."""
+    kolonlar = ["kaynak", "yenilenebilir", "lisans", "tarih_id", deger_kolon_adi]
+    capa = bul_capa(ws, tablo_etiketi)
+    if capa is None:
+        return pd.DataFrame(columns=kolonlar)
+    tablo_satir, _ = capa
+
+    baslik_satir = None
+    for satir in range(tablo_satir, tablo_satir + 6):
+        if _satirda_kolon_bul(ws, satir, "Kaynak Türü") is not None:
+            baslik_satir = satir
+            break
+    if baslik_satir is None:
+        return pd.DataFrame(columns=kolonlar)
+
+    satirlar = []
+    satir = baslik_satir + 1
+    while True:
+        etiket = ws.cell(row=satir, column=1).value
+        if etiket is None or str(etiket).strip() == "":
+            break
+        if normalize_label(etiket) in _DURDURMA_ETIKETLERI:
+            break
+        eslesme = kaynak_esle(etiket)
+        if eslesme is not None:
+            kaynak, yenilenebilir = eslesme
+            deger = parse_sayi(ws.cell(row=satir, column=2).value)
+            satirlar.append(
+                {
+                    "kaynak": kaynak,
+                    "yenilenebilir": yenilenebilir,
+                    "lisans": lisans,
+                    "tarih_id": tarih_id,
+                    deger_kolon_adi: deger,
+                }
+            )
+        satir += 1
+
+    df = pd.DataFrame(satirlar, columns=kolonlar)
+    if not df.empty:
+        # Aynı kanonik kaynağa eşlenen olası tekrar eden satırları topla.
+        df = df.groupby(
+            ["kaynak", "yenilenebilir", "lisans", "tarih_id"], as_index=False
+        )[deger_kolon_adi].sum(min_count=1)
+    return df
 
 
-def uretim_birlestir(kurulu_df: pd.DataFrame, uretim_df: pd.DataFrame) -> pd.DataFrame:
-    """Kurulu güç (T1/T4) ve üretim (T2/3/T5/6) çıktısını fact_uretim şekline birleştirir."""
-    ortak = ["il", "il_kodu", "tarih_id", "kaynak", "yenilenebilir", "lisans"]
-    return kurulu_df.merge(uretim_df, on=ortak, how="outer")
+def tablo_il_toplam_oku(
+    ws: Worksheet, tablo_etiketi: str, tarih_id: int, deger_kolon_adi: str, lisans: str
+) -> pd.DataFrame:
+    """T3/T6: İl × tek ay değeri (toplam üretim, kaynak kırılımı YOK)."""
+    kolonlar = ["il", "il_kodu", "tarih_id", "lisans", deger_kolon_adi]
+    capa = bul_capa(ws, tablo_etiketi)
+    if capa is None:
+        return pd.DataFrame(columns=kolonlar)
+    tablo_satir, _ = capa
+
+    konum = None
+    for satir in range(tablo_satir, tablo_satir + 6):
+        for varyant in _IL_BASLIK_VARYANTLARI:
+            hedef = normalize_label(varyant)
+            for col in (1, 2):
+                if normalize_label(ws.cell(row=satir, column=col).value) == hedef:
+                    konum = (satir, col)
+                    break
+            if konum:
+                break
+        if konum:
+            break
+    if konum is None:
+        return pd.DataFrame(columns=kolonlar)
+    baslik_satir, il_sutun = konum
+    deger_sutun = il_sutun + 1
+
+    satirlar = []
+    for satir_no, il_adi in _veri_satirlarini_gez(ws, baslik_satir, il_sutun):
+        deger = parse_sayi(ws.cell(row=satir_no, column=deger_sutun).value)
+        satirlar.append(
+            {
+                "il": il_adi,
+                "il_kodu": il_kodu_bul(il_adi),
+                "tarih_id": tarih_id,
+                "lisans": lisans,
+                deger_kolon_adi: deger,
+            }
+        )
+    return pd.DataFrame(satirlar, columns=kolonlar)
+
+
+def tablo2_uretim_kaynak_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
+    """T2: ülke geneli, kaynak bazında lisanslı üretim (MWh; il yok)."""
+    return tablo_kaynak_toplam_oku(ws, "Tablo 2", tarih_id, "uretim_mwh", "Lisanslı")
+
+
+def tablo3_uretim_il_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
+    """T3: il bazında toplam lisanslı üretim (MWh; kaynak kırılımı yok)."""
+    return tablo_il_toplam_oku(ws, "Tablo 3", tarih_id, "uretim_mwh", "Lisanslı")
+
+
+def tablo5_lisanssiz_uretim_kaynak_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
+    """T5: ülke geneli, kaynak bazında lisanssız üretim (MWh; il yok)."""
+    return tablo_kaynak_toplam_oku(ws, "Tablo 5", tarih_id, "uretim_mwh", "Lisanssız")
+
+
+def tablo6_lisanssiz_uretim_il_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
+    """T6: il bazında toplam lisanssız üretim (MWh; kaynak kırılımı yok)."""
+    return tablo_il_toplam_oku(ws, "Tablo 6", tarih_id, "uretim_mwh", "Lisanssız")
+
+
+def uretim_kaynak_birlestir(
+    kurulu_il_kaynak_df: pd.DataFrame, uretim_kaynak_df: pd.DataFrame
+) -> pd.DataFrame:
+    """T1/T4 (il×kaynak kurulu güç) kaynak bazında toplanır, T2/T5 (ülke geneli
+    üretim) ile 'kaynak' üzerinden birleştirilir. Sonuç ülke geneli, kaynak
+    bazında (il YOK) bir DataFrame'dir — worker/kpi.py'nin ulusal KPI'ları
+    (KPI-01..07) için kullanılabilir. İl×kaynak kesişiminde uretim_mwh yoktur
+    (bkz. modül notu); il bazlı kurulu güç detayı ayrı kalır.
+    """
+    if kurulu_il_kaynak_df.empty:
+        kurulu_kaynak = pd.DataFrame(
+            columns=["kaynak", "yenilenebilir", "lisans", "tarih_id", "kurulu_guc_mw"]
+        )
+    else:
+        kurulu_kaynak = kurulu_il_kaynak_df.groupby(
+            ["kaynak", "yenilenebilir", "lisans", "tarih_id"], as_index=False
+        )["kurulu_guc_mw"].sum(min_count=1)
+    ortak = ["kaynak", "yenilenebilir", "lisans", "tarih_id"]
+    return kurulu_kaynak.merge(uretim_kaynak_df, on=ortak, how="outer")
 
 
 # ---------------------------------------------------------------------------
@@ -521,12 +698,35 @@ def uretim_birlestir(kurulu_df: pd.DataFrame, uretim_df: pd.DataFrame) -> pd.Dat
 # ---------------------------------------------------------------------------
 
 
+_TABLO_NUMARA_DESENI = re.compile(r"TABLO\s*(\d+)(?:\s*-\s*(\d+))?")
+
+
+def _tablo_numaralarini_cikar(etiket: str) -> set[int]:
+    """'Tablo 2-3' → {2, 3}; 'Tablo 11' → {11}. Sayfa adı gerçek dosyada birden
+    fazla tabloyu aynı anda barındırabilir (ör. 'Tablo 2-3' hem Tablo 2'yi hem
+    Tablo 3'ü içerir)."""
+    eslesme = _TABLO_NUMARA_DESENI.search(normalize_label(etiket))
+    if eslesme is None:
+        return set()
+    ilk = int(eslesme.group(1))
+    if eslesme.group(2) is None:
+        return {ilk}
+    return set(range(ilk, int(eslesme.group(2)) + 1))
+
+
 def eksik_tablolari_bul(
     wb_sheet_names: list[str], gerekli_tablolar: list[str]
 ) -> list[str]:
-    """13 tablo mevcut mu; eksikse batch reddi (etiket eşleşmesi, sayfa adı üzerinden)."""
-    mevcut = {normalize_label(ad) for ad in wb_sheet_names}
-    return [t for t in gerekli_tablolar if normalize_label(t) not in mevcut]
+    """13 tablo mevcut mu; eksikse batch reddi (sayfa adındaki tablo numarası bazlı)."""
+    mevcut_numaralar: set[int] = set()
+    for sayfa in wb_sheet_names:
+        mevcut_numaralar |= _tablo_numaralarini_cikar(sayfa)
+    eksik = []
+    for tablo in gerekli_tablolar:
+        gerekli_numaralar = _tablo_numaralarini_cikar(tablo)
+        if not gerekli_numaralar <= mevcut_numaralar:
+            eksik.append(tablo)
+    return eksik
 
 
 def mutabakat_kontrol(hesaplanan: float, resmi: float, tolerans: float = 0.005) -> bool:
