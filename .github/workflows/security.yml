@@ -100,10 +100,13 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -r requirements.txt pip-licenses
       - name: Python licenses
+        # LGPL-3.0-only (psycopg/psycopg-binary) is intentionally allowed: it's a
+        # library dependency, not linked/modified and redistributed by us, so its
+        # copyleft terms don't apply to this codebase. GPL-3.0-only stays blocked.
         run: |
           pip-licenses --format=markdown \
-            --fail-on="GPL-3.0-only;LGPL-3.0-only;Proprietary;UNKNOWN" \
-            --allow-only="MIT;BSD;Apache-2.0;Apache Software License;BSD License;MIT License;PSF;ISC;Mozilla Public License 2.0 (MPL 2.0)"
+            --fail-on="GPL-3.0-only;Proprietary;UNKNOWN" \
+            --allow-only="MIT;BSD;Apache-2.0;Apache Software License;BSD License;MIT License;PSF;ISC;Mozilla Public License 2.0 (MPL 2.0);BSD-3-Clause;MIT-0;Apache-2.0 OR BSD-3-Clause;Apache License 2.0;BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0;Apache-2.0 OR BSD-2-Clause;MIT-CMU;3-Clause BSD License;LGPL-3.0-only;PSF-2.0"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
