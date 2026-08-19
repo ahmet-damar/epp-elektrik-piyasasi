@@ -31,6 +31,10 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      # upload-sarif needs this too, even with security-events: write - it reads
+      # workflow-run metadata during upload. Private-repo-specific requirement;
+      # see github/codeql-action#2117.
+      actions: read
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -75,16 +79,22 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      # see codeql job comment above - upload-sarif needs this too.
+      actions: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # v0.32.0
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scanners: vuln,secret,misconfig
           severity: HIGH,CRITICAL
           format: sarif
           output: trivy-results.sarif
+          # setup-trivy downloads the trivy binary via the GitHub API; without an
+          # authenticated token that can hit anonymous rate limits (seen as an
+          # opaque "Install Trivy" exit code 1, aquasecurity/trivy-action#516).
+          token-setup-trivy: ${{ secrets.GITHUB_TOKEN }}
       - uses: github/codeql-action/upload-sarif@988661ebb5e81487b3fb31b2185d2856c0a10679 # v4
         with:
           sarif_file: trivy-results.sarif
