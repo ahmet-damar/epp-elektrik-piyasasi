@@ -98,7 +98,7 @@ def main() -> int:
     # Ensure current_app_role execution grants are present and PUBLIC cannot execute it
     assert_contains(
         combined,
-        "REVOKE ALL ON FUNCTION public.current_app_role() FROM PUBLIC",
+        "REVOKE ALL ON FUNCTION public.current_app_role() FROM public",
         "current_app_role_revoke_public",
     )
     assert_contains(

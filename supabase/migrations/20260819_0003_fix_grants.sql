@@ -18,7 +18,7 @@ REVOKE USAGE ON SCHEMA public FROM viewer, data_operator, admin;
 GRANT USAGE ON SCHEMA public TO authenticated, service_role;
 
 -- current_app_role function: restrict execute to authenticated and service_role only
-REVOKE ALL ON FUNCTION public.current_app_role() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.current_app_role() FROM public;
 GRANT EXECUTE ON FUNCTION public.current_app_role() TO authenticated, service_role;
 
 -- authenticated: dimension tables - SELECT only
