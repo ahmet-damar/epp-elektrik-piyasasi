@@ -57,7 +57,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
         run: |
-          for f in $(ls migrations/*.sql | sort); do
+          for f in $(ls supabase/migrations/*.sql | sort); do
             echo ">> $f"
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
           done
