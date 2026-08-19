@@ -18,6 +18,17 @@ permissions:
 jobs:
   gitleaks:
     name: Secret scan (gitleaks)
+    # Dependabot-triggered pull_request runs are treated as if opened from a
+    # fork: GITHUB_TOKEN is capped to read-only and the top-level
+    # `contents: read` alone doesn't cover pull-requests. gitleaks-action
+    # calls the PR-commits API (to scope/comment on the PR) and needs
+    # pull-requests: read for that - GitHub's docs confirm the `permissions`
+    # key can raise this token's scope even on Dependabot runs (it's not
+    # silently ignored). See:
+    # https://docs.github.com/en/code-security/dependabot/troubleshooting-dependabot/troubleshooting-dependabot-on-github-actions
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
