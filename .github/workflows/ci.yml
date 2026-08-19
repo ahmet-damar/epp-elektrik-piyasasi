@@ -60,6 +60,10 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -r requirements.txt -r requirements-dev.txt
+      - name: Stub the auth schema (real Supabase Postgres has this; plain postgres:16 doesn't)
+        # supabase/ci-only/ is NOT under supabase/migrations/, so deploy.yml never
+        # applies it to real Supabase - it already has a real `auth` schema there.
+        run: psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/ci-only/00_auth_stub.sql
       - name: Apply schema + RLS + dimension seed to test PostgreSQL
         # 0003 grants anon/authenticated/service_role, which only exist on real
         # Supabase Postgres; skipped here since plain postgres:16 doesn't have them
@@ -97,7 +101,7 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
       - run: python -m pip install sqlfluff==3.3.0
-      - run: python -m sqlfluff lint db supabase/migrations --dialect postgres
+      - run: python -m sqlfluff lint db supabase/migrations supabase/ci-only --dialect postgres
 
   quality-gate:
     name: Quality Gate
