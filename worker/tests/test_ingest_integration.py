@@ -135,6 +135,29 @@ def test_uretim_ve_abone_yukle(conn) -> None:  # type: ignore[no-untyped-def]
         assert cur.fetchone()[0] == 5
 
 
+def test_fact_uretim_uretim_mwh_kolonu_olmadan_yuklenir(conn) -> None:  # type: ignore[no-untyped-def]
+    """T1/T4'ün ham çıktısında uretim_mwh sütunu hiç yok (bkz. worker/parser.py
+    modül notu — aylık raporda il×kaynak grain'inde üretim verisi mevcut
+    değil). kurulu_guc_mw doluysa satır kabul edilmeli, uretim_mwh NULL yazılmalı."""
+    ingest.dim_tarih_getir_veya_olustur(conn, 202601)
+    kurulu = kpi.yukle_uretim(GOLDEN_INPUT / "uretim.csv").kabul.drop(
+        columns=["uretim_mwh"]
+    )
+    assert "uretim_mwh" not in kurulu.columns
+
+    batch = _yeni_batch(conn, "test-kurulu-guc-only")
+    yuklenen, atlanan = ingest.fact_uretim_yukle(conn, kurulu, batch)
+    assert yuklenen == 5
+    assert atlanan == 0
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT count(*) FROM fact_uretim WHERE ingestion_batch_id = %s AND uretim_mwh IS NULL",
+            (batch,),
+        )
+        assert cur.fetchone()[0] == 5
+
+
 def test_batch_olustur_p0_5_tekil(conn) -> None:  # type: ignore[no-untyped-def]
     source_asset_id = ingest.kaynak_asset_olustur(
         conn,

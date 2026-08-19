@@ -247,15 +247,19 @@ def fact_tuketim_yukle(
 def fact_uretim_yukle(
     conn: Connection, df: pd.DataFrame, batch_id: int
 ) -> tuple[int, int]:
+    """kurulu_guc_mw zorunlu (NOT NULL). uretim_mwh il×kaynak grain'inde aylık
+    EPDK raporunda hiç mevcut değil (bkz. worker/parser.py modül notu) — bu
+    yüzden nullable'dır (migration 20260819_0005); `df`'te sütun bile
+    yoksa (T1/T4'ün ham çıktısı) NULL olarak yazılır."""
     yuklenen = 0
     atlanan = 0
     with conn.cursor() as cur:
         for satir in df.itertuples(index=False):
             kurulu = _sayisal_temiz(satir.kurulu_guc_mw)
-            uretim = _sayisal_temiz(satir.uretim_mwh)
-            if kurulu is None or uretim is None:  # ikisi de NOT NULL
+            if kurulu is None:  # fact_uretim.kurulu_guc_mw NOT NULL
                 atlanan += 1
                 continue
+            uretim = _sayisal_temiz(getattr(satir, "uretim_mwh", None))
             kaynak_id = dim_kaynak_id_bul(conn, satir.kaynak)
             lisans_id = dim_lisans_id_bul(conn, getattr(satir, "lisans", "Lisanslı"))
             cur.execute(

@@ -85,7 +85,9 @@ CREATE TABLE IF NOT EXISTS fact_uretim (
   kaynak_id INT NOT NULL REFERENCES dim_kaynak(kaynak_id) ON DELETE RESTRICT,
   lisans_id INT NOT NULL REFERENCES dim_lisans(lisans_id) ON DELETE RESTRICT,
   kurulu_guc_mw NUMERIC(16,3) NOT NULL CHECK (kurulu_guc_mw >= 0),
-  uretim_mwh NUMERIC(16,3) NOT NULL CHECK (uretim_mwh >= 0),
+  -- uretim_mwh nullable: bu grain'de (il×kaynak) aylık EPDK raporunda hiçbir
+  -- tablo bu veriyi vermiyor (bkz. migration 0005, worker/parser.py notu).
+  uretim_mwh NUMERIC(16,3) CHECK (uretim_mwh >= 0),
   ingestion_batch_id BIGINT NOT NULL REFERENCES ingestion_batch(batch_id) ON DELETE RESTRICT,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

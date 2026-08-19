@@ -68,6 +68,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0001_init_schema.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0002_rls_roles.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0004_seed_dimensions.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0005_uretim_mwh_nullable.sql
       - name: Run static RLS validation
         run: python worker/validate_rls_static.py
       - name: Run ingest pipeline integration tests (P0-4/P0-5)
