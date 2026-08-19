@@ -109,51 +109,76 @@ def main() -> int:
 
     # Ensure admin policies have corresponding authenticated DELETE grants
     import re
+
     # find admin policies with their FOR action (e.g., FOR ALL or FOR SELECT)
-    admin_policies = re.findall(r"CREATE POLICY\s+(admin_[^\s]+)\s+ON\s+(\w+)\s+FOR\s+([A-Z]+)\s+TO\s+admin", combined, flags=re.I)
+    admin_policies = re.findall(
+        r"CREATE POLICY\s+(admin_[^\s]+)\s+ON\s+(\w+)\s+FOR\s+([A-Z]+)\s+TO\s+admin",
+        combined,
+        flags=re.IGNORECASE,
+    )
     # find GRANT ... ON TABLE ... TO authenticated blocks (multiline-aware)
-    grant_blocks = re.findall(r"GRANT\s+([\s\S]+?)\s+ON\s+TABLE\s+([\s\S]+?)\s+TO\s+authenticated", combined, flags=re.I)
+    grant_blocks = re.findall(
+        r"GRANT\s+([\s\S]+?)\s+ON\s+TABLE\s+([\s\S]+?)\s+TO\s+authenticated",
+        combined,
+        flags=re.IGNORECASE,
+    )
     for policy_name, table_name, for_action in admin_policies:
         # only require DELETE grant when policy FOR is ALL or DELETE
-        if for_action.upper() not in ('ALL', 'DELETE'):
+        if for_action.upper() not in ("ALL", "DELETE"):
             continue
         found = False
         has_delete = False
         for perm_text, tables_text in grant_blocks:
-            tables = [x.strip().strip(',') for x in re.split(r"[,\n]+", tables_text) if x.strip()]
+            tables = [
+                x.strip().strip(",")
+                for x in re.split(r"[,\n]+", tables_text)
+                if x.strip()
+            ]
             if table_name in tables:
                 found = True
-                if 'DELETE' in perm_text.upper():
+                if "DELETE" in perm_text.upper():
                     has_delete = True
         if not found:
-            raise AssertionError(f'admin policy {policy_name} exists for {table_name} but no authenticated grant block found')
+            raise AssertionError(
+                f"admin policy {policy_name} exists for {table_name} but no authenticated grant block found"
+            )
         if not has_delete:
-            raise AssertionError(f'admin policy {policy_name} exists for {table_name} but authenticated is not granted DELETE')
+            raise AssertionError(
+                f"admin policy {policy_name} exists for {table_name} but authenticated is not granted DELETE"
+            )
 
     # Audit log must not have UPDATE/DELETE/TRUNCATE granted to anyone
-    if any(keyword in combined and 'audit_log' in combined for keyword in ('GRANT', 'UPDATE', 'DELETE', 'TRUNCATE')):
+    if any(
+        keyword in combined and "audit_log" in combined
+        for keyword in ("GRANT", "UPDATE", "DELETE", "TRUNCATE")
+    ):
         # more precise check below
         pass
     # explicit checks
-    if 'GRANT' in combined:
+    if "GRANT" in combined:
         for line in combined.splitlines():
-            if 'audit_log' in line.upper() or 'audit_log' in line:
+            if "audit_log" in line.upper() or "audit_log" in line:
                 up = line.upper()
-                if 'UPDATE' in up or 'DELETE' in up or 'TRUNCATE' in up:
-                    raise AssertionError('audit_log must not be granted UPDATE/DELETE/TRUNCATE')
+                if "UPDATE" in up or "DELETE" in up or "TRUNCATE" in up:
+                    raise AssertionError(
+                        "audit_log must not be granted UPDATE/DELETE/TRUNCATE"
+                    )
 
     # Ensure anon has no privileges (GRANT to anon is not allowed; REVOKE FROM anon is expected)
     import re as _re
-    cleaned = _re.sub(r'--.*', '', combined)  # strip SQL line comments for checks
-    if _re.search(r"GRANT\s+[\s\S]*\bTO\s+anon\b", cleaned, flags=_re.I):
-        raise AssertionError('anon must not be granted privileges in migrations')
+
+    cleaned = _re.sub(r"--.*", "", combined)  # strip SQL line comments for checks
+    if _re.search(r"GRANT\s+[\s\S]*\bTO\s+anon\b", cleaned, flags=_re.IGNORECASE):
+        raise AssertionError("anon must not be granted privileges in migrations")
 
     # Detect data_operator DELETE policy (disallowed)
-    if 'data_operator' in combined and 'DELETE' in combined:
+    if "data_operator" in combined and "DELETE" in combined:
         # look for policy lines that combine data_operator and DELETE or FOR ALL to data_operator
-        bad = re.search(r"CREATE POLICY[\s\S]{0,120}data_operator[\s\S]{0,120}DELETE", combined)
+        bad = re.search(
+            r"CREATE POLICY[\s\S]{0,120}data_operator[\s\S]{0,120}DELETE", combined
+        )
         if bad:
-            raise AssertionError('data_operator must not have DELETE policy')
+            raise AssertionError("data_operator must not have DELETE policy")
 
     if "user_metadata" in combined:
         raise AssertionError("user_metadata must not be used as the role source")
