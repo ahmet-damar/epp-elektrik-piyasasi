@@ -17,6 +17,12 @@ jobs:
   build-push:
     name: Build & Push (GHCR)
     runs-on: ubuntu-latest
+    # Geçici olarak devre dışı: web/ klasörü henüz yok, ne web ne worker için
+    # Dockerfile mevcut değil - bu job şu haliyle context resolution'da başarısız
+    # olur. Faz 1'de Next.js web/ iskeleti + her iki servis için Dockerfile
+    # eklendiğinde bu satırı kaldır. migrate/deploy-ssh/smoke bu job'a `needs`
+    # ile bağlı olduğundan otomatik olarak skip edilir.
+    if: false
     strategy:
       matrix:
         include:

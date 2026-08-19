@@ -17,11 +17,19 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -r requirements.txt
+      # Geçici olarak devre dışı: worker/jobs/fetch_weather.py henüz yazılmadı
+      # (Open-Meteo entegrasyonu Faz 3 kapsamı, dokumanlar/01_kavramsal_tasarim.md
+      # §7). Modül eklendiğinde bu adımı aç.
       - name: Hava verisini çek (source_asset kind=api) ve DB'ye yaz
+        if: false
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
         run: python -m worker.jobs.fetch_weather --incremental
+      # Geçici olarak devre dışı: refresh_all_matviews() DB fonksiyonu henüz
+      # yok (materialized view'lar Faz 2+ dashboard çalışmasıyla birlikte
+      # tasarlanacak). Fonksiyon eklendiğinde bu adımı aç.
       - name: Materialized view'ları yenile
+        if: false
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
         run: psql "$DATABASE_URL" -c "select refresh_all_matviews();"
