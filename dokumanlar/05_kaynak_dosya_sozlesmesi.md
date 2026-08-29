@@ -20,12 +20,23 @@ Parser SABİT hücreye güvenmez; değişmez etiketleri arar:
 | T8 | Faturalanan tüketim (il) | fact_tuketim |
 | T9/T10 | Tüketici sayısı | fact_abone |
 | **T11** | **Tüketim (iletim/dağıtım!)** | **fact_tuketim.baglanti** |
-| T12 | Tüketim (dağıtım bölgesi) | fact_tuketim |
+| T12 | Tüketim (dağıtım şirketi) | **parse edilmiyor — bkz. not** |
 | T13 | Serbest tüketici | fact_serbest_tuketici |
 
 **P0-2 KRİTİK:** Tablo 11, 'Sanayi-İLETİM' ve 'Sanayi-DAĞITIM' sütunlarını
 içeren TEK tablodur → fact_tuketim.baglanti'yi besler. Diğer tüketim
 tablolarında baglanti='dagitim' varsayılır; iletim yalnız T11'den gelir.
+
+**T12 NOTU (2026-08-30, gerçek dosyayla doğrulandı):** Doküman başlığı
+"dağıtım bölgesi" diyor ama gerçek kolon adı 'Lisans Unvanı' — grain aslında
+**dağıtım şirketi** (21 şirket + ulusal 'İLETİMDEN BAĞLI TÜKETİCİLER
+(TÜRKİYE)' satırı, yalnız Sanayi). T12'nin 'Genel Toplam' ve
+iletim/Sanayi rakamları T7/T11 ile birebir eşleşiyor → **T11 ile redundant,
+hiçbir yeni bilgi taşımıyor.** Bu yüzden parser'da implemente edilmedi
+(worker/parser.py). İleride dağıtım şirketi bazlı bir KPI gerekirse (ör.
+DSO karşılaştırması), T12'yi parse etmeye gerek yok: statik bir
+dim_il → dagitim_sirketi eşleme tablosuyla T11'in il bazlı verisinden
+türetilebilir — bilgi kaybı yok.
 
 ## Tüketici Grubu Eşleme
 | Kaynak etiket | grup_adi | grup_id |

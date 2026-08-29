@@ -110,13 +110,16 @@ CREATE TABLE IF NOT EXISTS fact_serbest_tuketici (
   fact_serbest_tuketici_id BIGSERIAL PRIMARY KEY,
   il_kodu INT NOT NULL REFERENCES dim_il(il_kodu) ON DELETE RESTRICT,
   tarih_id INT NOT NULL REFERENCES dim_tarih(tarih_id) ON DELETE RESTRICT,
-  tur TEXT NOT NULL CHECK (tur IN ('Lisansli', 'Lisanssiz')),
+  -- gerçek EPDK Tablo 13 tur değerleri (2026-08-30 doğrulandı); 'Lisansli'/
+  -- 'Lisanssiz' yanlış varsayımdı (bkz. migration 0006).
+  tur TEXT NOT NULL CHECK (tur IN ('Serbest Tuketici', 'ST Olma Hakki Bulunmayan Aboneler', 'ST Olma Hakkini Kullanmayan Aboneler')),
+  grup_id INT NOT NULL REFERENCES dim_tuketici_grubu(grup_id) ON DELETE RESTRICT,
   tuketim_mwh NUMERIC(16,3) NOT NULL CHECK (tuketim_mwh >= 0),
   tuketici_sayisi BIGINT NOT NULL CHECK (tuketici_sayisi >= 0),
   ingestion_batch_id BIGINT NOT NULL REFERENCES ingestion_batch(batch_id) ON DELETE RESTRICT,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT uq_fact_serbest_tuketici_batch UNIQUE (il_kodu, tarih_id, tur, ingestion_batch_id)
+  CONSTRAINT uq_fact_serbest_tuketici_batch UNIQUE (il_kodu, tarih_id, tur, grup_id, ingestion_batch_id)
 );
 
 CREATE TABLE IF NOT EXISTS fact_hava_aylik (
@@ -185,7 +188,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_fact_abone_active
   WHERE is_active;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_fact_serbest_tuketici_active
-  ON fact_serbest_tuketici (il_kodu, tarih_id, tur)
+  ON fact_serbest_tuketici (il_kodu, tarih_id, tur, grup_id)
   WHERE is_active;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_fact_hava_aylik_active

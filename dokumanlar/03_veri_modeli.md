@@ -84,7 +84,9 @@ CREATE UNIQUE INDEX uq_fact_tuketim_active
 ### Diğer fact (aynı desen: batch_id + is_active + iki kısıt)
 - **fact_uretim:** NK (il_kodu, tarih_id, kaynak_id, lisans_id); kurulu_guc_mw, uretim_mwh
 - **fact_abone:** NK (il_kodu, tarih_id, grup_id); abone_sayisi
-- **fact_serbest_tuketici:** NK (il_kodu, tarih_id, tur); tuketim_mwh, tuketici_sayisi
+- **fact_serbest_tuketici:** NK (il_kodu, tarih_id, tur, grup_id); tuketim_mwh, tuketici_sayisi
+  (tur: gerçek T13 değerleri — 'Serbest Tuketici' / 'ST Olma Hakki Bulunmayan
+  Aboneler' / 'ST Olma Hakkini Kullanmayan Aboneler', 2026-08-30 doğrulandı)
 - **fact_hava_aylik:** UNIQUE(il_kodu, tarih_id); t_ort, hdd, cdd, radyasyon, ruzgar
   + **fact_hava_aylik_log:** old_data/new_data JSONB (tüm ölçüm snapshot)
 
