@@ -1,0 +1,50 @@
+# ============================================================================
+# EPP — GEÇİCİ: gerçek bir EPDK dosyasını epdk_aylik_isle()'a karşı çalıştırıp
+# sonucu raporlar. Yalnız elle tetiklenir (workflow_dispatch), push/PR
+# akışlarını etkilemez. Bu dosya ve worker/scripts/gercek_dosya_dogrula.py +
+# worker/tests/fixtures/_gecici_gercek_epdk_202601.xlsx yalnız
+# chore/gercek-dosya-dogrula throwaway dalında var - main'e taşınmayacak.
+# ============================================================================
+name: Manual Real File Check
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: epdk_aylik_isle() gerçek dosyaya karşı
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: epp_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U test" --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/epp_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -r requirements.txt -r requirements-dev.txt
+      - name: Stub the auth schema
+        run: psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/ci-only/00_auth_stub.sql
+      - name: Apply schema + RLS + dimension seed
+        run: |
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0001_init_schema.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0002_rls_roles.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0004_seed_dimensions.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0005_uretim_mwh_nullable.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0006_fact_serbest_tuketici_grain.sql
+      - name: Gerçek dosyayı işle ve raporla
+        run: python worker/scripts/gercek_dosya_dogrula.py
