@@ -53,7 +53,9 @@ CREATE POLICY admin_fact_hava_aylik_log_insert ON fact_hava_aylik_log
   FOR INSERT TO admin
   WITH CHECK (public.current_app_role() = 'admin');
 
-GRANT SELECT, INSERT ON TABLE fact_hava_aylik_log TO data_operator, admin, authenticated, service_role;
-GRANT USAGE, SELECT ON SEQUENCE fact_hava_aylik_log_log_id_seq TO authenticated, service_role;
+-- authenticated/service_role Supabase-yönetimli roller - CI'ın düz postgres:16'sında
+-- YOK (migration 0003 ile aynı gerekçeyle, bkz. o dosyanın başlığı). Bu ikisine
+-- grant, ayrı bir Supabase-özel migration'da (20260819_0010) - CI'a eklenmez.
+GRANT SELECT, INSERT ON TABLE fact_hava_aylik_log TO data_operator, admin;
 
 COMMIT;
