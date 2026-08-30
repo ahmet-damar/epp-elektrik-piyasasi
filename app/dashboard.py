@@ -223,6 +223,13 @@ if secili_il != "Türkiye Geneli":
 if secili_grup != "Tümü":
     f = f[f["grup"] == secili_grup]
 
+# yalnız il'e göre filtrelenmiş (grup filtresi UYGULANMAMIŞ) - KPI-09 "payı"
+# kartları için: paydanın (seçili ildeki TÜM gruplar) grup filtresiyle
+# daralması "payı"yı anlamsızlaştırır (tek grup kalınca %100'e yakınsar).
+il_filtreli = tuketim.copy()
+if secili_il != "Türkiye Geneli":
+    il_filtreli = il_filtreli[il_filtreli["il"] == secili_il]
+
 abone_f = abone.copy()
 if secili_il != "Türkiye Geneli" and not abone_f.empty:
     abone_f = abone_f[abone_f["il"] == secili_il]
@@ -285,17 +292,25 @@ t1.metric(
     f"{top_tuk / 1e6:,.2f} TWh" if top_tuk > 1e6 else f"{top_tuk / 1000:,.0f} GWh",
 )
 
-mesken_pay = kpi.kpi_09_grup_payi(tuketim, "Mesken")
+# il_filtreli: seçili ile göre daralır, Tüketici Grubu filtresinden ETKİLENMEZ
+# (payının anlamlı kalması için paydada TÜM gruplar kalmalı - bkz. yukarıdaki not).
+mesken_pay = kpi.kpi_09_grup_payi(il_filtreli, "Mesken")
 t2.metric(
     "Mesken Payı (KPI-09)",
     f"%{mesken_pay:.1f}" if mesken_pay is not None else "veri yok",
 )
 
-sanayi_pay = kpi.kpi_09_grup_payi(tuketim, "Sanayi")
+sanayi_pay = kpi.kpi_09_grup_payi(il_filtreli, "Sanayi")
 t3.metric(
     "Sanayi Payı (KPI-09)",
     f"%{sanayi_pay:.1f}" if sanayi_pay is not None else "veri yok",
 )
+if secili_grup != "Tümü":
+    st.caption(
+        "Mesken/Sanayi Payı kartları İl filtresine göre güncellenir, "
+        "Tüketici Grubu filtresinden bağımsızdır (payının anlamlı kalması "
+        "için payda her zaman seçili ildeki TÜM grupları içerir)."
+    )
 
 abone_basi_mesken = (
     kpi.kpi_10_abone_basi(tuketim, abone, "Mesken") if not abone.empty else None
@@ -347,8 +362,10 @@ c3, c4 = st.columns(2)
 
 with c3:
     st.subheader("Tüketici Grubu Payı (KPI-09, %)")
-    gruplar_sirali = sorted(tuketim["grup"].dropna().unique().tolist())
-    grup_paylari = {g: kpi.kpi_09_grup_payi(tuketim, g) for g in gruplar_sirali}
+    # il_filtreli: bkz. yukarıdaki not - grup filtresi burada da UYGULANMAZ,
+    # aksi halde tek bir grup kalıp grafik anlamsızca tek çubuğa iner.
+    gruplar_sirali = sorted(il_filtreli["grup"].dropna().unique().tolist())
+    grup_paylari = {g: kpi.kpi_09_grup_payi(il_filtreli, g) for g in gruplar_sirali}
     grup_paylari = {g: p for g, p in grup_paylari.items() if p is not None}
     if grup_paylari:
         st.bar_chart(
