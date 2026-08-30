@@ -108,7 +108,39 @@ CREATE UNIQUE INDEX uq_fact_tuketim_active
 - **sistem_parametre:** (anahtar PK, deger) → hdd_baz_c=18, cdd_baz_c=22, hava_norm_yil=10, tuketim_norm_yil=5
 - **kpi_esik:** (kpi_id, surum PK), yesil/sari/kirmizi bantları, yon
 - **il_baz_sicaklik:** (Faz 3) il bazlı override
-- **audit_log:** append-only (revoke update/delete)
+- **audit_log:** append-only (revoke update/delete). table_name, record_id,
+  action_type CHECK(INSERT/UPDATE/DELETE/SELECT), actor_name, payload JSONB.
+  **Faz 0'da hiçbir kod ona yazmıyordu (2026-08-31'de bulunan boşluk, bkz.
+  dokumanlar/06_canli_veri_operasyon_gunlugu.md) — artık worker/pipeline.py
+  iki noktada otomatik yazıyor:**
+  - `_isle_govde()` (parse+doğrula+yükle) tamamlandığında: `table_name=
+    'ingestion_batch'`, `record_id`=batch_id, `action_type='INSERT'`,
+    `actor_name`=epdk_aylik_isle()'ın `uploaded_by`'ı (yoksa
+    `"system:epdk_aylik_isle"`) / worker/job_worker.py için
+    `"system:job_worker"`. `payload` şekli:
+    ```json
+    {
+      "olay": "ingest_tamamlandi",
+      "tarih_id": 202601,
+      "mutabakat": {"fact_tuketim": true, "fact_abone": true},
+      "tablolar": {
+        "fact_tuketim": {
+          "toplam": 486, "red": 1, "karantina": 0, "yuklenen": 485, "atlanan": 0,
+          "red_satirlari": [ /* dogrula_*()'nin red DataFrame'i, TAM detay */ ],
+          "karantina_ornekleri": [ /* karantina DataFrame'inin İLK 20 satırı - TAM döküm değil, büyük olabilir */ ]
+        }
+      }
+    }
+    ```
+    (eksik tablo yüzünden batch reddedilirse `"olay": "ingest_basarisiz"`,
+    yalnız `eksik_tablolar` alanıyla.)
+  - `batch_onayla()` tamamlandığında: `action_type='UPDATE'`, `actor_name`
+    parametreli (worker/job_worker.py'nin otomatik yolu için
+    `"system:job_worker-otomatik"`, worker/scripts/onayla.py CLI'nin
+    `--actor`'ı, varsayılan `"manual-cli"`). `payload`:
+    `{"olay": "batch_onaylandi", "aktive_edilen_tablolar": [...]}` — hiçbir
+    tablo aktive edilmediyse (tüm satırlar reddedildi) boş liste, kayıt
+    yine de yazılır.
 
 ## İlişki Özeti
 - dim_tarih 1→N tüm fact · dim_il 1→N tüm fact

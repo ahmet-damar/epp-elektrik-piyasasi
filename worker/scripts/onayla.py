@@ -12,7 +12,13 @@ pipeline.batch_onayla()'yı DOĞRUDAN çağırarak kapatır — aynı mantığı
 yeniden yazmaya gerek kalmaz.
 
 Kullanım:
-    python -m worker.scripts.onayla --batch-id 3
+    python -m worker.scripts.onayla --batch-id 3 --actor "adiniz veya rolunuz"
+
+--actor: audit_log.actor_name'e yazılır (kim onayladı) - 2026-08-31'de
+bulunan bir boşluğu kapatır: batch_onayla() daha önce audit_log'a HİÇ
+yazmıyordu (bkz. dokumanlar/06_canli_veri_operasyon_gunlugu.md). Belirtilmezse
+"manual-cli" yazılır — audit_log'da "kim onayladı" hiçbir zaman boş/None
+KALMAMALI, bu yüzden zorunlu değil ama varsayılanı da anlamlı bir değer.
 
 DATABASE_URL ortam değişkeninden okunur (worker/db.py load_dotenv() ile
 .env'i otomatik yükler).
@@ -37,6 +43,11 @@ def main() -> int:
         description="EPP: bir batch'i elle onayla (pipeline.batch_onayla())"
     )
     ap.add_argument("--batch-id", required=True, type=int)
+    ap.add_argument(
+        "--actor",
+        default="manual-cli",
+        help="audit_log.actor_name'e yazılır (kim onayladı, örn. adınız/rolünüz)",
+    )
     args = ap.parse_args()
 
     database_url = get_database_url()
@@ -45,7 +56,9 @@ def main() -> int:
         return 1
 
     with psycopg.connect(database_url) as conn:
-        aktive_edilen = pipeline.batch_onayla(conn, args.batch_id)
+        aktive_edilen = pipeline.batch_onayla(
+            conn, args.batch_id, actor_name=args.actor
+        )
         conn.commit()
 
     if aktive_edilen:

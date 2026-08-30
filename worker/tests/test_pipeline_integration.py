@@ -96,9 +96,34 @@ def test_epdk_aylik_isle_uctan_uca(conn) -> None:  # type: ignore[no-untyped-def
         )
         assert cur.fetchone()[0] == "running"  # bkz. modül notu: onay bekliyor
 
+    # _isle_govde() tamamlandığında audit_log'a OTOMATİK bir INSERT kaydı
+    # düşülmeli (2026-08-31'de bulunan boşluk kapatıldı — bkz. dokumanlar/
+    # 06_canli_veri_operasyon_gunlugu.md). Sentetik workbook'ta fact_
+    # serbest_tuketici'de en az 1 RED satırı var (Eskişehir/Mesken/ST Olma
+    # Hakkını Kullanmayan Aboneler = -5.0) — payload'da tam detayıyla
+    # görünmeli.
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT action_type, actor_name, payload FROM audit_log
+            WHERE table_name = 'ingestion_batch' AND record_id = %s
+              AND payload->>'olay' = 'ingest_tamamlandi'
+            """,
+            (sonuc.batch_id,),
+        )
+        row = cur.fetchone()
+        assert row is not None
+        action_type, actor_name, payload = row
+        assert action_type == "INSERT"
+        assert actor_name == "system:epdk_aylik_isle"  # uploaded_by verilmedi
+        serbest_payload = payload["tablolar"]["fact_serbest_tuketici"]
+        assert serbest_payload["red"] == 1
+        assert len(serbest_payload["red_satirlari"]) == 1
+        assert serbest_payload["red_satirlari"][0]["tuketim_mwh"] == pytest.approx(-5.0)
+
     # Adım 5: Faz 0'da UI yok — bu çağrı onay yerine geçer. Yalnız batch_id
     # alır (IslemSonucu DEĞİL) - bkz. pipeline.batch_onayla() docstring'i.
-    aktive_edilen = pipeline.batch_onayla(conn, sonuc.batch_id)
+    aktive_edilen = pipeline.batch_onayla(conn, sonuc.batch_id, actor_name="test-suite")
     assert set(aktive_edilen) == set(sonuc.tablolar)
 
     with conn.cursor() as cur:
@@ -113,6 +138,23 @@ def test_epdk_aylik_isle_uctan_uca(conn) -> None:  # type: ignore[no-untyped-def
             "SELECT status FROM ingestion_batch WHERE batch_id = %s", (sonuc.batch_id,)
         )
         assert cur.fetchone()[0] == "succeeded"
+
+        # batch_onayla() de kendi audit_log kaydını (UPDATE, actor_name'li)
+        # düşmeli - kim/ne zaman aktive etti.
+        cur.execute(
+            """
+            SELECT action_type, actor_name, payload FROM audit_log
+            WHERE table_name = 'ingestion_batch' AND record_id = %s
+              AND payload->>'olay' = 'batch_onaylandi'
+            """,
+            (sonuc.batch_id,),
+        )
+        row = cur.fetchone()
+        assert row is not None
+        action_type, actor_name, payload = row
+        assert action_type == "UPDATE"
+        assert actor_name == "test-suite"
+        assert set(payload["aktive_edilen_tablolar"]) == set(sonuc.tablolar)
 
 
 def test_batch_onayla_hicbir_tabloya_veri_yazilmamis_batch_hata_vermez(  # type: ignore[no-untyped-def]
@@ -135,7 +177,7 @@ def test_batch_onayla_hicbir_tabloya_veri_yazilmamis_batch_hata_vermez(  # type:
     )
     batch_id = ingest.batch_olustur(conn, source_asset_id, "test-bos-batch-v1", "s1")
 
-    aktive_edilen = pipeline.batch_onayla(conn, batch_id)
+    aktive_edilen = pipeline.batch_onayla(conn, batch_id, actor_name="test-bos-batch")
     assert aktive_edilen == []
 
     with conn.cursor() as cur:
@@ -143,6 +185,22 @@ def test_batch_onayla_hicbir_tabloya_veri_yazilmamis_batch_hata_vermez(  # type:
             "SELECT status FROM ingestion_batch WHERE batch_id = %s", (batch_id,)
         )
         assert cur.fetchone()[0] == "succeeded"
+
+        # Aktive edilecek hiçbir tablo olmasa bile audit_log kaydı yazılmalı -
+        # "hiçbir şey aktive edilmedi" de audit edilmesi gereken bir olay.
+        cur.execute(
+            """
+            SELECT actor_name, payload FROM audit_log
+            WHERE table_name = 'ingestion_batch' AND record_id = %s
+              AND payload->>'olay' = 'batch_onaylandi'
+            """,
+            (batch_id,),
+        )
+        row = cur.fetchone()
+        assert row is not None
+        actor_name, payload = row
+        assert actor_name == "test-bos-batch"
+        assert payload["aktive_edilen_tablolar"] == []
 
 
 def test_epdk_aylik_isle_eksik_tablo_reddedilir(conn) -> None:  # type: ignore[no-untyped-def]

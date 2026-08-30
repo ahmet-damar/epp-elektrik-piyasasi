@@ -516,6 +516,36 @@ _DOGAL_ANAHTAR = {
 }
 
 
+def audit_log_yaz(
+    conn: Connection,
+    *,
+    table_name: str,
+    record_id: int | None,
+    action_type: str,
+    actor_name: str,
+    payload: dict[str, Any],
+) -> None:
+    """audit_log'a TEK bir satır ekler (append-only, UPDATE/DELETE yok — bkz.
+    db/schema.sql RLS notu). `payload` json.dumps(..., default=str) ile
+    serileştirilir: pandas/numpy tipleri (int64, float64, NaT, Decimal) bu
+    sayede hataya düşmeden string'e döner - audit_log bir teşhis/iz kaydı,
+    tip-birebir bir veri kopyası değil."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO audit_log (table_name, record_id, action_type, actor_name, payload)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (
+                table_name,
+                record_id,
+                action_type,
+                actor_name,
+                json.dumps(payload, ensure_ascii=False, default=str),
+            ),
+        )
+
+
 def batch_dolu_tablolari_bul(conn: Connection, batch_id: int) -> list[str]:
     """Bir batch_id için hangi fact tablolarının (varsa) satır yazdığını DB'den
     sorgular — worker/pipeline.py'nin batch_onayla()'sı, süreç sınırını

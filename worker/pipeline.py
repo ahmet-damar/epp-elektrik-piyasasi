@@ -196,7 +196,13 @@ def epdk_aylik_isle(
         sonuc.sahiplenildi = False
         return sonuc
 
-    return _isle_govde(conn, batch_id, icerik, tarih_id)
+    return _isle_govde(
+        conn,
+        batch_id,
+        icerik,
+        tarih_id,
+        actor_name=uploaded_by or "system:epdk_aylik_isle",
+    )
 
 
 def epdk_isi_kuyruga_al(
@@ -244,12 +250,24 @@ def epdk_isi_kuyruga_al(
 
 
 def _isle_govde(
-    conn: Connection, batch_id: int, icerik: bytes, tarih_id: int
+    conn: Connection,
+    batch_id: int,
+    icerik: bytes,
+    tarih_id: int,
+    actor_name: str = "system",
 ) -> IslemSonucu:
     """Adım 4'ün gövdesi: parse + doğrula + yükle (is_active=false). batch'in
     zaten var olduğunu ve sahiplenildiğini varsayar (çağıran sorumludur) —
     hem epdk_aylik_isle() (senkron) hem worker/job_worker.py (asenkron) bunu
-    paylaşır."""
+    paylaşır.
+
+    `actor_name`: audit_log'a düşecek "kim/ne işledi" bilgisi (epdk_aylik_isle()
+    çağıranın uploaded_by'ı ya da worker/job_worker.py'nin sabit değeri).
+    Adım 4 (bu fonksiyon) TAMAMLANDIĞINDA audit_log'a bir INSERT kaydı düşülür:
+    her tablonun toplam/red/karantina/yüklenen/atlanan sayıları + RED
+    satırlarının TAM detayı (genelde az sayıda, sıfır tolerans kuralı gereği)
+    + KARANTİNA satırlarının yalnız sayısı ve ilk 20 örneği (tam döküm değil -
+    büyük olabilir, bkz. dokumanlar/06_canli_veri_operasyon_gunlugu.md)."""
     sonuc = IslemSonucu(batch_id=batch_id)
     wb = openpyxl.load_workbook(BytesIO(icerik), data_only=True)
     sonuc.eksik_tablolar = parser.eksik_tablolari_bul(wb.sheetnames, _ZORUNLU_TABLOLAR)
@@ -260,6 +278,17 @@ def _isle_govde(
             "failed",
             error_summary=f"eksik tablo(lar): {', '.join(sonuc.eksik_tablolar)}",
         )
+        ingest.audit_log_yaz(
+            conn,
+            table_name="ingestion_batch",
+            record_id=batch_id,
+            action_type="UPDATE",
+            actor_name=actor_name,
+            payload={
+                "olay": "ingest_basarisiz",
+                "eksik_tablolar": sonuc.eksik_tablolar,
+            },
+        )
         return sonuc
 
     ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
@@ -267,6 +296,10 @@ def _isle_govde(
     toplam_satir = 0
     toplam_yuklenen = 0
     toplam_atlanan = 0
+    # audit_log payload'ı için: RED satırlarının TAM detayı (genelde az sayıda,
+    # sıfır tolerans kuralı gereği) + KARANTİNA'nın yalnız sayısı + ilk 20
+    # örneği (tam döküm değil - potansiyel olarak büyük olabilir).
+    audit_tablolar: dict[str, dict[str, object]] = {}
 
     def _isle(
         anahtar: str,
@@ -286,6 +319,15 @@ def _isle_govde(
         toplam_satir += len(ham)
         toplam_yuklenen += yuklenen
         toplam_atlanan += atlanan + len(dogrulanan.red) + len(dogrulanan.karantina)
+        audit_tablolar[anahtar] = {
+            "toplam": len(ham),
+            "red": len(dogrulanan.red),
+            "karantina": len(dogrulanan.karantina),
+            "yuklenen": yuklenen,
+            "atlanan": atlanan,
+            "red_satirlari": dogrulanan.red.to_dict("records"),
+            "karantina_ornekleri": dogrulanan.karantina.head(20).to_dict("records"),
+        }
 
     # --- T1 + T4 -> fact_uretim (yalnız kurulu_guc_mw) ---
     uretim_ham = pd.concat(
@@ -346,10 +388,25 @@ def _isle_govde(
         accepted_row_count=toplam_yuklenen,
         rejected_row_count=toplam_atlanan,
     )
+    ingest.audit_log_yaz(
+        conn,
+        table_name="ingestion_batch",
+        record_id=batch_id,
+        action_type="INSERT",
+        actor_name=actor_name,
+        payload={
+            "olay": "ingest_tamamlandi",
+            "tarih_id": tarih_id,
+            "mutabakat": sonuc.mutabakat,
+            "tablolar": audit_tablolar,
+        },
+    )
     return sonuc
 
 
-def batch_onayla(conn: Connection, batch_id: int) -> list[str]:
+def batch_onayla(
+    conn: Connection, batch_id: int, actor_name: str = "system"
+) -> list[str]:
     """Adım 5 (dokumanlar/01 §4): Faz 0'da onay UI'ı yok — bu fonksiyonun
     BİLİNÇLİ OLARAK çağrılması onay yerine geçer. epdk_aylik_isle()'ın
     is_active=false yazdığı HER fact tablosu için tek tek aktivasyon_yap()
@@ -369,9 +426,22 @@ def batch_onayla(conn: Connection, batch_id: int) -> list[str]:
     çağrılıyorsa (örn. worker/job_worker.py) `batch_onayla(conn, sonuc.batch_id)`
     şeklinde çağrılır — sonuc.batch_id zaten mevcuttur.
 
+    `actor_name`: kim onayladı (worker/job_worker.py'nin otomatik yolu,
+    worker/scripts/onayla.py'nin --actor'ı, ya da bir test) — audit_log'a
+    düşer (2026-08-31'de bulunan boşluk: bu fonksiyon daha önce audit_log'a
+    HİÇ yazmıyordu, bkz. dokumanlar/06_canli_veri_operasyon_gunlugu.md).
+
     Döndürdüğü liste, aktive edilen tablo adlarıdır (audit/log amaçlı)."""
     tablolar = ingest.batch_dolu_tablolari_bul(conn, batch_id)
     for tablo in tablolar:
         ingest.aktivasyon_yap(conn, tablo, batch_id)
     ingest.batch_durumu_guncelle(conn, batch_id, "succeeded")
+    ingest.audit_log_yaz(
+        conn,
+        table_name="ingestion_batch",
+        record_id=batch_id,
+        action_type="UPDATE",
+        actor_name=actor_name,
+        payload={"olay": "batch_onaylandi", "aktive_edilen_tablolar": tablolar},
+    )
     return tablolar

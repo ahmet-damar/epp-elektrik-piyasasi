@@ -82,14 +82,18 @@ def _isi_uygula(conn: Connection, job: IsKaydi) -> None:
     tarih_id = ingest.tarih_id_from_source_period(source_period, donem_tipi)
 
     ingest.batch_sahiplen(conn, batch_id)  # defense-in-depth; batch zaten 'queued'
-    sonuc = pipeline._isle_govde(conn, batch_id, icerik, tarih_id)
+    sonuc = pipeline._isle_govde(
+        conn, batch_id, icerik, tarih_id, actor_name="system:job_worker"
+    )
 
     if sonuc.eksik_tablolar:
         raise RuntimeError(f"eksik tablo(lar): {', '.join(sonuc.eksik_tablolar)}")
 
     uygun, sebep = pipeline.otomatik_onaya_uygun(sonuc)
     if uygun:
-        pipeline.batch_onayla(conn, sonuc.batch_id)
+        pipeline.batch_onayla(
+            conn, sonuc.batch_id, actor_name="system:job_worker-otomatik"
+        )
         print(f"[OK] batch_id={batch_id} otomatik aktive edildi")
     else:
         print(
