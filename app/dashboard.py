@@ -16,6 +16,14 @@ istemcisi Faz 2'de gerçek sorgu yolunu DESTEKLEMEZ (farklı bir API yüzeyi;
 ayrıca anon-key erişimi RLS'e tabidir, tek-kullanıcılı Faz 2 kapsamının
 dışında) — bu durumda da statik veriye düşülür.
 
+worker/ paketi repo kökünde, bu dosya app/ altında — Streamlit/Python yalnız
+çalıştırılan dosyanın klasörünü (app/) sys.path'e ekler, repo kökünü değil.
+Bu yüzden en üstte repo kökü sys.path'e eklenir (worker/ VE data/ aynı kökün
+altında olduğundan tek satır ikisini de karşılar). worker importu artık
+KRİTİK bir bağımlılık (analytics.py olmadan dashboard çalışmaz) — bilinçli
+olarak try/except ile yutulmuyor: sys.path doğruysa zaten başarılı olur,
+başarısız olursa net bir ModuleNotFoundError sessiz bir None'dan iyidir.
+
 Bağlantı yönetimi: @st.cache_resource ile bağlantı TEK SEFER açılır —
 Streamlit her etkileşimde script'i baştan çalıştırır; cache_resource
 olmasaydı her tıklamada yeni bir DB bağlantısı açılırdı. Sorgu sonuçları
@@ -29,24 +37,18 @@ devre dışı kalırdı).
 from __future__ import annotations
 
 import sys
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import streamlit as st
 
-# data/ klasörünü yola ekle (statik yedek veri)
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "data"))
-from tr_ocak2026 import TABLO2_KAYNAK, TABLO11
+# Repo kökünü yola ekle (worker/ VE data/ ikisi de kökün altında) — bkz. modül notu.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from data.tr_ocak2026 import TABLO2_KAYNAK, TABLO11
 from worker import analytics, ingest, kpi
-
-resolve_database_or_fallback: Callable[[], tuple[Any | None, str]] | None
-try:
-    from worker.db import resolve_database_or_fallback
-except ImportError:  # pragma: no cover - geliştirme ortamında uyumsuz olabilir
-    resolve_database_or_fallback = None
+from worker.db import resolve_database_or_fallback
 
 st.set_page_config(
     page_title="EPP — Türkiye Elektrik Piyasası", layout="wide", page_icon="⚡"
@@ -55,8 +57,6 @@ st.set_page_config(
 
 @st.cache_resource(show_spinner=False)
 def _baglanti_kur() -> tuple[Any | None, str]:
-    if resolve_database_or_fallback is None:
-        return None, "worker.db yüklenemedi"
     return resolve_database_or_fallback()
 
 
