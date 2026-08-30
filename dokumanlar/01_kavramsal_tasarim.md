@@ -52,6 +52,23 @@ servis istisnası (self-host alternatifi belgeli).
 ADR-7 (bkz. dokumanlar/06_adr_dashboard_teknoloji.md): sunum katmanı
 Streamlit (Faz 2); Next.js+TypeScript'e geçiş "Son Faz"a ertelendi.
 
+ADR-8 (2026-08-19'da denendi, 2026-08-31'de terk edildiği kayıt altına
+alındı): RLS'i fiziksel `viewer/data_operator/admin` rollerinden tamamen
+`authenticated` + `public.current_app_role()` moduna taşıyan alternatif bir
+tasarım (planlanan migration adları: `20260819_0004_fix_rls_policies.sql`,
+`20260819_0005_harden_service_role_grants.sql`) kısmen başlanıp
+tamamlanmadan bırakıldı (yalnız `git stash`'te iz var, içerik hiç
+commit'lenmedi). **Terk edilme sebebi:** mevcut `viewer/data_operator/admin`
++ `current_app_role()` mimarisi (bkz. `supabase/migrations/20260819_0002_
+rls_roles.sql`) zaten bu ihtiyacı karşılıyordu ve daha sonra gerçek canlı
+Supabase projesinde uçtan uca doğrulandı (2026-08-31) — yeniden tasarıma
+hiç gerek kalmadı. **Numaralandırma notu:** `20260819_0004` ve
+`20260819_0005` migration numaraları o zamandan beri tamamen farklı,
+gerçek migration'lar için kullanılıyor (`seed_dimensions.sql` /
+`uretim_mwh_nullable.sql`, ikisi de canlı projeye uygulandı) — git log'da
+yukarıdaki terk edilmiş dosya adlarını arayan biri bu isim çakışmasıyla
+karışmasın diye burada not edilmiştir.
+
 ## 7. Fazlar
 - **Faz 0:** Repo + şema + Eskişehir PoC + KPI-01..10/13/23/24
 - **Faz 1:** Asenkron worker, tüm iller, sürümleme
