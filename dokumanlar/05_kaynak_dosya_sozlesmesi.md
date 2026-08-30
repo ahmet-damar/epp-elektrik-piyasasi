@@ -74,6 +74,14 @@ T9/T10 ile birebir eşleşiyor (çapraz doğrulandı).
 | Taş Kömürü | Taş Kömürü | Hayır |
 | Asfaltit | Asfaltit | Hayır |
 | Fuel Oil | Fuel Oil | Hayır |
+| Motorin | Motorin | Hayır |
+| Nafta | Nafta | Hayır |
+
+**NOT (2026-08-30, gerçek dosyayla doğrulandı):** Motorin ve Nafta, parser'ın
+(`worker/parser.py` KAYNAK_ESLEME) zaten tanıdığı ama `dim_kaynak` seed'inde
+(migration 20260819_0004) unutulmuş iki kaynaktı — gerçek 2026 Ocak dosyasının
+T1'inde (kurulu güç) her ikisi de sütun olarak mevcut. Migration
+20260819_0007 ile eklendi.
 
 ## Birim / Tip Kuralları
 - Kurulu güç: MWe, numeric(14,3), ≥0
