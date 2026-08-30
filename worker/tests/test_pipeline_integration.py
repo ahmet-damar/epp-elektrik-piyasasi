@@ -139,15 +139,15 @@ def test_epdk_aylik_isle_eksik_tablo_reddedilir(conn) -> None:  # type: ignore[n
         assert cur.fetchone()[0] == 0
 
 
-def test_epdk_aylik_isle_p0_5_ikinci_cagri_sahiplenemez(conn) -> None:  # type: ignore[no-untyped-def]
-    """Aynı (source_asset_id, parser_version, schema_version) -> aynı batch_id
-    (P0-5); ilk çağrı zaten 'running'e taşıdığından ikinci çağrı sahiplenemez."""
-    icerik = _wb_bytes(_sentetik_workbook())
-
-    birinci = _isle(conn, icerik, "pipeline-test-tekil")
-    assert birinci.sahiplenildi is True
-
-    ikinci = _isle(conn, icerik, "pipeline-test-tekil")
-    assert ikinci.sahiplenildi is False
-    assert ikinci.batch_id == birinci.batch_id
-    assert ikinci.tablolar == {}  # tekrar parse/yükleme yapılmadı
+# NOT: adım 3'ün (atomik sahiplenme) "zaten sahiplenilmiş" yolu bilinçli olarak
+# BURADA test edilmiyor. kaynak_asset_olustur() şu an file_hash'e göre HİÇ
+# tekilleştirmiyor (her çağrı yeni bir source_asset satırı açıyor) - bu yüzden
+# epdk_aylik_isle()'ı aynı bayt içerikle iki kez çağırmak farklı
+# source_asset_id üretir ve P0-5'in (source_asset_id, parser_version,
+# schema_version) tekilliği hiç devreye girmez; batch_sahiplen()'in False
+# dönme yolu bu üst seviye arayüzden erişilemez. batch_sahiplen()'in atomik
+# davranışı, aynı source_asset_id üzerinde doğrudan çalışıldığı düzeyde
+# worker/tests/test_ingest_integration.py'de test ediliyor (bkz.
+# test_batch_sahiplen_atomik_ikinci_cagri_basarisiz). source_asset'in
+# file_hash'e göre tekilleştirilip tekilleştirilmeyeceği ayrı, açık bir karar
+# olarak kullanıcıya soruldu (2026-08-30).

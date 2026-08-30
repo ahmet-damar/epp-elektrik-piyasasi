@@ -224,6 +224,25 @@ def test_serbest_tuketici_yukle_ve_rejected_row_count(conn) -> None:  # type: ig
         assert cur.fetchone()[0] == 2
 
 
+def test_batch_sahiplen_atomik_ikinci_cagri_basarisiz(conn) -> None:  # type: ignore[no-untyped-def]
+    """Adım 3 (dokumanlar/01 §4): 'queued' -> 'running' geçişi ATOMİK. Aynı
+    batch_id üzerinde ikinci çağrı (batch zaten sahiplenilmiş/'running')
+    False döner - iki worker aynı batch'i aynı anda işlemeye kalkışamaz."""
+    batch_id = _yeni_batch(conn, "test-sahiplen")
+
+    birinci = ingest.batch_sahiplen(conn, batch_id)
+    assert birinci is True
+
+    ikinci = ingest.batch_sahiplen(conn, batch_id)
+    assert ikinci is False
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT status FROM ingestion_batch WHERE batch_id = %s", (batch_id,)
+        )
+        assert cur.fetchone()[0] == "running"
+
+
 def test_batch_olustur_p0_5_tekil(conn) -> None:  # type: ignore[no-untyped-def]
     source_asset_id = ingest.kaynak_asset_olustur(
         conn,
