@@ -356,7 +356,23 @@ def _isle_govde(
     sonuc.mutabakat["fact_abone"] = _mutabakat(abone_ham, t9_ham, "abone_sayisi")
 
     # --- T11 -> fact_tuketim (P0-2) (+ T7 yumuşak mutabakat) ---
-    tuketim_ham = parser.tablo11_tuketim_oku(_sayfa(wb, 11), tarih_id)
+    # T11 KÜMÜLATİF veri döndürür (yıl başından bu aya kadar - EPDK'nın kendi
+    # başlığı "Kümülatif Faturalanan Elektrik Tüketimi..." der, 2026-08-31'de
+    # bulundu). Aylık değeri, aynı yılın önceki aktif aylarının toplamını
+    # çıkararak türetiyoruz - bkz. ingest.yil_ici_onceki_tuketim_toplami()
+    # docstring'i. Yılın ilk ayında (öncesi yok) fark 0, kümülatif=aylık.
+    tuketim_kumulatif = parser.tablo11_tuketim_oku(_sayfa(wb, 11), tarih_id)
+    onceki_toplam = ingest.yil_ici_onceki_tuketim_toplami(
+        conn, tarih_id // 100, tarih_id
+    )
+    tuketim_ham = tuketim_kumulatif.merge(
+        onceki_toplam, on=["il_kodu", "grup", "baglanti"], how="left"
+    )
+    tuketim_ham["onceki_toplam"] = tuketim_ham["onceki_toplam"].fillna(0.0)
+    tuketim_ham["tuketim_mwh"] = (
+        tuketim_ham["tuketim_mwh"] - tuketim_ham["onceki_toplam"]
+    )
+    tuketim_ham = tuketim_ham.drop(columns=["onceki_toplam"])
     dogrulanan = kpi.dogrula_tuketim(tuketim_ham)
     yuklenen, atlanan = ingest.fact_tuketim_yukle(conn, dogrulanan.kabul, batch_id)
     _isle("fact_tuketim", tuketim_ham, dogrulanan, yuklenen, atlanan)

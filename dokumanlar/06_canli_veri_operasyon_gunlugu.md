@@ -98,3 +98,47 @@ devamında kapatıldı:
 
 Üçü de CI + Security'de yeşil, gerçek izole `postgres:16` entegrasyon
 testleriyle doğrulandı.
+
+## 2026-08-31 (devam 2) — Şubat-Haziran toplu yükleme: EPDK şablon değişikliği bulundu
+
+Kullanıcı Şubat-Haziran 2026 (5 ay) EPDK dosyalarını `worker/scripts/
+backfill.py` + `worker/job_worker.py` (asenkron yol, ilk kez canlı DB'ye
+karşı denendi) ile kuyruğa alıp işletti — hepsinde `otomatik_onaya_uygun()`
+`False` döndü (`mutabakat uyuşmadı: fact_tuketim`), hiçbiri aktive edilmedi,
+derinlemesine incelendi. **EPDK'nın rapor şablonu Mart 2026'dan itibaren
+değişmiş**, üç ayrı sorun bulundu:
+
+1. **Tablo 11 KÜMÜLATİF** (başlığı açıkça "Kümülatif Faturalanan Elektrik
+   Tüketimi..." diyor) — parser bunu aylık sanıp doğrudan `fact_tuketim`'e
+   yüklüyordu. Ocak'ta sorun görünmedi (yılın ilk ayında kümülatif=aylık).
+   **Düzeltildi**: `ingest.yil_ici_onceki_tuketim_toplami()` + `pipeline.py`
+   T11 okuma sonrası fark alma adımı — aynı yılın önceki aktif aylarının
+   toplamını DB'den çekip kümülatif değerden çıkarıyor. **Sonuç: ayları
+   SIRAYLA işlemek artık mimari bir zorunluluk** (bir ayı işlemek, o yılın
+   önceki tüm aylarının DB'de aktif/doğru olmasını gerektirir).
+2. **Tablo 13 satır düzeni kaymış** — "İl Adı" etiketi Ocak/Şubat'ta kendi
+   satırında, Mart'tan itibaren grup adlarıyla (Mesken/Sanayi/...) aynı
+   satırda; "Tüketici Sayısı" etiketi de bir üst satıra taşınmış.
+   `fact_serbest_tuketici`'yi Mart-Haziran için TAMAMEN BOŞ bırakıyordu
+   (`toplam=0`, sessizce — `eksik_tablolar` kontrolü bunu yakalamadı çünkü
+   sayfa VARDI, yalnız içeriği okunamıyordu). **Düzeltildi**:
+   `tablo13_serbest_tuketici_oku()` artık "Tüketici Sayısı" etiketini ve
+   grup-adı satırını sabit pozisyon yerine dinamik arıyor, her iki formatı
+   da destekliyor (regresyon testiyle: eski format `test_tablo13_serbest_
+   tuketici`, yeni format `test_tablo13_serbest_tuketici_yeni_format_
+   2026_03`).
+3. **Tablo 7 çoklu-ay format — DÜZELTİLMEDİ, bilinen gap.** T7 her ay yeni
+   bir "Miktar" sütunu ekleyerek büyüyor (Ocak, Ocak+Şubat, ...); parser
+   (`_uzun_format_grup_oku`) her zaman İLK sütunu (hep Ocak'ı) okuyor. Bu,
+   T7'nin SADECE mutabakat kontrolü için kullanılması nedeniyle fact
+   tablosuna yazılan veriyi ETKİLEMİYOR (düşük risk) — kullanıcı kararıyla
+   şimdilik ertelendi. **Etkisi**: `_mutabakat()`'ın fact_tuketim sonucu
+   Şubat'tan itibaren güvenilmez (yanlış pozitif/negatif verebilir);
+   `otomatik_onaya_uygun()` bu yüzden T11 düzeltmesi sonrasında bile
+   muhtemelen hâlâ elle onay isteyecek — bu BEKLENEN, T7 düzeltilene kadar
+   sürecek bir durum.
+
+Commit'ler: T11+T13 fix (bkz. main geçmişi), gerçek Mart dosyasına karşı
+doğrulandı (satır sayısı/toplam Şubat'a yakın çıktı, artık kümülatif artış
+göstermiyor). 5 ay, düzeltme sonrası sırayla (Şubat→Haziran) yeniden
+işlendi — sonuçlar bu bölümün devamında.

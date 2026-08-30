@@ -732,3 +732,98 @@ def test_dogrula_serbest_tuketici_red_ve_karantina() -> None:
     assert len(sonuc.kabul) == 1
     assert len(sonuc.red) == 1
     assert len(sonuc.karantina) == 2
+
+
+def test_tablo13_serbest_tuketici_yeni_format_2026_03() -> None:
+    """2026-03'ten itibaren EPDK sablonu degisti: 'İl Adı' etiketi artik
+    grup adlariyla (Mesken/Sanayi/...) AYNI satirda, 'Tüketici Sayısı'
+    etiketi de BİR ÜST satirda (2026-01/02'deki 'İl Adı ayri satirda, grup
+    adlari bir alt satirda' duzeninden farkli). Bu, gercek Mart 2026
+    dosyasinda bulundu (2026-08-31, bkz. dokumanlar/06_canli_veri_operasyon_
+    gunlugu.md) - fact_serbest_tuketici'yi tamamen bos birakiyordu (toplam=0).
+    tablo13_serbest_tuketici_oku()'nun HER İKİ formatı da desteklemesi
+    gerekiyor (eski format regresyonu test_tablo13_serbest_tuketici'de)."""
+    wb = openpyxl.Workbook()
+    t13 = wb.active
+    t13.title = "Tablo 13"
+    t13.append(
+        [
+            "Tablo 13: İl Bazında Serbest Tüketici Bilgileri (Tüketim Miktarı (MWh) - Tüketici Sayısı (Adet) )"
+        ]
+    )
+    t13.append(
+        [
+            "",
+            "",
+            "Tüketim Miktarı(MWh)",
+            None,
+            None,
+            None,
+            None,
+            None,
+            "Tüketici Sayısı",
+        ]
+    )
+    t13.append(
+        [
+            "İl Adı",
+            "Elektrik Tüketici Türü",
+            "Mesken",
+            "Sanayi",
+            "Kamu/Özel ",
+            "Tarımsal",
+            "Aydınlatma",
+            "Toplam",
+            "Mesken",
+            "Sanayi",
+            "Kamu/Özel ",
+            "Tarımsal",
+            "Aydınlatma",
+            "Toplam",
+        ]
+    )
+    t13.append(
+        [
+            "ADANA",
+            "Serbest Tüketici",
+            100.0,
+            200.0,
+            50.0,
+            None,
+            10.0,
+            360.0,
+            5,
+            10,
+            3,
+            None,
+            1,
+            19,
+        ]
+    )
+    t13.append(
+        [
+            None,
+            "İl Toplam",
+            100.0,
+            200.0,
+            50.0,
+            None,
+            10.0,
+            360.0,
+            5,
+            10,
+            3,
+            None,
+            1,
+            19,
+        ]
+    )
+
+    df = parser.tablo13_serbest_tuketici_oku(t13, 202603)
+    assert len(df) == 5  # 1 tur x 5 grup, "İl Toplam" satırı atlanır
+    mesken = df[df["grup"] == "Mesken"].iloc[0]
+    assert mesken["il"] == "Adana"
+    assert mesken["tuketim_mwh"] == pytest.approx(100.0)
+    assert mesken["tuketici_sayisi"] == pytest.approx(5.0)
+    tarimsal = df[df["grup"] == "Tarımsal"].iloc[0]
+    assert pd.isna(tarimsal["tuketim_mwh"])  # boş hücre = NULL, 0 DEĞİL

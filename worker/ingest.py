@@ -305,6 +305,33 @@ def _sayisal_temiz(deger: object) -> float | None:
     return float(deger)  # type: ignore[arg-type]
 
 
+def yil_ici_onceki_tuketim_toplami(
+    conn: Connection, yil: int, tarih_id: int
+) -> pd.DataFrame:
+    """T11 (tablo11_tuketim_oku) KÜMÜLATİF veri döndürür (yıl başından bu aya
+    kadar) - EPDK'nın kendi başlığı 'Kümülatif Faturalanan Elektrik
+    Tüketimi...' der (2026-08-31'de bulundu, bkz. dokumanlar/06_canli_veri_
+    operasyon_gunlugu.md). Bu ayın AYLIK değerini türetmek için, aynı yıl
+    içinde bu aydan ÖNCEKİ aktif fact_tuketim satırlarının (il_kodu, grup,
+    baglanti) bazında toplamını döner - çağıran bunu kümülatif değerden
+    çıkarır. Yılın ilk ayı için (öncesinde hiç ay yoksa) boş DataFrame döner
+    (referans toplamı 0 sayılır - kümülatif=aylık, mevcut Ocak davranışıyla
+    tutarlı)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT ft.il_kodu, g.grup_adi, ft.baglanti, sum(ft.tuketim_mwh) AS onceki_toplam
+            FROM fact_tuketim ft
+            JOIN dim_tuketici_grubu g ON g.grup_id = ft.grup_id
+            WHERE ft.is_active = true AND ft.tarih_id >= %s AND ft.tarih_id < %s
+            GROUP BY ft.il_kodu, g.grup_adi, ft.baglanti
+            """,
+            (yil * 100, tarih_id),
+        )
+        rows = cur.fetchall()
+    return pd.DataFrame(rows, columns=["il_kodu", "grup", "baglanti", "onceki_toplam"])
+
+
 def fact_tuketim_yukle(
     conn: Connection, df: pd.DataFrame, batch_id: int
 ) -> tuple[int, int]:

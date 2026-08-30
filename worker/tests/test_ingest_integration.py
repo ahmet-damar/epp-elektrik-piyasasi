@@ -138,6 +138,59 @@ def test_batch_dolu_tablolari_bul_hic_veri_yoksa_bos_liste(  # type: ignore[no-u
     assert ingest.batch_dolu_tablolari_bul(conn, batch) == []
 
 
+def test_yil_ici_onceki_tuketim_toplami(conn) -> None:  # type: ignore[no-untyped-def]
+    """T11 KÜMÜLATİF veri döndürür (2026-08-31'de bulundu) - bu fonksiyon
+    aylık değeri türetmek için önceki ayların toplamını sağlar. Sentinel
+    yıl 2097 (cross-test kirlenmesini önlemek için, established pattern)."""
+    for tarih_id in (209701, 209702, 209703):
+        ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+
+    df1 = pd.DataFrame(
+        [
+            {
+                "il_kodu": 1,
+                "tarih_id": 209701,
+                "grup": "Mesken",
+                "baglanti": "iletim",
+                "tuketim_mwh": 100.0,
+            }
+        ]
+    )
+    df2 = pd.DataFrame(
+        [
+            {
+                "il_kodu": 1,
+                "tarih_id": 209702,
+                "grup": "Mesken",
+                "baglanti": "iletim",
+                "tuketim_mwh": 150.0,
+            }
+        ]
+    )
+    b1 = _yeni_batch(conn, "test-yil-ici-v1")
+    ingest.fact_tuketim_yukle(conn, df1, b1)
+    ingest.aktivasyon_yap(conn, "fact_tuketim", b1)
+    b2 = _yeni_batch(conn, "test-yil-ici-v2")
+    ingest.fact_tuketim_yukle(conn, df2, b2)
+    ingest.aktivasyon_yap(conn, "fact_tuketim", b2)
+
+    # Yilin ilk ayi: oncesinde o yil icinde hic ay yok -> bos.
+    bos = ingest.yil_ici_onceki_tuketim_toplami(conn, 2097, 209701)
+    assert bos.empty
+
+    # 209702'den ONCEKI aylar: yalniz 209701 (kendisi HARIC) -> 100.0
+    tek_ay = ingest.yil_ici_onceki_tuketim_toplami(conn, 2097, 209702)
+    assert len(tek_ay) == 1
+    assert tek_ay.iloc[0]["onceki_toplam"] == pytest.approx(100.0)
+    assert tek_ay.iloc[0]["grup"] == "Mesken"
+    assert tek_ay.iloc[0]["baglanti"] == "iletim"
+
+    # 209703'ten ONCEKI aylar: 209701 + 209702 (ikisi de aktif) -> 250.0
+    iki_ay = ingest.yil_ici_onceki_tuketim_toplami(conn, 2097, 209703)
+    assert len(iki_ay) == 1
+    assert iki_ay.iloc[0]["onceki_toplam"] == pytest.approx(250.0)
+
+
 def test_uretim_ve_abone_yukle(conn) -> None:  # type: ignore[no-untyped-def]
     ingest.dim_tarih_getir_veya_olustur(conn, 202601)
     uretim = kpi.yukle_uretim(GOLDEN_INPUT / "uretim.csv").kabul

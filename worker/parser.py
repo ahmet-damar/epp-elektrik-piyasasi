@@ -573,13 +573,32 @@ def tablo13_serbest_tuketici_oku(
         return pd.DataFrame(columns=kolonlar)
 
     tur_kolon = il_kolon + 1
-    grup_baslik_satir = baslik_satir + 1  # grup adları bir alt satırda tekrar eder
 
-    sayisi_baslangic = _satirda_kolon_bul(
-        ws, baslik_satir, "Tüketici Sayısı", min_col=tur_kolon + 1
-    )
+    # "Tüketici Sayısı" etiketinin satırı EPDK şablonuna göre değişebilir:
+    # 2026-01/02'de "İl Adı" ile AYNI satırda, 2026-03'ten itibaren "İl Adı"
+    # satırının BİR ÜSTÜNDE (2026-08-31'de bulundu, bkz. dokumanlar/06_canli_
+    # veri_operasyon_gunlugu.md) - sabit satır varsaymak yerine birkaç satırda
+    # ara, hangisinde bulunursa onu kullan.
+    sayisi_baslangic = None
+    for satir in range(tablo_satir, tablo_satir + 6):
+        sayisi_baslangic = _satirda_kolon_bul(
+            ws, satir, "Tüketici Sayısı", min_col=tur_kolon + 1
+        )
+        if sayisi_baslangic is not None:
+            break
     if sayisi_baslangic is None:
         return pd.DataFrame(columns=kolonlar)
+
+    # grup adları (Mesken/Sanayi/...) da aynı sebeple ya "İl Adı" ile AYNI
+    # satırda (yeni format) ya da BİR ALT satırda (eski format) olabilir -
+    # hangisinde gerçek grup eşleşmesi varsa onu kullan.
+    grup_baslik_satir = None
+    for aday in (baslik_satir, baslik_satir + 1):
+        if _grup_kolonlarini_tara(ws, aday, tur_kolon + 1, tur_kolon + 20):
+            grup_baslik_satir = aday
+            break
+    if grup_baslik_satir is None:
+        grup_baslik_satir = baslik_satir + 1  # güvenli varsayılan (eski davranış)
 
     tuketim_kolonlari = _grup_kolonlarini_tara(
         ws, grup_baslik_satir, tur_kolon + 1, sayisi_baslangic - 1
