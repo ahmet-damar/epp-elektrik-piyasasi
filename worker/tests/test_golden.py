@@ -109,6 +109,16 @@ def test_kpi_05_kapasite_faktoru(hesaplanan: dict) -> None:
     assert kpi.kpi_05_kapasite_faktoru(uretim, 0) is None
 
 
+def test_kpi_05_uretim_mwh_hic_yoksa_hesaplanamaz(hesaplanan: dict) -> None:
+    """Gerçek DB verisinde (aylık EPDK raporu, il×kaynak grain) uretim_mwh
+    tamamen NULL'dır (bkz. migration 20260819_0005) - bu durumda 0/(kurulu*saat)
+    gibi yanıltıcı bir %0.0 DEĞİL, 'hesaplanamaz' (None) dönmeli. Faz 2
+    dashboard'unu gerçek dosyayla doğrularken bulunan gerçek bir hataydı."""
+    uretim = kpi.yukle_uretim(INPUT / "uretim.csv").kabul.copy()
+    uretim["uretim_mwh"] = pd.NA
+    assert kpi.kpi_05_kapasite_faktoru(uretim, 31 * 24) is None
+
+
 def test_kpi_07_lisanssiz_pay_lisans_kolonu_yoksa_sifir(hesaplanan: dict) -> None:
     uretim = kpi.yukle_uretim(INPUT / "uretim.csv").kabul
     assert kpi.kpi_07_lisanssiz_pay(uretim) == 0.0

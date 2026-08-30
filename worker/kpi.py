@@ -147,10 +147,16 @@ def kpi_04_kaynak_payi(uretim: pd.DataFrame) -> dict[str, float] | None:
 
 
 def kpi_05_kapasite_faktoru(uretim: pd.DataFrame, saat: float) -> float | None:
+    """uretim_mwh bu grain'de (il×kaynak) aylık EPDK raporunda hiç mevcut
+    değil (bkz. migration 20260819_0005, worker/parser.py modül notu) —
+    sütun tamamen boşsa (gerçek DB verisi) 'hesaplanamaz' (None) döner,
+    aksi halde 0/(kurulu*saat) gibi yanıltıcı bir %0.0 gösterilirdi."""
     kurulu = float(uretim["kurulu_guc_mw"].sum()) if not uretim.empty else 0.0
     if kurulu == 0 or saat <= 0:
         return None
-    uretim_toplam = float(uretim["uretim_mwh"].sum()) if not uretim.empty else 0.0
+    if uretim.empty or uretim["uretim_mwh"].isna().all():
+        return None
+    uretim_toplam = float(uretim["uretim_mwh"].sum())
     return round(uretim_toplam / (kurulu * saat) * 100, 1)
 
 
