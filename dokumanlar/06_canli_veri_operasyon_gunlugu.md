@@ -1,13 +1,17 @@
 # EPP — Canlı Veri Operasyon Günlüğü
 
 Faz 0'da onay için ayrı bir UI yok (bkz. `worker/pipeline.py` modül notu) —
-`otomatik_onaya_uygun()` eşiği tutmadığında elle `batch_onayla()` (veya onunla
-birebir aynı `ingest.aktivasyon_yap()` + `ingest.batch_durumu_guncelle()`
-çağrısı) çalıştırılır. Bu dosya, canlı Supabase projesinde yapılan HER TÜRLÜ
-elle aktivasyon/müdahaleyi kaydeder — `audit_log` tablosu şemada var ama
-hiçbir uygulama kodu ona otomatik yazmıyor (2026-08-31 itibarıyla doğrulandı),
-bu yüzden bu günlük + ilgili `audit_log` satırları (bkz. aşağıda) birlikte
-kalıcı iz oluşturur.
+`otomatik_onaya_uygun()` eşiği tutmadığında elle onay verilir: **artık
+`worker/scripts/onayla.py --batch-id N --actor "..."` ile resmi
+`pipeline.batch_onayla(conn, batch_id, actor_name)` doğrudan çağrılabilir**
+(2026-08-31'den itibaren — bkz. aşağıdaki "2026-08-31 (devam)" bölümü;
+önceki `batch_id=1`/`batch_id=3` aktivasyonları bu araç var olmadan, elle
+`aktivasyon_yap()` çağrılarıyla yapılmıştı). `_isle_govde()` ve
+`batch_onayla()` artık `audit_log`'a KENDİLİĞİNDEN yazıyor (kim/ne zaman/
+hangi batch/hangi istisna satırlar — bkz. `03_veri_modeli.md`), bu yüzden bu
+günlük dosyası artık her elle müdahale için ZORUNLU bir yedek değil, ama
+"neden bu batch elle onaylandı" gibi anlatısal bağlamı (audit_log payload'ı
+saklamıyor) kaydetmeye devam eder.
 
 ## 2026-08-31 — EPDK Ocak 2026, ilk canlı yükleme + T13 düzeltmesi
 
@@ -54,7 +58,43 @@ gerçek resmi veri, `dogrula_tuketim`/`dogrula_serbest_tuketici`'nin
 `record_id`=batch_id, `actor_name='manual-remediation:claude-code (kullanıcı
 onaylı)'`, `payload` JSONB'de bu tablodaki bilgilerin makine-okunur hâli).
 
-**Açık madde:** `audit_log`'a hiçbir uygulama kodu (ne `aktivasyon_yap()` ne
-`batch_onayla()`) otomatik yazmıyor — bu, resmi onay yolundan geçilse bile
-geçerli bir eksiklik. Kod değiştirilmedi (kapsam dışı bırakıldı), yalnızca
-burada ve `audit_log`'a retroaktif elle kayıtla belgelendi.
+**Açık madde (2026-08-31'de KAPATILDI, aşağıya bkz.):** ~~`audit_log`'a
+hiçbir uygulama kodu (ne `aktivasyon_yap()` ne `batch_onayla()`) otomatik
+yazmıyor~~.
+
+## 2026-08-31 (devam) — Üç açık madde kapatıldı
+
+Yukarıdaki elle remediation sırasında bulunan üç boşluk, aynı günün
+devamında kapatıldı:
+
+1. **Stray uncommitted dosyalar temizlendi** (commit `c926a04`): `worker/
+   validate_rls_static.py` ve `.github/workflows/security.yml`'deki iz-suz
+   değişiklikler HEAD'e sıfırlandı; 2 boş migration + 2 boş debug script
+   silindi. Kök neden: `git stash`'te duran, 2026-08-19'dan kalma terk
+   edilmiş bir RLS yeniden-tasarım denemesi (authenticated + current_app_
+   role() modeline geçiş, migration 0004-0005 numaralı) — karar gerekçesi
+   ve migration-numarası çakışma uyarısı `01_kavramsal_tasarim.md` ADR-8'e
+   düşüldü, stash'ler drop edildi.
+
+2. **`batch_onayla()` artık pratik çağrılabilir** (commit `9bcd824`):
+   imza `batch_onayla(conn, sonuc: IslemSonucu)` → `batch_onayla(conn,
+   batch_id: int, actor_name="system")`. IslemSonucu (pandas DataFrame'ler
+   içeren bellek nesnesi) süreç sınırını aşamıyordu — batch_id (düz int)
+   aşabiliyor. Hangi tabloların aktive edileceği artık `ingest.
+   batch_dolu_tablolari_bul()` ile DB'den sorgulanıyor. Yeni `worker/
+   scripts/onayla.py` CLI: `python -m worker.scripts.onayla --batch-id N
+   --actor "..."`. 2 yeni test (bir batch'in bazı/tüm tablolara hiç veri
+   yazmadığı durum) CI'ın gerçek postgres:16'sında doğrulandı.
+
+3. **`audit_log` artık koddan otomatik yazılıyor** (commit `fd6cfaa`):
+   `_isle_govde()` tamamlandığında (`action_type='INSERT'`, RED satırlarının
+   tam detayı + KARANTİNA'nın sayı+ilk 20 örneği) ve `batch_onayla()`
+   tamamlandığında (`action_type='UPDATE'`, `actor_name` + aktive edilen
+   tablolar) birer kayıt düşülüyor — manuel backfill değil. Şema
+   `03_veri_modeli.md`'ye belgelendi. `audit_id` 1-2 (bu dosyanın yukarıdaki
+   bölümündeki `batch_id=1`/`batch_id=3` için) hâlâ geçerli, retroaktif elle
+   yazılmış kayıtlar olarak kalıyor — yeni mekanizma yalnız BUNDAN SONRAKİ
+   ingest/onay çağrıları için otomatik çalışır.
+
+Üçü de CI + Security'de yeşil, gerçek izole `postgres:16` entegrasyon
+testleriyle doğrulandı.
