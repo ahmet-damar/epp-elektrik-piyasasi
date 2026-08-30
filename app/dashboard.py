@@ -385,6 +385,13 @@ with c4:
         f"İletim: {san.get('iletim', 0):.2f} TWh · Dağıtım: {san.get('dagitim', 0):.2f} TWh "
         f"→ Toplam {san.sum():.2f} TWh (Tablo 11 ile birebir)"
     )
+    if secili_il != "Türkiye Geneli":
+        st.caption(
+            "Bu grafik İl filtresinden bağımsızdır, her zaman Türkiye geneli "
+            "gösterir — kaynak dosyanın 'TÜRKİYE' satırıyla yapılan sabit bir "
+            "veri kalite/mutabakat kontrolüdür (bkz. dokumanlar/02_srs_ozet.md, "
+            "'İl toplamı ↔ TÜRKİYE satırı ±%0,5 mutabık')."
+        )
 
 # ---------------- SERBEST TÜKETİCİ (Faz 0/1'de kurulan tablo) ----------------
 if not serbest.empty:
