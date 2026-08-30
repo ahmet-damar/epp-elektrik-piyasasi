@@ -203,18 +203,23 @@ def test_hava_getir_is_active_kolonu_yok_dogrudan_calisir(conn) -> None:  # type
 
 
 def _tuketim_hava_gecmisi_kur(conn) -> int:  # type: ignore[no-untyped-def]
-    """il_kodu=26 için 2020-2022 tam yıl (36 ay) + 2023 Ocak (hedef dönem) —
+    """il_kodu=26 için 2090-2092 tam yıl (36 ay) + 2093 Ocak (hedef dönem) —
     kpi_11_12_hesapla'nın regresyon (min 12 gözlem) VE hava_norm_yil=3/
-    tuketim_norm_yil=2 (testte küçültülmüş pencereler) için yeterli geçmiş."""
+    tuketim_norm_yil=2 (testte küçültülmüş pencereler) için yeterli geçmiş.
+    Yıllar bilinçli olarak uzak-gelecek sentinel (worker/tests/
+    test_job_worker_integration.py'deki tarih_id=209912 deseniyle tutarlı) -
+    başka hiçbir testle çakışmaz. hdd yalnız 'ay'a, cdd HEM 'ay' HEM 'yil'e
+    bağlı (kolineer DEĞİL) - aksi halde OLS β/γ'yi ayrı ayrı tahmin edemez
+    (yalnız toplam etkiyi görür, gerçek katsayılar kurtarılamaz)."""
     il_kodu = 26
     batch_id = _bos_batch(conn, "test-kpi-11-12")
-    donemler = [(yil, ay) for yil in (2020, 2021, 2022) for ay in range(1, 13)]
-    donemler.append((2023, 1))
+    donemler = [(yil, ay) for yil in (2090, 2091, 2092) for ay in range(1, 13)]
+    donemler.append((2093, 1))
     for yil, ay in donemler:
         tarih_id = yil * 100 + ay
         ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
         hdd = max(0.0, 300.0 - (ay - 1) * 20.0)
-        cdd = float(ay) * 10.0
+        cdd = float(ay) * 5.0 + float(yil - 2090) * 20.0
         tuketim_mwh = 5000.0 + 4.0 * hdd + 2.0 * cdd
         _hava_upsert(conn, il_kodu, tarih_id, hdd, cdd, batch_id)
         with conn.cursor() as cur:
@@ -234,7 +239,7 @@ def _tuketim_hava_gecmisi_kur(conn) -> int:  # type: ignore[no-untyped-def]
 def test_kpi_11_12_hesapla_yeterli_gecmisle_hesaplanir(conn) -> None:  # type: ignore[no-untyped-def]
     il_kodu = _tuketim_hava_gecmisi_kur(conn)
     sonuc = analytics.kpi_11_12_hesapla(
-        conn, il_kodu, 202301, hava_norm_yil=3, tuketim_norm_yil=2
+        conn, il_kodu, 209301, hava_norm_yil=3, tuketim_norm_yil=2
     )
     assert sonuc["beta"] is not None
     assert sonuc["beta"] == pytest.approx(4.0, abs=0.01)
@@ -276,9 +281,12 @@ def test_kpi_11_12_hesapla_yetersiz_gecmis_hesaplanamaz(conn) -> None:  # type: 
 
 
 def test_yillik_serilerinden_cagr(conn) -> None:  # type: ignore[no-untyped-def]
+    """yillik_tuketim_serisi_getir() TÜM il'i toplar (bilinçli, KPI-25 ulusal
+    bir gösterge) - bu yüzden yıllar bilinçli olarak uzak-gelecek sentinel
+    (2096/2100), başka hiçbir testle/gerçek veriyle çakışmaz."""
     il_kodu = 26
     batch_id = _bos_batch(conn, "test-cagr")
-    for yil, tuketim_carpan in ((2021, 1.0), (2025, 1.4641)):  # %10/yıl, n=4
+    for yil, tuketim_carpan in ((2096, 1.0), (2100, 1.4641)):  # %10/yıl, n=4
         tarih_id = yil * 100 + 1
         ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
         with conn.cursor() as cur:
@@ -306,7 +314,7 @@ def test_yillik_yenilenebilir_kurulu_guc_serisi_yil_sonu_alir(conn) -> None:  # 
     lisans_sorgu = "SELECT lisans_id FROM dim_lisans WHERE tur = 'Lisansli'"
     # kaynak_sorgu/lisans_sorgu sabit metin (kullanıcı girdisi değil), f-string
     # yalnız bu ikisini gömer - değerler (il_kodu vb.) ayrı parametre.
-    for tarih_id, kurulu_guc in ((202401, 100.0), (202406, 150.0), (202412, 200.0)):
+    for tarih_id, kurulu_guc in ((209801, 100.0), (209806, 150.0), (209812, 200.0)):
         ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
         with conn.cursor() as cur:
             cur.execute(
@@ -319,7 +327,7 @@ def test_yillik_yenilenebilir_kurulu_guc_serisi_yil_sonu_alir(conn) -> None:  # 
             )
 
     seri = analytics.yillik_yenilenebilir_kurulu_guc_serisi_getir(conn)
-    satir = seri.loc[seri["yil"] == 2024]
+    satir = seri.loc[seri["yil"] == 2098]
     assert len(satir) == 1
     assert satir["kurulu_guc_mw"].iloc[0] == pytest.approx(
         200.0
