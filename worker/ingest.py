@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import calendar
 import hashlib
+import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -188,6 +189,42 @@ def kaynak_asset_olustur(
                 dosya_hash(icerik),
                 uploaded_by,
                 storage_path,
+            ),
+        )
+        row = cur.fetchone()
+        assert row is not None
+        return int(row[0])
+
+
+def api_kaynak_olustur(
+    conn: Connection,
+    *,
+    source_type: str,
+    source_uri: str,
+    request_hash: str,
+    donem_tipi: str,
+    source_period: str,
+    uploaded_by: str | None = None,
+) -> int:
+    """P0-3: source_kind='api' → source_uri + request_hash zorunlu (dosya
+    kind'inin file_name/file_hash'ine karşılık gelir). Faz 3'te
+    worker/jobs/fetch_weather.py (Open-Meteo) tarafından kullanılır —
+    request_hash tipik olarak dosya_hash(istek_imzası.encode())."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO source_asset
+                (source_type, source_kind, source_period, donem_tipi, source_uri, request_hash, uploaded_by)
+            VALUES (%s, 'api', %s, %s, %s, %s, %s)
+            RETURNING source_asset_id
+            """,
+            (
+                source_type,
+                source_period,
+                donem_tipi,
+                source_uri,
+                request_hash,
+                uploaded_by,
             ),
         )
         row = cur.fetchone()
@@ -401,6 +438,74 @@ def fact_serbest_tuketici_yukle(
             )
             yuklenen += 1
     return yuklenen, atlanan
+
+
+def fact_hava_aylik_upsert(
+    conn: Connection,
+    il_kodu: int,
+    tarih_id: int,
+    olcumler: dict[str, float | None],
+    batch_id: int,
+) -> None:
+    """fact_hava_aylik DİĞER fact_*_yukle() fonksiyonlarından FARKLI çalışır
+    (bkz. migration 20260819_0009 ve worker/pipeline.py'nin aksine burada
+    is_active/batch-versiyonlama YOK): (il_kodu, tarih_id) üzerine gerçek
+    UPSERT yapar (ON CONFLICT DO UPDATE), TEK güncel satır kalır. Her
+    çağrıdan önceki değer (varsa) + yeni değer fact_hava_aylik_log'a
+    append-only JSONB snapshot olarak yazılır (SÜRÜMLEME KURALI).
+    olcumler anahtarları: t_ort, hdd, cdd, radyasyon, ruzgar."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT t_ort, hdd, cdd, radyasyon, ruzgar FROM fact_hava_aylik WHERE il_kodu = %s AND tarih_id = %s",
+            (il_kodu, tarih_id),
+        )
+        eski = cur.fetchone()
+        eski_json = (
+            json.dumps(
+                {
+                    "t_ort": _decimal_to_float(eski[0]),
+                    "hdd": _decimal_to_float(eski[1]),
+                    "cdd": _decimal_to_float(eski[2]),
+                    "radyasyon": _decimal_to_float(eski[3]),
+                    "ruzgar": _decimal_to_float(eski[4]),
+                }
+            )
+            if eski is not None
+            else None
+        )
+
+        cur.execute(
+            """
+            INSERT INTO fact_hava_aylik
+                (il_kodu, tarih_id, t_ort, hdd, cdd, radyasyon, ruzgar, ingestion_batch_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (il_kodu, tarih_id) DO UPDATE SET
+                t_ort = EXCLUDED.t_ort, hdd = EXCLUDED.hdd, cdd = EXCLUDED.cdd,
+                radyasyon = EXCLUDED.radyasyon, ruzgar = EXCLUDED.ruzgar,
+                ingestion_batch_id = EXCLUDED.ingestion_batch_id
+            """,
+            (
+                il_kodu,
+                tarih_id,
+                olcumler.get("t_ort"),
+                olcumler.get("hdd"),
+                olcumler.get("cdd"),
+                olcumler.get("radyasyon"),
+                olcumler.get("ruzgar"),
+                batch_id,
+            ),
+        )
+        cur.execute(
+            """
+            INSERT INTO fact_hava_aylik_log (il_kodu, tarih_id, old_data, new_data, ingestion_batch_id)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (il_kodu, tarih_id, eski_json, json.dumps(olcumler), batch_id),
+        )
+
+
+def _decimal_to_float(deger: object) -> float | None:
+    return None if deger is None else float(deger)  # type: ignore[arg-type]
 
 
 _DOGAL_ANAHTAR = {

@@ -87,6 +87,8 @@ jobs:
         run: python -m pytest worker/tests/test_job_worker_integration.py -v
       - name: Run Faz 2 analytics integration tests (dashboard sorguları)
         run: python -m pytest worker/tests/test_analytics_integration.py -v
+      - name: Run Faz 3 fetch_weather integration tests (mocklu Open-Meteo)
+        run: python -m pytest worker/tests/test_fetch_weather_integration.py -v
 
   supabase-tooling:
     name: Supabase tooling (npm install + audit)
