@@ -1,3 +1,6 @@
+# Faz 1: worker/job_worker.py'nin işlediği yüklenen dosyalar (source_asset.storage_path)
+var/
+
 # Python
 __pycache__/
 *.py[cod]

@@ -93,6 +93,11 @@ CREATE UNIQUE INDEX uq_fact_tuketim_active
 ## İşlem & Config Tabloları
 - **job_status:** correlation_id, status CHECK(queued/running/succeeded/failed/retrying/dead_letter),
   attempt_count, locked_by, heartbeat_at, next_retry_at
+  **Faz 1'de kullanımda (2026-08-30):** worker/job_worker.py'nin harici broker'sız
+  (yalnız Postgres polling, FOR UPDATE SKIP LOCKED) asenkron kuyruğu — bkz.
+  worker/ingest.py `is_sahiplen`/`is_basarili`/`is_basarisiz` ve worker/pipeline.py
+  `epdk_isi_kuyruga_al`. correlation_id = str(ingestion_batch.batch_id) konvansiyonu;
+  tek iş türü olduğundan job_type kolonu henüz eklenmedi (YAGNI, ikinci iş türünde eklenir).
 - **sistem_parametre:** (anahtar PK, deger) → hdd_baz_c=18, cdd_baz_c=22, hava_norm_yil=10, tuketim_norm_yil=5
 - **kpi_esik:** (kpi_id, surum PK), yesil/sari/kirmizi bantları, yon
 - **il_baz_sicaklik:** (Faz 3) il bazlı override

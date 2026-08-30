@@ -1,4 +1,4 @@
-"""EPP — Faz 0 orkestrasyon: EPDK aylık dosyayı uçtan uca işler.
+"""EPP — EPDK aylık dosyayı uçtan uca işler (Faz 0 senkron + Faz 1 asenkron).
 
 Kaynak: dokumanlar/01_kavramsal_tasarim.md §4 (Uçtan Uca Veri Akışı):
 1. SHA-256 hash
@@ -8,20 +8,33 @@ Kaynak: dokumanlar/01_kavramsal_tasarim.md §4 (Uçtan Uca Veri Akışı):
 5. Aktivasyon transaction -> is_active=true (eski sürüm pasif)
 6. Dashboard güncel aktif sürümü gösterir (Faz 2, kapsam dışı)
 
-Adım 1-4 TEK fonksiyonda (epdk_aylik_isle). Adım 5 BİLİNÇLİ OLARAK AYRI bir
-fonksiyondadır (batch_onayla) — Faz 0'da henüz bir onay UI'ı yok; bu ayrım,
+İki çağrı yolu vardır, ikisi de adım 4'ün gövdesini (_isle_govde) paylaşır:
+- **Senkron (Faz 0):** epdk_aylik_isle() adım 1-4'ü TEK çağrıda, aynı süreçte
+  yapar (CLI/manuel/test kullanımı — bkz. worker/scripts/gercek_dosya_dogrula.py).
+- **Asenkron (Faz 1):** epdk_isi_kuyruga_al() yalnız adım 1-2'yi yapar (+
+  job_status'a 'queued' bir kayıt) ve HEMEN döner — parse etmez. Dosya
+  baytları content-addressed olarak diske yazılır (source_asset.storage_path).
+  worker/job_worker.py daha sonra (ayrı bir çalıştırmada/süreçte) bu job'ı
+  atomik sahiplenir, dosyayı storage_path'ten okur, _isle_govde()'yi çağırır.
+
+Adım 5 (aktivasyon) BİLİNÇLİ OLARAK AYRI bir fonksiyondadır (batch_onayla) —
 is_active=false ile yazılmış "önizleme" verisi ile "aktivasyon" arasındaki
-gerçek boşluğu korur: epdk_aylik_isle() sonucundaki sayılar (tablo başına
-yüklenen/atlanan/red/karantina + mutabakat) önce incelenir, ancak SONRA
-batch_onayla() çağrılır. batch_onayla()'nın çağrılması, ileride UI'daki
-"onayla" adımının Faz 0'daki karşılığıdır (otomatik değil, bilinçli ayrı
-bir çağrı). ingestion_batch.status yalnız şu değerleri alabilir (db/schema.sql
-CHECK): queued/running/succeeded/failed/retrying/dead_letter — bu yüzden
-"önizleme, henüz aktive edilmedi" durumu ayrı bir status değeriyle DEĞİL,
-'running'in devamı olarak temsil edilir; yalnız batch_onayla() sonunda
+gerçek boşluğu korur. ingestion_batch.status yalnız şu değerleri alabilir
+(db/schema.sql CHECK): queued/running/succeeded/failed/retrying/dead_letter —
+bu yüzden "önizleme, henüz aktive edilmedi" durumu ayrı bir status değeriyle
+DEĞİL, 'running'in devamı olarak temsil edilir; yalnız batch_onayla() sonunda
 'succeeded'e geçer.
 
-Kapsam (Faz 0, tek bir EPDK aylık dosya -> tüm fact tablolarına yazma):
+Faz 0'da (senkron) batch_onayla() çağrısı her zaman bilinçli/elle yapılırdı
+(UI yoktu). Faz 1'de worker/job_worker.py, otomatik_onaya_uygun() eşiğini
+geçen batch'leri OTOMATİK aktive eder (kullanıcı kararı, 2026-08-30): tüm
+mutabakat sonuçları False değilse (True/None kabul) VE hiçbir tabloda red/
+karantina yoksa, worker batch_onayla()'yı kendisi çağırır. Eşik tutmazsa
+batch 'running'de bırakılır, net bir log/uyarı düşülür — elle batch_onayla()
+beklenir (Faz 0'daki gibi). Amaç: temiz geçen aylar otomatik aksın, şüpheli
+olanlar insan gözünden kaçmasın.
+
+Kapsam (tek bir EPDK aylık dosya -> tüm fact tablolarına yazma):
 - T1 + T4 (kurulu güç, lisanslı/lisanssız) -> fact_uretim. Yalnız
   kurulu_guc_mw yazılır; uretim_mwh bu grain'de (il×kaynak) kaynak dosyada
   hiç mevcut değil (bkz. worker/parser.py modül notu, migration 20260819_0005).
@@ -51,6 +64,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from io import BytesIO
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import openpyxl
@@ -64,6 +78,11 @@ if TYPE_CHECKING:
 
 # Yalnız fact tablosuna YAZAN tablolar zorunlu; T7/T9 (mutabakat-only) hariç.
 _ZORUNLU_TABLOLAR = ["Tablo 1", "Tablo 4", "Tablo 10", "Tablo 11", "Tablo 13"]
+
+# worker/job_worker.py'nin işleyeceği dosyaların content-addressed yazıldığı
+# varsayılan dizin (self-host: yerel disk, harici depolama bağımlılığı yok).
+# .gitignore'da 'var/' — hiçbir yüklenen dosya repoya girmez.
+VARSAYILAN_DEPO_DIZINI = Path("var/uploads")
 
 
 @dataclass
@@ -89,6 +108,33 @@ class IslemSonucu:
     eksik_tablolar: list[str] = field(default_factory=list)
     tablolar: dict[str, TabloSonucu] = field(default_factory=dict)
     mutabakat: dict[str, bool | None] = field(default_factory=dict)
+
+
+@dataclass
+class KuyrukSonucu:
+    """epdk_isi_kuyruga_al()'ın döndürdüğü kimlikler — worker/job_worker.py
+    job_id'yi job_status'tan sahiplenir, correlation_id üzerinden batch_id'ye ulaşır."""
+
+    job_id: int
+    batch_id: int
+    source_asset_id: int
+
+
+def otomatik_onaya_uygun(sonuc: IslemSonucu) -> tuple[bool, str]:
+    """Faz 1 otomatik aktivasyon eşiği (kullanıcı kararı, 2026-08-30):
+    TÜM mutabakat sonuçları False DEĞİL (True/None kabul) VE HER tabloda
+    red=0 VE karantina=0 olmalı. Biri tutmazsa (False, sebep) döner —
+    worker/job_worker.py batch'i aktive etmeden bırakır, elle batch_onayla()
+    beklenir (Faz 0'daki gibi)."""
+    for anahtar, deger in sonuc.mutabakat.items():
+        if deger is False:
+            return False, f"mutabakat uyuşmadı: {anahtar}"
+    for tablo, t in sonuc.tablolar.items():
+        if t.red > 0:
+            return False, f"{tablo}: {t.red} satır reddedildi"
+        if t.karantina > 0:
+            return False, f"{tablo}: {t.karantina} satır karantinada"
+    return True, ""
 
 
 def _sayfa(wb: openpyxl.Workbook, tablo_no: int) -> Worksheet:
@@ -126,9 +172,10 @@ def epdk_aylik_isle(
     schema_version: str = "1",
     uploaded_by: str | None = None,
 ) -> IslemSonucu:
-    """Adım 1-4: hash -> source_asset(file)+batch(queued) -> atomik sahiplenme
-    -> parse + doğrula + yükle (is_active=false). Adım 5 (aktivasyon) BURADA
-    YAPILMAZ — bkz. modül notu, batch_onayla()."""
+    """SENKRON yol (Faz 0): adım 1-4'ü TEK çağrıda yapar — hash ->
+    source_asset(file)+batch(queued) -> atomik sahiplenme -> _isle_govde().
+    Adım 5 (aktivasyon) BURADA YAPILMAZ — bkz. modül notu, batch_onayla().
+    Asenkron/kuyruklu yol için bkz. epdk_isi_kuyruga_al()."""
     source_asset_id = ingest.kaynak_asset_olustur(
         conn,
         source_type="epdk_aylik",
@@ -149,6 +196,61 @@ def epdk_aylik_isle(
         sonuc.sahiplenildi = False
         return sonuc
 
+    return _isle_govde(conn, batch_id, icerik, tarih_id)
+
+
+def epdk_isi_kuyruga_al(
+    conn: Connection,
+    *,
+    dosya_adi: str,
+    icerik: bytes,
+    tarih_id: int,
+    source_period: str,
+    parser_version: str = "0.1",
+    schema_version: str = "1",
+    uploaded_by: str | None = None,
+    depo_dizini: Path | str = VARSAYILAN_DEPO_DIZINI,
+) -> KuyrukSonucu:
+    """ASENKRON yol (Faz 1): adım 1-2'yi yapar (+ job_status'a 'queued' kayıt)
+    ve HEMEN döner — PARSE ETMEZ. Dosya baytları content-addressed olarak
+    diske yazılır (source_asset.storage_path); worker/job_worker.py daha
+    sonra bu job'ı sahiplenip _isle_govde()'yi çağırır. Aynı dosya birden
+    çok kez kuyruğa alınırsa her seferinde yeni bir source_asset satırı
+    açılır (bilinçli — source_asset bir audit log, bkz. worker/ingest.py
+    modül notu); disk yazımı content-addressed olduğundan tekrar edilmez."""
+    depo = Path(depo_dizini)
+    depo.mkdir(parents=True, exist_ok=True)
+    hedef_yol = depo / f"{ingest.dosya_hash(icerik)}.xlsx"
+    if not hedef_yol.exists():
+        hedef_yol.write_bytes(icerik)
+
+    source_asset_id = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="epdk_aylik",
+        dosya_adi=dosya_adi,
+        icerik=icerik,
+        donem_tipi=ingest.tarih_bilesenleri(tarih_id)["donem_tipi"],
+        source_period=source_period,
+        uploaded_by=uploaded_by,
+        storage_path=str(hedef_yol),
+    )
+    batch_id = ingest.batch_olustur(
+        conn, source_asset_id, parser_version, schema_version
+    )
+    job_id = ingest.is_kaydi_olustur(conn, str(batch_id))
+    return KuyrukSonucu(
+        job_id=job_id, batch_id=batch_id, source_asset_id=source_asset_id
+    )
+
+
+def _isle_govde(
+    conn: Connection, batch_id: int, icerik: bytes, tarih_id: int
+) -> IslemSonucu:
+    """Adım 4'ün gövdesi: parse + doğrula + yükle (is_active=false). batch'in
+    zaten var olduğunu ve sahiplenildiğini varsayar (çağıran sorumludur) —
+    hem epdk_aylik_isle() (senkron) hem worker/job_worker.py (asenkron) bunu
+    paylaşır."""
+    sonuc = IslemSonucu(batch_id=batch_id)
     wb = openpyxl.load_workbook(BytesIO(icerik), data_only=True)
     sonuc.eksik_tablolar = parser.eksik_tablolari_bul(wb.sheetnames, _ZORUNLU_TABLOLAR)
     if sonuc.eksik_tablolar:

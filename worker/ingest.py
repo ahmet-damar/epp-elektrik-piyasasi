@@ -1,4 +1,5 @@
-"""EPP — Ingestion pipeline (Faz 0): source_asset → ingestion_batch → fact_*.
+"""EPP — Ingestion pipeline: source_asset → ingestion_batch → fact_*
+(Faz 0, senkron) + job_status (Faz 1, asenkron kuyruk).
 
 Kaynak: dokumanlar/01_kavramsal_tasarim.md (§4 Uçtan Uca Veri Akışı),
 dokumanlar/02_srs_ozet.md (P0-2..P0-5), dokumanlar/03_veri_modeli.md.
@@ -8,6 +9,16 @@ running) → doğrulanmış satırlar fact_* tablosuna is_active=false yazılır
 aktivasyon_yap() TEK transaction içinde eski aktif sürümü pasifler ve yeni
 batch'i aktifler (P0-4). Tüm sorgular parametrelidir (SQL injection'a karşı).
 
+Faz 1: job_status (db/schema.sql'de tanımlı ama Faz 0'da hiç kullanılmayan
+tablo) worker/job_worker.py'nin harici bir broker (Redis/Celery/RabbitMQ)
+OLMADAN, salt Postgres polling ile çalışan asenkron kuyruğunu destekler —
+bkz. is_sahiplen()/is_basarili()/is_basarisiz() ve worker/pipeline.py'nin
+epdk_isi_kuyruga_al(). job_status = iş YÜRÜTME/retry/kilit takibi (altyapı);
+ingestion_batch.status = veri YAŞAM DÖNGÜSÜ (iş) takibi — ayrı ama
+correlation_id (=str(batch_id)) ile bağlı. Tek iş türü (EPDK dosya işleme)
+olduğundan job_status'a henüz bir job_type kolonu eklenmedi (YAGNI) —
+ikinci bir iş türü (ör. Faz 3 hava/matview) gelince ayrı migration'la eklenir.
+
 NOT: Bu modül gerçek bir PostgreSQL'e karşı yalnızca CI'nin 'integration'
 job'ında (worker/tests/test_ingest_integration.py, DATABASE_URL ile) test
 edilir; yerel geliştirme ortamında çalışan bir Postgres yoktu.
@@ -16,6 +27,7 @@ edilir; yerel geliştirme ortamında çalışan bir Postgres yoktu.
 from __future__ import annotations
 
 import hashlib
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -62,6 +74,18 @@ def tarih_bilesenleri(tarih_id: int) -> dict[str, Any]:
         "yil_ay": yil_ay,
         "donem_tipi": donem_tipi,
     }
+
+
+def tarih_id_from_source_period(source_period: str, donem_tipi: str) -> int:
+    """tarih_bilesenleri()'nin (tarih_id -> bilesen) tersi: source_period
+    ('YYYY-MM' aylık / 'YYYY' yıllık) -> tarih_id (YYYYMM/YYYY00). Faz 1'de
+    worker/job_worker.py, source_asset'te SAKLANMAYAN tarih_id'yi (yalnız
+    source_period+donem_tipi saklanır) buradan yeniden türetir — ayrı bir
+    DB alanı eklemeden."""
+    if donem_tipi == "yillik":
+        return int(source_period) * 100
+    yil_str, ay_str = source_period.split("-")
+    return int(yil_str) * 100 + int(ay_str)
 
 
 def dim_tarih_getir_veya_olustur(conn: Connection, tarih_id: int) -> int:
@@ -129,14 +153,17 @@ def kaynak_asset_olustur(
     donem_tipi: str,
     source_period: str,
     uploaded_by: str | None = None,
+    storage_path: str | None = None,
 ) -> int:
-    """P0-3: source_kind='file' → file_name + file_hash zorunlu."""
+    """P0-3: source_kind='file' → file_name + file_hash zorunlu. storage_path
+    Faz 1'de epdk_isi_kuyruga_al() tarafından set edilir (worker/job_worker.py
+    dosyayı buradan okur); senkron (Faz 0) yolda None kalır."""
     with conn.cursor() as cur:
         cur.execute(
             """
             INSERT INTO source_asset
-                (source_type, source_kind, source_period, donem_tipi, file_name, file_hash, uploaded_by)
-            VALUES (%s, 'file', %s, %s, %s, %s, %s)
+                (source_type, source_kind, source_period, donem_tipi, file_name, file_hash, uploaded_by, storage_path)
+            VALUES (%s, 'file', %s, %s, %s, %s, %s, %s)
             RETURNING source_asset_id
             """,
             (
@@ -146,6 +173,7 @@ def kaynak_asset_olustur(
                 dosya_adi,
                 dosya_hash(icerik),
                 uploaded_by,
+                storage_path,
             ),
         )
         row = cur.fetchone()
@@ -400,3 +428,115 @@ def aktivasyon_yap(conn: Connection, tablo: str, batch_id: int) -> None:
             f"UPDATE {tablo} SET is_active = true WHERE ingestion_batch_id = %s",  # nosec B608
             (batch_id,),
         )
+
+
+# ---------------------------------------------------------------------------
+# job_status — Faz 1 asenkron kuyruk (bkz. modül notu)
+# ---------------------------------------------------------------------------
+
+_STALE_ESIK_SANIYE = 600  # 10 dk: heartbeat bu kadar eskiyse worker çökmüş sayılır
+_MAX_DENEME = 5
+
+
+@dataclass
+class IsKaydi:
+    job_id: int
+    correlation_id: str
+    attempt_count: int
+
+
+def is_kaydi_olustur(conn: Connection, correlation_id: str) -> int:
+    """epdk_isi_kuyruga_al()'ın adım 2'ye eklediği parça: batch oluşturulduktan
+    sonra job_status'a 'queued' bir satır ekler (worker/job_worker.py'nin
+    daha sonra sahipleneceği iş). correlation_id konvansiyonu: str(batch_id)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO job_status (correlation_id, status) VALUES (%s, 'queued') RETURNING job_id",
+            (correlation_id,),
+        )
+        row = cur.fetchone()
+        assert row is not None
+        return int(row[0])
+
+
+def is_sahiplen(conn: Connection, worker_id: str) -> IsKaydi | None:
+    """worker/job_worker.py'nin ana poll adımı. Önce heartbeat'i bayat
+    ('running' ama _STALE_ESIK_SANIYE'den uzun süredir güncellenmemiş,
+    yani worker çökmüş) işleri 'queued'a geri alır (ayrı bir reaper süreci
+    gerekmez), sonra kuyruktan (queued VEYA zamanı gelmiş retrying) TEK bir
+    işi FOR UPDATE SKIP LOCKED ile atomik sahiplenir — aynı batch_sahiplen()
+    deseni gibi, birden fazla worker aynı işi asla paylaşamaz. attempt_count
+    burada +1 edilir (bu bir deneme sayılır); is_basarisiz() eşik kontrolünü
+    döndürülen attempt_count'a göre yapar. Kuyrukta iş yoksa None döner."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE job_status SET status = 'queued', locked_by = NULL
+            WHERE status = 'running'
+              AND heartbeat_at < now() - (%s || ' seconds')::interval
+            """,
+            (_STALE_ESIK_SANIYE,),
+        )
+        cur.execute(
+            """
+            UPDATE job_status
+            SET status = 'running', locked_by = %s, heartbeat_at = now(),
+                attempt_count = attempt_count + 1, updated_at = now()
+            WHERE job_id = (
+                SELECT job_id FROM job_status
+                WHERE status = 'queued'
+                   OR (status = 'retrying' AND next_retry_at <= now())
+                ORDER BY created_at
+                FOR UPDATE SKIP LOCKED
+                LIMIT 1
+            )
+            RETURNING job_id, correlation_id, attempt_count
+            """,
+            (worker_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return None
+        return IsKaydi(
+            job_id=int(row[0]), correlation_id=row[1], attempt_count=int(row[2])
+        )
+
+
+def is_basarili(conn: Connection, job_id: int) -> None:
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE job_status SET status = 'succeeded', updated_at = now() WHERE job_id = %s",
+            (job_id,),
+        )
+
+
+def _backoff_saniye(attempt_count: int) -> int:
+    """Üstel geri çekilme, 1 saatte tavanlanır: 30, 60, 120, 240, ... saniye."""
+    return min(30 * 2 ** (attempt_count - 1), 3600)
+
+
+def is_basarisiz(conn: Connection, job: IsKaydi) -> str:
+    """attempt_count _MAX_DENEME'ye ulaştıysa 'dead_letter', değilse üstel
+    geri çekilmeyle 'retrying'e geçer; hangisi olduğunu döner ki çağıran
+    (worker/job_worker.py) ingestion_batch.status'u aynı karara göre
+    senkronize edebilsin. Hata metni job_status'ta SAKLANMAZ (kolon yok,
+    bilinçli - bkz. modül notu); çağıran ingestion_batch.error_summary'ye yazar."""
+    with conn.cursor() as cur:
+        if job.attempt_count >= _MAX_DENEME:
+            cur.execute(
+                "UPDATE job_status SET status = 'dead_letter', updated_at = now() WHERE job_id = %s",
+                (job.job_id,),
+            )
+            return "dead_letter"
+        bekleme = _backoff_saniye(job.attempt_count)
+        cur.execute(
+            """
+            UPDATE job_status
+            SET status = 'retrying',
+                next_retry_at = now() + (%s || ' seconds')::interval,
+                updated_at = now()
+            WHERE job_id = %s
+            """,
+            (bekleme, job.job_id),
+        )
+        return "retrying"

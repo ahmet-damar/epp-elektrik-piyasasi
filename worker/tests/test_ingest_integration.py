@@ -243,6 +243,86 @@ def test_batch_sahiplen_atomik_ikinci_cagri_basarisiz(conn) -> None:  # type: ig
         assert cur.fetchone()[0] == "running"
 
 
+def test_is_kuyruk_atomik_sahiplenme(conn) -> None:  # type: ignore[no-untyped-def]
+    """Faz 1: is_sahiplen() bir 'queued' işi bulup 'running'e taşır, attempt_count
+    1'e çıkar; hemen ardından ikinci bir sahiplenme denemesi (henüz heartbeat
+    bayat değil) None döner - iki worker aynı işi paylaşamaz."""
+    job_id = ingest.is_kaydi_olustur(conn, "test-correlation-1")
+
+    job = ingest.is_sahiplen(conn, "worker-a")
+    assert job is not None
+    assert job.job_id == job_id
+    assert job.correlation_id == "test-correlation-1"
+    assert job.attempt_count == 1
+
+    ikinci = ingest.is_sahiplen(conn, "worker-b")
+    assert ikinci is None
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT status, locked_by FROM job_status WHERE job_id = %s", (job_id,)
+        )
+        assert cur.fetchone() == ("running", "worker-a")
+
+
+def test_is_basarisiz_once_deneme_retrying_esik_ustunde_dead_letter(  # type: ignore[no-untyped-def]
+    conn,
+) -> None:
+    """attempt_count eşiğin (_MAX_DENEME=5) altındaysa 'retrying' + üstel
+    geri çekilme; eşiğe ulaşmışsa 'dead_letter'. Gerçek backoff süresini
+    beklemeden test etmek için IsKaydi elle, farklı attempt_count'larla
+    oluşturuluyor."""
+    job_id = ingest.is_kaydi_olustur(conn, "test-correlation-2")
+
+    ilk_deneme = ingest.IsKaydi(
+        job_id=job_id, correlation_id="test-correlation-2", attempt_count=1
+    )
+    durum = ingest.is_basarisiz(conn, ilk_deneme)
+    assert durum == "retrying"
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT status, next_retry_at IS NOT NULL FROM job_status WHERE job_id = %s",
+            (job_id,),
+        )
+        assert cur.fetchone() == ("retrying", True)
+
+    son_deneme = ingest.IsKaydi(
+        job_id=job_id, correlation_id="test-correlation-2", attempt_count=5
+    )
+    durum = ingest.is_basarisiz(conn, son_deneme)
+    assert durum == "dead_letter"
+    with conn.cursor() as cur:
+        cur.execute("SELECT status FROM job_status WHERE job_id = %s", (job_id,))
+        assert cur.fetchone() == ("dead_letter",)
+
+
+def test_is_sahiplen_bayat_heartbeat_geri_alir(conn) -> None:  # type: ignore[no-untyped-def]
+    """Bir worker bir işi sahiplenip çökerse (heartbeat_at güncellenmeyi
+    bırakırsa), _STALE_ESIK_SANIYE'den eskiyse başka bir is_sahiplen() çağrısı
+    onu 'queued'a geri alıp yeniden sahiplenir - kalıcı olarak kilitli kalmaz."""
+    job_id = ingest.is_kaydi_olustur(conn, "test-correlation-3")
+    ilk = ingest.is_sahiplen(conn, "worker-cokecek")
+    assert ilk is not None
+    assert ilk.attempt_count == 1
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE job_status SET heartbeat_at = now() - interval '20 minutes' WHERE job_id = %s",
+            (job_id,),
+        )
+
+    kurtaran = ingest.is_sahiplen(conn, "worker-kurtaran")
+    assert kurtaran is not None
+    assert kurtaran.job_id == job_id
+    assert kurtaran.attempt_count == 2  # ikinci deneme
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT status, locked_by FROM job_status WHERE job_id = %s", (job_id,)
+        )
+        assert cur.fetchone() == ("running", "worker-kurtaran")
+
+
 def test_batch_olustur_p0_5_tekil(conn) -> None:  # type: ignore[no-untyped-def]
     source_asset_id = ingest.kaynak_asset_olustur(
         conn,
