@@ -89,7 +89,7 @@ def _isi_uygula(conn: Connection, job: IsKaydi) -> None:
 
     uygun, sebep = pipeline.otomatik_onaya_uygun(sonuc)
     if uygun:
-        pipeline.batch_onayla(conn, sonuc)
+        pipeline.batch_onayla(conn, sonuc.batch_id)
         print(f"[OK] batch_id={batch_id} otomatik aktive edildi")
     else:
         print(

@@ -106,6 +106,38 @@ def test_tuketim_yukle_ve_p0_4_aktivasyon(conn) -> None:  # type: ignore[no-unty
         assert cur.fetchall() == []
 
 
+def test_batch_dolu_tablolari_bul_yalniz_veri_yazilan_tablolari_dondurur(  # type: ignore[no-untyped-def]
+    conn,
+) -> None:
+    """worker/pipeline.py:batch_onayla() artık IslemSonucu DEĞİL yalnız
+    batch_id alıyor (süreç sınırını aşabilmek için) — hangi tabloların
+    aktive edileceğini bu fonksiyonla DB'den sorguluyor. Bir batch'in
+    tablolarının BAZILARINA (örn. tüm satırları reddedildiği/karantinaya
+    düştüğü için) hiç satır yazmadığı durumu doğrular: o tablo listeye
+    girmemeli, aktivasyon_yap() ona hiç çağrılmamalı."""
+    ingest.dim_tarih_getir_veya_olustur(conn, 202601)
+    tuketim = kpi.yukle_tuketim(GOLDEN_INPUT / "tuketim.csv").kabul
+
+    batch = _yeni_batch(conn, "test-bos-tablo-v1")
+    ingest.fact_tuketim_yukle(conn, tuketim, batch)
+    # fact_uretim/fact_abone/fact_serbest_tuketici'ye BİLİNÇLİ OLARAK hiç
+    # yazılmadı (gerçekte tüm satırları reddedilmiş bir batch'i simüle eder).
+
+    dolu_tablolar = ingest.batch_dolu_tablolari_bul(conn, batch)
+    assert dolu_tablolar == ["fact_tuketim"]
+
+
+def test_batch_dolu_tablolari_bul_hic_veri_yoksa_bos_liste(  # type: ignore[no-untyped-def]
+    conn,
+) -> None:
+    """Bir batch hiçbir fact tablosuna satır yazmadıysa (4 tablonun da TÜM
+    satırları reddedildi/karantinaya düştü) bos liste doner - pipeline.
+    batch_onayla() bu durumda hicbir aktivasyon_yap() cagirmaz, yalniz
+    batch'i 'succeeded' yapar (hata FIRLATMAZ)."""
+    batch = _yeni_batch(conn, "test-tamamen-bos-v1")
+    assert ingest.batch_dolu_tablolari_bul(conn, batch) == []
+
+
 def test_uretim_ve_abone_yukle(conn) -> None:  # type: ignore[no-untyped-def]
     ingest.dim_tarih_getir_veya_olustur(conn, 202601)
     uretim = kpi.yukle_uretim(GOLDEN_INPUT / "uretim.csv").kabul

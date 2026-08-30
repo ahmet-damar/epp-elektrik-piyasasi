@@ -516,6 +516,30 @@ _DOGAL_ANAHTAR = {
 }
 
 
+def batch_dolu_tablolari_bul(conn: Connection, batch_id: int) -> list[str]:
+    """Bir batch_id için hangi fact tablolarının (varsa) satır yazdığını DB'den
+    sorgular — worker/pipeline.py'nin batch_onayla()'sı, süreç sınırını
+    (ayrı bir CLI/script çağrısı — elde yalnız batch_id vardır, epdk_aylik_isle()
+    tarafından döndürülen IslemSonucu bellek nesnesi DEĞİL) aşarken hangi
+    tabloları aktive edeceğini bununla belirler. Bir batch bazı tablolara hiç
+    satır yazmamışsa (örn. o tablonun tüm satırları reddedildi/karantinaya
+    düştü) o tablo listeye girmez — aktivasyon_yap() hiç çağrılmaz, o tablodaki
+    önceki aktif sürüm dokunulmadan kalır (doğru davranış: bu batch o tabloyu
+    hiç etkilemedi)."""
+    bulunanlar = []
+    with conn.cursor() as cur:
+        for tablo in _DOGAL_ANAHTAR:
+            cur.execute(
+                f"SELECT EXISTS(SELECT 1 FROM {tablo} WHERE ingestion_batch_id = %s)",  # nosec B608
+                (batch_id,),
+            )
+            row = cur.fetchone()
+            assert row is not None
+            if row[0]:
+                bulunanlar.append(tablo)
+    return bulunanlar
+
+
 def aktivasyon_yap(conn: Connection, tablo: str, batch_id: int) -> None:
     """P0-4: eski aktif sürümü pasifler + yeni batch'i TEK transaction'da aktifler.
 

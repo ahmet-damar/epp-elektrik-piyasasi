@@ -349,11 +349,29 @@ def _isle_govde(
     return sonuc
 
 
-def batch_onayla(conn: Connection, sonuc: IslemSonucu) -> None:
+def batch_onayla(conn: Connection, batch_id: int) -> list[str]:
     """Adım 5 (dokumanlar/01 §4): Faz 0'da onay UI'ı yok — bu fonksiyonun
     BİLİNÇLİ OLARAK çağrılması onay yerine geçer. epdk_aylik_isle()'ın
     is_active=false yazdığı HER fact tablosu için tek tek aktivasyon_yap()
-    çağırır (P0-4), sonunda batch'i 'succeeded' yapar."""
-    for tablo in sonuc.tablolar:
-        ingest.aktivasyon_yap(conn, tablo, sonuc.batch_id)
-    ingest.batch_durumu_guncelle(conn, sonuc.batch_id, "succeeded")
+    çağırır (P0-4), sonunda batch'i 'succeeded' yapar.
+
+    Kasıtlı olarak yalnız `batch_id: int` alır, IslemSonucu DEĞİL — bu
+    fonksiyon SIK SIK epdk_aylik_isle()'ı çağıran süreçten AYRI bir süreçte
+    çağrılır (elle/gecikmeli onay: bir CLI — worker/scripts/onayla.py —, bir
+    job kuyruğu, ya da bir insan; bkz. dokumanlar/06_canli_veri_operasyon_
+    gunlugu.md). IslemSonucu bellek içi bir dataclass'tır (pandas DataFrame'ler
+    içerir) ve süreç sınırını aşamaz; hangi tabloların aktive edileceği bu
+    yüzden DB'den sorgulanır (ingest.batch_dolu_tablolari_bul), IslemSonucu.
+    tablolar'ın anahtarlarından DEĞİL — ki zaten bu fonksiyon önceden de
+    yalnız o anahtarları kullanıyordu, DataFrame içeriğine hiç dokunmuyordu.
+
+    Aynı süreçte, epdk_aylik_isle()'ın döndürdüğü sonuc ile hemen ardından
+    çağrılıyorsa (örn. worker/job_worker.py) `batch_onayla(conn, sonuc.batch_id)`
+    şeklinde çağrılır — sonuc.batch_id zaten mevcuttur.
+
+    Döndürdüğü liste, aktive edilen tablo adlarıdır (audit/log amaçlı)."""
+    tablolar = ingest.batch_dolu_tablolari_bul(conn, batch_id)
+    for tablo in tablolar:
+        ingest.aktivasyon_yap(conn, tablo, batch_id)
+    ingest.batch_durumu_guncelle(conn, batch_id, "succeeded")
+    return tablolar

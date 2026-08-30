@@ -96,8 +96,10 @@ def test_epdk_aylik_isle_uctan_uca(conn) -> None:  # type: ignore[no-untyped-def
         )
         assert cur.fetchone()[0] == "running"  # bkz. modül notu: onay bekliyor
 
-    # Adım 5: Faz 0'da UI yok — bu çağrı onay yerine geçer.
-    pipeline.batch_onayla(conn, sonuc)
+    # Adım 5: Faz 0'da UI yok — bu çağrı onay yerine geçer. Yalnız batch_id
+    # alır (IslemSonucu DEĞİL) - bkz. pipeline.batch_onayla() docstring'i.
+    aktive_edilen = pipeline.batch_onayla(conn, sonuc.batch_id)
+    assert set(aktive_edilen) == set(sonuc.tablolar)
 
     with conn.cursor() as cur:
         for tablo, tablo_sonucu in sonuc.tablolar.items():
@@ -109,6 +111,36 @@ def test_epdk_aylik_isle_uctan_uca(conn) -> None:  # type: ignore[no-untyped-def
 
         cur.execute(
             "SELECT status FROM ingestion_batch WHERE batch_id = %s", (sonuc.batch_id,)
+        )
+        assert cur.fetchone()[0] == "succeeded"
+
+
+def test_batch_onayla_hicbir_tabloya_veri_yazilmamis_batch_hata_vermez(  # type: ignore[no-untyped-def]
+    conn,
+) -> None:
+    """batch_onayla() artık batch_id alıyor (bkz. modül notu, ayrı süreçte
+    çağrılabilme) — hiçbir fact tablosuna hiç satır yazmamış bir batch
+    (tüm satırları reddedildi senaryosu) üzerinde çağrıldığında hata
+    FIRLATMAMALI, yalnız hiçbir tabloyu aktive etmeden batch'i
+    'succeeded' yapmalı."""
+    from worker import ingest
+
+    source_asset_id = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="epdk_aylik",
+        dosya_adi="test_bos_batch.xlsx",
+        icerik=b"bos-batch-testi",
+        donem_tipi="aylik",
+        source_period="2026-01",
+    )
+    batch_id = ingest.batch_olustur(conn, source_asset_id, "test-bos-batch-v1", "s1")
+
+    aktive_edilen = pipeline.batch_onayla(conn, batch_id)
+    assert aktive_edilen == []
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT status FROM ingestion_batch WHERE batch_id = %s", (batch_id,)
         )
         assert cur.fetchone()[0] == "succeeded"
 
