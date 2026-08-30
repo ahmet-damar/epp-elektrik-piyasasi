@@ -140,3 +140,187 @@ def test_iller_getir_81_il(conn) -> None:  # type: ignore[no-untyped-def]
     df = analytics.iller_getir(conn)
     assert len(df) == 81
     assert "Eskişehir" in df["il_adi"].tolist()
+
+
+# ---------------------------------------------------------------------------
+# Faz 3 (hava normalizasyonu): sistem_parametre, hava_getir (UPSERT modeli),
+# kpi_11_12_hesapla, yıllık seriler + CAGR.
+# ---------------------------------------------------------------------------
+
+
+def test_sistem_parametre_getir_seed_degerleri(conn) -> None:  # type: ignore[no-untyped-def]
+    parametreler = analytics.sistem_parametre_getir(conn)
+    assert parametreler["hdd_baz_c"] == 18.0
+    assert parametreler["cdd_baz_c"] == 22.0
+    assert parametreler["hava_norm_yil"] == 10.0
+    assert parametreler["tuketim_norm_yil"] == 5.0
+
+
+def _bos_batch(conn, parser_version: str) -> int:  # type: ignore[no-untyped-def]
+    source_asset_id = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="acik_meteo",
+        dosya_adi=f"test_{parser_version}",
+        icerik=parser_version.encode(),
+        donem_tipi="aylik",
+        source_period="2020-01",
+    )
+    return ingest.batch_olustur(conn, source_asset_id, parser_version, "v1")
+
+
+def _hava_upsert(
+    conn, il_kodu: int, tarih_id: int, hdd: float, cdd: float, batch_id: int
+) -> None:  # type: ignore[no-untyped-def]
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO fact_hava_aylik (il_kodu, tarih_id, t_ort, hdd, cdd, ingestion_batch_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (il_kodu, tarih_id) DO UPDATE
+                SET hdd = EXCLUDED.hdd, cdd = EXCLUDED.cdd,
+                    ingestion_batch_id = EXCLUDED.ingestion_batch_id
+            """,
+            (il_kodu, tarih_id, 15.0, hdd, cdd, batch_id),
+        )
+
+
+def test_hava_getir_is_active_kolonu_yok_dogrudan_calisir(conn) -> None:  # type: ignore[no-untyped-def]
+    """Faz 3 migration 20260819_0009: fact_hava_aylik'ta is_active YOK,
+    hava_getir() bunu bekleyip patlamamalı."""
+    ingest.dim_tarih_getir_veya_olustur(conn, 202601)
+    batch_id = _bos_batch(conn, "test-hava-upsert")
+    _hava_upsert(conn, 26, 202601, hdd=250.0, cdd=10.0, batch_id=batch_id)
+
+    df = analytics.hava_getir(conn, 202601, il_kodu=26)
+    assert len(df) == 1
+    assert df["hdd"].iloc[0] == pytest.approx(250.0)
+
+    # UPSERT: aynı (il,tarih_id) tekrar yazılırsa tek satır kalmalı (çoğulluk yok)
+    _hava_upsert(conn, 26, 202601, hdd=260.0, cdd=12.0, batch_id=batch_id)
+    df2 = analytics.hava_getir(conn, 202601, il_kodu=26)
+    assert len(df2) == 1
+    assert df2["hdd"].iloc[0] == pytest.approx(260.0)
+
+
+def _tuketim_hava_gecmisi_kur(conn) -> int:  # type: ignore[no-untyped-def]
+    """il_kodu=26 için 2020-2022 tam yıl (36 ay) + 2023 Ocak (hedef dönem) —
+    kpi_11_12_hesapla'nın regresyon (min 12 gözlem) VE hava_norm_yil=3/
+    tuketim_norm_yil=2 (testte küçültülmüş pencereler) için yeterli geçmiş."""
+    il_kodu = 26
+    batch_id = _bos_batch(conn, "test-kpi-11-12")
+    donemler = [(yil, ay) for yil in (2020, 2021, 2022) for ay in range(1, 13)]
+    donemler.append((2023, 1))
+    for yil, ay in donemler:
+        tarih_id = yil * 100 + ay
+        ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+        hdd = max(0.0, 300.0 - (ay - 1) * 20.0)
+        cdd = float(ay) * 10.0
+        tuketim_mwh = 5000.0 + 4.0 * hdd + 2.0 * cdd
+        _hava_upsert(conn, il_kodu, tarih_id, hdd, cdd, batch_id)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO fact_tuketim
+                    (il_kodu, tarih_id, grup_id, baglanti, tuketim_mwh, ingestion_batch_id, is_active)
+                VALUES (%s, %s, (SELECT grup_id FROM dim_tuketici_grubu WHERE grup_adi = 'Mesken'),
+                        'dagitim', %s, %s, true)
+                ON CONFLICT ON CONSTRAINT uq_fact_tuketim_batch DO NOTHING
+                """,
+                (il_kodu, tarih_id, tuketim_mwh, batch_id),
+            )
+    return il_kodu
+
+
+def test_kpi_11_12_hesapla_yeterli_gecmisle_hesaplanir(conn) -> None:  # type: ignore[no-untyped-def]
+    il_kodu = _tuketim_hava_gecmisi_kur(conn)
+    sonuc = analytics.kpi_11_12_hesapla(
+        conn, il_kodu, 202301, hava_norm_yil=3, tuketim_norm_yil=2
+    )
+    assert sonuc["beta"] is not None
+    assert sonuc["beta"] == pytest.approx(4.0, abs=0.01)
+    assert sonuc["gamma"] == pytest.approx(2.0, abs=0.01)
+    assert sonuc["hava_norm_hdd"] is not None
+    assert sonuc["tuketim_norm"] is not None
+    assert sonuc["arindirilmis"] is not None
+    # gürültüsüz sentetik veri: arındırılmış tüketim, tüketim normuna çok yakın olmalı
+    assert sonuc["arindirilmis"] == pytest.approx(sonuc["tuketim_norm"], abs=1.0)
+    assert sonuc["kpi_12"] is not None
+    assert sonuc["kpi_12"] == pytest.approx(0.0, abs=0.5)
+
+
+def test_kpi_11_12_hesapla_yetersiz_gecmis_hesaplanamaz(conn) -> None:  # type: ignore[no-untyped-def]
+    ingest.dim_tarih_getir_veya_olustur(conn, 202601)
+    batch_id = _bos_batch(conn, "test-kpi-11-12-yetersiz")
+    _hava_upsert(conn, 26, 202601, hdd=200.0, cdd=5.0, batch_id=batch_id)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO fact_tuketim
+                (il_kodu, tarih_id, grup_id, baglanti, tuketim_mwh, ingestion_batch_id, is_active)
+            VALUES (26, 202601, (SELECT grup_id FROM dim_tuketici_grubu WHERE grup_adi = 'Mesken'),
+                    'dagitim', 6000.0, %s, true)
+            """,
+            (batch_id,),
+        )
+
+    sonuc = analytics.kpi_11_12_hesapla(conn, 26, 202601)
+    assert sonuc == {
+        "beta": None,
+        "gamma": None,
+        "hava_norm_hdd": None,
+        "hava_norm_cdd": None,
+        "tuketim_norm": None,
+        "arindirilmis": None,
+        "kpi_12": None,
+    }
+
+
+def test_yillik_serilerinden_cagr(conn) -> None:  # type: ignore[no-untyped-def]
+    il_kodu = 26
+    batch_id = _bos_batch(conn, "test-cagr")
+    for yil, tuketim_carpan in ((2021, 1.0), (2025, 1.4641)):  # %10/yıl, n=4
+        tarih_id = yil * 100 + 1
+        ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO fact_tuketim
+                    (il_kodu, tarih_id, grup_id, baglanti, tuketim_mwh, ingestion_batch_id, is_active)
+                VALUES (%s, %s, (SELECT grup_id FROM dim_tuketici_grubu WHERE grup_adi = 'Mesken'),
+                        'dagitim', %s, %s, true)
+                """,
+                (il_kodu, tarih_id, 1000.0 * tuketim_carpan, batch_id),
+            )
+
+    seri = analytics.yillik_tuketim_serisi_getir(conn)
+    cagr = analytics.cagr_seriden_hesapla(seri, "tuketim_mwh")
+    assert cagr is not None
+    assert cagr == pytest.approx(10.0, abs=0.1)
+
+
+def test_yillik_yenilenebilir_kurulu_guc_serisi_yil_sonu_alir(conn) -> None:  # type: ignore[no-untyped-def]
+    """Kurulu güç stok metriği - aylar TOPLANMAZ, yılın en güncel ayı alınır."""
+    il_kodu = 26
+    batch_id = _bos_batch(conn, "test-cagr-kurulu-guc")
+    kaynak_sorgu = "SELECT kaynak_id FROM dim_kaynak WHERE kaynak_adi = 'Rüzgar'"
+    lisans_sorgu = "SELECT lisans_id FROM dim_lisans WHERE tur = 'Lisansli'"
+    # kaynak_sorgu/lisans_sorgu sabit metin (kullanıcı girdisi değil), f-string
+    # yalnız bu ikisini gömer - değerler (il_kodu vb.) ayrı parametre.
+    for tarih_id, kurulu_guc in ((202401, 100.0), (202406, 150.0), (202412, 200.0)):
+        ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                INSERT INTO fact_uretim
+                    (il_kodu, tarih_id, kaynak_id, lisans_id, kurulu_guc_mw, ingestion_batch_id, is_active)
+                VALUES (%s, %s, ({kaynak_sorgu}), ({lisans_sorgu}), %s, %s, true)
+                """,  # nosec B608
+                (il_kodu, tarih_id, kurulu_guc, batch_id),
+            )
+
+    seri = analytics.yillik_yenilenebilir_kurulu_guc_serisi_getir(conn)
+    satir = seri.loc[seri["yil"] == 2024]
+    assert len(satir) == 1
+    assert satir["kurulu_guc_mw"].iloc[0] == pytest.approx(
+        200.0
+    )  # aralık (en son ay), 300 (toplam) DEĞİL

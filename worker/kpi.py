@@ -1,8 +1,14 @@
-"""EPP — KPI hesaplama motoru (Faz 0).
+"""EPP — KPI hesaplama motoru (Faz 0 + Faz 3 hava normalizasyonu).
 
 Kaynak: dokumanlar/04_kpi_sozlesmeleri.md (Ek B), dokumanlar/05_kaynak_dosya_sozlesmesi.md (Ek F).
 Girdi: is_active kabul edilmiş (dogrulanmis) DataFrame'ler. Veri kalite
 kurallari (red/karantina) bu modulun dogrula_* fonksiyonlarinda uygulanir.
+
+Faz 3 (KPI-11/12/25/26): tüm fonksiyonlar SAF kalır (bu modül hiç DB'ye
+bağlanmaz) — geçmiş yıl/ay serilerini (regresyon girdisi, norm hesapları)
+DB'den çekmek worker/analytics.py'nin sorumluluğu. Yeterli geçmiş veri
+yoksa (β/γ regresyonu, hava/tüketim normu, CAGR) fonksiyonlar sahte bir
+değer ÜRETMEZ, None ('hesaplanamaz') döner.
 """
 
 from __future__ import annotations
@@ -10,6 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 # dokumanlar/05_kaynak_dosya_sozlesmesi.md — Tüketici Grubu Eşleme
@@ -29,9 +36,9 @@ GECERLI_TURLER = {
     "ST Olma Hakkini Kullanmayan Aboneler",
 }
 
-# sistem_parametre varsayılanları (OD-1) — Faz 0'da sabit, ileride DB'den okunur
-HDD_BAZ_C = 18
-CDD_BAZ_C = 22
+# OD-1: HDD/CDD baz sıcaklıkları koda GÖMÜLMEZ — kpi_23_hdd/kpi_24_cdd
+# parametre olarak alır, çağıran (worker/analytics.py) sistem_parametre'den
+# okur (bkz. migration 20260819_0004: hdd_baz_c=18, cdd_baz_c=22).
 
 
 @dataclass
@@ -206,16 +213,101 @@ def kpi_13_yoy(simdi: float, gecen_yil: float | None) -> float | None:
 
 
 # ---------------------------------------------------------------------------
-# Hava Türetimleri (Faz 0 altyapı — β/γ Faz 3'te)
+# Hava Türetimleri (KPI-23/24, Faz 0'dan production) + KPI-11/12 (Faz 3)
 # ---------------------------------------------------------------------------
 
 
-def kpi_23_hdd(hava: pd.DataFrame) -> float:
-    return float((HDD_BAZ_C - hava["t_ort"]).clip(lower=0).sum())
+def kpi_23_hdd(hava: pd.DataFrame, hdd_baz_c: float) -> float:
+    return float((hdd_baz_c - hava["t_ort"]).clip(lower=0).sum())
 
 
-def kpi_24_cdd(hava: pd.DataFrame) -> float:
-    return float((hava["t_ort"] - CDD_BAZ_C).clip(lower=0).sum())
+def kpi_24_cdd(hava: pd.DataFrame, cdd_baz_c: float) -> float:
+    return float((hava["t_ort"] - cdd_baz_c).clip(lower=0).sum())
+
+
+_MIN_REGRESYON_GOZLEM = 12
+
+
+def beta_gamma_tahmin_et(
+    gecmis: pd.DataFrame, min_gozlem: int = _MIN_REGRESYON_GOZLEM
+) -> tuple[float, float, float] | None:
+    """KPI-11'in β/γ katsayılarını geçmiş (tuketim_mwh, hdd, cdd) gözlemleri
+    üzerinde basit OLS ile tahmin eder: tuketim_mwh ~ β·hdd + γ·cdd + sabit.
+    gecmis: aynı il, farklı dönemler (satır=dönem). Yeterli gözlem yoksa
+    (< min_gozlem, varsayılan 12 ay) None ('hesaplanamaz') döner — sahte
+    katsayı ÜRETİLMEZ. Döner: (beta, gamma, sabit)."""
+    if gecmis.empty:
+        return None
+    gecerli = gecmis.dropna(subset=["tuketim_mwh", "hdd", "cdd"])
+    if len(gecerli) < min_gozlem:
+        return None
+    X = np.column_stack(
+        [gecerli["hdd"].to_numpy(), gecerli["cdd"].to_numpy(), np.ones(len(gecerli))]
+    )
+    y = gecerli["tuketim_mwh"].to_numpy()
+    katsayilar, *_ = np.linalg.lstsq(X, y, rcond=None)
+    beta, gamma, sabit = katsayilar
+    return float(beta), float(gamma), float(sabit)
+
+
+def hava_normu_hesapla(
+    hdd_cdd_serisi: pd.DataFrame, yil_sayisi: int = 10
+) -> tuple[float, float] | None:
+    """OD-2: hava normu, aynı ay için son yil_sayisi (varsayılan 10, SABİT
+    pencere) yılın HDD/CDD ortalaması. hdd_cdd_serisi kolonları: hdd, cdd
+    (satır=yıl, aynı takvim ayı). Yeterli yıl yoksa None."""
+    gecerli = hdd_cdd_serisi.dropna(subset=["hdd", "cdd"])
+    if len(gecerli) < yil_sayisi:
+        return None
+    return float(gecerli["hdd"].mean()), float(gecerli["cdd"].mean())
+
+
+def tuketim_normu_hesapla(
+    arindirilmis_serisi: pd.Series, yil_sayisi: int = 5
+) -> float | None:
+    """OD-2: tüketim normu, aynı ay için son yil_sayisi (varsayılan 5,
+    ROLLING pencere) yılın ARINDIRILMIŞ (kpi_11_arindirilmis_tuketim'den
+    geçmiş) tüketim ortalaması. Yeterli yıl yoksa None."""
+    gecerli = arindirilmis_serisi.dropna()
+    if len(gecerli) < yil_sayisi:
+        return None
+    return float(gecerli.mean())
+
+
+def kpi_11_arindirilmis_tuketim(
+    tuketim_mwh: float,
+    hdd: float,
+    cdd: float,
+    hdd_norm: float,
+    cdd_norm: float,
+    beta: float,
+    gamma: float,
+) -> float:
+    """KPI-11: arındırılmış = gerçek − β·(HDD−HDD_norm) − γ·(CDD−CDD_norm)."""
+    return tuketim_mwh - beta * (hdd - hdd_norm) - gamma * (cdd - cdd_norm)
+
+
+def kpi_12_norm_sapmasi(
+    arindirilmis: float, tuketim_norm: float | None
+) -> float | None:
+    """KPI-12: (arındırılmış − tüketim_norm)/tüketim_norm × 100. tüketim_norm
+    yoksa/0 ise 'hesaplanamaz' (None)."""
+    if not tuketim_norm:
+        return None
+    return round((arindirilmis - tuketim_norm) / tuketim_norm * 100, 1)
+
+
+def kpi_cagr(ilk: float | None, son: float | None, n: int) -> float | None:
+    """KPI-25/26 jenerik CAGR: (son/ilk)^(1/n) − 1 × 100 ; n = gözlem − 1
+    (dokumanlar/04_kpi_sozlesmeleri.md, SRS_Teknik-Gereksinim_v1.5 Tablo 26).
+    KPI-25 = tüketim CAGR (ilk/son: toplam tüketim_mwh, yıl bazında).
+    KPI-26 = yenilenebilir kurulu güç CAGR (ilk/son: Σ kurulu_guc_mw WHERE
+    dim_kaynak.yenilenebilir_mi=true, yıl bazında) — hangi seriyi geçeceği
+    çağırana (worker/analytics.py + app/dashboard.py) aittir, formül aynı.
+    ilk<=0 veya n<=0 ise 'hesaplanamaz' (None) — sıfıra/negatife bölme yok."""
+    if ilk is None or son is None or ilk <= 0 or n <= 0:
+        return None
+    return round(((son / ilk) ** (1 / n) - 1) * 100, 1)
 
 
 # ---------------------------------------------------------------------------

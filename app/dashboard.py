@@ -326,8 +326,14 @@ st.divider()
 st.subheader("Hava (Faz 3 — henüz veri yok)")
 h1, h2 = st.columns(2)
 if not hava.empty:
-    h1.metric("Isıtma Derece Gün (KPI-23 HDD)", f"{kpi.kpi_23_hdd(hava):,.0f}")
-    h2.metric("Soğutma Derece Gün (KPI-24 CDD)", f"{kpi.kpi_24_cdd(hava):,.0f}")
+    # TODO(Faz 3 adım 5): analytics.sistem_parametre_getir()'den oku (OD-1).
+    h1.metric(
+        "Isıtma Derece Gün (KPI-23 HDD)", f"{kpi.kpi_23_hdd(hava, hdd_baz_c=18.0):,.0f}"
+    )
+    h2.metric(
+        "Soğutma Derece Gün (KPI-24 CDD)",
+        f"{kpi.kpi_24_cdd(hava, cdd_baz_c=22.0):,.0f}",
+    )
 else:
     h1.metric("Isıtma Derece Gün (KPI-23 HDD)", "veri yok")
     h2.metric("Soğutma Derece Gün (KPI-24 CDD)", "veri yok")

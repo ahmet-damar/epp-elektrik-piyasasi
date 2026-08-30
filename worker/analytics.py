@@ -1,4 +1,4 @@
-"""EPP — Faz 2 dashboard için salt-okunur analitik sorgular.
+"""EPP — Faz 2 dashboard için salt-okunur analitik sorgular (+ Faz 3 hava normalizasyonu).
 
 worker/kpi.py'nin ZATEN beklediği DataFrame şekillerini üretir (kpi.py'ye
 hiç dokunulmadı) — fact_* tablolarını ilgili dim_*'larla join'leyip
@@ -19,6 +19,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pandas as pd
+
+from worker import kpi
 
 if TYPE_CHECKING:
     from psycopg import Connection
@@ -150,14 +152,16 @@ def hava_getir(
     conn: Connection, tarih_id: int, il_kodu: int | None = None
 ) -> pd.DataFrame:
     """kpi_23_hdd/kpi_24_cdd'nin beklediği şekil: il, il_kodu, t_ort, hdd, cdd,
-    radyasyon, ruzgar. fact_hava_aylik Faz 2'de henüz hiç doldurulmadı (Faz 3,
-    Open-Meteo) — boş DataFrame dönebilir; çağıran 'veri yok' göstermeli."""
+    radyasyon, ruzgar. fact_hava_aylik Faz 3'te UPSERT modeline geçti (bkz.
+    migration 20260819_0009) — is_active YOK, her (il,tarih_id) için tek
+    güncel satır zaten var. Open-Meteo hiç çekilmediyse boş DataFrame
+    dönebilir; çağıran 'veri yok' göstermeli."""
     kolonlar = ["il", "il_kodu", "t_ort", "hdd", "cdd", "radyasyon", "ruzgar"]
     sorgu = """
         SELECT di.il_adi, fh.il_kodu, fh.t_ort, fh.hdd, fh.cdd, fh.radyasyon, fh.ruzgar
         FROM fact_hava_aylik fh
         JOIN dim_il di ON di.il_kodu = fh.il_kodu
-        WHERE fh.tarih_id = %s AND fh.is_active
+        WHERE fh.tarih_id = %s
     """
     parametreler: list[object] = [tarih_id]
     if il_kodu is not None:
@@ -169,6 +173,188 @@ def hava_getir(
     df = pd.DataFrame(satirlar, columns=kolonlar)
     _numerik(df, ["t_ort", "hdd", "cdd", "radyasyon", "ruzgar"])
     return df
+
+
+def sistem_parametre_getir(conn: Connection) -> dict[str, float]:
+    """OD-1: HDD/CDD baz sıcaklıkları vb. sistem_parametre'den okunur, koda
+    gömülmez. Anahtarlar: hdd_baz_c, cdd_baz_c, hava_norm_yil, tuketim_norm_yil
+    (bkz. migration 20260819_0004)."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT parametre_adi, parametre_degeri FROM sistem_parametre")
+        satirlar = cur.fetchall()
+    return {ad: float(deger) for ad, deger in satirlar}
+
+
+def _il_tuketim_hava_getir(conn: Connection, il_kodu: int) -> pd.DataFrame:
+    """KPI-11/12'nin TEK veri kaynağı: bir ilin tüm dönemlerinde toplam
+    tuketim_mwh (tüm grup/baglanti) + o dönemin hdd/cdd'si + yil/ay.
+    Regresyon (β/γ), hava normu ve tüketim normu hepsi bundan (pandas'ta
+    filtrelenerek) türetilir — bkz. kpi_11_12_hesapla()."""
+    kolonlar = ["tarih_id", "yil", "ay", "tuketim_mwh", "hdd", "cdd"]
+    sorgu = """
+        SELECT dt.tarih_id, dt.yil, dt.ay, SUM(ft.tuketim_mwh) AS tuketim_mwh,
+               fh.hdd, fh.cdd
+        FROM fact_tuketim ft
+        JOIN dim_tarih dt ON dt.tarih_id = ft.tarih_id
+        JOIN fact_hava_aylik fh
+          ON fh.il_kodu = ft.il_kodu AND fh.tarih_id = ft.tarih_id
+        WHERE ft.il_kodu = %s AND ft.is_active
+        GROUP BY dt.tarih_id, dt.yil, dt.ay, fh.hdd, fh.cdd
+        ORDER BY dt.tarih_id
+    """
+    with conn.cursor() as cur:
+        cur.execute(sorgu, [il_kodu])
+        satirlar = cur.fetchall()
+    df = pd.DataFrame(satirlar, columns=kolonlar)
+    _numerik(df, ["tuketim_mwh", "hdd", "cdd"])
+    return df
+
+
+def kpi_11_12_hesapla(
+    conn: Connection,
+    il_kodu: int,
+    tarih_id: int,
+    hava_norm_yil: int = 10,
+    tuketim_norm_yil: int = 5,
+) -> dict[str, float | None]:
+    """KPI-11 (arındırılmış tüketim) + KPI-12 (norm sapması) için gereken
+    geçmiş veriyi çeker ve worker/kpi.py'nin SAF fonksiyonlarını sırayla
+    çağırır: β/γ regresyonu -> hava normu (OD-2: hava_norm_yil, SABİT
+    pencere) -> tüketim normu (OD-2: tuketim_norm_yil, ROLLING pencere,
+    aynı-ay ARINDIRILMIŞ ortalama) -> arındırılmış + KPI-12. Zincirin
+    HERHANGİ bir adımında yeterli geçmiş yoksa sonraki adımlar atlanır,
+    ilgili alanlar None ('hesaplanamaz') kalır — sahte değer üretilmez.
+    hava_norm_yil/tuketim_norm_yil çağıran tarafından sistem_parametre'den
+    (hava_norm_yil, tuketim_norm_yil) okunup geçirilmelidir (OD-1/OD-2)."""
+    sonuc: dict[str, float | None] = {
+        "beta": None,
+        "gamma": None,
+        "hava_norm_hdd": None,
+        "hava_norm_cdd": None,
+        "tuketim_norm": None,
+        "arindirilmis": None,
+        "kpi_12": None,
+    }
+
+    yil, ay = divmod(tarih_id, 100)
+    gecmis = _il_tuketim_hava_getir(conn, il_kodu)
+    if gecmis.empty:
+        return sonuc
+
+    katsayilar = kpi.beta_gamma_tahmin_et(gecmis)
+    if katsayilar is None:
+        return sonuc
+    beta, gamma, _sabit = katsayilar
+    sonuc["beta"], sonuc["gamma"] = beta, gamma
+
+    ayni_ay = gecmis[gecmis["ay"] == ay]
+    hava_penceresi = ayni_ay[
+        (ayni_ay["yil"] < yil) & (ayni_ay["yil"] >= yil - hava_norm_yil)
+    ]
+    normu = kpi.hava_normu_hesapla(
+        hava_penceresi[["hdd", "cdd"]], yil_sayisi=hava_norm_yil
+    )
+    if normu is None:
+        return sonuc
+    hdd_norm, cdd_norm = normu
+    sonuc["hava_norm_hdd"], sonuc["hava_norm_cdd"] = hdd_norm, cdd_norm
+
+    tuketim_penceresi = ayni_ay[
+        (ayni_ay["yil"] < yil) & (ayni_ay["yil"] >= yil - tuketim_norm_yil)
+    ].copy()
+    tuketim_norm: float | None = None
+    if not tuketim_penceresi.empty:
+        tuketim_penceresi["arindirilmis"] = tuketim_penceresi.apply(
+            lambda satir: kpi.kpi_11_arindirilmis_tuketim(
+                satir["tuketim_mwh"],
+                satir["hdd"],
+                satir["cdd"],
+                hdd_norm,
+                cdd_norm,
+                beta,
+                gamma,
+            ),
+            axis=1,
+        )
+        tuketim_norm = kpi.tuketim_normu_hesapla(
+            tuketim_penceresi["arindirilmis"], yil_sayisi=tuketim_norm_yil
+        )
+    sonuc["tuketim_norm"] = tuketim_norm
+
+    simdiki = gecmis[gecmis["tarih_id"] == tarih_id]
+    if simdiki.empty:
+        return sonuc
+    satir = simdiki.iloc[0]
+    arindirilmis = kpi.kpi_11_arindirilmis_tuketim(
+        satir["tuketim_mwh"],
+        satir["hdd"],
+        satir["cdd"],
+        hdd_norm,
+        cdd_norm,
+        beta,
+        gamma,
+    )
+    sonuc["arindirilmis"] = arindirilmis
+    sonuc["kpi_12"] = kpi.kpi_12_norm_sapmasi(arindirilmis, tuketim_norm)
+    return sonuc
+
+
+def yillik_tuketim_serisi_getir(conn: Connection) -> pd.DataFrame:
+    """KPI-25 (tüketim CAGR) girdisi: yıl başına toplam tuketim_mwh (tüm il,
+    tüm grup/baglanti — akış/flow metriği, aylar toplanır). Kolonlar: yil, tuketim_mwh."""
+    sorgu = """
+        SELECT dt.yil, SUM(ft.tuketim_mwh) AS tuketim_mwh
+        FROM fact_tuketim ft
+        JOIN dim_tarih dt ON dt.tarih_id = ft.tarih_id
+        WHERE ft.is_active
+        GROUP BY dt.yil
+        ORDER BY dt.yil
+    """
+    with conn.cursor() as cur:
+        cur.execute(sorgu)
+        satirlar = cur.fetchall()
+    df = pd.DataFrame(satirlar, columns=["yil", "tuketim_mwh"])
+    _numerik(df, ["tuketim_mwh"])
+    return df
+
+
+def yillik_yenilenebilir_kurulu_guc_serisi_getir(conn: Connection) -> pd.DataFrame:
+    """KPI-26 (yenilenebilir kurulu güç CAGR) girdisi: yıl başına, o yılın
+    EN GÜNCEL ayındaki toplam yenilenebilir kurulu_guc_mw (dim_kaynak.
+    yenilenebilir_mi=true) — kurulu güç bir STOK metriğidir, aylar
+    TOPLANMAZ, yılın son ölçümü alınır. Kolonlar: yil, kurulu_guc_mw."""
+    sorgu = """
+        SELECT dt.tarih_id, dt.yil, dt.ay, SUM(fu.kurulu_guc_mw) AS kurulu_guc_mw
+        FROM fact_uretim fu
+        JOIN dim_tarih dt ON dt.tarih_id = fu.tarih_id
+        JOIN dim_kaynak dk ON dk.kaynak_id = fu.kaynak_id
+        WHERE fu.is_active AND dk.yenilenebilir_mi = true
+        GROUP BY dt.tarih_id, dt.yil, dt.ay
+        ORDER BY dt.tarih_id
+    """
+    with conn.cursor() as cur:
+        cur.execute(sorgu)
+        satirlar = cur.fetchall()
+    df = pd.DataFrame(satirlar, columns=["tarih_id", "yil", "ay", "kurulu_guc_mw"])
+    _numerik(df, ["kurulu_guc_mw"])
+    if df.empty:
+        return pd.DataFrame(columns=["yil", "kurulu_guc_mw"])
+    en_guncel = df.loc[df.groupby("yil")["ay"].idxmax()]
+    return en_guncel[["yil", "kurulu_guc_mw"]].reset_index(drop=True)
+
+
+def cagr_seriden_hesapla(seri: pd.DataFrame, deger_kolonu: str) -> float | None:
+    """seri: en az iki farklı yıl içeren (yil, deger_kolonu) DataFrame — bkz.
+    yillik_tuketim_serisi_getir/yillik_yenilenebilir_kurulu_guc_serisi_getir.
+    n = son_yil - ilk_yil (dokumanlar/04_kpi_sozlesmeleri.md, SRS Tablo 26
+    örneği: 2021->2025 => n=4). worker/kpi.py kpi_cagr()'ı çağırır."""
+    gecerli = seri.dropna(subset=[deger_kolonu]).sort_values("yil")
+    if len(gecerli) < 2:
+        return None
+    ilk = float(gecerli[deger_kolonu].iloc[0])
+    son = float(gecerli[deger_kolonu].iloc[-1])
+    n = int(gecerli["yil"].iloc[-1] - gecerli["yil"].iloc[0])
+    return kpi.kpi_cagr(ilk, son, n)
 
 
 def donemler_getir(conn: Connection) -> pd.DataFrame:

@@ -12,7 +12,11 @@ CREATE TABLE IF NOT EXISTS dim_il (
   il_kodu INT PRIMARY KEY CHECK (il_kodu BETWEEN 1 AND 81),
   il_adi TEXT NOT NULL,
   bolge TEXT,
-  dagitim_bolgesi TEXT
+  dagitim_bolgesi TEXT,
+  -- il merkezi enlem/boylam (Faz 3, worker/jobs/fetch_weather.py Open-Meteo
+  -- konumu için) - il geneli ağırlıklı ortalama DEĞİL, bkz. 03_veri_modeli.md.
+  lat NUMERIC(8, 5),
+  lon NUMERIC(8, 5)
 );
 
 CREATE TABLE IF NOT EXISTS dim_kaynak (
@@ -122,6 +126,10 @@ CREATE TABLE IF NOT EXISTS fact_serbest_tuketici (
   CONSTRAINT uq_fact_serbest_tuketici_batch UNIQUE (il_kodu, tarih_id, tur, grup_id, ingestion_batch_id)
 );
 
+-- fact_hava_aylik DİĞER fact tablolarından FARKLI bir sürümleme modeli
+-- kullanır (dokumanlar/02_srs_ozet.md SÜRÜMLEME KURALI): batch-versiyonlama
+-- + is_active YOK, UPSERT ile TEK güncel satır (il_kodu, tarih_id başına).
+-- Değişiklik geçmişi fact_hava_aylik_log'a (aşağıda) JSONB olarak yazılır.
 CREATE TABLE IF NOT EXISTS fact_hava_aylik (
   fact_hava_aylik_id BIGSERIAL PRIMARY KEY,
   il_kodu INT NOT NULL REFERENCES dim_il(il_kodu) ON DELETE RESTRICT,
@@ -132,10 +140,20 @@ CREATE TABLE IF NOT EXISTS fact_hava_aylik (
   radyasyon NUMERIC(8,2),
   ruzgar NUMERIC(8,2),
   ingestion_batch_id BIGINT NOT NULL REFERENCES ingestion_batch(batch_id) ON DELETE RESTRICT,
-  is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT uq_fact_hava_batch UNIQUE (il_kodu, tarih_id, ingestion_batch_id)
+  CONSTRAINT uq_fact_hava_aylik_il_tarih UNIQUE (il_kodu, tarih_id)
 );
+
+CREATE TABLE IF NOT EXISTS fact_hava_aylik_log (
+  log_id BIGSERIAL PRIMARY KEY,
+  il_kodu INT NOT NULL REFERENCES dim_il(il_kodu) ON DELETE RESTRICT,
+  tarih_id INT NOT NULL REFERENCES dim_tarih(tarih_id) ON DELETE RESTRICT,
+  old_data JSONB,
+  new_data JSONB NOT NULL,
+  ingestion_batch_id BIGINT NOT NULL REFERENCES ingestion_batch(batch_id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_fact_hava_aylik_log_il_tarih ON fact_hava_aylik_log (il_kodu, tarih_id);
 
 CREATE TABLE IF NOT EXISTS job_status (
   job_id BIGSERIAL PRIMARY KEY,
@@ -191,10 +209,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_fact_serbest_tuketici_active
   ON fact_serbest_tuketici (il_kodu, tarih_id, tur, grup_id)
   WHERE is_active;
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_fact_hava_aylik_active
-  ON fact_hava_aylik (il_kodu, tarih_id)
-  WHERE is_active;
-
 CREATE INDEX IF NOT EXISTS idx_fact_tuketim_batch_id ON fact_tuketim (ingestion_batch_id);
 CREATE INDEX IF NOT EXISTS idx_fact_uretim_batch_id ON fact_uretim (ingestion_batch_id);
 CREATE INDEX IF NOT EXISTS idx_fact_abone_batch_id ON fact_abone (ingestion_batch_id);
@@ -239,6 +253,7 @@ ALTER TABLE fact_uretim ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fact_abone ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fact_serbest_tuketici ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fact_hava_aylik ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fact_hava_aylik_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY viewer_source_asset_select ON source_asset
@@ -267,7 +282,7 @@ CREATE POLICY viewer_fact_serbest_tuketici_select ON fact_serbest_tuketici
 
 CREATE POLICY viewer_fact_hava_aylik_select ON fact_hava_aylik
   FOR SELECT TO viewer
-  USING (public.current_app_role() = 'viewer' AND is_active = true);
+  USING (public.current_app_role() = 'viewer');
 
 CREATE POLICY data_operator_source_asset_insert ON source_asset
   FOR INSERT TO data_operator
@@ -332,6 +347,16 @@ CREATE POLICY data_operator_fact_hava_aylik_update ON fact_hava_aylik
   USING (public.current_app_role() = 'data_operator')
   WITH CHECK (public.current_app_role() = 'data_operator');
 
+-- fact_hava_aylik_log append-only: audit_log ile aynı desen, SELECT+INSERT
+-- yalnızca, UPDATE/DELETE hiç kimseye açılmaz.
+CREATE POLICY data_operator_fact_hava_aylik_log_select ON fact_hava_aylik_log
+  FOR SELECT TO data_operator
+  USING (public.current_app_role() = 'data_operator');
+
+CREATE POLICY data_operator_fact_hava_aylik_log_insert ON fact_hava_aylik_log
+  FOR INSERT TO data_operator
+  WITH CHECK (public.current_app_role() = 'data_operator');
+
 CREATE POLICY admin_source_asset_all ON source_asset
   FOR ALL TO admin
   USING (public.current_app_role() = 'admin')
@@ -367,6 +392,14 @@ CREATE POLICY admin_fact_hava_aylik_all ON fact_hava_aylik
   USING (public.current_app_role() = 'admin')
   WITH CHECK (public.current_app_role() = 'admin');
 
+CREATE POLICY admin_fact_hava_aylik_log_select ON fact_hava_aylik_log
+  FOR SELECT TO admin
+  USING (public.current_app_role() = 'admin');
+
+CREATE POLICY admin_fact_hava_aylik_log_insert ON fact_hava_aylik_log
+  FOR INSERT TO admin
+  WITH CHECK (public.current_app_role() = 'admin');
+
 CREATE POLICY admin_audit_log_select ON audit_log
   FOR SELECT TO admin
   USING (public.current_app_role() = 'admin');
@@ -385,6 +418,7 @@ GRANT SELECT, INSERT, UPDATE ON TABLE fact_tuketim, fact_uretim, fact_abone, fac
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE source_asset, ingestion_batch TO admin;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE fact_tuketim, fact_uretim, fact_abone, fact_serbest_tuketici, fact_hava_aylik TO admin;
 GRANT SELECT, INSERT ON TABLE audit_log TO admin;
+GRANT SELECT, INSERT ON TABLE fact_hava_aylik_log TO data_operator, admin;
 
 BEGIN;
 
@@ -400,6 +434,7 @@ ALTER TABLE public.fact_uretim ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fact_abone ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fact_serbest_tuketici ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fact_hava_aylik ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fact_hava_aylik_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dim_tarih ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dim_il ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dim_kaynak ENABLE ROW LEVEL SECURITY;

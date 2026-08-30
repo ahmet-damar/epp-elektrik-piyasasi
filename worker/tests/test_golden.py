@@ -44,8 +44,8 @@ def hesaplanan() -> dict:
         "KPI-09_mesken": kpi.kpi_09_grup_payi(tuketim, "Mesken"),
         "KPI-10_mesken": kpi.kpi_10_abone_basi(tuketim, abone, "Mesken"),
         "KPI-13_yoy": kpi.kpi_13_yoy(toplam_tuketim, toplam_gecen_yil),
-        "KPI-23_hdd": kpi.kpi_23_hdd(hava),
-        "KPI-24_cdd": kpi.kpi_24_cdd(hava),
+        "KPI-23_hdd": kpi.kpi_23_hdd(hava, hdd_baz_c=18),
+        "KPI-24_cdd": kpi.kpi_24_cdd(hava, cdd_baz_c=22),
         "P0-2": kpi.p0_2_sanayi(tuketim),
     }
 

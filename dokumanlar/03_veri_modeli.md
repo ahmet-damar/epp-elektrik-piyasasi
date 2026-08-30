@@ -89,6 +89,13 @@ CREATE UNIQUE INDEX uq_fact_tuketim_active
   Aboneler' / 'ST Olma Hakkini Kullanmayan Aboneler', 2026-08-30 doğrulandı)
 - **fact_hava_aylik:** UNIQUE(il_kodu, tarih_id); t_ort, hdd, cdd, radyasyon, ruzgar
   + **fact_hava_aylik_log:** old_data/new_data JSONB (tüm ölçüm snapshot)
+  **Faz 3'te kuruldu (2026-08-30, migration 20260819_0009):** diğer fact
+  tablolarından FARKLI sürümleme modeli — batch-versiyonlama/is_active YOK,
+  worker/jobs/fetch_weather.py doğrudan UPSERT eder (UNIQUE(il_kodu,tarih_id)
+  tekilliği), her değişiklik fact_hava_aylik_log'a append-only JSONB olarak
+  yazılır. HDD/CDD **il merkezi** koordinatından (dim_il.lat/lon, migration
+  20260819_0008) hesaplanır — il geneli ağırlıklı ortalama DEĞİL, tek bir
+  temsili nokta (il merkezi/şehir merkezi).
 
 ## İşlem & Config Tabloları
 - **job_status:** correlation_id, status CHECK(queued/running/succeeded/failed/retrying/dead_letter),
