@@ -109,3 +109,16 @@ eksikse yalnız mutabakat kontrolü atlanıyor (batch reddedilmiyor), T2/T3/T5/
 T6/T8/T12'nin varlığı hiç aranmıyor. "İl toplamı ↔ TÜRKİYE ±%0,5" kuralı da
 sert red değil — uyuşmazlık `IslemSonucu.mutabakat`'a düşer, batch_onayla()
 öncesi insan/gelecekteki UI incelemesine bırakılır.
+
+**Gerçek veri notu (2026-08-31, EPDK Ocak 2026 ilk canlı yükleme):** EPDK
+raporları zaman zaman retroaktif negatif düzeltme kalemleri içerebiliyor —
+bu ayki örnek: Batman/Tarımsal, T11'de tek satır (−471,934 MWh) ve T13'te
+aynı toplamı oluşturan iki satıra bölünmüş (−45,081 + −426,853 MWh); ayrıca
+Tekirdağ/Sanayi (−172,630) ve Yozgat/Sanayi (−3,791) T13'te. Bunlar parser
+hatası DEĞİL — resmi dosyada böyle yayınlanmış, ülke geneli toplamlar
+(T7/T9 mutabakatı) bu değerleri zaten içeriyor. Yukarıdaki "Negatif değer →
+reddet" kuralı BİLİNÇLİ OLARAK bunları da reddediyor (gerçek veri hatasına
+karşı sıfır tolerans tercih edildi) — bu yüzden `otomatik_onaya_uygun()`
+her seferinde bu tür satırlar için elle inceleme/onay isteyecek. Kural
+DEĞİŞTİRİLMEDİ; bu, "neden yine red var" sorusuna gelecekte hazır cevap
+olsun diye düşülmüş bir not.

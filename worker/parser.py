@@ -626,7 +626,25 @@ def tablo13_serbest_tuketici_oku(
                         }
                     )
         satir += 1
-    return pd.DataFrame(satirlar, columns=kolonlar)
+    df = pd.DataFrame(satirlar, columns=kolonlar)
+    if df.empty:
+        return df
+    # İstanbul gibi birden fazla dağıtım bölgesine bölünmüş il'ler aynı
+    # il_kodu'na düşer (T9/T10 ile aynı desen, bkz. _uzun_format_grup_oku) -
+    # "il" metni farklı olduğundan gruplamadan HARİÇ tutulur, tekrar eden
+    # (il_kodu, tarih_id, tur, grup) satırları toplanır, sonra kanonik il adı
+    # geri eklenir. Bu olmadan ON CONFLICT DO NOTHING sessizce bir tarafı
+    # düşürüyordu (2026-08-31 canlı veride tespit edildi, ~2,77M MWh kayıp).
+    grup_kolonlari = [
+        k for k in kolonlar if k not in ("il", "tuketim_mwh", "tuketici_sayisi")
+    ]
+    sonuc = df.groupby(grup_kolonlari, as_index=False, dropna=False)[
+        ["tuketim_mwh", "tuketici_sayisi"]
+    ].sum(min_count=1)
+    sonuc["il"] = sonuc["il_kodu"].map(
+        lambda k: il_adi_kanonik(k) if pd.notna(k) else "TÜRKİYE"
+    )
+    return sonuc[kolonlar]
 
 
 # ---------------------------------------------------------------------------

@@ -323,6 +323,45 @@ def _sentetik_workbook() -> openpyxl.Workbook:
     t13.append(
         [None, "İl Toplam", 1.0, 2.0, 3.0, 4.0, 5.0, 15.0, 10, 20, 30, 40, 50, 150]
     )
+    # İstanbul: Anadolu + Avrupa aynı il_kodu'na (34) düşer, toplanmalı -
+    # 2026-08-31 canlı veri incelemesinde bulunan silent-drop hatası
+    # (ON CONFLICT DO NOTHING bir tarafı sessizce eliyordu) için regresyon.
+    t13.append(
+        [
+            "İSTANBUL (ANADOLU)",
+            "Serbest Tüketici",
+            10.0,
+            20.0,
+            30.0,
+            40.0,
+            50.0,
+            150.0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            15,
+        ]
+    )
+    t13.append(
+        [
+            "İSTANBUL (AVRUPA)",
+            "Serbest Tüketici",
+            100.0,
+            200.0,
+            300.0,
+            400.0,
+            500.0,
+            1500.0,
+            10,
+            20,
+            30,
+            40,
+            50,
+            150,
+        ]
+    )
 
     return wb
 
@@ -596,8 +635,9 @@ def test_tablo13_serbest_tuketici(wb: openpyxl.Workbook) -> None:
     df = parser.tablo13_serbest_tuketici_oku(wb["Tablo 13"], 202601)
 
     # "İl Toplam" satırları hiç üretilmemeli: 3 tur × 5 grup (Eskişehir) +
-    # 1 tur × 5 grup (Adana) = 20 satır.
-    assert len(df) == 20
+    # 1 tur × 5 grup (Adana) + 1 tur × 5 grup (İstanbul, Anadolu+Avrupa
+    # toplanmış) = 25 satır.
+    assert len(df) == 25
     assert set(df["tur"].unique()) == {
         "Serbest Tuketici",
         "ST Olma Hakki Bulunmayan Aboneler",
@@ -631,9 +671,24 @@ def test_tablo13_serbest_tuketici(wb: openpyxl.Workbook) -> None:
     assert kullanmayan["tuketim_mwh"] == pytest.approx(-5.0)
 
     # İleri doldurma: Adana'nın tek satırı da doğru il'e bağlanmalı.
+    # "il" metni artık kanonik ada normalize ediliyor (T9/T10 ile aynı desen,
+    # bkz. tablo13_serbest_tuketici_oku'daki İstanbul Anadolu/Avrupa toplama
+    # düzeltmesi) - ham hücre metni ("ADANA") değil il_adi_kanonik() çıktısı.
     adana = df[df["il_kodu"] == 1]
     assert len(adana) == 5
-    assert (adana["il"] == "ADANA").all()
+    assert (adana["il"] == "Adana").all()
+
+    # İstanbul (Anadolu) + İstanbul (Avrupa) -> tek "İstanbul" satırına
+    # toplanmalı, hiçbiri sessizce kaybolmamalı.
+    istanbul = df[df["il_kodu"] == 34]
+    assert len(istanbul) == 5
+    assert (istanbul["il"] == "İstanbul").all()
+    mesken_ist = istanbul[istanbul["grup"] == "Mesken"].iloc[0]
+    assert mesken_ist["tuketim_mwh"] == pytest.approx(110.0)  # 10 + 100
+    assert mesken_ist["tuketici_sayisi"] == pytest.approx(11.0)  # 1 + 10
+    aydinlatma_ist = istanbul[istanbul["grup"] == "Aydınlatma"].iloc[0]
+    assert aydinlatma_ist["tuketim_mwh"] == pytest.approx(550.0)  # 50 + 500
+    assert aydinlatma_ist["tuketici_sayisi"] == pytest.approx(55.0)  # 5 + 50
 
 
 def test_dogrula_serbest_tuketici_red_ve_karantina() -> None:
