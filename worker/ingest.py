@@ -26,6 +26,7 @@ edilir; yerel geliştirme ortamında çalışan bir Postgres yoktu.
 
 from __future__ import annotations
 
+import calendar
 import hashlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -86,6 +87,19 @@ def tarih_id_from_source_period(source_period: str, donem_tipi: str) -> int:
         return int(source_period) * 100
     yil_str, ay_str = source_period.split("-")
     return int(yil_str) * 100 + int(ay_str)
+
+
+def donem_saat_sayisi(tarih_id: int) -> float:
+    """worker/kpi.py kpi_05_kapasite_faktoru()'nün 'saat' parametresi için:
+    tarih_id'nin kapsadığı dönemdeki toplam saat sayısı (aylık: o ayın gün
+    sayısı*24; yıllık: 365/366 gün*24). Faz 2 dashboard'unda kullanılır."""
+    bilesen = tarih_bilesenleri(tarih_id)
+    yil, ay = bilesen["yil"], bilesen["ay"]
+    if ay == 0:
+        gun_sayisi = 366 if calendar.isleap(yil) else 365
+    else:
+        gun_sayisi = calendar.monthrange(yil, ay)[1]
+    return gun_sayisi * 24.0
 
 
 def dim_tarih_getir_veya_olustur(conn: Connection, tarih_id: int) -> int:

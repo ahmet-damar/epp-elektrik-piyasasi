@@ -13,11 +13,16 @@ ve dashboard'a dönüştüren **açık kaynak** web platformu.
 
 ## 3. Mimari (3 Katman)
 ```
-SUNUM      : Next.js + TypeScript (app/)      — dashboard, yükleme UI
+SUNUM      : Streamlit (app/dashboard.py)     — dashboard (Faz 2); Next.js+TS "Son Faz"'a ertelendi
 İŞLEM      : Python + FastAPI (worker/)       — parser, KPI, jobs
 VERİ       : PostgreSQL (db/)                 — yıldız şema + batch
 ```
 Tüm bileşenler açık kaynak; Docker ile self-host edilebilir.
+
+**NOT (2026-08-30, Faz 2):** Sunum katmanı kararı gözden geçirildi — bkz.
+dokumanlar/06_adr_dashboard_teknoloji.md. Next.js+TypeScript'e geçiş
+kapsam dışı bırakılmadı, yalnızca "Son Faz" (LinkedIn yayını) öncesine
+bilinçli olarak ertelendi.
 
 ## 4. Uçtan Uca Veri Akışı (dosya yükleme)
 1. Kullanıcı EPDK dosyası yükler → SHA-256 hash

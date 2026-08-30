@@ -16,6 +16,7 @@ kod üretirken bu dosyaları bağlam (context) olarak okuyabilmesi.
 | `03_veri_modeli.md` | Tablolar, DDL, ilişkiler (yıldız şema) | SRS Böl. 5 / Ek C |
 | `04_kpi_sozlesmeleri.md` | KPI formülleri + kenar durumlar | Ek B |
 | `05_kaynak_dosya_sozlesmesi.md` | EPDK dosya kolon haritası (parser) | Ek F |
+| `06_adr_dashboard_teknoloji.md` | ADR: sunum katmanı Streamlit (Faz 2), Next.js ertelendi | — (2026-08-30) |
 
 ## Copilot İçin Kullanım
 Chat'te bağlam vermek için:

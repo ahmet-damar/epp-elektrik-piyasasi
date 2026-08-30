@@ -38,6 +38,17 @@ def test_tarih_bilesenleri_yillik() -> None:
     }
 
 
+def test_donem_saat_sayisi_aylik() -> None:
+    assert ingest.donem_saat_sayisi(202601) == 31 * 24  # Ocak
+    assert ingest.donem_saat_sayisi(202602) == 28 * 24  # Şubat, 2026 artık yıl değil
+    assert ingest.donem_saat_sayisi(202404) == 30 * 24  # Nisan
+
+
+def test_donem_saat_sayisi_yillik() -> None:
+    assert ingest.donem_saat_sayisi(202500) == 365 * 24
+    assert ingest.donem_saat_sayisi(202400) == 366 * 24  # 2024 artık yıl
+
+
 @pytest.mark.parametrize(
     ("ay", "beklenen_ceyrek", "beklenen_ay_adi"),
     [
