@@ -116,6 +116,34 @@ def _hava_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
     return analytics.hava_getir(_conn, tarih_id)
 
 
+@st.cache_data(show_spinner=False)
+def _sistem_parametre_getir_cached(_conn: Any) -> dict[str, float]:
+    return analytics.sistem_parametre_getir(_conn)
+
+
+@st.cache_data(show_spinner="Hava normalizasyonu (KPI-11/12) hesaplanıyor...")
+def _kpi_11_12_hesapla_cached(
+    _conn: Any, il_kodu: int, tarih_id: int, hava_norm_yil: int, tuketim_norm_yil: int
+) -> dict[str, float | None]:
+    return analytics.kpi_11_12_hesapla(
+        _conn,
+        il_kodu,
+        tarih_id,
+        hava_norm_yil=hava_norm_yil,
+        tuketim_norm_yil=tuketim_norm_yil,
+    )
+
+
+@st.cache_data(show_spinner="Yıllık tüketim serisi yükleniyor...")
+def _yillik_tuketim_serisi_cached(_conn: Any) -> pd.DataFrame:
+    return analytics.yillik_tuketim_serisi_getir(_conn)
+
+
+@st.cache_data(show_spinner="Yıllık kurulu güç serisi yükleniyor...")
+def _yillik_yenilenebilir_kurulu_guc_serisi_cached(_conn: Any) -> pd.DataFrame:
+    return analytics.yillik_yenilenebilir_kurulu_guc_serisi_getir(_conn)
+
+
 @st.cache_data
 def _statik_veri_hazirla() -> tuple[
     pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame
@@ -191,12 +219,22 @@ if gercek_veri_var:
     iller = ["Türkiye Geneli"] + il_listesi["il_adi"].tolist()
     donem_etiketi = secili_yil_ay
     donem_saat = ingest.donem_saat_sayisi(secili_tarih_id)
+
+    # OD-1: baz sıcaklıklar sistem_parametre'den (koda gömülmez).
+    _sp = _sistem_parametre_getir_cached(db_handle)
+    hdd_baz_c = _sp.get("hdd_baz_c", 18.0)
+    cdd_baz_c = _sp.get("cdd_baz_c", 22.0)
+    hava_norm_yil = int(_sp.get("hava_norm_yil", 10))
+    tuketim_norm_yil = int(_sp.get("tuketim_norm_yil", 5))
 else:
     tuketim, uretim, abone, serbest, hava = _statik_veri_hazirla()
     onceki_tuketim = pd.DataFrame(columns=tuketim.columns)
     iller = ["Türkiye Geneli"] + sorted(tuketim["il"].dropna().unique().tolist())
     donem_etiketi = "2026-01 (yerel dosya)"
     donem_saat = ingest.donem_saat_sayisi(202601)
+    # statik yedekte sistem_parametre'ye erişim yok - migration 20260819_0004
+    # seed değerleriyle aynı (Faz 2 dashboard notunda da böyleydi).
+    hdd_baz_c, cdd_baz_c, hava_norm_yil, tuketim_norm_yil = 18.0, 22.0, 10, 5
     with st.sidebar:
         st.header("Dönem")
         st.selectbox("Ay/Yıl", [donem_etiketi], disabled=True)
@@ -233,6 +271,15 @@ if secili_il != "Türkiye Geneli":
 abone_f = abone.copy()
 if secili_il != "Türkiye Geneli" and not abone_f.empty:
     abone_f = abone_f[abone_f["il"] == secili_il]
+
+# KPI-11/12 (hava normalizasyonu) il bazlı çalışır (Türkiye ölçeğinde tek bir
+# β/γ anlamlı değil — iklim bölgeye göre çok değişir) - yalnız DB modunda VE
+# belirli bir İl seçiliyken hesaplanabilir.
+secili_il_kodu: int | None = None
+if gercek_veri_var and secili_il != "Türkiye Geneli":
+    eslesen = il_listesi.loc[il_listesi["il_adi"] == secili_il, "il_kodu"]
+    if not eslesen.empty:
+        secili_il_kodu = int(eslesen.iloc[0])
 
 # ---------------- KPI KARTLARI — ÜRETİM ----------------
 st.subheader("Üretim")
@@ -322,21 +369,74 @@ t4.metric(
 
 st.divider()
 
-# ---------------- KPI KARTLARI — HAVA (Faz 3 altyapısı) ----------------
-st.subheader("Hava (Faz 3 — henüz veri yok)")
-h1, h2 = st.columns(2)
+# ---------------- KPI KARTLARI — HAVA NORMALİZASYONU (Faz 3) ----------------
+st.subheader("Hava")
+h1, h2, h3, h4 = st.columns(4)
 if not hava.empty:
-    # TODO(Faz 3 adım 5): analytics.sistem_parametre_getir()'den oku (OD-1).
     h1.metric(
-        "Isıtma Derece Gün (KPI-23 HDD)", f"{kpi.kpi_23_hdd(hava, hdd_baz_c=18.0):,.0f}"
+        "Isıtma Derece Gün (KPI-23 HDD)",
+        f"{kpi.kpi_23_hdd(hava, hdd_baz_c=hdd_baz_c):,.0f}",
     )
     h2.metric(
         "Soğutma Derece Gün (KPI-24 CDD)",
-        f"{kpi.kpi_24_cdd(hava, cdd_baz_c=22.0):,.0f}",
+        f"{kpi.kpi_24_cdd(hava, cdd_baz_c=cdd_baz_c):,.0f}",
     )
 else:
     h1.metric("Isıtma Derece Gün (KPI-23 HDD)", "veri yok")
     h2.metric("Soğutma Derece Gün (KPI-24 CDD)", "veri yok")
+
+if secili_il_kodu is not None:
+    kpi_11_12 = _kpi_11_12_hesapla_cached(
+        db_handle, secili_il_kodu, secili_tarih_id, hava_norm_yil, tuketim_norm_yil
+    )
+    h3.metric(
+        "Arındırılmış Tüketim (KPI-11)",
+        f"{kpi_11_12['arindirilmis']:,.0f} MWh"
+        if kpi_11_12["arindirilmis"] is not None
+        else "hesaplanamaz",
+    )
+    h4.metric(
+        "Norm Sapması (KPI-12)",
+        f"%{kpi_11_12['kpi_12']:+.1f}"
+        if kpi_11_12["kpi_12"] is not None
+        else "hesaplanamaz",
+    )
+else:
+    h3.metric("Arındırılmış Tüketim (KPI-11)", "hesaplanamaz")
+    h4.metric("Norm Sapması (KPI-12)", "hesaplanamaz")
+    if gercek_veri_var:
+        st.caption(
+            "KPI-11/12 (hava normalizasyonu) il bazlı çalışır — sidebar'dan "
+            "'Türkiye Geneli' yerine belirli bir İl seçin. Ayrıca yeterli "
+            "geçmiş (β/γ regresyonu + hava/tüketim normu) yoksa 'hesaplanamaz' "
+            "kalır — bu, sahte bir değer üretmemek için bilinçli bir davranıştır."
+        )
+
+st.divider()
+
+# ---------------- KPI KARTLARI — YILLIK TRENDLER (CAGR) ----------------
+st.subheader("Yıllık Trendler")
+y1, y2 = st.columns(2)
+if gercek_veri_var:
+    tuketim_serisi = _yillik_tuketim_serisi_cached(db_handle)
+    kpi_25 = analytics.cagr_seriden_hesapla(tuketim_serisi, "tuketim_mwh")
+    kurulu_serisi = _yillik_yenilenebilir_kurulu_guc_serisi_cached(db_handle)
+    kpi_26 = analytics.cagr_seriden_hesapla(kurulu_serisi, "kurulu_guc_mw")
+else:
+    kpi_25 = None
+    kpi_26 = None
+y1.metric(
+    "Tüketim CAGR (KPI-25)", f"%{kpi_25:+.1f}" if kpi_25 is not None else "hesaplanamaz"
+)
+y2.metric(
+    "Yenilenebilir Kurulu Güç CAGR (KPI-26)",
+    f"%{kpi_26:+.1f}" if kpi_26 is not None else "hesaplanamaz",
+)
+if gercek_veri_var and (kpi_25 is None or kpi_26 is None):
+    st.caption(
+        "CAGR için en az iki farklı yıla ait aktif veri gerekir — henüz "
+        "yeterli geçmiş (backfill) yüklenmemiş olabilir."
+    )
 
 st.divider()
 
