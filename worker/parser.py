@@ -24,11 +24,17 @@ farklı olan şu noktaları ortaya çıkardı:
   Sanayi'yi iletim/dağıtım olarak ayırıyor) → T8 ayrıca implemente edilmedi,
   T11 tek başına yeterli. T7/T9 yalnız ülke geneli mutabakat satırları
   (fact tablosuna yazılmaz, yalnız mutabakat_kontrol için).
-- T12 (dağıtım şirketi bazlı) ve T13 (serbest tüketici) HENÜZ eklenmedi:
-  T12'nin gerçek boyutu "il" değil "dağıtım şirketi" — şemada böyle bir
-  boyut yok. T13'ün gerçek "tür" değerleri şemadaki
-  fact_serbest_tuketici.tur CHECK'iyle uyuşmuyor. İkisi de veri modeli
-  kararı gerektiriyor, parser'da uydurulmadı.
+- T12'nin gerçek boyutu "il" değil "dağıtım şirketi" (21 şirket + ulusal
+  'İletimden Bağlı Tüketiciler' satırı, yalnız Sanayi) ve T11 ile birebir
+  redundant (Genel Toplam + Sanayi-İletim rakamları eşleşiyor) — bu yüzden
+  parse edilmiyor (bkz. dokumanlar/05_kaynak_dosya_sozlesmesi.md T12 notu).
+- T13 (serbest tüketici) gerçek dosyayla doğrulandı (2026-08-30): grain
+  dokümanın ima ettiğinden farklı, her (il, tur) AYRICA 5 tüketici grubuna
+  bölünmüş (bkz. migration 20260819_0006, tablo13_serbest_tuketici_oku).
+  Gerçek "tur" değerleri 'Lisanslı'/'Lisanssız' DEĞİL: 'Serbest Tüketici',
+  'ST Olma Hakkı Bulunmayan Aboneler', 'ST Olma Hakkını Kullanmayan
+  Aboneler'. Yerleşim iki paralel bloktur (Tüketim Miktarı + Tüketici
+  Sayısı, aynı 5 grup adı iki kez).
 """
 
 from __future__ import annotations
@@ -245,7 +251,11 @@ GRUP_ESLEME: dict[str, str] = {
     for etiketler, kanonik in [
         (["Aydınlatma"], "Aydınlatma"),
         (
-            ["Kamu ve Özel Hizmetler", "Kamu ve Özel Hizmetler Sektörü ile Diğer"],
+            [
+                "Kamu ve Özel Hizmetler",
+                "Kamu ve Özel Hizmetler Sektörü ile Diğer",
+                "Kamu/Özel",  # T13'te kısaltılmış yazım (_sade_anahtar zaten trim eder)
+            ],
             "Kamu ve Özel Hizmetler",
         ),
         (["Mesken"], "Mesken"),
@@ -258,6 +268,29 @@ GRUP_ESLEME: dict[str, str] = {
 
 def grup_esle(etiket: object) -> str | None:
     return GRUP_ESLEME.get(_sade_anahtar(etiket))
+
+
+# ---------------------------------------------------------------------------
+# Serbest Tüketici Türü Eşleme (T13) — gerçek Türkçe etiket → migration
+# 20260819_0006'daki (Türkçe karaktersiz) kanonik fact_serbest_tuketici.tur
+# CHECK değerleri. 'Lisanslı'/'Lisanssız' DEĞİL — dokumanlar/05 2026-08-30 notu.
+# ---------------------------------------------------------------------------
+
+TUR_ESLEME: dict[str, str] = {
+    _sade_anahtar(etiket): kanonik
+    for etiket, kanonik in [
+        ("Serbest Tüketici", "Serbest Tuketici"),
+        ("ST Olma Hakkı Bulunmayan Aboneler", "ST Olma Hakki Bulunmayan Aboneler"),
+        (
+            "ST Olma Hakkını Kullanmayan Aboneler",
+            "ST Olma Hakkini Kullanmayan Aboneler",
+        ),
+    ]
+}
+
+
+def tur_esle(etiket: object) -> str | None:
+    return TUR_ESLEME.get(_sade_anahtar(etiket))
 
 
 # ---------------------------------------------------------------------------
@@ -477,6 +510,122 @@ def tablo9_abone_tur_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
 def tablo10_abone_il_oku(ws: Worksheet, tarih_id: int) -> pd.DataFrame:
     """T10: il × tüketici grubu → abone_sayisi. fact_abone'nin BİRİNCİL kaynağı."""
     return _uzun_format_grup_oku(ws, "Tablo 10", tarih_id, "abone_sayisi")
+
+
+# ---------------------------------------------------------------------------
+# T13 — Serbest tüketici (il × tur × grup, iki paralel değer bloğu)
+# ---------------------------------------------------------------------------
+# Gerçek yerleşim: 'İl Adı' | 'Elektrik Tüketici Türü' | ['Tüketim Miktarı(MWh)'
+# başlığı altında 5 grup sütunu + Toplam] | [aynı 5 grup adı 'Tüketici Sayısı'
+# başlığı altında tekrar + Toplam]. İl adı yalnız o ilin ilk satırında yazılı
+# (ileri doldurma, T7-T10'daki gibi); her ilin sonunda atlanacak bir
+# 'İl Toplam' satırı var. 'Toplam' sütunları grup_esle() ile zaten elenir.
+
+_SERBEST_TUKETICI_ATLA = {"TOPLAM", "IL TOPLAM"}
+
+
+def _grup_kolonlarini_tara(
+    ws: Worksheet, satir: int, baslangic_col: int, bitis_col: int
+) -> list[tuple[int, str]]:
+    """[baslangic_col, bitis_col] aralığında grup_esle ile eşleşen sütunları toplar."""
+    sonuc = []
+    for col in range(baslangic_col, bitis_col + 1):
+        deger = ws.cell(row=satir, column=col).value
+        if deger is None or str(deger).strip() == "":
+            continue
+        grup = grup_esle(deger)
+        if grup is not None:
+            sonuc.append((col, grup))
+    return sonuc
+
+
+def tablo13_serbest_tuketici_oku(
+    ws: Worksheet, tarih_id: int, tablo_etiketi: str = "Tablo 13"
+) -> pd.DataFrame:
+    """T13: il (ileri doldurma) × tur × grup → tuketim_mwh + tuketici_sayisi."""
+    kolonlar = [
+        "il",
+        "il_kodu",
+        "tarih_id",
+        "tur",
+        "grup",
+        "tuketim_mwh",
+        "tuketici_sayisi",
+    ]
+
+    capa = bul_capa(ws, tablo_etiketi)
+    if capa is None:
+        return pd.DataFrame(columns=kolonlar)
+    tablo_satir, _ = capa
+
+    baslik_satir = None
+    il_kolon = None
+    hedef_il_adi = normalize_label("İl Adı")
+    for satir in range(tablo_satir, tablo_satir + 6):
+        for col in range(1, 5):
+            if normalize_label(ws.cell(row=satir, column=col).value) == hedef_il_adi:
+                baslik_satir, il_kolon = satir, col
+                break
+        if baslik_satir is not None:
+            break
+    if baslik_satir is None or il_kolon is None:
+        return pd.DataFrame(columns=kolonlar)
+
+    tur_kolon = il_kolon + 1
+    grup_baslik_satir = baslik_satir + 1  # grup adları bir alt satırda tekrar eder
+
+    sayisi_baslangic = _satirda_kolon_bul(
+        ws, baslik_satir, "Tüketici Sayısı", min_col=tur_kolon + 1
+    )
+    if sayisi_baslangic is None:
+        return pd.DataFrame(columns=kolonlar)
+
+    tuketim_kolonlari = _grup_kolonlarini_tara(
+        ws, grup_baslik_satir, tur_kolon + 1, sayisi_baslangic - 1
+    )
+    sayisi_kolonlari = {
+        grup: col
+        for col, grup in _grup_kolonlarini_tara(
+            ws, grup_baslik_satir, sayisi_baslangic, sayisi_baslangic + 15
+        )
+    }
+
+    satirlar = []
+    mevcut_il: str | None = None
+    satir = grup_baslik_satir + 1
+    while True:
+        tur_ham = ws.cell(row=satir, column=tur_kolon).value
+        if tur_ham is None or str(tur_ham).strip() == "":
+            break
+        il_ham = ws.cell(row=satir, column=il_kolon).value
+        if il_ham is not None and str(il_ham).strip() != "":
+            mevcut_il = str(il_ham).strip()
+        if normalize_label(tur_ham) not in _SERBEST_TUKETICI_ATLA:
+            tur = tur_esle(tur_ham)
+            if tur is not None:
+                for tuketim_col, grup in tuketim_kolonlari:
+                    tuketim_deger = parse_sayi(
+                        ws.cell(row=satir, column=tuketim_col).value
+                    )
+                    sayisi_col = sayisi_kolonlari.get(grup)
+                    sayisi_deger = (
+                        parse_sayi(ws.cell(row=satir, column=sayisi_col).value)
+                        if sayisi_col is not None
+                        else None
+                    )
+                    satirlar.append(
+                        {
+                            "il": mevcut_il,
+                            "il_kodu": il_kodu_bul(mevcut_il),
+                            "tarih_id": tarih_id,
+                            "tur": tur,
+                            "grup": grup,
+                            "tuketim_mwh": tuketim_deger,
+                            "tuketici_sayisi": sayisi_deger,
+                        }
+                    )
+        satir += 1
+    return pd.DataFrame(satirlar, columns=kolonlar)
 
 
 # ---------------------------------------------------------------------------

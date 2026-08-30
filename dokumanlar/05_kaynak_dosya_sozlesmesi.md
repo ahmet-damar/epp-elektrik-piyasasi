@@ -21,7 +21,7 @@ Parser SABİT hücreye güvenmez; değişmez etiketleri arar:
 | T9/T10 | Tüketici sayısı | fact_abone |
 | **T11** | **Tüketim (iletim/dağıtım!)** | **fact_tuketim.baglanti** |
 | T12 | Tüketim (dağıtım şirketi) | **parse edilmiyor — bkz. not** |
-| T13 | Serbest tüketici | fact_serbest_tuketici |
+| T13 | Serbest tüketici (il×tur×grup) | fact_serbest_tuketici — bkz. not |
 
 **P0-2 KRİTİK:** Tablo 11, 'Sanayi-İLETİM' ve 'Sanayi-DAĞITIM' sütunlarını
 içeren TEK tablodur → fact_tuketim.baglanti'yi besler. Diğer tüketim
@@ -37,6 +37,18 @@ hiçbir yeni bilgi taşımıyor.** Bu yüzden parser'da implemente edilmedi
 DSO karşılaştırması), T12'yi parse etmeye gerek yok: statik bir
 dim_il → dagitim_sirketi eşleme tablosuyla T11'in il bazlı verisinden
 türetilebilir — bilgi kaybı yok.
+
+**T13 NOTU (2026-08-30, gerçek dosyayla doğrulandı, worker/parser.py
+`tablo13_serbest_tuketici_oku`):** Grain dokümanın ima ettiğinden farklı —
+her (il, tur) AYRICA 5 tüketici grubuna bölünmüş (bkz. migration
+20260819_0006). Gerçek 'tur' değerleri 'Lisanslı'/'Lisanssız' DEĞİL:
+'Serbest Tüketici', 'ST Olma Hakkı Bulunmayan Aboneler', 'ST Olma Hakkını
+Kullanmayan Aboneler'. Yerleşim iki paralel bloktur: 'Tüketim
+Miktarı(MWh)' başlığı altında 5 grup sütunu, hemen ardından aynı 5 grup adı
+'Tüketici Sayısı' başlığı altında tekrar. İl adı yalnız o ilin ilk
+satırında yazılı (ileri doldurma); her ilin sonunda atlanan bir 'İl Toplam'
+satırı var. Toplam tuketim_mwh T7/T11/T12 ile, toplam tuketici_sayisi
+T9/T10 ile birebir eşleşiyor (çapraz doğrulandı).
 
 ## Tüketici Grubu Eşleme
 | Kaynak etiket | grup_adi | grup_id |

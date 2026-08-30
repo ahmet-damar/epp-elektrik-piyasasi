@@ -183,6 +183,147 @@ def _sentetik_workbook() -> openpyxl.Workbook:
         ]
     )
 
+    # --- T13: serbest tüketici (il × tur × grup, iki paralel değer bloğu) ---
+    t13 = wb.create_sheet("Tablo 13")
+    t13.append(
+        [
+            "Tablo 13- İl Bazında Serbest Tüketici Bilgileri (Tüketim Miktarı - Tüketici Sayısı)"
+        ]
+    )
+    t13.append(
+        [
+            "İl Adı",
+            "Elektrik Tüketici Türü",
+            "Tüketim Miktarı(MWh)",
+            None,
+            None,
+            None,
+            None,
+            None,
+            "Tüketici Sayısı",
+            None,
+            None,
+            None,
+            None,
+            None,
+        ]
+    )
+    t13.append(
+        [
+            None,
+            None,
+            "Mesken",
+            "Sanayi",
+            "Kamu/Özel ",
+            "Tarımsal",
+            "Aydınlatma",
+            "Toplam",
+            "Mesken",
+            "Sanayi",
+            "Kamu/Özel ",
+            "Tarımsal",
+            "Aydınlatma",
+            "Toplam",
+        ]
+    )
+    # Eskişehir: 3 tur satırı + atlanacak bir "İl Toplam" satırı; Tarımsal
+    # sütunu ilk turda boş (NULL, 0 DEĞİL), üçüncü turda Mesken negatif
+    # (dogrula_serbest_tuketici'nin red yolu için).
+    t13.append(
+        [
+            "ESKİŞEHİR",
+            "Serbest Tüketici",
+            100.0,
+            200.0,
+            50.0,
+            None,
+            10.0,
+            360.0,
+            5,
+            10,
+            3,
+            None,
+            1,
+            19,
+        ]
+    )
+    t13.append(
+        [
+            None,
+            "ST Olma Hakkı Bulunmayan Aboneler",
+            20.0,
+            30.0,
+            5.0,
+            1.0,
+            2.0,
+            58.0,
+            100,
+            50,
+            20,
+            5,
+            2,
+            177,
+        ]
+    )
+    t13.append(
+        [
+            None,
+            "ST Olma Hakkını Kullanmayan Aboneler",
+            -5.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            -5.0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+        ]
+    )
+    t13.append(
+        [
+            None,
+            "İl Toplam",
+            115.0,
+            230.0,
+            55.0,
+            1.0,
+            12.0,
+            413.0,
+            106,
+            60,
+            23,
+            5,
+            3,
+            197,
+        ]
+    )
+    # Adana: ileri-doldurma tek satırlık bir tur ile de doğrulanır.
+    t13.append(
+        [
+            "ADANA",
+            "Serbest Tüketici",
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            5.0,
+            15.0,
+            10,
+            20,
+            30,
+            40,
+            50,
+            150,
+        ]
+    )
+    t13.append(
+        [None, "İl Toplam", 1.0, 2.0, 3.0, 4.0, 5.0, 15.0, 10, 20, 30, 40, 50, 150]
+    )
+
     return wb
 
 
@@ -432,3 +573,107 @@ def test_uretim_kaynak_birlestir_ulusal_grain() -> None:
         30.0
     )  # 10+20, il boyutu kayboldu
     assert birlesik["uretim_mwh"].iloc[0] == pytest.approx(5000.0)
+
+
+def test_tur_esle() -> None:
+    assert parser.tur_esle("Serbest Tüketici") == "Serbest Tuketici"
+    assert parser.tur_esle("ST Olma Hakkı Bulunmayan Aboneler") == (
+        "ST Olma Hakki Bulunmayan Aboneler"
+    )
+    assert parser.tur_esle("ST Olma Hakkını Kullanmayan Aboneler") == (
+        "ST Olma Hakkini Kullanmayan Aboneler"
+    )
+    assert parser.tur_esle("Bilinmeyen Tür") is None
+
+
+def test_grup_esle_kamu_ozel_kisaltma() -> None:
+    """T13'te 'Kamu/Özel ' (sondaki boşluklu) kısaltması kullanılıyor."""
+    assert parser.grup_esle("Kamu/Özel ") == "Kamu ve Özel Hizmetler"
+    assert parser.grup_esle("Kamu/Özel") == "Kamu ve Özel Hizmetler"
+
+
+def test_tablo13_serbest_tuketici(wb: openpyxl.Workbook) -> None:
+    df = parser.tablo13_serbest_tuketici_oku(wb["Tablo 13"], 202601)
+
+    # "İl Toplam" satırları hiç üretilmemeli: 3 tur × 5 grup (Eskişehir) +
+    # 1 tur × 5 grup (Adana) = 20 satır.
+    assert len(df) == 20
+    assert set(df["tur"].unique()) == {
+        "Serbest Tuketici",
+        "ST Olma Hakki Bulunmayan Aboneler",
+        "ST Olma Hakkini Kullanmayan Aboneler",
+    }
+    assert set(df["grup"].unique()) == {
+        "Mesken",
+        "Sanayi",
+        "Kamu ve Özel Hizmetler",
+        "Tarımsal",
+        "Aydınlatma",
+    }
+
+    eskisehir = df[(df["il_kodu"] == 26) & (df["tur"] == "Serbest Tuketici")]
+    mesken = eskisehir[eskisehir["grup"] == "Mesken"].iloc[0]
+    assert mesken["tuketim_mwh"] == pytest.approx(100.0)
+    assert mesken["tuketici_sayisi"] == pytest.approx(5.0)
+
+    # Boş hücre = NULL (0 DEĞİL)
+    tarimsal = eskisehir[eskisehir["grup"] == "Tarımsal"].iloc[0]
+    assert pd.isna(tarimsal["tuketim_mwh"])
+    assert pd.isna(tarimsal["tuketici_sayisi"])
+
+    # Negatif değer parser seviyesinde reddedilmez (bu dogrula_serbest_tuketici'nin işi);
+    # ham değer olduğu gibi geçmeli.
+    kullanmayan = df[
+        (df["il_kodu"] == 26)
+        & (df["tur"] == "ST Olma Hakkini Kullanmayan Aboneler")
+        & (df["grup"] == "Mesken")
+    ].iloc[0]
+    assert kullanmayan["tuketim_mwh"] == pytest.approx(-5.0)
+
+    # İleri doldurma: Adana'nın tek satırı da doğru il'e bağlanmalı.
+    adana = df[df["il_kodu"] == 1]
+    assert len(adana) == 5
+    assert (adana["il"] == "ADANA").all()
+
+
+def test_dogrula_serbest_tuketici_red_ve_karantina() -> None:
+    df = pd.DataFrame(
+        [
+            {
+                "il_kodu": 26,
+                "tarih_id": 202601,
+                "tur": "Serbest Tuketici",
+                "grup": "Mesken",
+                "tuketim_mwh": 100.0,
+                "tuketici_sayisi": 5.0,
+            },
+            {
+                "il_kodu": 26,
+                "tarih_id": 202601,
+                "tur": "Serbest Tuketici",
+                "grup": "Mesken",
+                "tuketim_mwh": -5.0,
+                "tuketici_sayisi": 1.0,
+            },
+            {
+                "il_kodu": 26,
+                "tarih_id": 202601,
+                "tur": "Bilinmeyen Tur",
+                "grup": "Mesken",
+                "tuketim_mwh": 10.0,
+                "tuketici_sayisi": 1.0,
+            },
+            {
+                "il_kodu": 26,
+                "tarih_id": 202601,
+                "tur": "Serbest Tuketici",
+                "grup": "Bilinmeyen Grup",
+                "tuketim_mwh": 10.0,
+                "tuketici_sayisi": 1.0,
+            },
+        ]
+    )
+    sonuc = kpi.dogrula_serbest_tuketici(df)
+    assert len(sonuc.kabul) == 1
+    assert len(sonuc.red) == 1
+    assert len(sonuc.karantina) == 2

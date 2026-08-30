@@ -21,6 +21,14 @@ GECERLI_GRUPLAR = {
     "Kamu ve Özel Hizmetler",
 }
 
+# fact_serbest_tuketici.tur — gerçek T13 değerleri (2026-08-30 doğrulandı,
+# bkz. migration 20260819_0006 ve dokumanlar/03_veri_modeli.md)
+GECERLI_TURLER = {
+    "Serbest Tuketici",
+    "ST Olma Hakki Bulunmayan Aboneler",
+    "ST Olma Hakkini Kullanmayan Aboneler",
+}
+
 # sistem_parametre varsayılanları (OD-1) — Faz 0'da sabit, ileride DB'den okunur
 HDD_BAZ_C = 18
 CDD_BAZ_C = 22
@@ -59,6 +67,20 @@ def dogrula_uretim(df: pd.DataFrame) -> DogrulamaSonucu:
 def dogrula_abone(df: pd.DataFrame) -> DogrulamaSonucu:
     red_mask = df["abone_sayisi"] < 0
     karantina_mask = ~df["grup"].isin(GECERLI_GRUPLAR) & ~red_mask
+    kabul_mask = ~red_mask & ~karantina_mask
+    return DogrulamaSonucu(
+        kabul=df[kabul_mask].reset_index(drop=True),
+        red=df[red_mask].reset_index(drop=True),
+        karantina=df[karantina_mask].reset_index(drop=True),
+    )
+
+
+def dogrula_serbest_tuketici(df: pd.DataFrame) -> DogrulamaSonucu:
+    """T13: negatif tuketim_mwh/tuketici_sayisi → red; bilinmeyen tur/grup → karantina."""
+    red_mask = (df["tuketim_mwh"] < 0) | (df["tuketici_sayisi"] < 0)
+    karantina_mask = (
+        ~df["tur"].isin(GECERLI_TURLER) | ~df["grup"].isin(GECERLI_GRUPLAR)
+    ) & ~red_mask
     kabul_mask = ~red_mask & ~karantina_mask
     return DogrulamaSonucu(
         kabul=df[kabul_mask].reset_index(drop=True),
