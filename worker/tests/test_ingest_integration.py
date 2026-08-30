@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import pandas as pd
 import psycopg
 import pytest
 
@@ -156,6 +157,71 @@ def test_fact_uretim_uretim_mwh_kolonu_olmadan_yuklenir(conn) -> None:  # type: 
             (batch,),
         )
         assert cur.fetchone()[0] == 5
+
+
+def test_serbest_tuketici_yukle_ve_rejected_row_count(conn) -> None:  # type: ignore[no-untyped-def]
+    """T13: iki ölçüden biri eksikse satır atlanır VE bu sayı sessizce
+    kaybolmaz — ingestion_batch.rejected_row_count'a yansıtılır (diğer
+    dogrula_*/red mantığıyla tutarlı)."""
+    ingest.dim_tarih_getir_veya_olustur(conn, 202601)
+    df = pd.DataFrame(
+        [
+            {
+                "il_kodu": 26,
+                "tarih_id": 202601,
+                "tur": "Serbest Tuketici",
+                "grup": "Mesken",
+                "tuketim_mwh": 100.0,
+                "tuketici_sayisi": 5.0,
+            },
+            {
+                "il_kodu": 26,
+                "tarih_id": 202601,
+                "tur": "Serbest Tuketici",
+                "grup": "Sanayi",
+                "tuketim_mwh": 200.0,
+                "tuketici_sayisi": 10.0,
+            },
+            {
+                "il_kodu": 26,
+                "tarih_id": 202601,
+                "tur": "Serbest Tuketici",
+                "grup": "Tarımsal",
+                "tuketim_mwh": None,  # boş hücre — dogrula_serbest_tuketici reddetmez,
+                "tuketici_sayisi": None,  # ama fact tablosu NOT NULL: yukle_* atlar.
+            },
+        ]
+    )
+    kabul = kpi.dogrula_serbest_tuketici(df).kabul
+    assert len(kabul) == 3  # negatif/bilinmeyen yok, hiçbiri red/karantina değil
+
+    batch = _yeni_batch(conn, "test-serbest-tuketici")
+    yuklenen, atlanan = ingest.fact_serbest_tuketici_yukle(conn, kabul, batch)
+    assert yuklenen == 2
+    assert atlanan == 1
+
+    ingest.batch_durumu_guncelle(
+        conn,
+        batch,
+        "succeeded",
+        accepted_row_count=yuklenen,
+        rejected_row_count=atlanan,
+    )
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT accepted_row_count, rejected_row_count FROM ingestion_batch WHERE batch_id = %s",
+            (batch,),
+        )
+        assert cur.fetchone() == (2, 1)
+
+    ingest.aktivasyon_yap(conn, "fact_serbest_tuketici", batch)
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT count(*) FROM fact_serbest_tuketici WHERE ingestion_batch_id = %s AND is_active",
+            (batch,),
+        )
+        assert cur.fetchone()[0] == 2
 
 
 def test_batch_olustur_p0_5_tekil(conn) -> None:  # type: ignore[no-untyped-def]

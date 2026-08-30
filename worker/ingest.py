@@ -308,10 +308,49 @@ def fact_abone_yukle(
     return yuklenen, atlanan
 
 
+def fact_serbest_tuketici_yukle(
+    conn: Connection, df: pd.DataFrame, batch_id: int
+) -> tuple[int, int]:
+    """tuketim_mwh VE tuketici_sayisi ikisi de NOT NULL (migration 20260819_0006);
+    biri eksikse satır atlanır. `atlanan` sayısı ingestion_batch.rejected_row_count'a
+    yansıtılmak üzere döner — bkz. batch_durumu_guncelle()."""
+    yuklenen = 0
+    atlanan = 0
+    with conn.cursor() as cur:
+        for satir in df.itertuples(index=False):
+            tuketim = _sayisal_temiz(satir.tuketim_mwh)
+            sayisi = _sayisal_temiz(satir.tuketici_sayisi)
+            if tuketim is None or sayisi is None:
+                atlanan += 1
+                continue
+            grup_id = dim_grup_id_bul(conn, satir.grup)
+            cur.execute(
+                """
+                INSERT INTO fact_serbest_tuketici
+                    (il_kodu, tarih_id, tur, grup_id, tuketim_mwh, tuketici_sayisi,
+                     ingestion_batch_id, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, false)
+                ON CONFLICT ON CONSTRAINT uq_fact_serbest_tuketici_batch DO NOTHING
+                """,
+                (
+                    satir.il_kodu,
+                    satir.tarih_id,
+                    satir.tur,
+                    grup_id,
+                    tuketim,
+                    int(sayisi),
+                    batch_id,
+                ),
+            )
+            yuklenen += 1
+    return yuklenen, atlanan
+
+
 _DOGAL_ANAHTAR = {
     "fact_tuketim": ["il_kodu", "tarih_id", "grup_id", "baglanti"],
     "fact_uretim": ["il_kodu", "tarih_id", "kaynak_id", "lisans_id"],
     "fact_abone": ["il_kodu", "tarih_id", "grup_id"],
+    "fact_serbest_tuketici": ["il_kodu", "tarih_id", "tur", "grup_id"],
 }
 
 
