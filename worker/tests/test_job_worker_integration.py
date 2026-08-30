@@ -54,13 +54,25 @@ def _wb_bytes_temiz(wb: openpyxl.Workbook) -> bytes:
     return _wb_bytes(wb)
 
 
+# job_worker'ın gerçek dünya doğruluğu için _bir_is_isle() ara adımlarda
+# conn.commit() ÇAĞIRMAK ZORUNDA (bkz. worker/job_worker.py modül notu) - bu
+# yüzden bu dosyanın testleri CI'nin paylaşılan postgres:16'sında KALICI veri
+# bırakır (diğer worker/tests/*.py dosyalarının aksine, connection.rollback()
+# ile temizlenmez). Diğer dosyaların hepsi tarih_id=202601 (golden CSV/gerçek
+# dosya) kullandığından, çakışmayı (örn. worker/tests/test_analytics_integration.py'nin
+# satır sayısı beklentilerini bozmayı) önlemek için burada AYRI, sentinel bir
+# tarih_id kullanılır.
+_TEST_TARIH_ID = 209912
+_TEST_SOURCE_PERIOD = "2099-12"
+
+
 def _kuyruga_al(conn, icerik: bytes, parser_version: str, depo_dizini):  # type: ignore[no-untyped-def]
     return pipeline.epdk_isi_kuyruga_al(
         conn,
         dosya_adi="test_job_worker.xlsx",
         icerik=icerik,
-        tarih_id=202601,
-        source_period="2026-01",
+        tarih_id=_TEST_TARIH_ID,
+        source_period=_TEST_SOURCE_PERIOD,
         parser_version=parser_version,
         schema_version="s1",
         depo_dizini=depo_dizini,
