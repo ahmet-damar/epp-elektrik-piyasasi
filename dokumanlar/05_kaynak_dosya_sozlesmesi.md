@@ -91,3 +91,13 @@ T9/T10 ile birebir eşleşiyor (çapraz doğrulandı).
 - İl toplamı ↔ 'TÜRKİYE' ±%0,5
 - İl adları ≥%99 dim_il'e eşlenmeli; eşleşmeyen karantina
 - Negatif değer → reddet; bilinmeyen grup/kaynak → karantina + uyarı
+
+**Faz 0 orkestrasyon notu (2026-08-30, worker/pipeline.py):** Yukarıdaki kural
+tam 13 tabloyu ima ediyor, ancak fact tablosuna gerçekten YAZAN yalnız 5
+tablo var (T1/T4/T10/T11/T13 — bkz. yukarıdaki Hedef sütunu; T8/T12
+redundant, T2/T3/T5/T6'da il×kaynak kesişimi hiç yok). `epdk_aylik_isle()`
+bu yüzden yalnız bu 5'ini ZORUNLU sayıp eksikse batch'i reddediyor; T7/T9
+eksikse yalnız mutabakat kontrolü atlanıyor (batch reddedilmiyor), T2/T3/T5/
+T6/T8/T12'nin varlığı hiç aranmıyor. "İl toplamı ↔ TÜRKİYE ±%0,5" kuralı da
+sert red değil — uyuşmazlık `IslemSonucu.mutabakat`'a düşer, batch_onayla()
+öncesi insan/gelecekteki UI incelemesine bırakılır.

@@ -55,7 +55,11 @@ def dogrula_tuketim(df: pd.DataFrame) -> DogrulamaSonucu:
 
 
 def dogrula_uretim(df: pd.DataFrame) -> DogrulamaSonucu:
-    red_mask = (df["uretim_mwh"] < 0) | (df["kurulu_guc_mw"] < 0)
+    """uretim_mwh sütunu bazı kaynaklarda hiç yok (T1/T4'ün ham çıktısında il×kaynak
+    grain'inde uretim_mwh mevcut değil, bkz. worker/parser.py modül notu) — sütun
+    yoksa negatiflik kontrolünden muaf tutulur, kurulu_guc_mw yine de kontrol edilir."""
+    uretim_negatif = df["uretim_mwh"] < 0 if "uretim_mwh" in df.columns else False
+    red_mask = uretim_negatif | (df["kurulu_guc_mw"] < 0)
     kabul_mask = ~red_mask
     return DogrulamaSonucu(
         kabul=df[kabul_mask].reset_index(drop=True),

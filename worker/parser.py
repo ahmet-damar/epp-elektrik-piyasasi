@@ -45,6 +45,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 if TYPE_CHECKING:
+    from openpyxl.workbook import Workbook
     from openpyxl.worksheet.worksheet import Worksheet
 
 # ---------------------------------------------------------------------------
@@ -861,6 +862,18 @@ def _tablo_numaralarini_cikar(etiket: str) -> set[int]:
     if eslesme.group(2) is None:
         return {ilk}
     return set(range(ilk, int(eslesme.group(2)) + 1))
+
+
+def sayfa_bul(wb: Workbook, tablo_no: int) -> Worksheet | None:
+    """Sayfa adındaki tablo numarasına göre worksheet döner (ör. gerçek dosyada
+    'Tablo 9-10' birleşik sayfası hem tablo_no=9 hem tablo_no=10 için eşleşir;
+    sentetik test dosyasındaki ayrı 'Tablo 9'/'Tablo 10' sayfaları da aynı
+    şekilde çalışır). Ay değiştikçe sayfa adlandırması farklılaşsa bile
+    orkestrasyon (worker/pipeline.py) sabit sayfa adına bağımlı kalmaz."""
+    for ad in wb.sheetnames:
+        if tablo_no in _tablo_numaralarini_cikar(ad):
+            return wb[ad]
+    return None
 
 
 def eksik_tablolari_bul(

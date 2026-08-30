@@ -78,6 +78,8 @@ jobs:
         run: python worker/validate_rls_static.py
       - name: Run ingest pipeline integration tests (P0-4/P0-5)
         run: python -m pytest worker/tests/test_ingest_integration.py -v
+      - name: Run orchestration integration tests (§4 Uçtan Uca Veri Akışı)
+        run: python -m pytest worker/tests/test_pipeline_integration.py -v
 
   supabase-tooling:
     name: Supabase tooling (npm install + audit)

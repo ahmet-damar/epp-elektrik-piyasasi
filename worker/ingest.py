@@ -156,12 +156,14 @@ def kaynak_asset_olustur(
 def batch_olustur(
     conn: Connection, source_asset_id: int, parser_version: str, schema_version: str
 ) -> int:
-    """P0-5: (source_asset_id, parser_version, schema_version) tekil; varsa mevcut batch_id döner."""
+    """P0-5: (source_asset_id, parser_version, schema_version) tekil; varsa mevcut
+    batch_id döner. Adım 2 (dokumanlar/01 §4): 'queued' ile açılır — 'running'e
+    geçiş, worker'ın adım 3'te ATOMİK sahiplenmesiyle olur, bkz. batch_sahiplen()."""
     with conn.cursor() as cur:
         cur.execute(
             """
             INSERT INTO ingestion_batch (source_asset_id, parser_version, schema_version, status)
-            VALUES (%s, %s, %s, 'running')
+            VALUES (%s, %s, %s, 'queued')
             ON CONFLICT (source_asset_id, parser_version, schema_version)
             DO UPDATE SET status = ingestion_batch.status
             RETURNING batch_id
@@ -171,6 +173,19 @@ def batch_olustur(
         row = cur.fetchone()
         assert row is not None
         return int(row[0])
+
+
+def batch_sahiplen(conn: Connection, batch_id: int) -> bool:
+    """Adım 3 (dokumanlar/01 §4): worker batch'i ATOMİK sahiplenir (queued ->
+    running). Tek bir UPDATE...WHERE status='queued' cümlesi olduğundan aynı
+    anda birden fazla worker aynı batch'i sahiplenmeye çalışırsa satır kilidi
+    sayesinde yalnız biri rowcount=1 alır (True döner); diğerleri False alır."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE ingestion_batch SET status = 'running' WHERE batch_id = %s AND status = 'queued'",
+            (batch_id,),
+        )
+        return cur.rowcount == 1
 
 
 def batch_durumu_guncelle(
