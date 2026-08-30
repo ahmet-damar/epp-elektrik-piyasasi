@@ -3,6 +3,14 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from dotenv import load_dotenv
+
+# Proje kökündeki .env dosyasını sürece yükler (varsa) - zaten ayarlı ortam
+# değişkenlerinin üzerine yazmaz (override=False, varsayılan). CI ve gerçek
+# deploy'larda .env dosyası yoktur, bu durumda load_dotenv() sessizce no-op'tur
+# ve DATABASE_URL/SUPABASE_* zaten iş akışının kendi env değişkenlerinden gelir.
+load_dotenv()
+
 
 def _read_env(name: str) -> str:
     return os.getenv(name, "").strip()
