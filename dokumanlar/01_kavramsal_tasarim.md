@@ -40,7 +40,7 @@ bilinçli olarak ertelendi.
 ## 6. Teknoloji (Tümü OSI Açık Kaynak)
 | Katman | Seçim | Lisans |
 |--------|-------|--------|
-| Web | Next.js + TypeScript | MIT/Apache-2.0 |
+| Web | Streamlit (Faz 2); Next.js + TypeScript ("Son Faz") | Apache-2.0 / MIT |
 | Backend | Python 3.12 + FastAPI | PSF/MIT |
 | DB | PostgreSQL | PostgreSQL |
 | Parser | pandas, openpyxl, python-docx | BSD/MIT |
@@ -49,6 +49,8 @@ bilinçli olarak ertelendi.
 
 ADR-6: Uygulama bileşenleri OSI açık kaynak; GitHub/Actions/GHCR yönetilen
 servis istisnası (self-host alternatifi belgeli).
+ADR-7 (bkz. dokumanlar/06_adr_dashboard_teknoloji.md): sunum katmanı
+Streamlit (Faz 2); Next.js+TypeScript'e geçiş "Son Faz"a ertelendi.
 
 ## 7. Fazlar
 - **Faz 0:** Repo + şema + Eskişehir PoC + KPI-01..10/13/23/24
