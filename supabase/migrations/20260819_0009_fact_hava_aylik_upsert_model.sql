@@ -9,11 +9,15 @@ BEGIN;
 -- yazan batch'i işaret etmeye devam eder (provenance), ama artık
 -- çoğulluk/tekillik anahtarının parçası DEĞİLDİR.
 
+-- Politika is_active'e bağımlı (USING (... AND is_active = true)) - kolonu
+-- DÜŞÜRMEDEN ÖNCE politikayı düşürüp is_active'siz yeniden kurmak gerekir
+-- (aksi halde "cannot drop column ... because other objects depend on it").
+DROP POLICY IF EXISTS viewer_fact_hava_aylik_select ON fact_hava_aylik;
+
 ALTER TABLE fact_hava_aylik DROP CONSTRAINT IF EXISTS uq_fact_hava_batch;
 ALTER TABLE fact_hava_aylik ADD CONSTRAINT uq_fact_hava_aylik_il_tarih UNIQUE (il_kodu, tarih_id);
 ALTER TABLE fact_hava_aylik DROP COLUMN IF EXISTS is_active;
 
-DROP POLICY IF EXISTS viewer_fact_hava_aylik_select ON fact_hava_aylik;
 CREATE POLICY viewer_fact_hava_aylik_select ON fact_hava_aylik
   FOR SELECT TO viewer
   USING (public.current_app_role() = 'viewer');
