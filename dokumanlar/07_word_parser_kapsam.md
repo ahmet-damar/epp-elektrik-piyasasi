@@ -147,6 +147,21 @@ DEĞİŞMEZ — mevcut iki-değerli `baglanti` modeli korunur, yalnızca Word
 dönemlerinde Sanayi grubunun fact_tuketim'e hiç girmediği (Karar 1'deki
 mekanizmayla) açıkça işaretlenir.
 
+**Kapsam netliği (2026-09-01, Mart 2024 dry-run'ında netleştirildi):** Bu
+dışlama **YALNIZCA `fact_tuketim`'i (T11-karşılığı) etkiler.** Gerekçe
+`baglanti` alanının kendisi — `worker/ingest.py`'nin `_DOGAL_ANAHTAR`'ında
+`baglanti` yalnız `fact_tuketim`'in doğal anahtarında var
+(`["il_kodu","tarih_id","grup_id","baglanti"]`); `fact_abone`
+(`["il_kodu","tarih_id","grup_id"]`), `fact_uretim` ve
+`fact_serbest_tuketici`'nin doğal anahtarlarında `baglanti` hiç yok. Yani
+**genel ilke**: Sanayi grubu, `baglanti` içermeyen HİÇBİR fact tablosunda
+(bugün: `fact_abone`; ileride: T1/T4→`fact_uretim`, varsa T13-karşılığı→
+`fact_serbest_tuketici`) dışlanmaz, normal yüklenir — dışlama yalnız
+`fact_tuketim`'e özgüdür. Mart 2024'te T10-karşılığında (`fact_abone`)
+Sanayi dahil edilerek doğrulandı: 81 il × 5 grup = 405 satır, 49.929.418
+toplam abone. Bu ilke her yeni ay/tablo için yeniden sorulmayacak şekilde
+buraya sabitlenmiştir.
+
 ## Kapsam Tahmini
 
 | Kalem | Süre |
@@ -172,24 +187,39 @@ EPDK'nın kendi şablonunu değiştirmesiyle yaşanan T11/T13 sürprizleri
 (2026-08-31, bkz. `06_canli_veri_operasyon_gunlugu.md`) aynı riskin Word
 tarafında da geçerli olduğunu gösteriyor.
 
-## Yarından devam — uygulama turu başlangıç noktası
+## 2024 tarifi UYGULANDI ve gerçek Supabase'e yüklendi (2026-09-01)
 
-1. `requirements.txt`'ye `python-docx` ekle (kurulu ama deklare edilmemiş).
-2. **Tek-seferlik aktarım script'ini `worker/scripts/` altında AÇ** (örn.
-   `gecmis_veri_aktarimi.py`) — `worker/parser.py`'a DOKUNMA. Script,
-   `ingest.py`/`pipeline.py` primitiflerini (kaynak_asset_olustur,
-   batch_olustur, fact_*_yukle, batch_onayla) doğrudan çağırsın.
-3. T1/T4 (kurulu güç) tablolarının Word karşılığını incele (bu turda
-   yapılmadı).
-4. **TEK bir yıldan (önerilen: 2024, en sağlam numaralandırmaya sahip)
-   başlayarak, o yıla özel açık eşleme tarifini yaz** (metin-arama tabanlı
-   tablo bulma — `document.element.body.iterchildren()` + başlık paragrafı
-   eşleştirme) — "genel/otomatik" bir motor değil, bu yılın gerçek
-   başlıklarına göre yazılmış, doğrulanınca kapatılacak bir tarif.
-5. Karar 1 & 2'nin somut DB/kod mekanizmasını tasarla ve uygula (dim_tarih
-   bayrağı mı, `ingestion_batch.error_summary` notu mu — karar ver).
-6. O yılın tarifini regresyon testleriyle doğrula, SONRA 2023 ve 2025 için
-   AYRI tarifler yaz (aynı çekirdeği kullanarak, ama her biri kendi
-   başlık/sütun farklarına göre).
-7. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
+Bkz. `06_canli_veri_operasyon_gunlugu.md` ("2026-09-01 — Word (.docx) 2024
+tarihsel aktarımı") — tam sonuç, bulunan/düzeltilen idempotency bug'ı, ve
+per-ay red/aktivasyon tablosu orada. Özet: `worker/scripts/word_ortak.py`
+(ortak çekirdek) + `worker/scripts/word_2024.py` (2024 tarifi) yazıldı,
+`python-docx` `requirements.txt`'ye eklendi, Karar 2 netleştirildi (Sanayi
+dışlaması yalnız `fact_tuketim`'e özgü). 12/12 ay yüklendi — 9'u aktive
+edildi, 3'ü (Ocak/Mart/Nisan, her biri gerçek kaynak verisinde 1'er
+açıklanabilir negatif "Tarımsal" değeri yüzünden) elle onay bekliyor.
+
+**Bu turda kapsam dışı kalanlar (Karar 1 gereği, henüz yapılmadı):**
+T13-karşılığı (fact_serbest_tuketici — Word'de zaten kaynağı yok, Karar 1'in
+"açık işaretleme" mekanizması henüz somutlaştırılmadı) ve T1/T4-karşılığı
+(fact_uretim — Word tarafı hiç incelenmedi).
+
+## Yarından devam
+
+1. **Ocak/Mart/Nisan 2024'ün 3 bekleyen batch'i için karar ver** —
+   `python -m worker.scripts.onayla --batch-id 17/16/20 --actor "..."` ile
+   elle aktive et (öneri: evet, 324 satırdan 1'i hariç geri kalanı sağlam)
+   ya da başka bir işlem.
+2. T1/T4 (kurulu güç) tablolarının Word karşılığını incele (hiç yapılmadı).
+3. Karar 1'in somut DB/kod mekanizmasını tasarla ve uygula (T13'ün Word
+   dönemlerinde "kaynakta yok" olduğunu dim_tarih bayrağı mı,
+   `ingestion_batch.error_summary` notu mu ile işaretleyeceğine karar ver).
+4. `word_2024.py`'nin regresyon testlerini yaz (şu an yalnız script-içi
+   assertion'lara — 81 il, beklenen satır sayısı — güveniliyor, dedike
+   pytest testi yok).
+5. 2024 tarifi doğrulandığına göre, 2023 ve 2025 için AYRI tarifler yaz
+   (`word_2025.py`/`word_2023.py` — aynı `word_ortak.py` çekirdeğini
+   kullanarak, ama her biri kendi başlık/sütun farklarına göre; 2025'in
+   12 dosyası da bu turda MANIFEST_2024'ün taramasıyla YAN ÜRÜN olarak
+   bulundu, bkz. `word_2024.py` modül notu).
+6. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
    bölüm olarak ya da bu dosyanın devamı olarak yaz.

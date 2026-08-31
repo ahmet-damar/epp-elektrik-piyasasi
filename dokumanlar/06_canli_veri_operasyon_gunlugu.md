@@ -210,3 +210,66 @@ sorgu (varsayılan eşiği aşan) hatasız çalıştı.
 3. *(Düşük öncelik)* T7 çoklu-ay format düzeltmesi — hâlâ bilinen-gap
    (bkz. yukarıdaki bölüm), `_mutabakat()` sonucu güvenilmez kalmaya
    devam ediyor ama fact tablosuna yazmadığı için risk düşük.
+
+## 2026-09-01 — Word (.docx) 2024 tarihsel aktarımı: ilk gerçek yükleme
+
+Kaynak: `dokumanlar/07_word_parser_kapsam.md` (teşhis + Karar 1/2). Bu turda
+**kod yazıldı ve gerçek Supabase'e yazıldı**: `worker/scripts/word_ortak.py`
+(ortak tablo-bulma çekirdeği) + `worker/scripts/word_2024.py` (2024'e özel
+tarif — T11-karşılığı→`fact_tuketim`, T10-karşılığı→`fact_abone`;
+T13/T1/T4-karşılığı Karar 1 gereği bu turda YOK). `requirements.txt`'ye
+`python-docx` eklendi.
+
+**Karar 2 netleştirildi** (bkz. `07_word_parser_kapsam.md`): Sanayi dışlaması
+YALNIZ `fact_tuketim`'e özgü (`baglanti` yalnız onun doğal anahtarında var) —
+`fact_abone`'de Sanayi normal yüklenir. Mart 2024 dry-run'ında doğrulandı:
+T11 81×4=324 satır (Sanayi hariç), T10 81×5=405 satır (Sanayi dahil).
+
+**Dosya→ay eşlemesi (MANIFEST_2024):** gerçek dosya adları opak portal
+hash'leri, tarih taşımıyor (`backfill.py`'deki manifest gerekçesiyle aynı).
+Hafif bir `zipfile`+regex taramasıyla (python-docx açmadan) 12 aday bulundu;
+**her biri işlenirken kendi T11-karşılığı başlığından ("...{Ay} {Yıl}
+Döneminde...") ay/yıl yeniden çıkarılıp manifest'le karşılaştırıldı**
+(`_ay_yil_dogrula`) — 12/12 doğrulandı, uyuşmazlık çıkmadı.
+
+**Bulunan ve düzeltilen bir script bug'ı (idempotency):**
+`ingest.kaynak_asset_olustur()` HER ÇAĞRIDA yeni bir `source_asset` satırı
+açar (bilinçli — bir audit log). Mart 2024 önce `--ay 3` ile tek başına
+gerçek yüklendi (`batch_id=16`), sonra tüm-yıl çalıştırması (henüz
+idempotency kontrolü yokken) Mart'ı BİR DAHA işledi (`batch_id=19`, TAM
+AYNI 323 fact_tuketim + 405 fact_abone satırı, `is_active=false`). Fark
+edildi (DB'den doğrudan sorgulanarak, çıktıdaki `[ATLA]` mesajının
+eksikliğinden şüphelenilerek) — **hiçbir aktivasyon yapılmadan önce**
+yakalandı, dolayısıyla `is_active=true` hiçbir satır etkilenmedi. Temizlik:
+`batch_id=19`'un veri satırları silindi, batch `'failed'` + açıklayıcı
+`error_summary` ile işaretlendi (silinmedi — audit izi kalıcı), yeni bir
+`audit_log` satırı (`olay: mukerrer_batch_temizlendi`) düşüldü. **Kalıcı
+düzeltme:** `word_2024.py`'nin `isle_ay()`'i artık her ay başında
+`source_period` bazlı bir idempotency kontrolüyle açılıyor — aynı ay ikinci
+kez çalıştırılırsa `[ATLA]` ile sessizce (ama açıkça loglanarak) çıkar,
+yeni bir batch/satır seti YARATMAZ.
+
+**Sonuç — 12/12 ay gerçek Supabase'e yüklendi, ay/yıl+satır sayısı
+doğrulandı:**
+
+| Dönem | batch_id | red | Durum |
+|---|---|---|---|
+| 2024-01 | 17 | 1 | **BEKLEMEDE** (elle onay gerekiyor) |
+| 2024-02 | 18 | 0 | ✅ aktive edildi |
+| 2024-03 | 16 | 1 | **BEKLEMEDE** (elle onay gerekiyor) |
+| 2024-04 | 20 | 1 | **BEKLEMEDE** (elle onay gerekiyor) |
+| 2024-05..12 | 21-28 | 0 | ✅ aktive edildi (9 ay toplam: 02,05,06,07,08,09,10,11,12) |
+
+3 ayda (Ocak/Mart/Nisan) `kpi.dogrula_tuketim()`'in sıfır-tolerans kuralı
+(`tuketim_mwh < 0` → red) tam olarak 1'er satırı reddetti — **parser hatası
+DEĞİL**: üçü de "Tarımsal" grubunda, farklı il/ay, kaynak dosyanın kendi
+"Genel Toplam" sütunuyla aritmetik olarak tutarlı küçük negatif değerler
+(Ağrı -1,63 MWh Ocak; Malatya -63,96 MWh Mart; Sivas -100,75 MWh Nisan —
+muhtemelen EPDK'nın kendi fatura düzeltmeleri). Mevcut proje politikası
+(`otomatik_onaya_uygun()`, 2026-08-30 kararı) gereği red>0 olan batch'ler
+otomatik aktive edilmez, insan onayı bekler — bu 3 ay bilinçli olarak
+`running` durumunda bırakıldı, elle onay için: `python -m worker.scripts.
+onayla --batch-id 17/16/20 --actor "..."`.
+
+**Kapsam dışı (Karar 1 gereği, bu turda yok):** T13-karşılığı
+(fact_serbest_tuketici) ve T1/T4-karşılığı (fact_uretim, henüz incelenmedi).

@@ -1,0 +1,476 @@
+"""EPP — 2024 Word (.docx) EPDK aylık raporları: TEK SEFERLİK tarihsel
+aktarım tarifi. Bkz. dokumanlar/07_word_parser_kapsam.md ("Mimari Kapsam
+Netliği", Karar 1, Karar 2) — bu dosya o kararların 2024'e özel, açık
+uygulamasıdır. worker/parser.py'a (kalıcı Excel parser) EKLENMEZ; bu script
+bir kere çalışıp kapatılacak, gelecekte bakım gerektirmeyecek.
+
+Kapsam (bu turda): T11-karşılığı → fact_tuketim (Sanayi HARİÇ, Karar 2),
+T10-karşılığı → fact_abone (Sanayi DAHİL — Karar 2'nin netleştirilmiş hali:
+dışlama yalnız `baglanti` içeren fact_tuketim'e özgü). T13/T1/T4-karşılığı
+BU TURDA YOK (Karar 1, ayrıca bkz. Bulgu 3 — T1/T4 henüz incelenmedi).
+
+Dosya→ay eşlemesi (MANIFEST_2024): gerçek EPDK dosya adları (portal
+üretimi opak hash'ler) tarih taşımıyor — worker/scripts/backfill.py'deki
+manifest deseniyle AYNI gerekçe. Eşleme, `document.xml`'in hafif bir
+zipfile taramasıyla (python-docx açmadan) bulundu: her dosyanın T10-
+karşılığı dönemler-arası-karşılaştırma başlığında "{yıl-1} {ay}"/"{yıl}
+{ay}" deseni var — Mart 2024 dosyasının (önceden doğrulanmış) desenini
+taşıyan TAM 12 dosya bulundu (2025'in kendi 12 dosyası da AYRI, farklı bir
+desenle - "{ay}{2025}" başlık + "2024 {ay}"/"2025 {ay}" karşılaştırma -
+bulunup KARIŞTIRILMADI). Bu eşleme KESİN DOĞRULANMIŞ SAYILMAZ — her dosya
+işlenirken kendi T11-karşılığı başlığındaki "{Ay} {Yıl} Döneminde..."
+metninden ay/yıl BİR DAHA çıkarılıp manifest'teki beklenenle karşılaştırılır
+(_ay_yil_dogrula) — uyuşmazlıkta İŞLEM DURDURULUR, sessizce geçilmez.
+
+Kullanım:
+    python -m worker.scripts.word_2024 --ay 3                  # tek ay, gerçek yükleme
+    python -m worker.scripts.word_2024                          # 2024'ün TÜMÜ
+    python -m worker.scripts.word_2024 --ay 3 --onayla          # yükle + uygunsa aktive et
+    python -m worker.scripts.word_2024 --ay 3 --dry-run         # yalnız parse, DB'ye YAZMA
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from io import BytesIO
+from pathlib import Path
+
+import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from docx import Document
+
+from worker import ingest, kpi, pipeline
+from worker.db import get_database_url  # import yan etkisi: .env yüklenir
+from worker.parser import grup_esle as _excel_grup_esle
+from worker.parser import il_kodu_bul, parse_sayi
+from worker.scripts.word_ortak import (
+    basliklari_topla,
+    hedef_donem_kolonu_bul,
+    tek_aday_bul,
+)
+
+KLASOR_VARSAYILAN = Path(r"C:\Users\adama\Downloads\EPDK Verileri")
+
+# ay(int) -> dosya adı. Bkz. modül notu — her giriş isle_ay() içinde kendi
+# başlığından yeniden doğrulanır.
+MANIFEST_2024: dict[int, str] = {
+    1: "_PortalAdmin_Uploads_Content_FastAccess_5fbf3ac842928.docx",
+    2: "_PortalAdmin_Uploads_Content_FastAccess_415ed30988964.docx",
+    3: "_PortalAdmin_Uploads_Content_FastAccess_2c77e94437374.docx",
+    4: "_PortalAdmin_Uploads_Content_FastAccess_209b798e65783.docx",
+    5: "_PortalAdmin_Uploads_Content_FastAccess_7d2e927730995.docx",
+    6: "_PortalAdmin_Uploads_Content_FastAccess_98273a0762938.docx",
+    7: "_PortalAdmin_Uploads_Content_FastAccess_e93fc87058273.docx",
+    8: "_PortalAdmin_Uploads_Content_FastAccess_665644d185200.docx",
+    9: "_PortalAdmin_Uploads_Content_FastAccess_f2e01ba499855.docx",
+    10: "_PortalAdmin_Uploads_Content_FastAccess_8ed2dfe893662.docx",
+    11: "_PortalAdmin_Uploads_Content_FastAccess_1e2e588a20934.docx",
+    12: "_PortalAdmin_Uploads_Content_FastAccess_a007276985902.docx",
+}
+
+# Word raporu, Excel'de görülmeyen KISALTILMIŞ grup etiketleri kullanıyor
+# (Mart 2024 T10-karşılığında bulundu: "Kamu/Özel/Diğer"). worker/parser.py
+# DEĞİŞTİRİLMEDİ (mimari karar) — yalnız burada, bu tarife özel ek eşleme.
+# YENİ bir ay YENİ bir kısaltma getirirse grup_esle_zorunlu() SESSİZCE
+# DÜŞÜRMEZ, ValueError fırlatır — buraya elle eklenmesi gerekir.
+_GRUP_TAKMA_ADLAR = {
+    "Kamu/Özel/Diğer": "Kamu ve Özel Hizmetler",
+}
+# Toplam/özet satırları VE T11'in "Pay" yüzde-sütunu — grup DEĞİL, atlanması
+# gereken hücreler (satır ya da kolon başlığı olarak görülebilir).
+_ATLA_ETIKETLERI = {"Genel Toplam", "Toplam", "İl Toplam", "Türkiye", "TÜRKİYE", "Pay"}
+
+
+def grup_esle_zorunlu(metin: str) -> str | None:
+    """None → bilinen bir 'atla' etiketi (toplam/özet satırı, veri değil).
+    Aksi halde eşleşme bulunamazsa ValueError — worker/kpi.py'nin sessiz
+    karantina mekanizmasına GÜVENİLMEZ (bu tek seferlik script için "her ay
+    kendi tarifiyle kapanır" ilkesi, sürpriz sessizce geçilmez)."""
+    temiz = metin.strip()
+    if temiz in _ATLA_ETIKETLERI:
+        return None
+    if temiz in _GRUP_TAKMA_ADLAR:
+        return _GRUP_TAKMA_ADLAR[temiz]
+    grup = _excel_grup_esle(temiz)
+    if grup is None:
+        raise ValueError(
+            f"Tanınmayan tüketici grubu etiketi: {temiz!r} — "
+            "worker/scripts/word_2024.py: _GRUP_TAKMA_ADLAR'a eklenmeli mi "
+            "kontrol et (yeni bir ay yeni bir kısaltma getirmiş olabilir)."
+        )
+    return grup
+
+
+def _ay_yil_dogrula(
+    baslik: str, beklenen_ay_adi: str, beklenen_yil: int, etiket: str
+) -> None:
+    """T11-karşılığı başlığından ("... {Ay} {Yıl} Döneminde ...") ay/yıl'ı
+    çıkarır, MANIFEST_2024'teki beklenenle karşılaştırır. Uyuşmazlıkta
+    ValueError — dosya→ay eşlemesi YANLIŞSA yanlış tarih_id'ye veri
+    yazmak yerine işlemi DURDURUR."""
+    m = re.search(r"(\w+)\s+(20\d\d)\s+Döneminde", baslik)
+    if not m:
+        raise ValueError(f"{etiket}: başlıktan ay/yıl çıkarılamadı: {baslik!r}")
+    bulunan_ay, bulunan_yil = m.group(1), int(m.group(2))
+    if bulunan_ay != beklenen_ay_adi or bulunan_yil != beklenen_yil:
+        raise ValueError(
+            f"{etiket}: MANIFEST_2024 uyuşmazlığı! beklenen={beklenen_ay_adi} "
+            f"{beklenen_yil}, dosyanın kendi başlığı={bulunan_ay} {bulunan_yil} "
+            f"(başlık: {baslik!r})"
+        )
+
+
+def t11_oku(tbl, tarih_id: int) -> pd.DataFrame:
+    """T11-karşılığı: wide format, satır0=['İller', grup1..grupN, 'Genel
+    Toplam','Pay']. Karar 2: Sanayi HARİÇ (baglanti/P0-2 kaynakta yok)."""
+    baslik_satir = [c.text.strip() for c in tbl.rows[0].cells]
+    grup_kolonlari: list[tuple[int, str]] = []
+    for idx, hucre in enumerate(baslik_satir):
+        if idx == 0:
+            continue
+        grup = grup_esle_zorunlu(hucre)
+        if grup is None or grup == "Sanayi":
+            continue
+        grup_kolonlari.append((idx, grup))
+    if not grup_kolonlari:
+        raise ValueError(f"T11: hiç grup kolonu bulunamadı, başlık={baslik_satir}")
+
+    satirlar = []
+    for row in tbl.rows[1:]:
+        hucreler = [c.text.strip() for c in row.cells]
+        il_adi_ham = hucreler[0]
+        if not il_adi_ham or il_adi_ham.upper() in ("GENEL TOPLAM", "TOPLAM"):
+            continue
+        il_kodu = il_kodu_bul(il_adi_ham)
+        if il_kodu is None:
+            raise ValueError(f"T11: il_kodu bulunamadı: {il_adi_ham!r}")
+        for kolon_idx, grup in grup_kolonlari:
+            satirlar.append(
+                {
+                    "il_kodu": il_kodu,
+                    "tarih_id": tarih_id,
+                    "grup": grup,
+                    "baglanti": "dagitim",  # Karar 2: Sanayi hariç herkes 'dagitim' (bkz. worker/parser.py _T11_GRUP_KOLONLARI)
+                    "tuketim_mwh": parse_sayi(hucreler[kolon_idx]),
+                }
+            )
+    df = pd.DataFrame(
+        satirlar, columns=["il_kodu", "tarih_id", "grup", "baglanti", "tuketim_mwh"]
+    )
+    beklenen = 81 * len(grup_kolonlari)
+    if len(df) != beklenen:
+        raise ValueError(
+            f"T11: beklenen satır {beklenen} (81 il × {len(grup_kolonlari)} grup), "
+            f"gerçek {len(df)} — il sayısı 81 değil mi kontrol et"
+        )
+    return df
+
+
+def t10_oku(tbl, tarih_id: int, hedef_ay_yil: str) -> pd.DataFrame:
+    """T10-karşılığı: uzun format, dönemler-arası-karşılaştırma. Sanayi
+    DAHİL (Karar 2'nin netleştirilmiş hali — fact_abone'de baglanti yok)."""
+    donem_satiri = [c.text.strip() for c in tbl.rows[0].cells]
+    baslik_satiri = [c.text.strip() for c in tbl.rows[1].cells]
+    hedef_kolon = hedef_donem_kolonu_bul(
+        donem_satiri, baslik_satiri, hedef_ay_yil, "Sayı"
+    )
+
+    satirlar = []
+    for row in tbl.rows[2:]:
+        hucreler = [c.text.strip() for c in row.cells]
+        il_adi_ham, tur_ham = hucreler[0], hucreler[1]
+        if not il_adi_ham or not tur_ham:
+            continue
+        grup = grup_esle_zorunlu(tur_ham)
+        if grup is None:
+            continue
+        if il_adi_ham.upper() in ("TÜRKİYE",):
+            continue
+        il_kodu = il_kodu_bul(il_adi_ham)
+        if il_kodu is None:
+            raise ValueError(f"T10: il_kodu bulunamadı: {il_adi_ham!r}")
+        satirlar.append(
+            {
+                "il_kodu": il_kodu,
+                "tarih_id": tarih_id,
+                "grup": grup,
+                "abone_sayisi": parse_sayi(hucreler[hedef_kolon]),
+            }
+        )
+    df = pd.DataFrame(satirlar, columns=["il_kodu", "tarih_id", "grup", "abone_sayisi"])
+    beklenen = 81 * 5  # Aydınlatma, Kamu ve Özel Hizmetler, Mesken, Sanayi, Tarımsal
+    if len(df) != beklenen:
+        raise ValueError(f"T10: beklenen satır {beklenen}, gerçek {len(df)}")
+    return df
+
+
+def isle_ay(
+    conn,
+    *,
+    klasor: Path,
+    ay: int,
+    actor_name: str,
+    dry_run: bool = False,
+) -> pipeline.IslemSonucu | None:
+    """Bir ayı uçtan uca işler: kaynak_asset_olustur → batch_olustur →
+    batch_sahiplen → parse+doğrula → fact_tuketim_yukle/fact_abone_yukle →
+    batch_durumu_guncelle + audit_log_yaz. Adım 5 (aktivasyon) BURADA
+    YAPILMAZ — pipeline.batch_onayla() ayrı çağrılır (aynı ingestion_batch/
+    audit_log/is_active disiplini, bkz. dokumanlar/06_canli_veri_operasyon_
+    gunlugu.md ve worker/scripts/onayla.py).
+
+    dry_run=True: hiçbir DB yazımı yapmaz (kaynak_asset/batch dahil), yalnız
+    parse edip sonuçları terminale basar."""
+    dosya_adi = MANIFEST_2024[ay]
+    yol = klasor / dosya_adi
+    yil = 2024
+    tarih_id = yil * 100 + ay
+    ay_adi = ingest.AY_ADLARI[ay]
+    ay_yil = f"{ay_adi} {yil}"
+    source_period = f"{yil}-{ay:02d}"
+
+    print(f"\n=== {ay_yil} — {dosya_adi} ===")
+
+    if not dry_run:
+        # İDEMPOTENCY: kaynak_asset_olustur() HER ÇAĞRIDA yeni bir
+        # source_asset satırı açar (bilinçli - bir audit log, bkz.
+        # worker/ingest.py modül notu) - bu script senkron ve tek-seferlik
+        # çalıştığından (job_status'un koruduğu async kuyruk gibi DEĞİL),
+        # kendi idempotency korumasını BURADA yapmak ZORUNDA: aynı script
+        # aynı ay için iki kez çalıştırılırsa (2026-09-01'de Mart 2024'te
+        # gerçekten oldu - bkz. dokumanlar/07_word_parser_kapsam.md) sessizce
+        # İKİNCİ bir batch/satır seti YARATMAZ, açıkça atlar.
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT ib.batch_id, ib.status FROM ingestion_batch ib
+                JOIN source_asset sa ON sa.source_asset_id = ib.source_asset_id
+                WHERE sa.source_type = 'epdk_aylik_word' AND sa.source_period = %s
+                  AND ib.status != 'failed'
+                ORDER BY ib.batch_id
+                """,
+                (source_period,),
+            )
+            mevcut = cur.fetchall()
+        if mevcut:
+            print(
+                f"  [ATLA] {source_period} zaten işlenmiş: {mevcut} (yeniden işlemek için önce eski batch'i temizleyin)"
+            )
+            return None
+
+    icerik = yol.read_bytes()
+    doc = Document(BytesIO(icerik))
+    basliklar = basliklari_topla(doc)
+
+    t11_tbl, t11_baslik = tek_aday_bul(
+        basliklar,
+        icerir=[
+            "Faturalanan Elektrik Tüketiminin İl ve Tüketici Türü Bazında Dağılımı"
+        ],
+        icermez=["Karşılaştırılması", "Karşılaştırılmasının"],
+        regex_disla=r"\b\w+-\w+\s+20\d\d\b",
+        etiket="T11",
+    )
+    _ay_yil_dogrula(t11_baslik, ay_adi, yil, "T11")
+    print(f"  T11 başlık: {t11_baslik!r} (ay/yıl doğrulandı)")
+
+    t10_tbl, t10_baslik = tek_aday_bul(
+        basliklar,
+        icerir=[
+            "Tüketici Sayısının İl ve Tüketici Türü Bazında Dağılımının",
+            "Karşılaştırılması",
+        ],
+        etiket="T10",
+    )
+    print(f"  T10 başlık: {t10_baslik!r}")
+
+    tuketim_ham = t11_oku(t11_tbl, tarih_id)
+    abone_ham = t10_oku(t10_tbl, tarih_id, ay_yil)
+    print(
+        f"  T11: {len(tuketim_ham)} satır, grup={sorted(tuketim_ham['grup'].unique())}, "
+        f"toplam={tuketim_ham['tuketim_mwh'].sum():,.2f} MWh"
+    )
+    print(
+        f"  T10: {len(abone_ham)} satır, grup={sorted(abone_ham['grup'].unique())}, "
+        f"toplam={abone_ham['abone_sayisi'].sum():,.0f} abone"
+    )
+
+    if dry_run:
+        print("  [DRY-RUN] DB'ye yazılmadı.")
+        return None
+
+    source_asset_id = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="epdk_aylik_word",
+        dosya_adi=dosya_adi,
+        icerik=icerik,
+        donem_tipi="aylik",
+        source_period=source_period,
+        # source_asset.uploaded_by UUID'dir (Supabase auth.users FK) - bu
+        # tek seferlik CLI script'inin çağıranı gerçek bir auth kullanıcısı
+        # değil, None bırakılır. "Kim çalıştırdı" bilgisi actor_name olarak
+        # audit_log'a (TEXT alan) düşer, aşağıda.
+        uploaded_by=None,
+    )
+    batch_id = ingest.batch_olustur(conn, source_asset_id, "word-2024-v1", "1")
+    if not ingest.batch_sahiplen(conn, batch_id):
+        print(f"  [ATLA] batch_id={batch_id} zaten sahiplenilmiş/işlenmiş.")
+        return None
+
+    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+
+    sonuc = pipeline.IslemSonucu(batch_id=batch_id)
+    audit_tablolar: dict[str, dict[str, object]] = {}
+
+    dogrulanan_t = kpi.dogrula_tuketim(tuketim_ham)
+    yuklenen_t, atlanan_t = ingest.fact_tuketim_yukle(
+        conn, dogrulanan_t.kabul, batch_id
+    )
+    sonuc.tablolar["fact_tuketim"] = pipeline.TabloSonucu(
+        toplam=len(tuketim_ham),
+        red=len(dogrulanan_t.red),
+        karantina=len(dogrulanan_t.karantina),
+        yuklenen=yuklenen_t,
+        atlanan=atlanan_t,
+    )
+    audit_tablolar["fact_tuketim"] = {
+        "toplam": len(tuketim_ham),
+        "red": len(dogrulanan_t.red),
+        "karantina": len(dogrulanan_t.karantina),
+        "yuklenen": yuklenen_t,
+        "atlanan": atlanan_t,
+        "red_satirlari": dogrulanan_t.red.to_dict("records"),
+    }
+
+    dogrulanan_a = kpi.dogrula_abone(abone_ham)
+    yuklenen_a, atlanan_a = ingest.fact_abone_yukle(conn, dogrulanan_a.kabul, batch_id)
+    sonuc.tablolar["fact_abone"] = pipeline.TabloSonucu(
+        toplam=len(abone_ham),
+        red=len(dogrulanan_a.red),
+        karantina=len(dogrulanan_a.karantina),
+        yuklenen=yuklenen_a,
+        atlanan=atlanan_a,
+    )
+    audit_tablolar["fact_abone"] = {
+        "toplam": len(abone_ham),
+        "red": len(dogrulanan_a.red),
+        "karantina": len(dogrulanan_a.karantina),
+        "yuklenen": yuklenen_a,
+        "atlanan": atlanan_a,
+        "red_satirlari": dogrulanan_a.red.to_dict("records"),
+    }
+
+    if dogrulanan_t.red.shape[0] or dogrulanan_t.karantina.shape[0]:
+        print(
+            f"  [DİKKAT] fact_tuketim: red={len(dogrulanan_t.red)} karantina={len(dogrulanan_t.karantina)}"
+        )
+    if dogrulanan_a.red.shape[0] or dogrulanan_a.karantina.shape[0]:
+        print(
+            f"  [DİKKAT] fact_abone: red={len(dogrulanan_a.red)} karantina={len(dogrulanan_a.karantina)}"
+        )
+
+    toplam_satir = len(tuketim_ham) + len(abone_ham)
+    toplam_yuklenen = yuklenen_t + yuklenen_a
+    toplam_atlanan = toplam_satir - toplam_yuklenen
+
+    ingest.batch_durumu_guncelle(
+        conn,
+        batch_id,
+        "running",
+        total_row_count=toplam_satir,
+        accepted_row_count=toplam_yuklenen,
+        rejected_row_count=toplam_atlanan,
+    )
+    ingest.audit_log_yaz(
+        conn,
+        table_name="ingestion_batch",
+        record_id=batch_id,
+        action_type="INSERT",
+        actor_name=actor_name,
+        payload={
+            "olay": "ingest_tamamlandi",
+            "tarih_id": tarih_id,
+            "kaynak": "word_2024",
+            "tablolar": audit_tablolar,
+            "not": "T13/T1/T4-karşılığı bu turda YOK (Karar 1, dokumanlar/07_word_parser_kapsam.md)",
+        },
+    )
+
+    uygun, sebep = pipeline.otomatik_onaya_uygun(sonuc)
+    print(f"  otomatik_onaya_uygun() = {uygun}" + (f" ({sebep})" if sebep else ""))
+    return sonuc
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(
+        description="EPP: 2024 Word raporlarını yükle (tek seferlik)"
+    )
+    ap.add_argument(
+        "--ay",
+        type=int,
+        choices=range(1, 13),
+        help="Yalnız bu ayı işle (verilmezse 2024'ün tümü)",
+    )
+    ap.add_argument("--klasor", type=Path, default=KLASOR_VARSAYILAN)
+    ap.add_argument("--actor", default="manual-cli:word-2024")
+    ap.add_argument(
+        "--onayla",
+        action="store_true",
+        help="otomatik_onaya_uygun() ise batch_onayla() de çağır",
+    )
+    ap.add_argument(
+        "--dry-run", action="store_true", help="Yalnız parse et, DB'ye YAZMA"
+    )
+    args = ap.parse_args()
+
+    aylar = [args.ay] if args.ay else sorted(MANIFEST_2024)
+
+    if args.dry_run:
+        for ay in aylar:
+            isle_ay(
+                None, klasor=args.klasor, ay=ay, actor_name=args.actor, dry_run=True
+            )
+        return 0
+
+    import psycopg
+
+    database_url = get_database_url()
+    if not database_url:
+        print("HATA: DATABASE_URL tanımlı değil.")
+        return 1
+
+    # prepare_threshold=None: bkz. worker/db.py:get_db_connection().
+    with psycopg.connect(database_url, prepare_threshold=None) as conn:
+        for ay in aylar:
+            try:
+                sonuc = isle_ay(conn, klasor=args.klasor, ay=ay, actor_name=args.actor)
+            except Exception:
+                conn.rollback()
+                print(
+                    f"  [HATA] {ingest.AY_ADLARI[ay]} 2024 işlenirken istisna oluştu, bu ay atlandı, ROLLBACK yapıldı:"
+                )
+                raise
+            conn.commit()
+            if sonuc is None:
+                continue
+            if args.onayla:
+                uygun, _ = pipeline.otomatik_onaya_uygun(sonuc)
+                if uygun:
+                    aktive = pipeline.batch_onayla(
+                        conn, sonuc.batch_id, actor_name=args.actor
+                    )
+                    conn.commit()
+                    print(f"  [AKTİVE EDİLDİ] {aktive}")
+                else:
+                    print(
+                        f"  [BEKLEMEDE] otomatik onay eşiğini geçmedi, elle onay gerekir (worker/scripts/onayla.py --batch-id {sonuc.batch_id})"
+                    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
