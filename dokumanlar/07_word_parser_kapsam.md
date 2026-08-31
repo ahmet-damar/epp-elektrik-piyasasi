@@ -205,21 +205,22 @@ T13-karşılığı (fact_serbest_tuketici — Word'de zaten kaynağı yok, Karar
 
 ## Yarından devam
 
-1. **Ocak/Mart/Nisan 2024'ün 3 bekleyen batch'i için karar ver** —
-   `python -m worker.scripts.onayla --batch-id 17/16/20 --actor "..."` ile
-   elle aktive et (öneri: evet, 324 satırdan 1'i hariç geri kalanı sağlam)
-   ya da başka bir işlem.
-2. T1/T4 (kurulu güç) tablolarının Word karşılığını incele (hiç yapılmadı).
-3. Karar 1'in somut DB/kod mekanizmasını tasarla ve uygula (T13'ün Word
+1. ~~Ocak/Mart/Nisan 2024'ün 3 bekleyen batch'i için karar ver~~ **YAPILDI
+   (2026-09-01 kapanışı)** — üçü de elle onaylandı/aktive edildi, 2024'ün
+   12 ayı tamamen aktif ve tutarlı. Detay: `06_canli_veri_operasyon_
+   gunlugu.md` ("2026-09-01 (kapanış)").
+2. **2023 için ayrı bir tarif yaz** (`worker/scripts/word_2023.py`,
+   `word_ortak.py` çekirdeğini kullanarak — 2024'ün desenini birebir
+   kopyalama, kendi başlık/sütun farklarını doğrula).
+3. **Sonra 2025** — 12 dosyası bu turda `word_2024.py`'nin manifest
+   taramasında YAN ÜRÜN olarak zaten bulundu (bkz. o dosyanın modül notu)
+   ama hiç işlenmedi.
+4. T1/T4 (kurulu güç) tablolarının Word karşılığını incele (hiç yapılmadı).
+5. Karar 1'in somut DB/kod mekanizmasını tasarla ve uygula (T13'ün Word
    dönemlerinde "kaynakta yok" olduğunu dim_tarih bayrağı mı,
    `ingestion_batch.error_summary` notu mu ile işaretleyeceğine karar ver).
-4. `word_2024.py`'nin regresyon testlerini yaz (şu an yalnız script-içi
+6. `word_2024.py`'nin regresyon testlerini yaz (şu an yalnız script-içi
    assertion'lara — 81 il, beklenen satır sayısı — güveniliyor, dedike
-   pytest testi yok).
-5. 2024 tarifi doğrulandığına göre, 2023 ve 2025 için AYRI tarifler yaz
-   (`word_2025.py`/`word_2023.py` — aynı `word_ortak.py` çekirdeğini
-   kullanarak, ama her biri kendi başlık/sütun farklarına göre; 2025'in
-   12 dosyası da bu turda MANIFEST_2024'ün taramasıyla YAN ÜRÜN olarak
-   bulundu, bkz. `word_2024.py` modül notu).
-6. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
+   pytest testi yok) — 2023 tarifine başlamadan önce ya da onunla birlikte.
+7. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
    bölüm olarak ya da bu dosyanın devamı olarak yaz.

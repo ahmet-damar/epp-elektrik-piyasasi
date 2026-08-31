@@ -254,10 +254,10 @@ doğrulandı:**
 
 | Dönem | batch_id | red | Durum |
 |---|---|---|---|
-| 2024-01 | 17 | 1 | **BEKLEMEDE** (elle onay gerekiyor) |
+| 2024-01 | 17 | 1 | ✅ aktive edildi (2026-09-01 kapanışında, bkz. aşağıda) |
 | 2024-02 | 18 | 0 | ✅ aktive edildi |
-| 2024-03 | 16 | 1 | **BEKLEMEDE** (elle onay gerekiyor) |
-| 2024-04 | 20 | 1 | **BEKLEMEDE** (elle onay gerekiyor) |
+| 2024-03 | 16 | 1 | ✅ aktive edildi (2026-09-01 kapanışında, bkz. aşağıda) |
+| 2024-04 | 20 | 1 | ✅ aktive edildi (2026-09-01 kapanışında, bkz. aşağıda) |
 | 2024-05..12 | 21-28 | 0 | ✅ aktive edildi (9 ay toplam: 02,05,06,07,08,09,10,11,12) |
 
 3 ayda (Ocak/Mart/Nisan) `kpi.dogrula_tuketim()`'in sıfır-tolerans kuralı
@@ -273,3 +273,53 @@ onayla --batch-id 17/16/20 --actor "..."`.
 
 **Kapsam dışı (Karar 1 gereği, bu turda yok):** T13-karşılığı
 (fact_serbest_tuketici) ve T1/T4-karşılığı (fact_uretim, henüz incelenmedi).
+
+## 2026-09-01 (kapanış) — 3 bekleyen batch onaylandı, 2024 tamamlandı
+
+Yukarıdaki 3 bekleyen batch (Ocak/Mart/Nisan 2024, batch_id 17/16/20)
+incelendi: red satırları tutarlı bir desen (bugün sabahki Malatya -63,96 MWh
+dahil, toplam 5 satır — hepsi "Tarımsal" grubunda, kaynağın kendi "Genel
+Toplam" sütunuyla aritmetik olarak uyuşan, bilinen negatif-fatura-düzeltmesi
+sınıfı, parser hatası değil). Elle onaylandı:
+
+```
+python -m worker.scripts.onayla --batch-id 17 --actor "ahmet-manual"  # Ocak 2024
+python -m worker.scripts.onayla --batch-id 16 --actor "ahmet-manual"  # Mart 2024
+python -m worker.scripts.onayla --batch-id 20 --actor "ahmet-manual"  # Nisan 2024
+```
+
+**Doğrulama (DB'den doğrudan sorgulanarak):**
+- `fact_tuketim`: 2024-01..12'nin TAMAMI `is_active=true`, tarih_id başına
+  tek aktif satır seti (323 satır — 1 red hariç — 3 ay için; 324 satır 9 ay
+  için); hiçbir ay için birden fazla aktif `ingestion_batch_id` YOK
+  (çelişki kontrolü temiz).
+- `fact_abone`: 2024-01..12'nin TAMAMI `is_active=true`, her ay 405 satır.
+- `ingestion_batch`: 12 `succeeded` (2024'ün her ayı için 1) + 1 `failed`
+  (batch_id=19, Mart'ın temizlenen mükerrer kopyası — bkz. yukarıdaki
+  idempotency bug notu).
+- `audit_log`: batch_id 16/17/20 için 3 yeni `UPDATE` satırı,
+  `payload->>'olay'='batch_onaylandi'`, **`actor_name='ahmet-manual'`**
+  olarak görünür (kim onayladığı DB'de kalıcı).
+
+**2024'ün 12 ayı da artık tamamen aktif ve tutarlı.** Bu turda kod
+değişikliği YAPILMADI — yalnız aktivasyon + doğrulama.
+
+**Bu gece YENİ kapsam açılmadı** (bilinçli karar): 2023/2025'e veya
+T1/T4-karşılığına geçilmedi, yalnız 2024'ün kapanışı tamamlandı.
+
+**Yarın nereden devam edilecek (sırayla):**
+1. **2023 için ayrı bir tarif yaz** (`worker/scripts/word_2023.py`,
+   `word_ortak.py` çekirdeğini kullanarak — 2024'ün desenini birebir
+   kopyalama, kendi başlık/sütun farklarını doğrula; bkz.
+   `07_word_parser_kapsam.md` Bulgu 2 — "yakın=güvenilir" varsayımı
+   burada da geçerli değil, her yıl kendi metniyle doğrulanmalı).
+2. **Sonra 2025** — 12 dosyası bu turda YAN ÜRÜN olarak zaten bulundu
+   (`word_2024.py`'nin manifest taramasında, bkz. modül notu) ama HİÇ
+   işlenmedi; 2023 tarifi kapandıktan sonra sırada.
+3. **T13-karşılığı (Karar 1) ve T1/T4-karşılığı (fact_uretim) hâlâ kapsam
+   dışı** — 2023/2025 tarifleri de aynı şekilde bu ikisini atlayacak,
+   ayrı bir karar/iş kalemi gerekiyor (Word'de T13 kaynağı hiç yok; T1/T4
+   Word karşılığı bu session'da hiç incelenmedi).
+4. `word_2024.py`'nin parse mantığı için dedike pytest regresyon testi
+   yok (yalnız script-içi assertion'lara güveniliyor) — 2023 tarifine
+   başlamadan önce ya da onunla birlikte eklenmesi düşünülebilir.
