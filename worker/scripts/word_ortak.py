@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 
-from docx import Document
+from docx.document import Document
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
