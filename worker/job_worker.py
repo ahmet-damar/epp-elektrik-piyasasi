@@ -168,7 +168,9 @@ def main() -> None:
 
     database_url = os.environ["DATABASE_URL"]
     worker_id = _worker_id()
-    with psycopg.connect(database_url) as conn:
+    # prepare_threshold=None: bkz. worker/db.py:get_db_connection() - Supabase
+    # pooler ile psycopg3'un otomatik prepared statement'lari cakisiyor.
+    with psycopg.connect(database_url, prepare_threshold=None) as conn:
         if args.loop:
             calistir_loop(conn, worker_id, args.interval)
         else:

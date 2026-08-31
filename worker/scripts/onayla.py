@@ -55,7 +55,8 @@ def main() -> int:
         print("HATA: DATABASE_URL tanımlı değil.")
         return 1
 
-    with psycopg.connect(database_url) as conn:
+    # prepare_threshold=None: bkz. worker/db.py:get_db_connection().
+    with psycopg.connect(database_url, prepare_threshold=None) as conn:
         aktive_edilen = pipeline.batch_onayla(
             conn, args.batch_id, actor_name=args.actor
         )

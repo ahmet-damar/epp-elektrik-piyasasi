@@ -61,7 +61,14 @@ def get_db_connection() -> Any | None:
         return None
 
     try:
-        return psycopg.connect(database_url)
+        # prepare_threshold=None: Supabase'in transaction pooler'ı (pgbouncer)
+        # psycopg3'ün otomatik server-side prepared statement'larını (varsayılan
+        # esik=5) baglantilar arasi paylasmiyor/temizlemiyor - "prepared
+        # statement already exists" hatasina yol acabiliyor (2026-08-31'de
+        # canli veri yuklerken bulundu, bkz. dokumanlar/06_canli_veri_
+        # operasyon_gunlugu.md). Otomatik prepare'i kapatmak bu riski ortadan
+        # kaldirir.
+        return psycopg.connect(database_url, prepare_threshold=None)
     except psycopg.Error:
         return None
 

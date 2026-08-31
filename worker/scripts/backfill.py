@@ -61,7 +61,8 @@ def main() -> None:
     database_url = os.environ["DATABASE_URL"]
 
     kuyruklanan = 0
-    with psycopg.connect(database_url) as conn:
+    # prepare_threshold=None: bkz. worker/db.py:get_db_connection().
+    with psycopg.connect(database_url, prepare_threshold=None) as conn:
         for dosya_adi, bilgi in manifest.items():
             yol = args.dizin / dosya_adi
             if not yol.exists():

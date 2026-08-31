@@ -208,7 +208,8 @@ def main() -> None:
     tarih_id = args.tarih_id if args.tarih_id is not None else _hedef_tarih_id()
     database_url = os.environ["DATABASE_URL"]
 
-    with psycopg.connect(database_url) as conn:
+    # prepare_threshold=None: bkz. worker/db.py:get_db_connection().
+    with psycopg.connect(database_url, prepare_threshold=None) as conn:
         sonuc = hava_verisi_cek_ve_yaz(conn, tarih_id)
         conn.commit()
 
