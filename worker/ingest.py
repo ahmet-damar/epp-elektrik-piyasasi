@@ -329,7 +329,13 @@ def yil_ici_onceki_tuketim_toplami(
             (yil * 100, tarih_id),
         )
         rows = cur.fetchall()
-    return pd.DataFrame(rows, columns=["il_kodu", "grup", "baglanti", "onceki_toplam"])
+    df = pd.DataFrame(rows, columns=["il_kodu", "grup", "baglanti", "onceki_toplam"])
+    # psycopg, Postgres NUMERIC toplamini Decimal olarak dondurur - T11'in
+    # (float) kumulatif degerinden cikarilirken tip uyusmazligi (TypeError)
+    # yaratir, float'a cevir.
+    if not df.empty:
+        df["onceki_toplam"] = df["onceki_toplam"].astype(float)
+    return df
 
 
 def fact_tuketim_yukle(
