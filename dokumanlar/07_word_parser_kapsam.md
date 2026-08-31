@@ -19,6 +19,46 @@ Ocak 2025, Mart 2024, Şubat 2023 — üçü de gerçek `.docx` (ZIP/OOXML,
 olsa da ortamda kurulu — **bulgu**: bağımlılığı deklare etmeyi unutmayalım,
 uygulama turunda `requirements.txt`'ye eklenmeli).
 
+## Mimari Kapsam Netliği — Tek Seferlik Aktarım, Kalıcı Pipeline Bileşeni Değil
+
+(2026-08-31, kullanıcı netleştirdi.) Bu docx parser'ı **KALICI bir pipeline
+bileşeni DEĞİL, TEK SEFERLİK bir tarihsel veri aktarımı**. Eski Word
+dosyaları bir kere içeri alınacak, sonra hiç tekrar çalışmayacak —
+gelecekteki tüm yeni veriler zaten güncel Excel parser'ıyla
+(`worker/parser.py`) işlenmeye devam edecek. Bu, tasarımı iki yönden
+değiştiriyor:
+
+**1) Konum — `worker/parser.py`'a kalıcı bir "docx dalı" EKLENMEYECEK.**
+Onun yerine ayrı, tek-seferlik bir script/modül: `worker/scripts/
+gecmis_veri_aktarimi.py` (isim örnektir, uygulama turunda kesinleşir) —
+`worker/scripts/backfill.py`/`onayla.py` ile aynı konvansiyon (CLI script,
+kalıcı bir API yüzeyi değil, kullanılıp bırakılacak). `worker/parser.py`
+uzun vadede bakımını üstlenmemiz gereken, HER ZAMAN çalışan bir modül;
+docx kodu onun bir parçası OLMAMALI — ileride birisi `worker/parser.py`'yi
+okuyup "docx dalı neden hâlâ burada, kim kullanıyor" diye sormasın.
+
+**2) Genellik/esneklik seviyesi — "her formatı otomatik anlayan tek genel
+parser" YAZILMAYACAK.** Format setini (2010-2025 arası kaç farklı şablon
+varsa) BİR KERE, elle/yarı-elle keşfedip **her yıl (ya da her şablon
+varyasyonu) için AYRI, açık bir eşleme tarifi (mapping recipe)** yazmak
+tercih edilir — genel bir "otomatik algıla" motoruna göre daha az riskli
+ve muhtemelen daha hızlı, çünkü kod ASLA gelecekte görmediği bir formatla
+karşılaşmayacak (kalıcı bir pipeline'daki "her zaman sağlam kalmalı"
+baskısı yok, tersine her yıl için KODU BİR KERE GEÇİRİP kapatacağız).
+Aşağıdaki Bulgu 2'deki "sabit index değil, metin arama" ilkesi hâlâ
+geçerli (TEK bir yıl İÇİNDE bile ay ay küçük kaymalar olabilir, bkz.
+Excel'deki Mart 2026 T13 örneği, `06_canli_veri_operasyon_gunlugu.md`) —
+ama bu, HER YIL için AYRI YAZILAN bir tarifin İÇİNDE uygulanacak bir
+sağlamlık önlemi; "tüm yılları TEK kod yolunda otomatik ayırt et" hedefi
+DEĞİL.
+
+**3) Disiplin DEĞİŞMİYOR.** Veri DB'ye nasıl girerse girsin
+`ingestion_batch`/`audit_log`/`is_active` bütünlük kuralı AYNI kalır (bkz.
+`worker/pipeline.py`, `worker/ingest.py`). Tek seferlik script bu
+primitifleri (`ingest.kaynak_asset_olustur`, `ingest.batch_olustur`,
+`ingest.fact_*_yukle`, `pipeline.batch_onayla`, otomatik `audit_log`
+yazımı) DOĞRUDAN çağırmalı — kendi paralel bir yazma yolu İCAT ETMEMELİ.
+
 ## Bulgu 1 — Tablo yapısı Excel'den kökten farklı
 
 Excel'de her "Tablo N" ayrı bir çalışma sayfası; Word'de **27-28 tablo, TEK
@@ -27,8 +67,10 @@ resmi API'si (`document.tables`) paragraf↔tablo sırasını VERMİYOR — hang
 paragrafın hangi tablonun başlığı olduğunu bulmak için `document.element.
 body.iterchildren()` ile XML seviyesinde manuel gezinme gerekti (paragraf ve
 tablo elemanlarını orijinal doküman sırasında karışık dolaşan bir yardımcı
-fonksiyon yazıldı, teşhis sırasında doğrulandı — uygulama turunda `worker/`
-içine taşınacak).
+fonksiyon yazıldı, teşhis sırasında doğrulandı — uygulama turunda tek-seferlik
+aktarım script'inin (`worker/scripts/`, bkz. yukarıdaki "Mimari Kapsam
+Netliği") bir yardımcı fonksiyonu olarak taşınacak, `worker/parser.py`'a
+DEĞİL).
 
 ## Bulgu 2 — "Yakından uzağa" stratejisinin düzeltilmiş hali: SABİT İNDEKS DEĞİL, METİN ARAMA
 
@@ -109,12 +151,19 @@ mekanizmayla) açıkça işaretlenir.
 
 | Kalem | Süre |
 |---|---|
-| Docx parser çekirdeği (tablo bulma — metin arama, T11/T10 sütun eşleme, il normalizasyonu — mevcut `il_kodu_bul()`/`grup_esle()` büyük ölçüde yeniden kullanılabilir) | 1-2 gün |
-| T1/T4 (kurulu güç) desteği | +0,5-1 gün |
+| Tek-seferlik aktarım script'inin ortak çekirdeği (`worker/scripts/` altında — tablo bulma yardımcı fonksiyonu, `ingest.py`/`pipeline.py` primitiflerine bağlanma) | 0,5-1 gün |
+| **Her yıl için AYRI, açık eşleme tarifi** (2023, 2024, 2025 — üçü de kendi sütun/tablo haritasıyla, "genel algılama motoru" değil) | ~0,5 gün/yıl × 3 yıl ≈ 1,5 gün |
+| T1/T4 (kurulu güç) desteği (her yılın kendi tarifine eklenir) | +0,5-1 gün |
 | `baglanti`/T13 "kaynakta yok" işaretleme mekanizması + pipeline entegrasyonu (Karar 1 & 2) | +0,5-1 gün |
 | Testler — **2023/2024/2025 AYRI AYRI**, tek seferde değil | +1 gün |
-| Dokümantasyon (yeni kolon haritası) | +0,5 gün |
+| Dokümantasyon (yıl bazlı kolon haritaları) | +0,5 gün |
 | **Toplam** | **3-5 gün** (T13 tam kapsam dışı, T1/T4 dahil) |
+
+Not: "yıl bazlı ayrı tarif" yaklaşımı toplam süreyi tek bir genel motor
+yazmaya göre azaltmayabilir (üç tarif yazmak, bir motor yazmaktan az farklı
+sürebilir) — ama **riski** azaltır: her tarif yalnızca KENDİ yılının
+gerçek verisine karşı doğrulanır ve bir daha DOKUNULMAZ, "gelecekte
+bilinmeyen bir format kırar mı" endişesi taşımaz.
 
 **Neden yıl yıl test, tek seferde değil:** Ocak 2025'in numaralandırma kaybı
 bile TEK BAŞINA bir format varyasyonu; 2023-2025 arası herhangi bir yılda
@@ -126,12 +175,21 @@ tarafında da geçerli olduğunu gösteriyor.
 ## Yarından devam — uygulama turu başlangıç noktası
 
 1. `requirements.txt`'ye `python-docx` ekle (kurulu ama deklare edilmemiş).
-2. T1/T4 (kurulu güç) tablolarının Word karşılığını incele (bu turda
+2. **Tek-seferlik aktarım script'ini `worker/scripts/` altında AÇ** (örn.
+   `gecmis_veri_aktarimi.py`) — `worker/parser.py`'a DOKUNMA. Script,
+   `ingest.py`/`pipeline.py` primitiflerini (kaynak_asset_olustur,
+   batch_olustur, fact_*_yukle, batch_onayla) doğrudan çağırsın.
+3. T1/T4 (kurulu güç) tablolarının Word karşılığını incele (bu turda
    yapılmadı).
-3. Docx parser çekirdeğini yaz (metin-arama tabanlı tablo bulma —
-   `document.element.body.iterchildren()` + başlık paragrafı eşleştirme).
-4. Karar 1 & 2'nin somut DB/kod mekanizmasını tasarla ve uygula (dim_tarih
+4. **TEK bir yıldan (önerilen: 2024, en sağlam numaralandırmaya sahip)
+   başlayarak, o yıla özel açık eşleme tarifini yaz** (metin-arama tabanlı
+   tablo bulma — `document.element.body.iterchildren()` + başlık paragrafı
+   eşleştirme) — "genel/otomatik" bir motor değil, bu yılın gerçek
+   başlıklarına göre yazılmış, doğrulanınca kapatılacak bir tarif.
+5. Karar 1 & 2'nin somut DB/kod mekanizmasını tasarla ve uygula (dim_tarih
    bayrağı mı, `ingestion_batch.error_summary` notu mu — karar ver).
-5. Yeni kolon haritasını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir bölüm
-   olarak ya da bu dosyanın devamı olarak yaz.
-6. 2023, 2024, 2025 için AYRI AYRI regresyon testi.
+6. O yılın tarifini regresyon testleriyle doğrula, SONRA 2023 ve 2025 için
+   AYRI tarifler yaz (aynı çekirdeği kullanarak, ama her biri kendi
+   başlık/sütun farklarına göre).
+7. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
+   bölüm olarak ya da bu dosyanın devamı olarak yaz.
