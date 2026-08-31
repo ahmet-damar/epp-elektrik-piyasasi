@@ -142,3 +142,71 @@ Commit'ler: T11+T13 fix (bkz. main geçmişi), gerçek Mart dosyasına karşı
 doğrulandı (satır sayısı/toplam Şubat'a yakın çıktı, artık kümülatif artış
 göstermiyor). 5 ay, düzeltme sonrası sırayla (Şubat→Haziran) yeniden
 işlendi — sonuçlar bu bölümün devamında.
+
+## 2026-08-31 (kapanış) — Ocak-Haziran 2026 aktif, 2 ek bulgu ele alındı
+
+**Aktif/doğrulanmış dönemler (6/6):** `dim_tarih` = 202601..202606, hepsi
+`is_active=true` — batch_id 3 (Ocak, T13 fix sonrası), 10 (Şubat), 12
+(Mart), 13 (Nisan), 14 (Mayıs), 15 (Haziran). Eski/bozuk-parser'lı batch'ler
+(1, 4-8) hiçbir zaman aktive edilmedi, zararsız şekilde `succeeded`/`running`
+durumunda DB'de iz olarak duruyor.
+
+| Tarih | fact_uretim | fact_abone | fact_tuketim | fact_serbest_tuketici |
+|---|---|---|---|---|
+| 202601 | 521 | 405 | 485 | 1170 |
+| 202602 | 836 | 405 | 485 | 1169 |
+| 202603 | 504 | 405 | 485 | 1169 |
+| 202604 | 529 | 405 | 482 | 1162 |
+| 202605 | 531 | 405 | 483 | 1167 |
+| 202606 | 528 | 405 | 484 | 1172 |
+
+**KPI durumu (dashboard varsayılanı = en son dönem, 202606):**
+- Çalışıyor: KPI-01 (126.113 MW), KPI-08 (24,10 TWh), KPI-09, KPI-10.
+- "Veri yok" (bilinen, tasarım gereği): KPI-02/03/05/06/07 (uretim_mwh
+  il×kaynak grain'inde yok), KPI-13 YoY (önceki yıl verisi yok, beklenen).
+- **KPI-11/12 hâlâ "hesaplanamaz"** — sebep: hava verisi yalnız Ocak
+  2026 için var, Şubat-Haziran hiç çekilmedi (bu oturumun kapsamı dışında
+  bırakıldı, bkz. aşağıda "yarından devam"). β/γ regresyonu için tek veri
+  noktası yeterli değil.
+- **KPI-23/24 hâlâ "veri yok" (Haziran için)** — aynı sebep; Ocak
+  seçilirse hesaplanabilir durumda.
+- **KPI-25/26 hâlâ "hesaplanamaz"** — sebep: CAGR en az 2 farklı yıl
+  gerektiriyor, hâlâ tek yıl (2026) içindeyiz. Bu, öngörülen/beklenen bir
+  durum, veri eksikliği değil.
+
+**Şubat fact_uretim anomalisi (836 satır, diğer aylar 504-531) — TEŞHİS
+EDİLDİ, KOD HATASI DEĞİL, DÜZELTME YAPILMADI.** Kök neden: EPDK'nın Şubat
+raporunda "Doğal Gaz" kurulu güç sütunu her il için `0.0` olarak dolu
+yazılmış (333 hücre); Mart'tan itibaren aynı (sıfır kapasiteli) hücreler
+tamamen BOŞ bırakılmış. Parser zaten P0 kuralına ("boş hücre=NULL, 0
+DEĞİL") göre doğru davranıyor — bu, kaynak dosyanın kendi raporlama
+tutarsızlığı. Doğrulama: toplam kurulu güç makul ve tutarlı kaldı (Şubat
+124.320 MW → Mart 125.078 MW, doğal artış) — satır sayısı farkı TOPLAM
+DEĞERİ etkilemiyor, çünkü 0 zaten toplama katkı sağlamıyordu. Kod
+değiştirilmedi; bu, gelecekte tekrar karşılaşılırsa "neden yine böyle"
+sorusuna hazır cevap olsun diye burada belgelendi.
+
+**`psycopg.errors.DuplicatePreparedStatement` — DÜZELTİLDİ** (commit
+`769074c`). Kök neden: Supabase'in transaction pooler'ı (pgbouncer),
+psycopg3'ün otomatik server-side prepared statement'larını (varsayılan
+eşik=5 kullanım) bağlantılar arası paylaşmıyor/temizlemiyor. 5 production
+kod yolunda aynı desen vardı, hepsine `prepare_threshold=None` eklendi:
+`worker/db.py` (`get_db_connection()` — dashboard'un ana yolu),
+`worker/job_worker.py`, `worker/scripts/onayla.py`, `worker/scripts/
+backfill.py`, `worker/jobs/fetch_weather.py`. Test dosyalarına
+dokunulmadı (CI'ın düz `postgres:16`'sında pgbouncer yok, risk yok).
+Doğrulama: CI'da (ruff/mypy/pytest, gerçek `postgres:16` entegrasyon
+testleri) tamamen yeşil + canlı DB'ye karşı aynı bağlantıda 8 tekrarlı
+sorgu (varsayılan eşiği aşan) hatasız çalıştı.
+
+**Yarından devam edilecekler:**
+1. **Şubat-Haziran için Open-Meteo hava verisi çek** (`fetch_weather.py
+   --tarih-id 202602` ... `202606`) — KPI-11/12/23/24'ü tüm 6 ay için
+   gerçek hale getirir. Bugün BİLİNÇLİ OLARAK başlanmadı (kapsam/zaman
+   nedeniyle).
+2. **Faz 4 (Tahminleme) / Faz 5 (EPİAŞ) kavramsal tasarımı** — daha önce
+   "2-3 ay daha gerçek veri biriktirelim" kararıyla ertelenmişti; artık
+   6 ay veri var, karar gözden geçirilebilir.
+3. *(Düşük öncelik)* T7 çoklu-ay format düzeltmesi — hâlâ bilinen-gap
+   (bkz. yukarıdaki bölüm), `_mutabakat()` sonucu güvenilmez kalmaya
+   devam ediyor ama fact tablosuna yazmadığı için risk düşük.
