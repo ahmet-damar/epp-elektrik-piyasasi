@@ -479,8 +479,86 @@ düzeltmeyi almadı** — hâlâ açık bir karar bekliyor (bkz. yukarıdaki
 2026-09-01 bölümü).
 
 **Yarından devam (güncellendi — tam liste `07_word_parser_kapsam.md`'de):**
-1. 36 bekleyen T4 batch'i (53-88) için aktivasyon kararı.
+1. ~~36 bekleyen T4 batch'i (53-88) için aktivasyon kararı~~ **YAPILDI
+   (2026-09-02, aynı gün devam)** — 4 bağımsız kontrolden geçti, 36/36
+   aktive edildi. Bkz. aşağıdaki "(T4 aktivasyon)" bölümü.
 2. KPI-25 için hâlâ bir karar gerekiyor (KPI-26'nın aksine kod
    düzeltilmedi).
-3. Karar 1'in (artık T13 VE T1) somut mekanizması — öncelik yükseldi.
+3. ~~Karar 1'in (artık T13 VE T1) somut mekanizması~~ **YAPILDI
+   (2026-09-02)** — `veri_kapsam_disi` tablosu. Bkz. aşağıdaki
+   "(kapsam dışı mekanizması)" bölümü.
 4. T4 dahil regresyon testleri, 2022 genişletmesi.
+
+## 2026-09-02 (T4 aktivasyon) — 4 bağımsız kontrol, 36/36 batch aktive edildi
+
+Aktivasyon öncesi kullanıcı talebiyle 4 bağımsız kontrol yapıldı (hiçbiri
+`worker/scripts`'teki `t4_oku()`/`isle_ay_t4()` kodunu ÇAĞIRMADI — paylaşılan
+bir kod hatası varsa yakalanabilsin diye):
+1. **Kaynak çapraz doğrulama:** 4 örnek ay (2023-Eylül, 2024-Mart,
+   2025-Ekim, ve en büyük sıçramalı 2024-Nisan) — bağımsız bir script
+   `.docx`'u yeniden açtı, `Genel Toplam`'ı okudu, DB'deki batch
+   toplamıyla karşılaştırdı. 3'ü yuvarlama seviyesinde (≤0,08 MW), biri
+   (Nisan 2024) **tam 0,0000 MW fark**.
+2. **Ay-ay trend:** 36 ayın tamamında >%5 sıçrama taraması — 3 bulundu
+   (2024-02/04/07), kaynak kırılımı hepsinin neredeyse tamamen **Güneş**
+   (lisanssız/çatı solar) kaynaklı olduğunu gösterdi — Türkiye'nin o
+   dönemki bilinen büyüme trendiyle örtüşüyor, tek yönlü, açıklanabilir.
+3. **Linyit geçişi:** Nisan 2024 öncesi Linyit satırı DB'de HİÇ yok (0
+   değil), sonrası her ayda tam 81 satır — doğrulandı.
+4. **pytest:** `test_yillik_yenilenebilir_kurulu_guc_serisi_yil_sonu_alir`
+   canlı DB'ye karşı PASSED (yerelde `DATABASE_URL` export edilerek
+   çalıştırıldı, varsayılan olarak SKIP oluyordu).
+
+**Sonuç: 36/36 batch (53-88) aktive edildi, 0 UYARI.** `fact_uretim`'de
+2023-2025'in tamamı `is_active=true`, eksik/çelişki yok, T11/T10
+dokunulmadan sağlam. Kod (`word_ortak.py`, `word_2023/2024/2025.py`,
+`worker/analytics.py`) + dokümanlar TEK commit'te (`95ea9be`, ardından bir
+`ruff format` düzeltmesi `8bb1eca`) push edildi, CI yeşil.
+
+## 2026-09-02 (kapsam dışı mekanizması) — veri_kapsam_disi tablosu
+
+Karar 1 (T13) ve Karar 3'ün (T1) beklediği "kaynakta yok" işaretleme
+mekanizması kuruldu — dim_tarih bayrağı ya da `ingestion_batch.
+error_summary` notu DEĞİL (seçenekler arasından), yeni bir tablo:
+
+- **Migration:** `supabase/migrations/20260819_0012_veri_kapsam_disi.sql`
+  — `veri_kapsam_disi (tarih_id, fact_tablosu, nitelik, sebep,
+  karar_referansi, created_at)`, PK (tarih_id, fact_tablosu, nitelik).
+  `fact_tablosu` DB CHECK ile 4'lü whitelist'e (worker/ingest.py
+  `_DOGAL_ANAHTAR` ile aynı) kilitli. RLS + viewer/data_operator/admin
+  politikaları diğer tablolarla aynı desende. **`.github/workflows/
+  ci.yml`'in migration-apply listesine eklendi** (aksi halde CI'ın
+  integration testleri bu tabloyu görmez).
+- **`worker/pipeline.py:kapsam_disi_isaretle()`:** primitif fonksiyon,
+  `ingest.py`'nin diğer primitifleriyle aynı desende (Karar 1'in "paralel
+  yol icat etme" ilkesi). Aynı `(tarih_id, fact_tablosu, nitelik)` için
+  ikinci çağrı **UPSERT** yapar (hata FIRLATMAZ) — bu tablo `ingestion_
+  batch` gibi append-only bir audit izi değil, GÜNCEL bir "durum" kaydı;
+  bir backfill script'i aynı dönem için tekrar çağrılabilir, "zaten var"da
+  patlamak yerine metni güncellemek daha kullanışlı bulundu.
+- **Veri:** 2023-2025'in 36 ayının HEPSİ için 72 satır yazıldı (36×
+  `fact_serbest_tuketici`/`(tumu)`/Karar 1 + 36× `fact_uretim`/
+  `lisans_durumu=Lisanslı`/Karar 3) — canlı Supabase'e migration doğrudan
+  psql/psycopg ile uygulandı (deploy.yml'nin `migrate` job'ı şu an
+  `build-push`'a `needs` bağımlılığı üzerinden dolaylı olarak devre dışı
+  — `if: false`, Docker/web henüz yok — bu yüzden migration'lar elle
+  uygulanıyor, tıpkı 0001-0011'in muhtemelen daha önce uygulandığı gibi).
+- **Test:** `worker/tests/test_pipeline_integration.py`'ye
+  `kapsam_disi_isaretle()`'nin (a) doğru satırı eklediğini ve (b) aynı
+  anahtar için ikinci çağrının UPSERT yaptığını (hata vermediğini,
+  sebep/karar_referansi'nin güncellendiğini) doğrulayan testler eklendi.
+- **Dashboard/KPI koduna DOKUNULMADI** (bilinçli, kullanıcı talebi) — bu
+  tur yalnız mekanizmayı kurdu, Faz 2 dashboard çalışmasında tüketilecek.
+- **Commit/push YAPILMADI** — kullanıcı önce gözden geçirecek.
+
+**Yarından devam:**
+1. `veri_kapsam_disi`'yi Faz 2 dashboard'una bağlamak (örn. bir ay için
+   T13/T1 "bu dönemde mevcut değil" notu göstermek).
+2. KPI-25 için hâlâ bir karar gerekiyor.
+3. `word_2023.py`/`word_2024.py`/`word_2025.py` (T4 dahil) için dedike
+   pytest regresyon testi hâlâ yok — yalnız script-içi assertion var.
+4. 2022 ve öncesi yıllara genişletme.
+5. `deploy.yml`'in `migrate` job'ının neden dolaylı olarak devre dışı
+   olduğu (build-push'a `needs` bağımlılığı, `if: false`) — Docker/web
+   iskeleti gelince gözden geçirilmeli, o zamana kadar migration'lar elle
+   uygulanmaya devam edecek.

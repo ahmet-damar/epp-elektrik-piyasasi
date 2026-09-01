@@ -241,3 +241,79 @@ def test_epdk_aylik_isle_eksik_tablo_reddedilir(conn) -> None:  # type: ignore[n
 # test_batch_sahiplen_atomik_ikinci_cagri_basarisiz). source_asset'in
 # file_hash'e göre tekilleştirilip tekilleştirilmeyeceği ayrı, açık bir karar
 # olarak kullanıcıya soruldu (2026-08-30).
+
+
+def test_kapsam_disi_isaretle_dogru_satiri_ekler(conn) -> None:  # type: ignore[no-untyped-def]
+    """Karar 1 (T13) ve Karar 3'ün (T1) beklediği "kaynakta yok" mekanizması
+    (migration 20260819_0012, veri_kapsam_disi) — bkz. dokumanlar/
+    07_word_parser_kapsam.md."""
+    from worker import ingest
+
+    tarih_id = 209901  # sentinel yıl - gerçek veriyle çakışmaz
+    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+
+    pipeline.kapsam_disi_isaretle(
+        conn,
+        tarih_id=tarih_id,
+        fact_tablosu="fact_serbest_tuketici",
+        sebep="Word formatında serbest tüketici tablosu yok",
+        karar_referansi="Karar 1",
+    )
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT nitelik, sebep, karar_referansi FROM veri_kapsam_disi
+            WHERE tarih_id = %s AND fact_tablosu = 'fact_serbest_tuketici'
+            """,
+            (tarih_id,),
+        )
+        row = cur.fetchone()
+    assert row is not None
+    nitelik, sebep, karar_referansi = row
+    assert nitelik == "(tumu)"  # varsayılan
+    assert sebep == "Word formatında serbest tüketici tablosu yok"
+    assert karar_referansi == "Karar 1"
+
+
+def test_kapsam_disi_isaretle_ayni_anahtar_ikinci_cagri_upsert_yapar(  # type: ignore[no-untyped-def]
+    conn,
+) -> None:
+    """Aynı (tarih_id, fact_tablosu, nitelik) için ikinci çağrı HATA
+    FIRLATMAZ — UPSERT yapar (sebep/karar_referansi güncellenir). Bu
+    tablo ingestion_batch gibi append-only bir audit izi DEĞİL, GÜNCEL
+    bir "durum" kaydı — bkz. pipeline.kapsam_disi_isaretle() docstring'i."""
+    from worker import ingest
+
+    tarih_id = 209902
+    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+
+    pipeline.kapsam_disi_isaretle(
+        conn,
+        tarih_id=tarih_id,
+        fact_tablosu="fact_uretim",
+        nitelik="lisans_durumu=Lisanslı",
+        sebep="ilk gerekçe metni",
+        karar_referansi="Karar 3",
+    )
+    pipeline.kapsam_disi_isaretle(
+        conn,
+        tarih_id=tarih_id,
+        fact_tablosu="fact_uretim",
+        nitelik="lisans_durumu=Lisanslı",
+        sebep="güncellenmiş gerekçe metni",
+        karar_referansi="Karar 3",
+    )
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT count(*), max(sebep) FROM veri_kapsam_disi
+            WHERE tarih_id = %s AND fact_tablosu = 'fact_uretim'
+              AND nitelik = 'lisans_durumu=Lisanslı'
+            """,
+            (tarih_id,),
+        )
+        satir_sayisi, sebep = cur.fetchone()
+    assert satir_sayisi == 1  # ikinci çağrı YENİ bir satır AÇMADI
+    assert sebep == "güncellenmiş gerekçe metni"  # UPSERT ile güncellendi

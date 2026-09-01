@@ -1,3 +1,7 @@
 [sqlfluff]
 dialect = postgres
 exclude_rules = LT01, LT02, LT05, LT12, CP04, CP05
+# db/schema.sql migration 20260819_0012 (veri_kapsam_disi) ile 20000 byte
+# varsayilan esigini asti (21550 bayt) - sqlfluff dosyayi SESSIZCE atlamak
+# yerine lint kapsaminda tutmak icin esik yukseltildi.
+large_file_skip_byte_limit = 40000

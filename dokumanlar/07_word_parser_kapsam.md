@@ -187,10 +187,21 @@ kesişimi kaynakta hiç yok** (Bulgu 5, madde 1) — yüklenemez, tahmin de
 edilmeyecek (yukarıdaki reddedilen fikir). **T4 (Lisanssız) VAR ve
 grain'i uyuyor** (Bulgu 5, madde 2) — normal yüklenecek. **Karar: T1
 kapsam dışı, T13 gibi AÇIKÇA işaretlenecek** (Karar 1'in mekanizmasıyla
-aynı — uygulama turunda kesinleşecek); T4 tek başına `fact_uretim`'e
-yüklenecek. Satır-sayısı assertion'ı (Bulgu 5, madde 4) T11/T10'daki gibi
-katı "81 satır" DEĞİL, il sayısı ay bağımsız değişebileceğinden `Genel
-Toplam` ile aritmetik tutarlılık kontrolüne dayanmalı.
+AYNI — `veri_kapsam_disi` tablosu, bkz. Karar 1'in "Mekanizma UYGULANDI"
+notu); T4 tek başına `fact_uretim`'e yüklenecek. Satır-sayısı assertion'ı
+(Bulgu 5, madde 4) T11/T10'daki gibi katı "81 satır" DEĞİL, il sayısı ay
+bağımsız değişebileceğinden `Genel Toplam` ile aritmetik tutarlılık
+kontrolüne dayanmalı.
+
+**Mekanizma UYGULANDI (2026-09-02):** 2023-2025'in 36 ayının HEPSİ için
+`veri_kapsam_disi`'ye `fact_tablosu='fact_uretim',
+nitelik='lisans_durumu=Lisanslı', karar_referansi='Karar 3'` satırı
+eklendi — Karar 1'in T13 satırlarıyla AYNI mekanizma, aynı migration
+(`20260819_0012_veri_kapsam_disi.sql`), aynı primitif
+(`pipeline.kapsam_disi_isaretle()`). `nitelik` kolonu burada `'(tumu)'`
+DEĞİL, `'lisans_durumu=Lisanslı'` — T13'ten farklı olarak T1'in eksikliği
+`fact_uretim`'in TAMAMINI değil yalnız Lisanslı KESİTİNİ etkiliyor
+(Lisanssız/T4 zaten yüklü ve aktif).
 
 **Ek not (2026-09-02, uygulama turu):** T1'in Bulgu 5'te bulunan marjinal
 kırılımları — "İl Bazında Dağılımı" (il-only, kaynak yok) ve "Kaynak
@@ -207,13 +218,22 @@ Word dönemlerinde T13'ün kaynağı YOK. **Karar: kısmi yükleme yapılacak** 
 T11 (fact_tuketim), T10-karşılığı (fact_abone), ve T4-karşılığı
 (fact_uretim, Lisanssız — T1/Lisanslı KAPSAM DIŞI, bkz. Karar 3)
 normal şekilde yüklenecek, ama **T13 boş kalan her dönem için AÇIKÇA
-işaretlenecek** (dim_tarih'e bir bayrak ya da `ingestion_batch.error_summary`
-alanına "T13 kaynağı bu dönem için mevcut değil (Word formatı, aylık
-raporda serbest tüketici tablosu yok)" notu — uygulama turunda kesin
-mekanizma seçilecek). **Amaç:** "parser hatası yüzünden 0 satır" (bugünkü
-Mart-Haziran T13 satır-kayması bulgusu gibi) ile "kaynakta gerçekten hiç yok"
-durumunu KPI/dashboard seviyesinde her zaman ayırt edebilmek — bugünkü
-`audit_log` disiplinini (2026-08-31, bkz. `03_veri_modeli.md` ve
+işaretlenecek**.
+
+**Mekanizma UYGULANDI (2026-09-02):** `veri_kapsam_disi` tablosu
+(migration `20260819_0012_veri_kapsam_disi.sql`) + `worker/pipeline.py:
+kapsam_disi_isaretle(conn, *, tarih_id, fact_tablosu, sebep,
+karar_referansi, nitelik='(tumu)')`. `ingestion_batch`'ten BİLİNÇLİ OLARAK
+BAĞIMSIZ (dim_tarih'e bir bayrak ya da `ingestion_batch.error_summary`
+notu DEĞİL, seçenekler arasından bu tercih edildi) — çünkü bir dönem için
+o fact tablosunda hiçbir batch girişimi bile olmayabilir. 2023-2025'in
+36 ayının HEPSİ için `fact_tablosu='fact_serbest_tuketici',
+nitelik='(tumu)', karar_referansi='Karar 1'` satırı eklendi (bkz.
+`06_canli_veri_operasyon_gunlugu.md`). **Amaç:** "parser hatası yüzünden
+0 satır" (bugünkü Mart-Haziran T13 satır-kayması bulgusu gibi) ile
+"kaynakta gerçekten hiç yok" durumunu KPI/dashboard seviyesinde her zaman
+ayırt edebilmek — bugünkü `audit_log` disiplinini (2026-08-31, bkz.
+`03_veri_modeli.md` ve
 `06_canli_veri_operasyon_gunlugu.md`) bozmadan.
 
 ## Karar 2 — `baglanti` (Sanayi-İletim/Dağıtım) kaynakta yok: Sanayi grubu da kapsam dışı
@@ -376,12 +396,13 @@ hesaplanamıyor.
    karar hâlâ gerekiyor** (3 seçenek `06_canli_veri_operasyon_gunlugu.md`'de,
    KPI-26'dan farklı olarak KPI-25 henüz kod seviyesinde düzeltilmedi) —
    dashboard'a yanlış bir "-2,2%" sızmadan önce ele alınmalı.
-6. Karar 1'in (T13 VE T1 birlikte) somut DB/kod mekanizmasını tasarla ve
-   uygula ("kaynakta yok" olduğunu dim_tarih bayrağı mı,
-   `ingestion_batch.error_summary` notu mu ile işaretleyeceğine karar
-   ver) — **öncelik yükseldi**: artık yalnız T13 değil, T1 de (36 ay ×
-   Lisanslı boş) bu mekanizmayı bekliyor, gerçek bekleyen batch sayısı
-   arttıkça açık işaretleme daha değerli hale geliyor.
+6. ~~Karar 1'in (T13 VE T1 birlikte) somut DB/kod mekanizmasını tasarla ve
+   uygula~~ **YAPILDI (2026-09-02)** — `veri_kapsam_disi` tablosu
+   (migration `20260819_0012`) + `pipeline.kapsam_disi_isaretle()`; 2023-
+   2025'in 36 ayı için hem T13 (`fact_serbest_tuketici`, `(tumu)`) hem T1
+   (`fact_uretim`, `lisans_durumu=Lisanslı`) satırları eklendi — toplam 72
+   satır. Faz 2 dashboard'unda TÜKETİLMEDİ (bilinçli — bu tur yalnız
+   mekanizmayı kurdu), sıradaki adım bu tabloyu dashboard'a bağlamak.
 7. `word_2023.py`/`word_2024.py`/`word_2025.py`'nin regresyon testlerini
    yaz (şu an yalnız script-içi assertion'lara — 81 il, beklenen satır
    sayısı, Genel Toplam tutarlılığı — güveniliyor, dedike pytest testi

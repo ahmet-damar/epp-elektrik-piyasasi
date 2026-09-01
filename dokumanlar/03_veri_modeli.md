@@ -141,6 +141,19 @@ CREATE UNIQUE INDEX uq_fact_tuketim_active
     `{"olay": "batch_onaylandi", "aktive_edilen_tablolar": [...]}` — hiçbir
     tablo aktive edilmediyse (tüm satırlar reddedildi) boş liste, kayıt
     yine de yazılır.
+- **veri_kapsam_disi:** PK (tarih_id, fact_tablosu, nitelik); sebep,
+  karar_referansi, created_at. **2026-09-02'de eklendi (migration
+  20260819_0012), dokumanlar/07_word_parser_kapsam.md Karar 1 (T13) ve
+  Karar 3 (T1) için beklenen mekanizma.** `ingestion_batch`'ten BİLİNÇLİ
+  OLARAK BAĞIMSIZ — audit_log gibi append-only bir iz DEĞİL, GÜNCEL bir
+  "durum" kaydı (aynı anahtar için ikinci çağrı UPSERT yapar, hata
+  vermez — bkz. `worker/pipeline.py:kapsam_disi_isaretle()`). `nitelik`
+  kolonu aynı fact tablosunun İÇİNDE kısmi kapsam dışılığı ifade eder
+  (`'(tumu)'` = tüm tablo, örn. Karar 1; `'lisans_durumu=Lisanslı'` gibi
+  bir kesit, örn. Karar 3). Amaç: "parser hatası yüzünden 0 satır" ile
+  "kaynakta gerçekten yok" durumunu KPI/dashboard seviyesinde ayırt
+  edebilmek. Faz 0'da bu tur yalnız MEKANİZMAYI kurdu (2023-2025'in 36
+  ayı için 72 satır yazıldı) — Faz 2 dashboard'unda henüz TÜKETİLMİYOR.
 
 ## İlişki Özeti
 - dim_tarih 1→N tüm fact · dim_il 1→N tüm fact

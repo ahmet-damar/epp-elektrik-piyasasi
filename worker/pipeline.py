@@ -461,3 +461,56 @@ def batch_onayla(
         payload={"olay": "batch_onaylandi", "aktive_edilen_tablolar": tablolar},
     )
     return tablolar
+
+
+def kapsam_disi_isaretle(
+    conn: Connection,
+    *,
+    tarih_id: int,
+    fact_tablosu: str,
+    sebep: str,
+    karar_referansi: str,
+    nitelik: str = "(tumu)",
+) -> None:
+    """Karar 1 (T13/fact_serbest_tuketici) ve Karar 3 (T1/fact_uretim
+    Lisanslı) — dokumanlar/07_word_parser_kapsam.md — için beklenen
+    "kaynakta yok" işaretleme mekanizması (migration 20260819_0012,
+    `veri_kapsam_disi` tablosu).
+
+    `ingestion_batch`'ten BİLİNÇLİ OLARAK bağımsızdır — bir dönem için o
+    fact tablosunda hiçbir batch/yükleme girişimi bile olmayabilir (Word
+    kaynağında T13 hiç aranmıyor, T1 için Word'de il×kaynak birleşik
+    tablo hiç yok). Amaç: "parser hatası yüzünden 0 satır" ile "kaynakta
+    gerçekten yok" durumunu KPI/dashboard seviyesinde her zaman ayırt
+    edebilmek (bkz. Karar 1'in orijinal gerekçesi).
+
+    `fact_tablosu` DB'deki CHECK kısıtıyla (aynı 4'lü whitelist —
+    `worker/ingest.py`'nin `_DOGAL_ANAHTAR`'ıyla aynı tablolar) doğrulanır;
+    burada AYRICA bir Python-taraflı liste TUTULMAZ (tek doğruluk kaynağı
+    DB'de — Karar 1'in "paralel yol icat etme" ilkesi).
+
+    `nitelik`: aynı fact tablosunun İÇİNDE kısmi kapsam dışılık olabilir
+    (örn. Karar 3 — fact_uretim'in yalnız Lisanslı kesiti yok, Lisanssız
+    var); varsayılan `'(tumu)'` tüm tablo bu dönem için kapsam dışı demektir.
+
+    Aynı `(tarih_id, fact_tablosu, nitelik)` için İKİNCİ bir çağrı HATA
+    FIRLATMAZ — UPSERT yapar (`sebep`/`karar_referansi` güncellenir,
+    `created_at` yenilenir). Neden: bu fonksiyon tipik olarak bir backfill
+    script'i içinde AYNI dönem için tekrar tekrar çağrılabilir (örn. bir
+    yılın 12 ayı için döngüde) — "zaten var" durumunda patlamak yerine
+    fikrini güncelleyebilmek (örn. gerekçe metni netleştiğinde) daha
+    kullanışlı; bu tablo `ingestion_batch` gibi versiyonlu/append-only bir
+    audit izi DEĞİL, GÜNCEL bir "durum" kaydı."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO veri_kapsam_disi
+                (tarih_id, fact_tablosu, nitelik, sebep, karar_referansi)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (tarih_id, fact_tablosu, nitelik) DO UPDATE SET
+                sebep = EXCLUDED.sebep,
+                karar_referansi = EXCLUDED.karar_referansi,
+                created_at = now()
+            """,
+            (tarih_id, fact_tablosu, nitelik, sebep, karar_referansi),
+        )

@@ -193,6 +193,24 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- "Kaynakta gerçekten yok" (parser hatası DEĞİL) durumunun tablo+dönem+
+-- nitelik bazında sorgulanabilir kaydı — bkz. migration 20260819_0012,
+-- dokumanlar/07_word_parser_kapsam.md Karar 1 (T13) ve Karar 3 (T1).
+-- ingestion_batch'ten BİLİNÇLİ OLARAK bağımsız (bir dönem için o fact
+-- tablosunda hiç batch girişimi olmayabilir).
+CREATE TABLE IF NOT EXISTS veri_kapsam_disi (
+  tarih_id INT NOT NULL REFERENCES dim_tarih(tarih_id) ON DELETE RESTRICT,
+  fact_tablosu TEXT NOT NULL CHECK (
+    fact_tablosu IN ('fact_tuketim', 'fact_uretim', 'fact_abone', 'fact_serbest_tuketici')
+  ),
+  nitelik TEXT NOT NULL DEFAULT '(tumu)',
+  sebep TEXT NOT NULL,
+  karar_referansi TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (tarih_id, fact_tablosu, nitelik)
+);
+CREATE INDEX IF NOT EXISTS idx_veri_kapsam_disi_fact_tablosu ON veri_kapsam_disi (fact_tablosu);
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_fact_tuketim_active
   ON fact_tuketim (il_kodu, tarih_id, grup_id, baglanti)
   WHERE is_active;
@@ -255,6 +273,7 @@ ALTER TABLE fact_serbest_tuketici ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fact_hava_aylik ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fact_hava_aylik_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE veri_kapsam_disi ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY viewer_source_asset_select ON source_asset
   FOR SELECT TO viewer
@@ -408,6 +427,27 @@ CREATE POLICY admin_audit_log_insert ON audit_log
   FOR INSERT TO admin
   WITH CHECK (public.current_app_role() = 'admin');
 
+CREATE POLICY viewer_veri_kapsam_disi_select ON veri_kapsam_disi
+  FOR SELECT TO viewer
+  USING (public.current_app_role() = 'viewer');
+
+CREATE POLICY data_operator_veri_kapsam_disi_insert ON veri_kapsam_disi
+  FOR INSERT TO data_operator
+  WITH CHECK (public.current_app_role() = 'data_operator');
+
+-- UPDATE gerekli: kapsam_disi_isaretle() (worker/pipeline.py) UPSERT yapar
+-- (ON CONFLICT DO UPDATE) - ayni (tarih_id, fact_tablosu, nitelik) icin
+-- ikinci cagri sebep/karar_referansi'ni gunceller, hata firlatmaz.
+CREATE POLICY data_operator_veri_kapsam_disi_update ON veri_kapsam_disi
+  FOR UPDATE TO data_operator
+  USING (public.current_app_role() = 'data_operator')
+  WITH CHECK (public.current_app_role() = 'data_operator');
+
+CREATE POLICY admin_veri_kapsam_disi_all ON veri_kapsam_disi
+  FOR ALL TO admin
+  USING (public.current_app_role() = 'admin')
+  WITH CHECK (public.current_app_role() = 'admin');
+
 -- Service role bypasses RLS by design in Supabase. Do not expose the service role key to browser/dashboard or frontend code.
 
 GRANT USAGE ON SCHEMA public TO viewer, data_operator, admin;
@@ -419,6 +459,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE source_asset, ingestion_batch TO a
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE fact_tuketim, fact_uretim, fact_abone, fact_serbest_tuketici, fact_hava_aylik TO admin;
 GRANT SELECT, INSERT ON TABLE audit_log TO admin;
 GRANT SELECT, INSERT ON TABLE fact_hava_aylik_log TO data_operator, admin;
+GRANT SELECT ON TABLE veri_kapsam_disi TO viewer;
+GRANT SELECT, INSERT, UPDATE ON TABLE veri_kapsam_disi TO data_operator;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE veri_kapsam_disi TO admin;
 
 BEGIN;
 
@@ -444,5 +487,6 @@ ALTER TABLE public.job_status ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sistem_parametre ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.kpi_esik ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.veri_kapsam_disi ENABLE ROW LEVEL SECURITY;
 
 COMMIT;
