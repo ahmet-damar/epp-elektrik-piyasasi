@@ -43,6 +43,25 @@ pre-commit run --all-files
 | PROD_URL | smoke testi |
 | COOLIFY_WEBHOOK_URL | (opsiyonel) Coolify deploy |
 
+## CI'da Supabase Rol Bootstrap (2026-09-02)
+Gerçek Supabase Postgres, `supabase start` (Supabase CLI) tarafından proje
+migration'ları çalışmadan ÖNCE otomatik kurulan üç yönetilen rolle gelir:
+`anon`, `authenticated`, `service_role`. CI'ın `postgres:16` servisi bunlara
+sahip DEĞİL — bu üç role GRANT/REVOKE yapan migration'lar (0003, 0010,
+0011, 0013) daha önce CI'ın apply listesinden "role does not exist"
+gerekçesiyle çıkarılmıştı, yani hiç doğrulanmıyorlardı. `ci.yml`'in
+`integration` job'ı artık migration'lardan ÖNCE
+`supabase/ci-only/01_roles_bootstrap.sql`'i çalıştırıyor (roller +
+`GRANT USAGE ON SCHEMA public` — `supabase start`'ın kendi başlangıç
+durumunu taklit eder), ve TÜM migration'lar (0001-0013) sırayla uygulanıp
+`worker/validate_rls_static.py` (statik metin taraması) + `worker/
+validate_role_access.py` (gerçek `SET ROLE`+sorgu ile GRANT/RLS
+davranışını canlı test eder — `anon` tablo seviyesinde reddedilmeli,
+`viewer` JWT claim'siz 0 satır/claim'li satır görmeli) ile doğrulanıyor.
+`supabase/ci-only/` klasörü BİLİNÇLİ OLARAK `supabase/migrations/` dışında
+— `deploy.yml`'in migration glob'u bu dosyaları asla gerçek Supabase'e
+uygulamaz (orada zaten var).
+
 ## Kalite Kapıları (SRS §13.9)
 G-1 birim+golden · G-2 kapsam≥85% · G-3 entegrasyon · G-4 güvenlik
 G-5 RLS/lisans · G-6 model MAPE · G-7 lint+tip
