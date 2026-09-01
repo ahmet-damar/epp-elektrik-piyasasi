@@ -12,4 +12,11 @@ BEGIN;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE veri_kapsam_disi TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE veri_kapsam_disi TO service_role;
 
+-- anon'un hiç erişimi olmamalı - yeni tablolarda varsayılan olarak zaten
+-- yok, ama Supabase'in proje-seviyesi ALTER DEFAULT PRIVILEGES ayarı
+-- REFERENCES/TRIGGER/TRUNCATE gibi nesne yetkilerini anon'a otomatik
+-- verebiliyor (migration 20260819_0011'de fact_hava_aylik_log için
+-- bulunan AYNI davranış) - burada da aynı önlem alınıyor.
+REVOKE ALL ON TABLE veri_kapsam_disi FROM anon;
+
 COMMIT;
