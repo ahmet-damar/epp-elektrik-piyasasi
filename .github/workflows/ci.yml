@@ -87,6 +87,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0011_fact_hava_aylik_log_anon_revoke.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0012_veri_kapsam_disi.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0013_veri_kapsam_disi_authenticated_grants.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0014_current_app_role_viewer_grants.sql
       - name: Run static RLS validation
         run: python worker/validate_rls_static.py
       - name: Run role-based access verification (anon vs viewer, real RLS/GRANT behavior)
