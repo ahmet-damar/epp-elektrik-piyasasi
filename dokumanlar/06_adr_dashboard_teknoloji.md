@@ -48,6 +48,26 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   `authenticated` istemcisine (kullanıcının oturumuna bağlı, RLS politikaları
   uygulanan) geçmesi gerekir — bu, bu ADR'nin ve Faz 2'nin kapsamı DIŞINDA
   bırakılmıştır, ileride sürpriz olmaması için burada not edilir.
+- **RLS notu, ek bulgu (2026-09-03):** Yukarıdaki geçişi karmaşıklaştıran
+  somut bir kısıt bulundu — bu projenin `viewer`/`data_operator`/`admin`
+  rol-değiştirme modeli (RLS politikaları `TO viewer` vb.), `DATABASE_URL`'in
+  geçtiği Supabase transaction-mode connection pooler'ıyla (Supavisor)
+  UYUMSUZ olabilir: canlı Supabase'e karşı `postgres` kullanıcısıyla (bu
+  rollerin GERÇEK üyesi olduğu `pg_auth_members`'la doğrulandı) `SET ROLE
+  viewer` denendi, "permission denied to set role" ile reddedildi —
+  transaction-mode pooler'ların SET ROLE gibi session-durumu değiştiren
+  komutları (bağlantı havuzda paylaşıldığından, bir istemcinin rol
+  değişikliği başka bir istemciye sızmasın diye) kısıtlaması bilinen bir
+  davranıştır. **Şu an SORUN DEĞİL** — Faz 2 dashboard'u tek-kullanıcılı,
+  yalnız `DATABASE_URL` (RLS'ten muaf bağlantı) yolunu kullanıyor,
+  yukarıdaki `authenticated`/RLS yolu hiç tetiklenmiyor. **Ama çok-kullanıcılı
+  erişim inşa edilmeden ÖNCE** bu çözülmeli — ya PostgREST/Supabase'in
+  `anon`/`authenticated` gibi kendi yönettiği rollerine (pooler'ın zaten
+  desteklediği, `db-role-claim-key` mekanizmasıyla) geçilmeli, ya da
+  connection pooling'i bypass eden DOĞRUDAN (session-mode) bir bağlantı
+  kullanılmalı. Detay/tekrar üretme adımları: `dokumanlar/
+  06_canli_veri_operasyon_gunlugu.md` (2026-09-02, "auth schema USAGE"
+  bölümü).
 
 ## Değerlendirilen Alternatifler
 - **Next.js + TypeScript (şimdi):** Reddedildi — Faz 2 kapsamına göre erken;

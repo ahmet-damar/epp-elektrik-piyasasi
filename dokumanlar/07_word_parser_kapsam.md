@@ -370,46 +370,47 @@ hesaplanamıyor.
 
 ## Yarından devam
 
-1. ~~T1/T4 (kurulu güç) için YENİ bir teşhis turu~~ **YAPILDI (2026-09-02,
-   Bulgu 5 + Karar 3)** — sonuç: **T1 (Lisanslı) kaynakta YOK**, **T4
-   (Lisanssız) VAR**.
-2. ~~T4'ü `word_2023.py`/`word_2024.py`/`word_2025.py`'ye eklemek~~
-   **YAPILDI (2026-09-02, uygulama turu)** — `word_ortak.py`'ye
-   `t4_tablosunu_bul()`, her 3 script'e `t4_oku()` + AYRI bir
-   `isle_ay_t4()` (kendi `parser_version`'ı — `word-YYYY-t4-v1` — ile
-   T11/T10'un ZATEN aktif batch'lerine dokunmadan) eklendi. 36/36 ay
-   (2023+2024+2025) dry-run'dan VE gerçek yüklemeden geçti, **hepsi
-   temiz (0 red)** — ama kullanıcı talebiyle `--onayla` ÇAĞRILMADI, 36
-   batch de `running`/beklemede bırakıldı, elle onay bekliyor (bkz.
-   `06_canli_veri_operasyon_gunlugu.md`, "2026-09-02 (T4)").
-3. **36 bekleyen T4 batch'i için karar ver** — hepsi temiz (0 red) olduğu
-   için tek tek inceleme riski düşük, ama aktivasyon kararı kullanıcıya
-   ait (T9/T10 disiplini). `python -m worker.scripts.onayla --batch-id N
-   --actor "..."` — batch_id listesi `06_canli_veri_operasyon_gunlugu.md`'de.
-4. ~~KPI-26'nın T4-only ile de tam güvenilir olmayabileceği~~ **ELE ALINDI
-   (2026-09-02)** — `worker/analytics.py:
-   yillik_yenilenebilir_kurulu_guc_serisi_getir()` artık yalnız Lisanslı
-   verisi OLAN yılları seriye alıyor (Word'ün Lisanssız-only yılları
-   otomatik "veri yok" sayılıyor, sahte CAGR üretilmiyor) — gerekçe ve
-   kod: aynı fonksiyonun docstring'i + `04_kpi_sozlesmeleri.md`.
-5. **KPI-25'in Sanayi-dahil/hariç + tam-yıl/kısmi-yıl karışıklığı için bir
+**Tamamlananlar (referans için, sırayla):**
+- ~~T1/T4 (kurulu güç) için YENİ bir teşhis turu~~ **YAPILDI (2026-09-02,
+  Bulgu 5 + Karar 3)** — sonuç: **T1 (Lisanslı) kaynakta YOK**, **T4
+  (Lisanssız) VAR**.
+- ~~T4'ü `word_2023.py`/`word_2024.py`/`word_2025.py`'ye eklemek~~
+  **YAPILDI (2026-09-02, uygulama turu)** — `word_ortak.py`'ye
+  `t4_tablosunu_bul()`, her 3 script'e `t4_oku()` + AYRI bir
+  `isle_ay_t4()` (kendi `parser_version`'ı — `word-YYYY-t4-v1` — ile
+  T11/T10'un ZATEN aktif batch'lerine dokunmadan) eklendi.
+- ~~36 bekleyen T4 batch'i için karar ver~~ **YAPILDI (2026-09-02, commit
+  `95ea9be`)** — EK-KONTROL (Nisan 2024 bağımsız doğrulama, fark 0,0000
+  MW) sonrası 36/36 batch (53-88) `python -m worker.scripts.onayla` ile
+  aktive edildi, 36 `[OK]`/0 `[UYARI]`. 2026-09-03'te DB'den tekrar
+  doğrulandı: 36/36 batch `succeeded`, 36/36 ay `fact_uretim.is_active=
+  true`, eksik/çelişki yok (bkz. `06_canli_veri_operasyon_gunlugu.md`).
+- ~~KPI-26'nın T4-only ile de tam güvenilir olmayabileceği~~ **ELE ALINDI
+  (2026-09-02)** — `worker/analytics.py:
+  yillik_yenilenebilir_kurulu_guc_serisi_getir()` artık yalnız Lisanslı
+  verisi OLAN yılları seriye alıyor (Word'ün Lisanssız-only yılları
+  otomatik "veri yok" sayılıyor, sahte CAGR üretilmiyor) — gerekçe ve
+  kod: aynı fonksiyonun docstring'i + `04_kpi_sozlesmeleri.md`.
+- ~~Karar 1'in (T13 VE T1 birlikte) somut DB/kod mekanizmasını tasarla ve
+  uygula~~ **YAPILDI (2026-09-02)** — `veri_kapsam_disi` tablosu
+  (migration `20260819_0012`) + `pipeline.kapsam_disi_isaretle()`; 2023-
+  2025'in 36 ayı için hem T13 (`fact_serbest_tuketici`, `(tumu)`) hem T1
+  (`fact_uretim`, `lisans_durumu=Lisanslı`) satırları eklendi — toplam 72
+  satır. Faz 2 dashboard'unda TÜKETİLMEDİ (bilinçli — bu tur yalnız
+  mekanizmayı kurdu), sıradaki adım bu tabloyu dashboard'a bağlamak.
+
+**Açık kalanlar (yeniden numaralandı):**
+1. **KPI-25'in Sanayi-dahil/hariç + tam-yıl/kısmi-yıl karışıklığı için bir
    karar hâlâ gerekiyor** (3 seçenek `06_canli_veri_operasyon_gunlugu.md`'de,
    KPI-26'dan farklı olarak KPI-25 henüz kod seviyesinde düzeltilmedi) —
    dashboard'a yanlış bir "-2,2%" sızmadan önce ele alınmalı.
-6. ~~Karar 1'in (T13 VE T1 birlikte) somut DB/kod mekanizmasını tasarla ve
-   uygula~~ **YAPILDI (2026-09-02)** — `veri_kapsam_disi` tablosu
-   (migration `20260819_0012`) + `pipeline.kapsam_disi_isaretle()`; 2023-
-   2025'in 36 ayı için hem T13 (`fact_serbest_tuketici`, `(tumu)`) hem T1
-   (`fact_uretim`, `lisans_durumu=Lisanslı`) satırları eklendi — toplam 72
-   satır. Faz 2 dashboard'unda TÜKETİLMEDİ (bilinçli — bu tur yalnız
-   mekanizmayı kurdu), sıradaki adım bu tabloyu dashboard'a bağlamak.
-7. `word_2023.py`/`word_2024.py`/`word_2025.py`'nin regresyon testlerini
+2. `word_2023.py`/`word_2024.py`/`word_2025.py`'nin regresyon testlerini
    yaz (şu an yalnız script-içi assertion'lara — 81 il, beklenen satır
    sayısı, Genel Toplam tutarlılığı — güveniliyor, dedike pytest testi
    yok; T4/`t4_oku()` da bu kapsama girmeli).
-8. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
+3. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
    bölüm olarak ya da bu dosyanın devamı olarak yaz.
-9. 2022 ve öncesi yıllara genişletme (yakından uzağa stratejisinin devamı)
+4. 2022 ve öncesi yıllara genişletme (yakından uzağa stratejisinin devamı)
    — 2022'nin 12 dosyası da bu session'da yan ürün olarak zaten bulundu
    (bkz. `word_2024.py`/`word_2023.py`'nin manifest taramaları) ama hiç
    işlenmedi.
