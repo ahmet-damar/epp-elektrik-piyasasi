@@ -19,6 +19,7 @@ kod üretirken bu dosyaları bağlam (context) olarak okuyabilmesi.
 | `06_adr_dashboard_teknoloji.md` | ADR: sunum katmanı Streamlit (Faz 2), Next.js ertelendi | — (2026-08-30) |
 | `06_canli_veri_operasyon_gunlugu.md` | Canlı Supabase'de yapılan elle müdahalelerin kaydı | — (2026-08-31) |
 | `07_word_parser_kapsam.md` | Word (.docx) EPDK raporları — teşhis + kapsam kararları; T11/T10/T4 36 ay TAM aktif (T4 batch 53-88 aktive edildi). T13 (Karar 1) + T1 (Karar 3) kapsam dışı — artık `veri_kapsam_disi` tablosuyla açıkça işaretli (72 satır). KPI-26 ve KPI-25 düzeltildi, yeni KPI-27 (Sanayi-hariç tüketim CAGR) eklendi | — (2026-09-03) |
+| `08_word_2016_2022_kapsam.md` | Word (.docx) EPDK raporları 2016-2022 — teşhis (kod YOK). 12/12 ay her yıl bulundu. T1/T13 kapsam dışı kararları (07'deki) burada da GEÇERLİ, gözden geçirilmedi. YENİ açık karar: tüketici grubu taksonomisi (Ticarethane/Tarımsal Sulama) en az 2022'nin bir kısmına kadar farklı, kanonik eşleme yok | — (2026-09-03) |
 
 ## Copilot İçin Kullanım
 Chat'te bağlam vermek için:
