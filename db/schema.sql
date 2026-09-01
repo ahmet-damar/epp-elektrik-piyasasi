@@ -462,6 +462,12 @@ GRANT SELECT, INSERT ON TABLE fact_hava_aylik_log TO data_operator, admin;
 GRANT SELECT ON TABLE veri_kapsam_disi TO viewer;
 GRANT SELECT, INSERT, UPDATE ON TABLE veri_kapsam_disi TO data_operator;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE veri_kapsam_disi TO admin;
+-- admin_veri_kapsam_disi_all (FOR ALL) var oldugundan worker/validate_rls_static.py
+-- diger operasyonel tablolarla (0003_fix_grants.sql) AYNI desende bir
+-- authenticated+DELETE grant'i bekliyor - migration 20260819_0003'u
+-- DEGISTIRMEDEN (tarihsel/muhurlu dosya), burada, db/schema.sql'de saglanir.
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE veri_kapsam_disi TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE veri_kapsam_disi TO service_role;
 
 BEGIN;
 

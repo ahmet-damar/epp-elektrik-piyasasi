@@ -116,9 +116,15 @@ def main() -> int:
         combined,
         flags=re.IGNORECASE,
     )
-    # find GRANT ... ON TABLE ... TO authenticated blocks (multiline-aware)
+    # find GRANT ... ON TABLE ... TO authenticated blocks (multiline-aware,
+    # but bounded by ';' so it can't bleed across separate GRANT statements -
+    # [\s\S]+? alone would happily span an unrelated "GRANT ... TO viewer"
+    # statement and everything after it just to reach a LATER "TO authenticated"
+    # occurrence, corrupting both captured groups; found the hard way when
+    # db/schema.sql's veri_kapsam_disi grant became the FIRST "TO authenticated"
+    # text in the file (2026-09-02), bkz. dokumanlar/06_canli_veri_operasyon_gunlugu.md)
     grant_blocks = re.findall(
-        r"GRANT\s+([\s\S]+?)\s+ON\s+TABLE\s+([\s\S]+?)\s+TO\s+authenticated",
+        r"GRANT\s+([^;]+?)\s+ON\s+TABLE\s+([^;]+?)\s+TO\s+authenticated",
         combined,
         flags=re.IGNORECASE,
     )

@@ -66,6 +66,12 @@ CREATE POLICY admin_veri_kapsam_disi_all ON veri_kapsam_disi
 GRANT SELECT ON TABLE veri_kapsam_disi TO viewer;
 GRANT SELECT, INSERT, UPDATE ON TABLE veri_kapsam_disi TO data_operator;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE veri_kapsam_disi TO admin;
-REVOKE ALL ON TABLE veri_kapsam_disi FROM anon, authenticated;
+REVOKE ALL ON TABLE veri_kapsam_disi FROM anon;
+-- authenticated/service_role GRANT'ları BİLİNÇLİ OLARAK BURADA DEĞİL —
+-- bkz. 20260819_0013_veri_kapsam_disi_authenticated_grants.sql: bu
+-- roller yalnız GERÇEK Supabase Postgres'te var, CI'ın düz postgres:16'sı
+-- 0003_fix_grants.sql'i de AYNI gerekçeyle apply listesine hiç almıyor
+-- (bkz. .github/workflows/ci.yml yorumu) - 0012/0013 ayrımı o ayrımı
+-- birebir taklit ediyor.
 
 COMMIT;
