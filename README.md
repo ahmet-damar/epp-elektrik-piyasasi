@@ -62,6 +62,21 @@ davranışını canlı test eder — `anon` tablo seviyesinde reddedilmeli,
 — `deploy.yml`'in migration glob'u bu dosyaları asla gerçek Supabase'e
 uygulamaz (orada zaten var).
 
+## ⚠️ Canlı Supabase'e Karşı Test Çalıştırma Kuralı (2026-09-03)
+**Tam pytest paketi (`py -m pytest` argümansız/`-v` ile TÜMÜ) ASLA canlı
+Supabase'e karşı çalıştırılmaz.** Yalnız CI'ın izole, her çalıştırmada
+sıfırdan kurulan `postgres:16` konteynerinde (`integration` job) tam paket
+çalıştırılır. Canlı `DATABASE_URL`'e karşı yerel doğrulama gerekiyorsa
+YALNIZ hedefli bir alt küme: `py -m pytest -k <hedef>` (örn.
+`-k "kpi_25 or kpi_27"`). Sebep: `worker/tests/test_job_worker_integration.py`,
+`worker/job_worker.py`'nin async polling yolunu egzersiz eder ve bu yol
+KENDİ commit'lerini yapar — standart `conn` fixture'ının rollback tabanlı
+test izolasyonunu bypass eder. 2026-09-02'de tam paketin canlıya karşı
+çalıştırılması, sentinel `tarih_id=209912` (yıl 2099) için 4 fact
+tablosunda + `ingestion_batch` + `source_asset` + `dim_tarih`'te kalıcı
+test verisi bırakmıştı — üç turda tespit edilip temizlendi (detay:
+`dokumanlar/06_canli_veri_operasyon_gunlugu.md`, 2026-09-03 girdisi).
+
 ## Kalite Kapıları (SRS §13.9)
 G-1 birim+golden · G-2 kapsam≥85% · G-3 entegrasyon · G-4 güvenlik
 G-5 RLS/lisans · G-6 model MAPE · G-7 lint+tip
