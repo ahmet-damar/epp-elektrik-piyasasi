@@ -112,8 +112,6 @@ def t4_tablosunu_bul(basliklar: list[tuple[Table, str]]) -> tuple[Table, str]:
     dışı."""
     return tek_aday_bul(
         basliklar,
-        icerir=[
-            "Lisanssız Elektrik Kurulu Gücünün İllere ve Kaynaklara Göre Dağılımı"
-        ],
+        icerir=["Lisanssız Elektrik Kurulu Gücünün İllere ve Kaynaklara Göre Dağılımı"],
         etiket="T4",
     )
