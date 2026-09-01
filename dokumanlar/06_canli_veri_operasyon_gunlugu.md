@@ -389,3 +389,40 @@ KPI-26 açılamaz.
    sızmadan önce ele alınmalı.
 4. `word_2023.py`/`word_2024.py` için dedike pytest regresyon testi hâlâ
    yok.
+
+## 2026-09-02 (devam) — 2025 Word raporları yüklendi (12/12), 36 ay tamamlandı
+
+`worker/scripts/word_2025.py` yazıldı ve 12/12 ay gerçek Supabase'e
+yüklendi. **2023'ün aksine 2025 tek tip bir şablon** — 12 ay ön-taramada
+tek tek kontrol edildi (varsayılmadı): T11 başlığı hepsinde birebir aynı,
+T10'da yalnız 1 alias gerekti (`Kamu/Özel/Diğer`, 2024 Mart'la aynı).
+
+**Aktivasyon:** 8 ay otomatik (Mart, Mayıs, Haziran, Temmuz, Ağustos,
+Eylül, Ekim, Aralık), 4 ay (Ocak=41, Şubat=42, Nisan=44, Kasım=51) elle
+onaylandı — onaydan ÖNCE `source_asset`+`ingestion_batch`+`audit_log`
+doğrudan DB'den sorgulanarak red satırları (il/grup/değer) önceki dry-run
+taramasıyla birebir karşılaştırıldı, uyuşmazlık çıkmadı. **2023+2024+2025
+= 36 ayın TAMAMI artık `is_active=true`**, DB'den doğrulandı (36/36,
+çelişki yok).
+
+**Gözlem (kesin değil, ileride araştırılabilir):** "Aydınlatma + güneydoğu
+illeri" kırmızı-satır deseni hem 2023 (Haziran: Batman -1.259,11 MWh;
+Temmuz: Şanlıurfa -2.911,37 MWh) hem 2025'te (Nisan: Batman/Mardin/Siirt/
+Şanlıurfa/Şırnak, 5 il birden, hepsi Aydınlatma) tekrar ediyor. 2023'ün
+deprem-bölgesi vakaları (Kahramanmaraş/Batman/Şanlıurfa, yukarıda) 6 Şubat
+2023 depremiyle açıklanabilirken, 2025 Nisan'ının aynı bölgede AYNI grupta
+(Aydınlatma) tekrar etmesi — deprem 2 yıl önce olduğuna göre — muhtemelen
+depremden BAĞIMSIZ, bölgesel/yıllık bir mahsuplaşma/fatura döngüsü olduğuna
+işaret ediyor (örn. belediye aydınlatma sözleşmelerinin yıllık dönemsel
+kapanışı). Kesin değil — ayrı bir araştırma konusu, kod/veri sorunu değil.
+
+**Yarından devam (güncellendi):**
+1. **T1/T4 (kurulu güç) için YENİ bir teşhis turu** — T11/T10 gibi kendi
+   keşif turunu hak ediyor, hiç incelenmedi. Hem Karar 1'in hem KPI-26'nın
+   önünü açar, öncelik kazandı.
+2. KPI-25'in Sanayi-dahil/hariç + tam-yıl/kısmi-yıl karışıklığı için bir
+   karar gerekiyor (yukarıdaki 3 seçenek).
+3. `word_2023.py`/`word_2024.py`/`word_2025.py` için dedike pytest
+   regresyon testi hâlâ yok.
+4. 2022 ve öncesi yıllara genişletme — 2022'nin 12 dosyası da yan ürün
+   olarak zaten bulundu, hiç işlenmedi.

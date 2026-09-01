@@ -227,25 +227,60 @@ yanıltıcı bir -2,2% veriyor. KPI-26 hâlâ hesaplanamıyor (`fact_uretim`'de
 tek yıl var). Tam detay ve seçenekler: `06_canli_veri_operasyon_gunlugu.md`
 aynı bölüm.
 
+## 2025 tarifi UYGULANDI ve gerçek Supabase'e yüklendi (2026-09-02)
+
+`worker/scripts/word_2025.py` yazıldı (`word_ortak.py` çekirdeğini yeniden
+kullanarak). **2025 tek tip bir şablon** — 2023'ün aksine yıl içi bölünme
+YOK (12 ayın tümü ön-taramada kontrol edildi: T11 başlığı 12 ayda da
+birebir aynı, T10'da yalnız tek bir alias gerekti — "Kamu/Özel/Diğer",
+2024 Mart'la aynı). Field-code numaralandırması ay ay değişken boş render
+ediliyor ama kozmetik. 3 dosya (Mart/Mayıs/Haziran) farklı bir yükleme
+öneki (`..._Media_`) taşıyor, manifest'e doğru işlendi.
+
+**Aktivasyon:** 12/12 ay yüklendi ve **aktif** — 8'i otomatik (temiz: Mart,
+Mayıs, Haziran, Temmuz, Ağustos, Eylül, Ekim, Aralık), 4'ü (Ocak=batch 41,
+Şubat=batch 42, Nisan=batch 44, Kasım=batch 51) elle onaylandı. Onaydan
+önce DB'den (`source_asset`+`ingestion_batch`+`audit_log`) doğrudan
+sorgulanarak red satırları teyit edildi — Ocak: Şırnak/Yozgat Tarımsal;
+Şubat: Yozgat Tarımsal; Nisan: Batman/Mardin/Siirt/Şanlıurfa/Şırnak
+Aydınlatma (5 satır); Kasım: Batman Tarımsal — hepsi önceki dry-run
+taramasıyla birebir eşleşti, uyuşmazlık çıkmadı.
+
+**Gözlem (kesin değil, ileride araştırılabilir):** "Aydınlatma + güneydoğu
+illeri" deseni hem 2023 (Haziran/Temmuz — Batman/Şanlıurfa) hem 2025
+(Nisan — Batman/Mardin/Siirt/Şanlıurfa/Şırnak) yılında tekrarlıyor.
+Muhtemelen 6 Şubat 2023 depreminden bağımsız, bölgesel/yıllık bir
+mahsuplaşma döngüsü — ayrıntı `06_canli_veri_operasyon_gunlugu.md`'de.
+
+**2023 + 2024 + 2025 — 36 ayın TAMAMI artık aktif ve tutarlı** (DB'den
+doğrulandı: 36/36 ay `is_active=true`, çelişki yok). T13/T1-T4-karşılığı
+hâlâ kapsam dışı (Karar 1 gereği).
+
+**KPI-25/26 durumu:** değişmedi (bkz. yukarıdaki "2023 tarifi" bölümü) —
+KPI-25 hâlâ Sanayi-dahil/hariç + tam-yıl/kısmi-yıl karışıklığı yüzünden
+güvenilmez, KPI-26 hâlâ `fact_uretim`'de tek yıl (2026) olduğu için
+hesaplanamıyor.
+
 ## Yarından devam
 
-1. **2025 için ayrı bir tarif yaz** (`worker/scripts/word_2025.py`,
-   `word_ortak.py` çekirdeğini kullanarak) — 12 dosyası bu turda
-   `word_2024.py`'nin manifest taramasında YAN ÜRÜN olarak zaten bulundu
-   (bkz. o dosyanın modül notu) ama hiç işlenmedi. 2025'in kendi başlık/
-   sütun farklarını (ör. Ocak 2025'te "Tablo ." field-code'unun boş
-   render edildiği zaten biliniyor) doğrula.
+1. **T1/T4 (kurulu güç) için YENİ bir teşhis turu** — T11/T10 gibi kendi
+   keşif turunu hak ediyor, bu session'da HİÇ incelenmedi (varsayımla
+   ilerlenmeyecek): Word raporlarında T1/T4-karşılığı tabloları metin
+   aramasıyla bul, sütun/satır yapısını çıkar, `fact_uretim`'e (yalnız
+   `kurulu_guc_mw`, Excel tarafındaki gibi) uyup uymadığını doğrula. Hem
+   Karar 1'in (T13 kapsamı) hem KPI-26'nın önünü açar — öncelik kazandı.
 2. **KPI-25'in Sanayi-dahil/hariç + tam-yıl/kısmi-yıl karışıklığı için bir
    karar gerekiyor** (3 seçenek `06_canli_veri_operasyon_gunlugu.md`'de) —
-   dashboard'a yanlış bir "-2,2%" sızmadan önce ele alınmalı. Öncelik
-   kazandı (2023+2024 aktif olunca ortaya çıktı).
-3. T1/T4 (kurulu güç) tablolarının Word karşılığını incele (hiç yapılmadı)
-   — hem T13/Karar 1'in hem KPI-26'nın önünü açar.
-4. Karar 1'in somut DB/kod mekanizmasını tasarla ve uygula (T13'ün Word
+   dashboard'a yanlış bir "-2,2%" sızmadan önce ele alınmalı.
+3. Karar 1'in somut DB/kod mekanizmasını tasarla ve uygula (T13'ün Word
    dönemlerinde "kaynakta yok" olduğunu dim_tarih bayrağı mı,
    `ingestion_batch.error_summary` notu mu ile işaretleyeceğine karar ver).
-5. `word_2023.py`/`word_2024.py`'nin regresyon testlerini yaz (şu an yalnız
-   script-içi assertion'lara — 81 il, beklenen satır sayısı — güveniliyor,
-   dedike pytest testi yok).
-6. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
+4. `word_2023.py`/`word_2024.py`/`word_2025.py`'nin regresyon testlerini
+   yaz (şu an yalnız script-içi assertion'lara — 81 il, beklenen satır
+   sayısı — güveniliyor, dedike pytest testi yok).
+5. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
    bölüm olarak ya da bu dosyanın devamı olarak yaz.
+6. 2022 ve öncesi yıllara genişletme (yakından uzağa stratejisinin devamı)
+   — 2022'nin 12 dosyası da bu session'da yan ürün olarak zaten bulundu
+   (bkz. `word_2024.py`/`word_2023.py`'nin manifest taramaları) ama hiç
+   işlenmedi.
