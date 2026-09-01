@@ -48,10 +48,11 @@ from docx import Document
 from worker import ingest, kpi, pipeline
 from worker.db import get_database_url  # import yan etkisi: .env yüklenir
 from worker.parser import grup_esle as _excel_grup_esle
-from worker.parser import il_kodu_bul, parse_sayi
+from worker.parser import il_kodu_bul, kaynak_esle, parse_sayi
 from worker.scripts.word_ortak import (
     basliklari_topla,
     hedef_donem_kolonu_bul,
+    t4_tablosunu_bul,
     tek_aday_bul,
 )
 
@@ -105,6 +106,40 @@ def grup_esle_zorunlu(metin: str) -> str | None:
             "kontrol et (yeni bir ay yeni bir kısaltma getirmiş olabilir)."
         )
     return grup
+
+
+# T4-karşılığı (Lisanssız kurulu güç) kaynak-türü sütun başlıkları — Bulgu 5'te
+# (dokumanlar/07_word_parser_kapsam.md) 4 farklı yıl/şablonda hiç alias
+# gerekmedi (Biyokütle/Doğal Gaz/Güneş/Hidrolik/Rüzgar/Linyit hepsi
+# worker/parser.py:kaynak_esle() ile doğrudan eşleşti) — ama YENİ bir ay
+# YENİ bir varyant getirirse kaynak_esle_zorunlu() yine ValueError fırlatır.
+_KAYNAK_TAKMA_ADLAR: dict[str, str] = {}
+_KAYNAK_ATLA_ETIKETLERI = {"Genel Toplam", "Toplam", "İl Toplam"}
+# Türkiye'nin 81 ili, plaka kodu 1-81 (sabit, dim_il ile aynı) — T4-karşılığı
+# tabloda kapasitesi sıfır olan iller bazı yıllarda (2023) SATIR OLARAK HİÇ
+# GÖRÜNMÜYOR (bkz. Bulgu 5 madde 4); eksik iller için tüm kaynak türlerini
+# AÇIKÇA 0 yazmak (satırı atlamak/sessizce dışarıda bırakmak YERİNE) için
+# tam il kümesiyle karşılaştırma gerekiyor.
+TUM_IL_KODLARI = set(range(1, 82))
+
+
+def kaynak_esle_zorunlu(metin: str) -> str | None:
+    """None → bilinen bir 'atla' etiketi (toplam/özet satırı ya da kolonu,
+    veri değil). Aksi halde eşleşme bulunamazsa ValueError — sürpriz
+    sessizce geçilmez (grup_esle_zorunlu() ile aynı ilke)."""
+    temiz = metin.strip()
+    if temiz in _KAYNAK_ATLA_ETIKETLERI:
+        return None
+    if temiz in _KAYNAK_TAKMA_ADLAR:
+        return _KAYNAK_TAKMA_ADLAR[temiz]
+    eslesme = kaynak_esle(temiz)
+    if eslesme is None:
+        raise ValueError(
+            f"Tanınmayan kaynak türü etiketi: {temiz!r} — "
+            "worker/scripts/word_2023.py: _KAYNAK_TAKMA_ADLAR'a eklenmeli mi "
+            "kontrol et (yeni bir ay yeni bir kaynak türü/kısaltma getirmiş olabilir)."
+        )
+    return eslesme[0]
 
 
 _SIRKUMFLEKS_DUZELT = str.maketrans("ÂâÎîÛû", "AaİiUu")
@@ -221,6 +256,98 @@ def t10_oku(tbl, tarih_id: int, hedef_ay_yil: str) -> pd.DataFrame:
     beklenen = 81 * 5  # Aydınlatma, Kamu ve Özel Hizmetler, Mesken, Sanayi, Tarımsal
     if len(df) != beklenen:
         raise ValueError(f"T10: beklenen satır {beklenen}, gerçek {len(df)}")
+    return df
+
+
+def t4_oku(tbl, tarih_id: int) -> pd.DataFrame:
+    """T4-karşılığı: 'İLLER' × kaynak-türü matrisi, Lisanssız. Bkz. Bulgu 5
+    (dokumanlar/07_word_parser_kapsam.md):
+    - Kapasitesi sıfır olan iller bazı yıllarda (2023) SATIR OLARAK HİÇ
+      GÖRÜNMÜYOR — bu fonksiyon TUM_IL_KODLARI ile karşılaştırıp eksik
+      illeri, o ayın TÜM kaynak kolonları için AÇIKÇA 0.0 yazarak tamamlar
+      (satır atlama/sessizce dışarıda bırakma YOK — kullanıcı talebi).
+    - Görülen illerdeki BOŞ hücreler de aynı mantıkla 0.0 sayılır (EPDK'nın
+      kendi 'Toplam' sütunu boşları zaten 0 olarak topluyor, gerçek veride
+      doğrulandı).
+    - Satır sayısı yıldan yıla değişebildiği için (79-81 il) katı bir
+      "beklenen satır" assertion'ı YOK — bunun yerine tablonun kendi
+      'Genel Toplam' satırıyla aritmetik tutarlılık kontrol edilir
+      (küçük yuvarlama farkına toleranslı, 2025 Nisan'da 0,02 MW'lık bir
+      örnek zaten görüldü)."""
+    baslik_satir = [c.text.strip() for c in tbl.rows[0].cells]
+    kaynak_kolonlari: list[tuple[int, str]] = []
+    toplam_kolon_idx: int | None = None
+    for idx, hucre in enumerate(baslik_satir):
+        if idx == 0:
+            continue
+        if hucre.strip() in ("Toplam", "Genel Toplam"):
+            toplam_kolon_idx = idx
+            continue
+        kaynak = kaynak_esle_zorunlu(hucre)
+        if kaynak is None:
+            continue
+        kaynak_kolonlari.append((idx, kaynak))
+    if not kaynak_kolonlari:
+        raise ValueError(f"T4: hiç kaynak kolonu bulunamadı, başlık={baslik_satir}")
+    if toplam_kolon_idx is None:
+        raise ValueError(f"T4: 'Toplam' kolonu bulunamadı, başlık={baslik_satir}")
+
+    satirlar = []
+    gorulen_iller: set[int] = set()
+    genel_toplam_deger: float | None = None
+    for row in tbl.rows[1:]:
+        hucreler = [c.text.strip() for c in row.cells]
+        il_adi_ham = _il_adi_temizle(hucreler[0])
+        if not il_adi_ham:
+            continue
+        if il_adi_ham.upper() in ("GENEL TOPLAM", "TOPLAM"):
+            genel_toplam_deger = parse_sayi(hucreler[toplam_kolon_idx])
+            continue
+        il_kodu = il_kodu_bul(il_adi_ham)
+        if il_kodu is None:
+            raise ValueError(f"T4: il_kodu bulunamadı: {il_adi_ham!r}")
+        gorulen_iller.add(il_kodu)
+        for kolon_idx, kaynak in kaynak_kolonlari:
+            deger = parse_sayi(hucreler[kolon_idx])
+            satirlar.append(
+                {
+                    "il_kodu": il_kodu,
+                    "tarih_id": tarih_id,
+                    "kaynak": kaynak,
+                    "lisans": "Lisanssız",
+                    "kurulu_guc_mw": deger if deger is not None else 0.0,
+                }
+            )
+
+    # Eksik iller (kapasitesi sıfır, tabloda hiç satır yok) — AÇIKÇA 0 yaz.
+    eksik_iller = TUM_IL_KODLARI - gorulen_iller
+    for il_kodu in sorted(eksik_iller):
+        for kolon_idx, kaynak in kaynak_kolonlari:
+            satirlar.append(
+                {
+                    "il_kodu": il_kodu,
+                    "tarih_id": tarih_id,
+                    "kaynak": kaynak,
+                    "lisans": "Lisanssız",
+                    "kurulu_guc_mw": 0.0,
+                }
+            )
+
+    df = pd.DataFrame(
+        satirlar, columns=["il_kodu", "tarih_id", "kaynak", "lisans", "kurulu_guc_mw"]
+    )
+
+    if genel_toplam_deger is None:
+        raise ValueError("T4: 'Genel Toplam' satırı bulunamadı — doğrulama yapılamadı")
+    hesaplanan = float(df["kurulu_guc_mw"].sum())
+    fark = abs(hesaplanan - genel_toplam_deger)
+    tolerans = max(0.5, abs(genel_toplam_deger) * 0.001)
+    if fark > tolerans:
+        raise ValueError(
+            f"T4: hesaplanan toplam {hesaplanan:.2f} MW, tablonun kendi Genel "
+            f"Toplam'ı {genel_toplam_deger:.2f} MW — fark {fark:.2f} MW toleransı "
+            f"({tolerans:.2f}) aşıyor, bir hizalama/parse sorunu olabilir"
+        )
     return df
 
 
@@ -401,7 +528,140 @@ def isle_ay(
             "tarih_id": tarih_id,
             "kaynak": "word_2023",
             "tablolar": audit_tablolar,
-            "not": "T13/T1/T4-karşılığı bu turda YOK (Karar 1, dokumanlar/07_word_parser_kapsam.md)",
+            "not": "T13/T1-karşılığı bu turda YOK (Karar 1 & 3). T4-karşılığı "
+            "(fact_uretim, Lisanssız) AYRI bir batch'te yüklenir — bkz. isle_ay_t4().",
+        },
+    )
+
+    uygun, sebep = pipeline.otomatik_onaya_uygun(sonuc)
+    print(f"  otomatik_onaya_uygun() = {uygun}" + (f" ({sebep})" if sebep else ""))
+    return sonuc
+
+
+def isle_ay_t4(
+    conn,
+    *,
+    klasor: Path,
+    ay: int,
+    actor_name: str,
+    dry_run: bool = False,
+) -> pipeline.IslemSonucu | None:
+    """T4-karşılığı (fact_uretim, Lisanssız) için AYRI bir batch açar —
+    isle_ay()'in T11/T10 akışına DOKUNMAZ. Neden ayrı: 2023'ün 12 ayı için
+    T11/T10 batch'leri ZATEN 'succeeded' durumda (bkz. dokumanlar/
+    06_canli_veri_operasyon_gunlugu.md); isle_ay()'in idempotency kontrolü
+    (source_period bazlı, parser_version'dan BAĞIMSIZ) bu ayları [ATLA]
+    ile atlar — T4'ü isle_ay()'e eklemek, zaten aktif olan T11/T10 verisini
+    YENİDEN işlemeye kalkışmadan, YALNIZ eksik fact_uretim'i tamamlamak
+    için ayrı bir parser_version ("word-2023-t4-v1") ve ayrı bir idempotency
+    kontrolü (parser_version'a göre filtrelenmiş) kullanır — P0-5'in
+    doğal sonucu (farklı parser_version = meşru yeni batch, bkz.
+    worker/ingest.py:batch_olustur() docstring'i)."""
+    dosya_adi = MANIFEST_2023[ay]
+    yol = klasor / dosya_adi
+    yil = 2023
+    tarih_id = yil * 100 + ay
+    ay_adi = ingest.AY_ADLARI[ay]
+    source_period = f"{yil}-{ay:02d}"
+    parser_version = "word-2023-t4-v1"
+
+    print(f"\n=== T4 {ay_adi} {yil} — {dosya_adi} ===")
+
+    if not dry_run:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT ib.batch_id, ib.status FROM ingestion_batch ib
+                JOIN source_asset sa ON sa.source_asset_id = ib.source_asset_id
+                WHERE sa.source_type = 'epdk_aylik_word' AND sa.source_period = %s
+                  AND ib.parser_version = %s AND ib.status != 'failed'
+                ORDER BY ib.batch_id
+                """,
+                (source_period, parser_version),
+            )
+            mevcut = cur.fetchall()
+        if mevcut:
+            print(f"  [ATLA] T4 {source_period} zaten işlenmiş: {mevcut}")
+            return None
+
+    icerik = yol.read_bytes()
+    doc = Document(BytesIO(icerik))
+    basliklar = basliklari_topla(doc)
+
+    t4_tbl, t4_baslik = t4_tablosunu_bul(basliklar)
+    print(f"  T4 başlık: {t4_baslik!r}")
+
+    uretim_ham = t4_oku(t4_tbl, tarih_id)
+    print(
+        f"  T4: {len(uretim_ham)} satır, kaynak={sorted(uretim_ham['kaynak'].unique())}, "
+        f"toplam={uretim_ham['kurulu_guc_mw'].sum():,.2f} MW (Genel Toplam ile doğrulandı)"
+    )
+
+    if dry_run:
+        print("  [DRY-RUN] DB'ye yazılmadı.")
+        return None
+
+    source_asset_id = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="epdk_aylik_word",
+        dosya_adi=dosya_adi,
+        icerik=icerik,
+        donem_tipi="aylik",
+        source_period=source_period,
+        uploaded_by=None,
+    )
+    batch_id = ingest.batch_olustur(conn, source_asset_id, parser_version, "1")
+    if not ingest.batch_sahiplen(conn, batch_id):
+        print(f"  [ATLA] batch_id={batch_id} zaten sahiplenilmiş/işlenmiş.")
+        return None
+
+    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+
+    sonuc = pipeline.IslemSonucu(batch_id=batch_id)
+    dogrulanan = kpi.dogrula_uretim(uretim_ham)
+    yuklenen, atlanan = ingest.fact_uretim_yukle(conn, dogrulanan.kabul, batch_id)
+    sonuc.tablolar["fact_uretim"] = pipeline.TabloSonucu(
+        toplam=len(uretim_ham),
+        red=len(dogrulanan.red),
+        karantina=0,
+        yuklenen=yuklenen,
+        atlanan=atlanan,
+    )
+    audit_tablolar = {
+        "fact_uretim": {
+            "toplam": len(uretim_ham),
+            "red": len(dogrulanan.red),
+            "yuklenen": yuklenen,
+            "atlanan": atlanan,
+            "red_satirlari": dogrulanan.red.to_dict("records"),
+        }
+    }
+
+    if dogrulanan.red.shape[0]:
+        print(f"  [DİKKAT] fact_uretim: red={len(dogrulanan.red)}")
+
+    ingest.batch_durumu_guncelle(
+        conn,
+        batch_id,
+        "running",
+        total_row_count=len(uretim_ham),
+        accepted_row_count=yuklenen,
+        rejected_row_count=len(uretim_ham) - yuklenen,
+    )
+    ingest.audit_log_yaz(
+        conn,
+        table_name="ingestion_batch",
+        record_id=batch_id,
+        action_type="INSERT",
+        actor_name=actor_name,
+        payload={
+            "olay": "ingest_tamamlandi",
+            "tarih_id": tarih_id,
+            "kaynak": "word_2023_t4",
+            "tablolar": audit_tablolar,
+            "not": "Yalnız T4 (Lisanssız) - T1 (Lisanslı) kaynakta yok (Karar 3, "
+            "dokumanlar/07_word_parser_kapsam.md). T11/T10 AYRI bir batch'te "
+            "(parser_version=word-2023-v1) zaten aktif.",
         },
     )
 
@@ -430,13 +690,19 @@ def main() -> int:
     ap.add_argument(
         "--dry-run", action="store_true", help="Yalnız parse et, DB'ye YAZMA"
     )
+    ap.add_argument(
+        "--t4",
+        action="store_true",
+        help="T11/T10 yerine YALNIZ T4'ü (Lisanssız kurulu güç, fact_uretim) işle — ayrı batch",
+    )
     args = ap.parse_args()
 
     aylar = [args.ay] if args.ay else sorted(MANIFEST_2023)
+    isleyici = isle_ay_t4 if args.t4 else isle_ay
 
     if args.dry_run:
         for ay in aylar:
-            isle_ay(
+            isleyici(
                 None, klasor=args.klasor, ay=ay, actor_name=args.actor, dry_run=True
             )
         return 0
@@ -452,7 +718,7 @@ def main() -> int:
     with psycopg.connect(database_url, prepare_threshold=None) as conn:
         for ay in aylar:
             try:
-                sonuc = isle_ay(conn, klasor=args.klasor, ay=ay, actor_name=args.actor)
+                sonuc = isleyici(conn, klasor=args.klasor, ay=ay, actor_name=args.actor)
             except Exception:
                 conn.rollback()
                 print(

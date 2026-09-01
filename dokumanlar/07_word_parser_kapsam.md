@@ -97,7 +97,8 @@ stratejinin kendisini (yakından uzağa genişletme) GEÇERSİZ KILMIYOR — yal
 | **T10 (fact_abone)** | "Tablo 5.2 ... Tüketici Sayısının İl ve Tüketici Türü Bazında Dağılımının Dönemler Arası Karşılaştırılması" — 489 satır, UZUN format (İl Adı, Tüketici Türü, [yıl-1] Miktar+Pay, [yıl] Miktar+Pay, Değişim%) | **VAR, yapısal olarak uygun** — il×grup grain'i doğru, format Excel'den farklı (dönemler-arası-karşılaştırmalı, uzun) ama tek dönemin değeri çıkarılabilir. |
 | **T9 (mutabakat)** | "Tablo 2.5 ... Tüketici Sayısının Dağıtım Bölgesi Bazında..." | Farklı kırılım (21 dağıtım şirketi ünvanı, İL DEĞİL) — doğrudan mutabakat için kullanılamaz, T9'un doğrudan karşılığı yok. |
 | **T13 (fact_serbest_tuketici)** | **YOK.** Tüm paragraflar "serbest" için tarandı — yalnız "serbest ÜRETİM şirketleri" (T1/T4 bağlamında, farklı kavram) geçiyor. "Serbest Tüketici" tablosu bu rapor türünde hiç bulunmuyor. | **Kaynak yok.** |
-| T1/T4 (kurulu güç) | Muhtemelen var (Tablo[5]-[16] arası "Kaynak Türü"/"İLLER" başlıklı çok sayıda tablo görüldü) | **İncelenmedi** — uygulama turunun ilk adımlarından biri. |
+| T1 (fact_uretim, Lisanslı) | "Lisanslı ... İl Bazında Dağılımı" (il-ONLY, kaynak yok) ve "Lisanslı ... Kaynak Bazında Dağılımı" (kaynak-ONLY, ülke geneli, il yok) AYRI tablolar | **Kaynak yok** — il×kaynak birleşik tablo YOK, bkz. Bulgu 5. |
+| T4 (fact_uretim, Lisanssız) | "Lisanssız Elektrik Kurulu Gücünün İllere ve Kaynaklara Göre Dağılımı (MW)" | **VAR** — il×kaynak grain'i doğru, bkz. Bulgu 5. |
 
 Ek olarak Word raporu, T11'in HEM aylık (Tablo 2.6) HEM kümülatif/dönemler-
 arası-karşılaştırmalı (Tablo 2.7, "Ocak-Mart 2024...") halini AYRI tablolar
@@ -115,10 +116,96 @@ kullanılabilir (grup/kaynak eşleme mantığı — `grup_esle()`, `il_kodu_bul(
 büyük ölçüde yeniden kullanılabilir) ama kolon pozisyonları/başlıkları için
 AYRI bir harita (yeni bir doküman bölümü ya da bu dosyanın devamı) gerekir.
 
+## Bulgu 5 — T1/T4 (kurulu güç) teşhisi (2026-09-02, YALNIZ teşhis — kod yazılmadı)
+
+4 dosya incelendi: 2023-Ocak (1. şablon), 2023-Eylül (2. şablon), 2024-Ekim,
+2025-Ekim — hepsi `worker/scripts/word_ortak.py`'nin mevcut
+`basliklari_topla()`/`tek_aday_bul()` yardımcılarıyla, kod yazılmadan.
+
+**1) Word karşılığı — Bulgu 3'teki "muhtemelen Tablo[5]-[16]" ipucu KISMEN
+doğrulandı, KISMEN düzeltildi:** 4 dosyada da (aynı sırada, ~12 tablo)
+şu tablolar bulundu — "...Lisanslı Elektrik Kurulu Gücünün Kuruluşlara Göre
+Dağılımı...", "...Kaynak Bazında Dağılımı...", "...İl Bazında Dağılımı
+(MW)...", "...Devreye Giren-Devreden Çıkan...", ve LİSANSSIZ için ayrıca
+"...Kaynaklara Göre Dağılımı..." + "...**İllere ve Kaynaklara Göre
+Dağılımı (MW)**...". **Kritik asimetri: yalnız SONUNCUSU (Lisanssız) il×kaynak
+BİRLEŞİK bir tablo — Lisanslı'nın böyle bir tablosu YOK**, yalnız
+il-ONLY (kaynak yok, "Kuruluşlara/İl Bazında Dağılımı") ve kaynak-ONLY
+(ülke geneli, il yok, dönemler-arası-karşılaştırmalı "Kaynak Bazında
+Dağılımı") ayrı ayrı var. 4 dosyanın hepsinde bu asimetri AYNI — yıl
+bağımsız, EPDK'nın rapor formatının yapısal bir özelliği.
+
+**2) Grain:** Lisanssız-karşılığı ("...İllere ve Kaynaklara Göre Dağılımı
+(MW)") tablosu **il × kaynak**, tam olarak `_DOGAL_ANAHTAR["fact_uretim"]`
+(`["il_kodu","tarih_id","kaynak_id","lisans_id"]`, `worker/ingest.py`) ile
+UYUŞUYOR — `lisans_id` sabit "Lisanssız" olacak (Excel'deki T4 deseniyle
+birebir aynı, bkz. `worker/parser.py:tablo4_lisanssiz_kurulu_guc_oku`).
+**Lisanslı (T1) için bu grain'de kaynak YOK** (madde 1) — yükletilemez.
+
+**3) Kaynak türü etiketleri:** Lisanssız tablosunda görülen etiketler
+(Biyokütle, Doğal Gaz, Güneş, Hidrolik, Rüzgar — 2024/2025'te ayrıca
+Linyit) hepsi `worker/parser.py:kaynak_esle()` ile SORUNSUZ eşleşiyor, YENİ
+bir alias gerekmedi. `dim_kaynak`'ın diğer 7-8 üyesi (İthal Kömür, Taş
+Kömürü, Asfaltit, Fuel Oil, Motorin, Nafta, Jeotermal) bu tabloda HİÇ
+görülmedi — beklenen: bunlar büyük ölçekli/lisanslı santral türleri,
+lisanssız (küçük ölçekli/çatı) santrallerde doğal olarak yok, eksik veri
+DEĞİL.
+
+**4) Yapı/başlık farkı — "sabit index değil, metin arama" burada da
+ZORUNLU:** Kaynak kolonlarının SIRASI yıldan yıla değişiyor (2024: Linyit
+Güneş'ten ÖNCE; 2025: Linyit Rüzgar'dan SONRA) — kolon index'e değil
+başlık metnine göre okunmalı (T11/T10'daki ilkeyle aynı). **2025'in "tek
+tip şablon" bulgusu (T11/T10 için doğrulanmıştı) bu tabloya TAM
+TAŞINMIYOR:** başlık metni yıl bağımsız aynı olsa da, **SATIR SAYISI
+sabit değil** — 2023'te (Ocak VE Eylül, ikisi de) yalnız **79 il** listeli
+(o ay hiç lisanssız kapasitesi olmayan 2 il — Artvin, Hakkari —
+SESSİZCE atlanmış), 2024/2025'te tüm **81 il** listeli (sıfır değerli
+iller de boş hücreyle dahil). Yani T11/T10'un "beklenen=81 satır" katı
+assertion deseni bu tabloya DOĞRUDAN uygulanamaz — il sayısı ay/yıla göre
+değişebilir, `Genel Toplam` satırıyla aritmetik tutarlılık kontrolü daha
+güvenilir bir doğrulama olur.
+
+**5) Aylık mı dönemler-arası mı:** Ne T11'deki gibi bir belirsizlik var.
+"...İllere ve Kaynaklara Göre Dağılımı (MW)" başlığı TEK dönem
+("Ekim 2024 Döneminde", ay aralığı YOK) — ve zaten kurulu güç Excel
+tarafında da bir STOK metriği (`worker/analytics.py:
+yillik_yenilenebilir_kurulu_guc_serisi_getir()` — "aylar TOPLANMAZ, yılın
+son ölçümü alınır"), T11'in kümülatif/aylık karışıklığı kurulu güç için
+YAPISAL OLARAK söz konusu değil.
+
+**Değerlendirilen ama uygulanmayan bir fikir:** Lisanslı için il-only ve
+kaynak-only tablolardan (madde 1) istatistiksel bir TAHMİN (il toplamını
+ülke geneli kaynak yüzdeleriyle dağıtarak) üretmek. **Reddedildi** —
+gerçek veri değil, EPDK'nın raporlamadığı bir kesişimi TAHMİN ETMEK bu
+projenin "kaynakta yoksa açıkça işaretle, uydurma" ilkesine (Karar 1)
+aykırı düşer.
+
+## Karar 3 — T1 (Lisanslı kurulu güç) kaynağı yok, T4 (Lisanssız) var: kısmi yükleme
+
+Karar 1'deki T13 mantığıyla AYNI: Word dönemlerinde **T1'in il×kaynak
+kesişimi kaynakta hiç yok** (Bulgu 5, madde 1) — yüklenemez, tahmin de
+edilmeyecek (yukarıdaki reddedilen fikir). **T4 (Lisanssız) VAR ve
+grain'i uyuyor** (Bulgu 5, madde 2) — normal yüklenecek. **Karar: T1
+kapsam dışı, T13 gibi AÇIKÇA işaretlenecek** (Karar 1'in mekanizmasıyla
+aynı — uygulama turunda kesinleşecek); T4 tek başına `fact_uretim`'e
+yüklenecek. Satır-sayısı assertion'ı (Bulgu 5, madde 4) T11/T10'daki gibi
+katı "81 satır" DEĞİL, il sayısı ay bağımsız değişebileceğinden `Genel
+Toplam` ile aritmetik tutarlılık kontrolüne dayanmalı.
+
+**Ek not (2026-09-02, uygulama turu):** T1'in Bulgu 5'te bulunan marjinal
+kırılımları — "İl Bazında Dağılımı" (il-only, kaynak yok) ve "Kaynak
+Bazında Dağılımı" (ülke geneli, il yok, dönemler-arası-karşılaştırmalı) —
+`fact_uretim`'in il×kaynak grain'ine UYMADIĞI için buraya YÜKLENEMEZ, ama
+kendi başlarına DÜŞÜK-GRAIN metrikler olarak (örn. ayrı, düşük-detaylı bir
+tablo/görünüm) bir gün değerlendirilebilir. **Bu turda YAPILMAYACAK** —
+KPI-25'in Sanayi-hariç-alt-küme fikri gibi, belgelenmiş ama ertelenmiş bir
+opsiyon (gelecek iş, bkz. Yarından devam).
+
 ## Karar 1 — T13 (fact_serbest_tuketici) kaynağı yok: kısmi yükleme + açık işaretleme
 
 Word dönemlerinde T13'ün kaynağı YOK. **Karar: kısmi yükleme yapılacak** —
-T11 (fact_tuketim), T10-karşılığı (fact_abone), ve varsa T1/T4 (fact_uretim)
+T11 (fact_tuketim), T10-karşılığı (fact_abone), ve T4-karşılığı
+(fact_uretim, Lisanssız — T1/Lisanslı KAPSAM DIŞI, bkz. Karar 3)
 normal şekilde yüklenecek, ama **T13 boş kalan her dönem için AÇIKÇA
 işaretlenecek** (dim_tarih'e bir bayrak ya da `ingestion_batch.error_summary`
 alanına "T13 kaynağı bu dönem için mevcut değil (Word formatı, aylık
@@ -168,11 +255,11 @@ buraya sabitlenmiştir.
 |---|---|
 | Tek-seferlik aktarım script'inin ortak çekirdeği (`worker/scripts/` altında — tablo bulma yardımcı fonksiyonu, `ingest.py`/`pipeline.py` primitiflerine bağlanma) | 0,5-1 gün |
 | **Her yıl için AYRI, açık eşleme tarifi** (2023, 2024, 2025 — üçü de kendi sütun/tablo haritasıyla, "genel algılama motoru" değil) | ~0,5 gün/yıl × 3 yıl ≈ 1,5 gün |
-| T1/T4 (kurulu güç) desteği (her yılın kendi tarifine eklenir) | +0,5-1 gün |
-| `baglanti`/T13 "kaynakta yok" işaretleme mekanizması + pipeline entegrasyonu (Karar 1 & 2) | +0,5-1 gün |
+| T4 (Lisanssız kurulu güç) desteği (her yılın kendi tarifine eklenir — **T1/Lisanslı kapsam dışı, Karar 3**, satır-sayısı yerine Genel Toplam tutarlılığı ile doğrulanacak) | +0,5-1 gün (2023/2024/2025 için, 79-81 il değişkenliği nedeniyle biraz daha temkinli) |
+| `baglanti`/T13/T1 "kaynakta yok" işaretleme mekanizması + pipeline entegrasyonu (Karar 1, 2 & 3) | +0,5-1 gün |
 | Testler — **2023/2024/2025 AYRI AYRI**, tek seferde değil | +1 gün |
 | Dokümantasyon (yıl bazlı kolon haritaları) | +0,5 gün |
-| **Toplam** | **3-5 gün** (T13 tam kapsam dışı, T1/T4 dahil) |
+| **Toplam** | **3-5 gün** (T13 VE T1 tam kapsam dışı, yalnız T4 dahil) |
 
 Not: "yıl bazlı ayrı tarif" yaklaşımı toplam süreyi tek bir genel motor
 yazmaya göre azaltmayabilir (üç tarif yazmak, bir motor yazmaktan az farklı
@@ -263,24 +350,45 @@ hesaplanamıyor.
 
 ## Yarından devam
 
-1. **T1/T4 (kurulu güç) için YENİ bir teşhis turu** — T11/T10 gibi kendi
-   keşif turunu hak ediyor, bu session'da HİÇ incelenmedi (varsayımla
-   ilerlenmeyecek): Word raporlarında T1/T4-karşılığı tabloları metin
-   aramasıyla bul, sütun/satır yapısını çıkar, `fact_uretim`'e (yalnız
-   `kurulu_guc_mw`, Excel tarafındaki gibi) uyup uymadığını doğrula. Hem
-   Karar 1'in (T13 kapsamı) hem KPI-26'nın önünü açar — öncelik kazandı.
-2. **KPI-25'in Sanayi-dahil/hariç + tam-yıl/kısmi-yıl karışıklığı için bir
-   karar gerekiyor** (3 seçenek `06_canli_veri_operasyon_gunlugu.md`'de) —
+1. ~~T1/T4 (kurulu güç) için YENİ bir teşhis turu~~ **YAPILDI (2026-09-02,
+   Bulgu 5 + Karar 3)** — sonuç: **T1 (Lisanslı) kaynakta YOK**, **T4
+   (Lisanssız) VAR**.
+2. ~~T4'ü `word_2023.py`/`word_2024.py`/`word_2025.py`'ye eklemek~~
+   **YAPILDI (2026-09-02, uygulama turu)** — `word_ortak.py`'ye
+   `t4_tablosunu_bul()`, her 3 script'e `t4_oku()` + AYRI bir
+   `isle_ay_t4()` (kendi `parser_version`'ı — `word-YYYY-t4-v1` — ile
+   T11/T10'un ZATEN aktif batch'lerine dokunmadan) eklendi. 36/36 ay
+   (2023+2024+2025) dry-run'dan VE gerçek yüklemeden geçti, **hepsi
+   temiz (0 red)** — ama kullanıcı talebiyle `--onayla` ÇAĞRILMADI, 36
+   batch de `running`/beklemede bırakıldı, elle onay bekliyor (bkz.
+   `06_canli_veri_operasyon_gunlugu.md`, "2026-09-02 (T4)").
+3. **36 bekleyen T4 batch'i için karar ver** — hepsi temiz (0 red) olduğu
+   için tek tek inceleme riski düşük, ama aktivasyon kararı kullanıcıya
+   ait (T9/T10 disiplini). `python -m worker.scripts.onayla --batch-id N
+   --actor "..."` — batch_id listesi `06_canli_veri_operasyon_gunlugu.md`'de.
+4. ~~KPI-26'nın T4-only ile de tam güvenilir olmayabileceği~~ **ELE ALINDI
+   (2026-09-02)** — `worker/analytics.py:
+   yillik_yenilenebilir_kurulu_guc_serisi_getir()` artık yalnız Lisanslı
+   verisi OLAN yılları seriye alıyor (Word'ün Lisanssız-only yılları
+   otomatik "veri yok" sayılıyor, sahte CAGR üretilmiyor) — gerekçe ve
+   kod: aynı fonksiyonun docstring'i + `04_kpi_sozlesmeleri.md`.
+5. **KPI-25'in Sanayi-dahil/hariç + tam-yıl/kısmi-yıl karışıklığı için bir
+   karar hâlâ gerekiyor** (3 seçenek `06_canli_veri_operasyon_gunlugu.md`'de,
+   KPI-26'dan farklı olarak KPI-25 henüz kod seviyesinde düzeltilmedi) —
    dashboard'a yanlış bir "-2,2%" sızmadan önce ele alınmalı.
-3. Karar 1'in somut DB/kod mekanizmasını tasarla ve uygula (T13'ün Word
-   dönemlerinde "kaynakta yok" olduğunu dim_tarih bayrağı mı,
-   `ingestion_batch.error_summary` notu mu ile işaretleyeceğine karar ver).
-4. `word_2023.py`/`word_2024.py`/`word_2025.py`'nin regresyon testlerini
+6. Karar 1'in (T13 VE T1 birlikte) somut DB/kod mekanizmasını tasarla ve
+   uygula ("kaynakta yok" olduğunu dim_tarih bayrağı mı,
+   `ingestion_batch.error_summary` notu mu ile işaretleyeceğine karar
+   ver) — **öncelik yükseldi**: artık yalnız T13 değil, T1 de (36 ay ×
+   Lisanslı boş) bu mekanizmayı bekliyor, gerçek bekleyen batch sayısı
+   arttıkça açık işaretleme daha değerli hale geliyor.
+7. `word_2023.py`/`word_2024.py`/`word_2025.py`'nin regresyon testlerini
    yaz (şu an yalnız script-içi assertion'lara — 81 il, beklenen satır
-   sayısı — güveniliyor, dedike pytest testi yok).
-5. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
+   sayısı, Genel Toplam tutarlılığı — güveniliyor, dedike pytest testi
+   yok; T4/`t4_oku()` da bu kapsama girmeli).
+8. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
    bölüm olarak ya da bu dosyanın devamı olarak yaz.
-6. 2022 ve öncesi yıllara genişletme (yakından uzağa stratejisinin devamı)
+9. 2022 ve öncesi yıllara genişletme (yakından uzağa stratejisinin devamı)
    — 2022'nin 12 dosyası da bu session'da yan ürün olarak zaten bulundu
    (bkz. `word_2024.py`/`word_2023.py`'nin manifest taramaları) ama hiç
    işlenmedi.

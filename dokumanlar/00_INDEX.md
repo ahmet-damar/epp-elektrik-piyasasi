@@ -18,7 +18,7 @@ kod üretirken bu dosyaları bağlam (context) olarak okuyabilmesi.
 | `05_kaynak_dosya_sozlesmesi.md` | EPDK dosya kolon haritası (parser) | Ek F |
 | `06_adr_dashboard_teknoloji.md` | ADR: sunum katmanı Streamlit (Faz 2), Next.js ertelendi | — (2026-08-30) |
 | `06_canli_veri_operasyon_gunlugu.md` | Canlı Supabase'de yapılan elle müdahalelerin kaydı | — (2026-08-31) |
-| `07_word_parser_kapsam.md` | Word (.docx) EPDK raporları — teşhis + kapsam kararları (T13/baglanti); 2023+2024+2025 yüklü VE aktif (36 ay). Sırada: T1/T4 teşhis turu. KPI-25 hâlâ güvenilmez (Sanayi/kısmi-yıl karışıklığı) | — (2026-09-02) |
+| `07_word_parser_kapsam.md` | Word (.docx) EPDK raporları — teşhis + kapsam kararları (T13/T1/baglanti); T11/T10 36 ay aktif, T4 (kurulu güç, Lisanssız) 36 ay yüklü (batch 53-88, elle onay bekliyor), T1 kaynakta yok (Karar 3). KPI-26 düzeltildi, KPI-25 hâlâ karar bekliyor | — (2026-09-02) |
 
 ## Copilot İçin Kullanım
 Chat'te bağlam vermek için:

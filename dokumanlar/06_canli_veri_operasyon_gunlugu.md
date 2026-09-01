@@ -426,3 +426,61 @@ kapanışı). Kesin değil — ayrı bir araştırma konusu, kod/veri sorunu de�
    regresyon testi hâlâ yok.
 4. 2022 ve öncesi yıllara genişletme — 2022'nin 12 dosyası da yan ürün
    olarak zaten bulundu, hiç işlenmedi.
+
+## 2026-09-02 (T4) — T1/T4 teşhisi + T4 implementasyonu, KPI-26 düzeltmesi
+
+**Teşhis (Bulgu 5, `07_word_parser_kapsam.md`):** 4 dosya (2023 iki
+şablonu + 2024 + 2025) incelendi, kod yazılmadı. Kritik asimetri: **T1
+(Lisanslı) için il×kaynak birleşik tablo Word'de HİÇ YOK** (yalnız il-only
+ve kaynak-only ayrı tablolar var) — **T4 (Lisanssız) için VAR**
+("...İllere ve Kaynaklara Göre Dağılımı (MW)"), grain `fact_uretim`'in
+doğal anahtarına uyuyor. **Karar 3:** T1 kapsam dışı (T13 gibi), T4 tek
+başına yüklenecek.
+
+**İmplementasyon (aynı gün, uygulama turu):** `word_ortak.py`'ye
+`t4_tablosunu_bul()`; her 3 yıl script'ine `t4_oku()` (kapasitesi sıfır
+olan iller — 2023'te bazı aylarda satır olarak hiç görünmüyor — için tüm
+kaynak türlerini AÇIKÇA 0 yazan, "beklenen=81 satır" yerine tablonun kendi
+`Genel Toplam`'ıyla aritmetik tutarlılık kontrol eden bir okuyucu) + AYRI
+bir `isle_ay_t4()` (kendi `parser_version` = `word-YYYY-t4-v1`, T11/T10'un
+ZATEN aktif/succeeded batch'lerine DOKUNMADAN — farklı parser_version =
+P0-5 gereği meşru yeni batch) eklendi.
+
+**Sonuç — 36/36 ay (2023+2024+2025) dry-run VE gerçek yükleme, HEPSİ
+temiz:**
+
+| Yıl | Batch_id aralığı | Ay | Red | Kaynak sütunu sayısı |
+|---|---|---|---|---|
+| 2023 | 53-64 | 12 | 0 | 5 (Biyokütle/Doğal Gaz/Güneş/Hidrolik/Rüzgar) |
+| 2024 | 65-76 | 12 | 0 | 5 (Oca-Mar) → 6 (Nis-Ara, Linyit eklendi) |
+| 2025 | 77-88 | 12 | 0 | 6 (Linyit dahil, tüm yıl) |
+
+`fact_uretim`'e toplam 16.281 satır yazıldı (2023: 4.860 = 81×5×12;
+2024: 5.589 = 81×5×3+81×6×9; 2025: 5.832 = 81×6×12), hepsi
+`is_active=false`. **Kullanıcı talebiyle `--onayla` HİÇ ÇAĞRILMADI** — 36
+batch de (53-88) `running` durumda, elle onay bekliyor (T9/T10
+disiplininin aynısı: `python -m worker.scripts.onayla --batch-id N --actor
+"..."`). T11/T10'un mevcut aktif verisi (fact_tuketim 11.620 aktif satır)
+doğrulandı, dokunulmadı.
+
+**KPI-26 düzeltmesi (kod değişikliği, gerekçesi burada):** T4 yüklenince
+`fact_uretim`'de 2023-2025 için ARTIK veri var ama YALNIZ Lisanssız
+(Türkiye'nin toplam yenilenebilir kapasitesinin küçük bir kesri — büyük
+rüzgar/güneş/hidrolik çiftlikleri Lisanslı'dır). Bu, 2026 (Excel, Lisanslı+
+Lisanssız TAM) ile aynı CAGR serisine karışırsa KPI-25'in Sanayi dahil/
+hariç sorunuyla AYNI kök nedenden sahte bir sayı üretirdi. **Çözüm:**
+`worker/analytics.py:yillik_yenilenebilir_kurulu_guc_serisi_getir()`
+artık yalnız Lisanslı verisi OLAN yılları seriye alıyor (alt sorgu) —
+Word'ün Lisanssız-only yılları otomatik "veri yok" (None/"hesaplanamaz")
+sayılıyor, KPI-25 gibi belgelenip kod değişikliği ERTELENMEDİ, doğrudan
+düzeltildi (mevcut testler — `test_yillik_yenilenebilir_kurulu_guc_serisi_
+yil_sonu_alir` zaten Lisanslı veriyle kurulu, bozulmadı). **KPI-25 bu
+düzeltmeyi almadı** — hâlâ açık bir karar bekliyor (bkz. yukarıdaki
+2026-09-01 bölümü).
+
+**Yarından devam (güncellendi — tam liste `07_word_parser_kapsam.md`'de):**
+1. 36 bekleyen T4 batch'i (53-88) için aktivasyon kararı.
+2. KPI-25 için hâlâ bir karar gerekiyor (KPI-26'nın aksine kod
+   düzeltilmedi).
+3. Karar 1'in (artık T13 VE T1) somut mekanizması — öncelik yükseldi.
+4. T4 dahil regresyon testleri, 2022 genişletmesi.

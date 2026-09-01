@@ -60,3 +60,12 @@ Jenerik formül: (son/ilk)^(1/n) − 1 ; **n = yıl farkı** (2021→2025 ⇒ n=
   DEĞİL**, yalnız kurulu güç; kurulu güç bir STOK metriğidir, aylar
   TOPLANMAZ, yılın en güncel ayı alınır (bkz. worker/analytics.py
   `yillik_yenilenebilir_kurulu_guc_serisi_getir`).
+  **2026-09-02'de eklenen kısıt:** yalnız Lisanslı verisi OLAN yıllar
+  seriye girer — Word (.docx) kaynaklı 2023-2025 dönemlerinde T1
+  (Lisanslı kurulu güç) hiç yok (kaynakta yok, dokumanlar/
+  07_word_parser_kapsam.md Bulgu 5 + Karar 3), yalnız T4 (Lisanssız,
+  yenilenebilir kapasitenin küçük bir kesri) yüklendi — filtre olmasaydı
+  bu yıllar 2026 (Excel, Lisanslı+Lisanssız TAM) ile karışıp sahte bir
+  CAGR üretirdi (KPI-25'in Sanayi dahil/hariç sorunuyla AYNI kök neden).
+  Lisanslı'sı olmayan yıl "veri yok" sayılır (None/"hesaplanamaz"), sahte
+  bir sayı ÜRETİLMEZ.

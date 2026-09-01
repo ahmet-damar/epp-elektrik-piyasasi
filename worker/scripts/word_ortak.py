@@ -96,3 +96,24 @@ def hedef_donem_kolonu_bul(
         f"Hedef dönem {hedef_ay_yil!r} için {baslik_iceren!r} içeren kolon bulunamadı.\n"
         f"donem_satiri={donem_satiri}\nbaslik_satiri={baslik_satiri}"
     )
+
+
+def t4_tablosunu_bul(basliklar: list[tuple[Table, str]]) -> tuple[Table, str]:
+    """T4-karşılığı (fact_uretim, Lisanssız): 'Lisanssız Elektrik Kurulu
+    Gücünün İllere ve Kaynaklara Göre Dağılımı (MW)' — il×kaynak BİRLEŞİK
+    tek tablo. Bkz. dokumanlar/07_word_parser_kapsam.md Bulgu 5: 4 farklı
+    yıl/şablonda (2023 iki şablonu + 2024 + 2025) bu başlık METNİ birebir
+    aynı bulundu — yıl bağımsız, EPDK'nın rapor formatının sabit bir
+    parçası (yalnız tablo NUMARASI ve kaynak kolon SIRASI/SAYISI değişken,
+    bkz. word_2023.py/word_2024.py/word_2025.py'deki t4_oku()).
+
+    T1'in (Lisanslı) BÖYLE bir birleşik tablosu YOK (Bulgu 5, madde 1) —
+    bu fonksiyon T1 için KULLANILMAZ, Karar 3 gereği T1 tamamen kapsam
+    dışı."""
+    return tek_aday_bul(
+        basliklar,
+        icerir=[
+            "Lisanssız Elektrik Kurulu Gücünün İllere ve Kaynaklara Göre Dağılımı"
+        ],
+        etiket="T4",
+    )

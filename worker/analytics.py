@@ -322,13 +322,36 @@ def yillik_yenilenebilir_kurulu_guc_serisi_getir(conn: Connection) -> pd.DataFra
     """KPI-26 (yenilenebilir kurulu güç CAGR) girdisi: yıl başına, o yılın
     EN GÜNCEL ayındaki toplam yenilenebilir kurulu_guc_mw (dim_kaynak.
     yenilenebilir_mi=true) — kurulu güç bir STOK metriğidir, aylar
-    TOPLANMAZ, yılın son ölçümü alınır. Kolonlar: yil, kurulu_guc_mw."""
+    TOPLANMAZ, yılın son ölçümü alınır. Kolonlar: yil, kurulu_guc_mw.
+
+    **Yalnız Lisanslı verisi OLAN yıllar dahil edilir** (alt sorgu). Neden:
+    Word (.docx) kaynaklı 2023-2025 dönemleri için T1 (Lisanslı kurulu güç)
+    hiç yüklenmedi — kaynakta yok, il×kaynak birleşik tablo mevcut değil
+    (dokumanlar/07_word_parser_kapsam.md, Bulgu 5 + Karar 3). Yalnız T4
+    (Lisanssız) yüklendi. Bu filtre OLMASAYDI, 2023-2025 (yalnız Lisanssız
+    — Türkiye'nin toplam yenilenebilir kapasitesinin küçük bir kesri,
+    büyük rüzgar/güneş/hidrolik santralleri Lisanslı'dır) 2026 (Excel,
+    Lisanslı+Lisanssız TAM) ile AYNI CAGR serisine karışır ve KPI-26 sahte,
+    çarpıtılmış bir büyüme/düşüş sayısı üretir — KPI-25'te (Sanayi dahil/
+    hariç) bulunan sorunla AYNI kök neden, farklı KPI. Lisanslı verisi
+    olmayan bir yıl, bu fonksiyon için 'veri yok' (KPI-25/26'nın var olan
+    None="hesaplanamaz" davranışıyla tutarlı) sayılır — 2027+'de T1 gerçek
+    Excel verisiyle geldiğinde otomatik olarak seriye girecek, kod
+    değişikliği gerekmeyecek."""
     sorgu = """
         SELECT dt.tarih_id, dt.yil, dt.ay, SUM(fu.kurulu_guc_mw) AS kurulu_guc_mw
         FROM fact_uretim fu
         JOIN dim_tarih dt ON dt.tarih_id = fu.tarih_id
         JOIN dim_kaynak dk ON dk.kaynak_id = fu.kaynak_id
         WHERE fu.is_active AND dk.yenilenebilir_mi = true
+          AND dt.yil IN (
+              SELECT dt2.yil
+              FROM fact_uretim fu2
+              JOIN dim_tarih dt2 ON dt2.tarih_id = fu2.tarih_id
+              JOIN dim_lisans dl2 ON dl2.lisans_id = fu2.lisans_id
+              WHERE fu2.is_active AND dl2.tur = 'Lisansli'
+              GROUP BY dt2.yil
+          )
         GROUP BY dt.tarih_id, dt.yil, dt.ay
         ORDER BY dt.tarih_id
     """
