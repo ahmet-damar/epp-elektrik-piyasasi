@@ -398,19 +398,25 @@ hesaplanamıyor.
   (`fact_uretim`, `lisans_durumu=Lisanslı`) satırları eklendi — toplam 72
   satır. Faz 2 dashboard'unda TÜKETİLMEDİ (bilinçli — bu tur yalnız
   mekanizmayı kurdu), sıradaki adım bu tabloyu dashboard'a bağlamak.
+- ~~KPI-25'in Sanayi-dahil/hariç + tam-yıl/kısmi-yıl karışıklığı için bir
+  karar~~ **YAPILDI (2026-09-03)** — `worker/analytics.py:
+  yillik_tuketim_serisi_getir()` artık KPI-26'daki AYNI disiplinle yalnız
+  Sanayi'yi İÇEREN yılları seriye alıyor (bugün itibarıyla yalnız 2026,
+  bu yüzden KPI-25 None/'hesaplanamaz' dönüyor, sahte -2,2% ÜRETİLMİYOR).
+  AYRICA yeni bir metrik eklendi — `yillik_tuketim_sanayi_haric_serisi_
+  getir()` (KPI-27, Sanayi'yi TÜM yıllardan çıkarıp yalnız TAM yılları
+  karşılaştırır, KPI-25'İN YERİNE GEÇMEZ) — canlı veride 2023→2025 için
+  +%6,9 hesaplanıyor. Gerekçe/kod: aynı fonksiyonların docstring'i +
+  `04_kpi_sozlesmeleri.md`.
 
 **Açık kalanlar (yeniden numaralandı):**
-1. **KPI-25'in Sanayi-dahil/hariç + tam-yıl/kısmi-yıl karışıklığı için bir
-   karar hâlâ gerekiyor** (3 seçenek `06_canli_veri_operasyon_gunlugu.md`'de,
-   KPI-26'dan farklı olarak KPI-25 henüz kod seviyesinde düzeltilmedi) —
-   dashboard'a yanlış bir "-2,2%" sızmadan önce ele alınmalı.
-2. `word_2023.py`/`word_2024.py`/`word_2025.py`'nin regresyon testlerini
+1. `word_2023.py`/`word_2024.py`/`word_2025.py`'nin regresyon testlerini
    yaz (şu an yalnız script-içi assertion'lara — 81 il, beklenen satır
    sayısı, Genel Toplam tutarlılığı — güveniliyor, dedike pytest testi
    yok; T4/`t4_oku()` da bu kapsama girmeli).
-3. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
+2. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
    bölüm olarak ya da bu dosyanın devamı olarak yaz.
-4. 2022 ve öncesi yıllara genişletme (yakından uzağa stratejisinin devamı)
+3. 2022 ve öncesi yıllara genişletme (yakından uzağa stratejisinin devamı)
    — 2022'nin 12 dosyası da bu session'da yan ürün olarak zaten bulundu
    (bkz. `word_2024.py`/`word_2023.py`'nin manifest taramaları) ama hiç
    işlenmedi.

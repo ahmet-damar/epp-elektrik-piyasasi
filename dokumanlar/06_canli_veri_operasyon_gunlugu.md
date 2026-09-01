@@ -554,7 +554,8 @@ error_summary` notu DEĞİL (seçenekler arasından), yeni bir tablo:
 **Yarından devam:**
 1. `veri_kapsam_disi`'yi Faz 2 dashboard'una bağlamak (örn. bir ay için
    T13/T1 "bu dönemde mevcut değil" notu göstermek).
-2. KPI-25 için hâlâ bir karar gerekiyor.
+2. ~~KPI-25 için hâlâ bir karar gerekiyor.~~ **YAPILDI (2026-09-03, aşağıya
+   bkz.)**
 3. `word_2023.py`/`word_2024.py`/`word_2025.py` (T4 dahil) için dedike
    pytest regresyon testi hâlâ yok — yalnız script-içi assertion var.
 4. 2022 ve öncesi yıllara genişletme.
@@ -562,3 +563,84 @@ error_summary` notu DEĞİL (seçenekler arasından), yeni bir tablo:
    olduğu (build-push'a `needs` bağımlılığı, `if: false`) — Docker/web
    iskeleti gelince gözden geçirilmeli, o zamana kadar migration'lar elle
    uygulanmaya devam edecek.
+
+## 2026-09-03 — KPI-25 düzeltmesi (seçenek b) + yeni KPI-27 metriği (seçenek c)
+
+Yukarıdaki (2026-09-02) 3 seçenekten **b** (KPI-25'i yalnız Sanayi'yi
+İÇEREN yıllarla sınırla, KPI-26'daki AYNI disiplin) ve **c** (Sanayi-hariç
+ayrı bir metrik) BİRLİKTE uygulandı — biri diğerinin yerine geçmiyor.
+
+**KPI-25 (`worker/analytics.py:yillik_tuketim_serisi_getir`) —
+düzeltildi:** sorguya bir alt-sorgu eklendi, yalnız Sanayi grubunu içeren
+`dt.yil` değerleri seriye giriyor. Bugün itibarıyla bu tek başına 2026'yı
+bırakıyor (2023-2025/Word'de Sanayi hiç yok, Karar 2) — `cagr_seriden_
+hesapla()` ≥2 yıl gerektirdiğinden **KPI-25 artık None ('hesaplanamaz')
+dönüyor**, önceki yanıltıcı -2,2% YERİNE. 2027+'de ikinci bir Sanayi'li
+tam yıl gelince kod değişikliği gerekmeden otomatik seriye girecek.
+
+**KPI-27 (YENİ) — `worker/analytics.py:
+yillik_tuketim_sanayi_haric_serisi_getir`:** Sanayi grubu TÜM yıllardan
+(2023-2026 dahil) çıkarılıyor (KPI-25'in tersi strateji — yıl filtrelemek
+yerine grup filtreleniyor), yalnız TAM yıllar (12 farklı ay,
+`dim_tarih.donem_tipi='aylik'` + `ay`) dahil ediliyor — 2026 hâlâ 6 aylık
+kısmi olduğundan otomatik dışarıda kalıyor, 12 aya tamamlanınca kod
+değişikliği gerekmeden girecek. **KPI-25'İN YERİNE GEÇMİYOR** — resmi
+"toplam tüketim" tanımını karşılamıyor (Sanayi hariç), yalnız ek bağlam.
+
+**Canlı sonuç — dikkat, önceki turda bahsedilen +%9,4 (2023↔2024, n=1)
+İLE FARKLI bir sayı çıkıyor:** canlı veride 2025 de artık TAM bir yıl
+olarak nitelendiğinden (12/12 ay aktif), KPI-27'nin serisi 3 noktaya
+(2023, 2024, 2025) çıktı; `cagr_seriden_hesapla()` ilk/son mantığıyla
+2023→2025 (n=2) arasını hesaplıyor: **+%6,9**. Bu bir HATA DEĞİL — 2026-
+09-02'de yalnız 2 nokta (2023↔2024) vardı, o zamandan beri 2025'in T4
+verisi de aktive edildiği (bkz. yukarıdaki "T4 aktivasyon" bölümü) için
+fonksiyon şimdi daha fazla nitelikli veriyle daha uzun bir seri
+hesaplıyor — tasarım gereği (yeni veri geldikçe otomatik güncellenmesi
+İSTENEN davranış), sabit bir sayı değil.
+
+**Test:** `worker/tests/test_analytics_integration.py`'ye 2 yeni test
+eklendi — `test_kpi_25_tek_sanayili_yil_hesaplanamaz` (sentinel 2093/2097,
+tek Sanayi'li yılla None döndüğünü doğrular) ve `test_yillik_tuketim_
+sanayi_haric_serisi_ve_kpi_27_hesaplanir` (sentinel 2094/2095, TAM
+formülle +%9,4 üretecek şekilde kurgulanmış değerler + büyük bir Sanayi
+"dikkat dağıtıcı" satırı — dışlamanın gerçekten çalıştığını kanıtlıyor).
+Var olan `test_yillik_serilerinden_cagr` de güncellendi: (a) her iki
+sentinel yıla (2096/2100) bir Sanayi satırı eklendi (aksi halde yeni
+filtreyle ikisi de düşer), (b) seri kendi sentinel yıllarına izole edildi
+— canlı DB'ye karşı çalıştırıldığında gerçek yılların (2026 artık Sanayi
+İÇERDİĞİ için) seriye karışıp ilk/son seçimini bozmasını önlemek için
+(CI'nin boş konteynerinde bu risk yok, ama canlı DB'ye karşı denenince
+gerçek bir regresyon gibi görünen bir izolasyon açığı ortaya çıkardı —
+kök nedeni bulundu, "ortam farkı" denip geçilmedi, aynı izolasyon deseni
+yeni testlerle tutarlı hale getirildi).
+
+**Yan bulgu — canlı DB'de test kirliliği bulundu ve temizlendi:** bu
+turda KPI-25/27'yi canlı veriyle doğrularken beklenmedik bir `yil=2099`
+satırı (445.000 MWh) ortaya çıktı. Kök neden: T4 aktivasyonu sırasında
+(2026-09-02) regresyon kontrolü için TÜM pytest paketi (`py -m pytest -v`)
+canlı Supabase'e karşı çalıştırılmıştı — `worker/tests/
+test_job_worker_integration.py`, `worker/job_worker.py`'nin async
+polling yolunu egzersiz ediyor ve bu yol KENDİ commit'lerini yapıyor,
+standart `conn` fixture'ının rollback tabanlı izolasyonunu BYPASS ediyor.
+Sonuç: sentinel `tarih_id=209912` (yıl 2099) için 4 fact tablosunda
+(fact_tuketim: 12, fact_uretim: 14, fact_abone: 12,
+fact_serbest_tuketici: 47 satır) + 3 `ingestion_batch` + 3 `source_asset`
++ 1 `dim_tarih` kaydı canlı production DB'de KALICI olarak kalmıştı.
+**Temizlik:** 3 turda (ilk deneme FK ihlaliyle güvenle geri alındı, ikinci
+tur 4 fact tablosu + ingestion_batch + source_asset'i sildi, üçüncü/geniş
+tarama bir yetim `dim_tarih` satırı + ayrı bir üçüncü sızıntı — batch
+118/source_asset 116, `test_job_worker_eksik_tablo_retrying_yolu`'ndan —
+buldu ve sildi) tamamen temizlendi, geniş bir son taramayla DB'nin
+2099/209912 civarında hiç iz kalmadığı doğrulandı. **`audit_log`
+satırları (append-only kural gereği) bilinçli olarak SİLİNMEDİ** — sızıntı
+batch'lerine referans veren birkaç audit_log kaydı, `tarih_id=209912` ile
+kendiliğinden test-ilişkili olduğu belli, zararsız, kalıcı iz olarak
+bırakıldı. **Ders:** `test_job_worker_integration.py`'yi canlı DB'ye karşı
+çalıştırmak GÜVENLİ DEĞİL (kendi commit'lerini yapıyor) — ileride tüm
+paketi tekrar canlıya karşı çalıştırma kararı verilirse bu dosya hariç
+tutulmalı ya da ayrı, atılabilir bir Supabase projesine karşı koşulmalı.
+
+**Dokümantasyon:** `04_kpi_sozlesmeleri.md` (KPI-25 satırına KPI-26 ile
+aynı formatta not + yeni KPI-27 satırı), `07_word_parser_kapsam.md`
+("Yarından devam" listesinde KPI-25 maddesi YAPILDI), `00_INDEX.md`
+(özet satırı) güncellendi.
