@@ -65,16 +65,20 @@ jobs:
         # applies it to real Supabase - it already has these roles there. Mimics
         # what `supabase start` sets up locally before any project migration runs.
         run: psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/ci-only/01_roles_bootstrap.sql
+      - name: Apply 0001 (creates viewer/data_operator/admin roles, needed before the auth stub can grant to them)
+        run: psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0001_init_schema.sql
       - name: Stub the auth schema (real Supabase Postgres has this; plain postgres:16 doesn't)
         # supabase/ci-only/ is NOT under supabase/migrations/, so deploy.yml never
-        # applies it to real Supabase - it already has a real `auth` schema there.
+        # applies it to real Supabase - it already has a real `auth` schema there,
+        # already USAGE/EXECUTE-granted to every role. Runs AFTER 0001 so all 6
+        # roles (anon/authenticated/service_role from the bootstrap step above,
+        # viewer/data_operator/admin from 0001) exist for the stub's GRANTs.
         run: psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/ci-only/00_auth_stub.sql
       - name: Apply schema + RLS + dimension seed to test PostgreSQL
         # ALL migrations now apply here (2026-09-02) - the roles bootstrap step
         # above means 0003/0010/0011/0013 (anon/authenticated/service_role
         # grants) no longer need to be excluded for "role does not exist".
         run: |
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0001_init_schema.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0002_rls_roles.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0003_fix_grants.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0004_seed_dimensions.sql
@@ -88,6 +92,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0012_veri_kapsam_disi.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0013_veri_kapsam_disi_authenticated_grants.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0014_current_app_role_viewer_grants.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0015_auth_schema_usage_viewer_grants.sql
       - name: Run static RLS validation
         run: python worker/validate_rls_static.py
       - name: Run role-based access verification (anon vs viewer, real RLS/GRANT behavior)

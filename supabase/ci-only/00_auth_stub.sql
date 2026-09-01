@@ -36,3 +36,14 @@ AS $$
       NULLIF(current_setting('request.jwt.claim', true), '')
     )::jsonb
 $$;
+
+-- Real Supabase grants USAGE ON SCHEMA auth + EXECUTE ON auth.jwt() to its
+-- own managed roles (anon/authenticated/service_role) by default - AND
+-- (found 2026-09-02, migration 20260819_0015) to this project's custom
+-- roles (viewer/data_operator/admin) via that migration, since Supabase's
+-- own setup predates them and can't know about them. This step runs AFTER
+-- 0001 (creates viewer/data_operator/admin) so all 6 roles exist here -
+-- reproduces BOTH grants for all of them, matching real Supabase's final
+-- state (Supabase's own defaults + migration 0015 combined).
+GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role, viewer, data_operator, admin;
+GRANT EXECUTE ON FUNCTION auth.jwt() TO anon, authenticated, service_role, viewer, data_operator, admin;
