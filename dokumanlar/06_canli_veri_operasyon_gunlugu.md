@@ -323,3 +323,69 @@ T1/T4-karşılığına geçilmedi, yalnız 2024'ün kapanışı tamamlandı.
 4. `word_2024.py`'nin parse mantığı için dedike pytest regresyon testi
    yok (yalnız script-içi assertion'lara güveniliyor) — 2023 tarifine
    başlamadan önce ya da onunla birlikte eklenmesi düşünülebilir.
+
+## 2026-09-02 — 2023 Word raporları yüklendi (12/12), KPI-25/26 durumu netleşti
+
+**2023 için ayrı tarif** (`worker/scripts/word_2023.py`, `word_ortak.py`
+çekirdeğini yeniden kullanarak) yazıldı ve 12/12 ay gerçek Supabase'e
+yüklendi. **2023 tek bir şablon DEĞİL** — Ocak-Nisan "Tablo 2.5/2.6" +
+kısaltılmış grup etiketleri kullanırken, Mayıs-Aralık "Tablo 5.2" + tam
+etiketler kullanıyor (2024'ün formatıyla örtüşen taraf) — yıl içi bir EPDK
+şablon geçişi. Karşılaşılan ve `worker/parser.py`'a DOKUNMADAN, yalnız
+`word_2023.py`'ye özel çözülen 3 yeni sürpriz sınıfı: (1) "Kamu ve Özel
+Hizmetler" için 4 farklı kısaltma varyantı; (2) `ADIYAMAN*` gibi dipnot
+yıldızlı il adları; (3) `HAKKÂRİ` gibi inceltme-işaretli eski yazım.
+
+**Aktivasyon — 4 ay otomatik (temiz), 8 ay elle, TEK TEK onaylandı (toplu
+değil, kullanıcı talebiyle):** Ağustos/Eylül/Ekim/Kasım red=0 otomatik
+aktive oldu. Kalan 8 ayda toplam 16 kırmızı satır vardı (2024'ün 3 satırına
+göre çok daha yoğun) — her biri "Genel Toplam" ile aritmetik tutarlılık
+açısından örneklem doğrulamasından geçirildi (bkz. aşağıdaki not), sonra
+kullanıcı hepsini tek tek (`--batch-id 29,30,31,33,40` sonra ayrı bir turda
+`32,34,35`) onayladı. **2023'ün 12 ayı da artık tamamen aktif, çelişki yok.**
+
+**Not — 3 batch'te (32=Nisan, 34=Haziran, 35=Temmuz) sıra dışı bir desen:**
+kırmızı satırın grubu "Tarımsal" değil, **Kahramanmaraş/Kamu ve Özel
+Hizmetler**, **Batman/Aydınlatma**, **Şanlıurfa/Aydınlatma** idi — üçü de
+**6 Şubat 2023 deprem bölgesindeki iller**. Kullanıcı talebiyle özellikle
+doğrulandı: üçü de "Genel Toplam" sütunuyla tam aritmetik tutarlı (fark
+0,0000) — parser/hizalama hatası DEĞİL. Kahramanmaraş'ın Nisan satırında
+ayrıca Mesken VE Tarımsal sıfır — muhtemelen deprem sonrası fatura/mahsup
+düzeltmeleri bu bölgede birden fazla grupta sıra dışı değerler olarak
+yansımış. **Bu not buraya bilinçli düşüldü:** ileride biri bu 3 batch'in
+audit_log'unda "neden Tarımsal değil de Aydınlatma/Kamu grubunda kırmızı
+satır var" diye şüphelenip yeniden araştırmaya kalkmasın — köküne kadar
+inildi, açıklaması var, kod sorunu değil.
+
+**KPI-25 (tüketim CAGR) — hâlâ GÜVENİLMEZ, sebebi netleşti:**
+`worker/analytics.py:yillik_tuketim_serisi_getir()` `fact_tuketim`'in TÜM
+gruplarını toplar. 2023/2024 (Word) Sanayi'yi HİÇ içermiyor (Karar 2), 2026
+(Excel) içeriyor — üstüne 2026 yalnızca 6 aylık kısmi veri (Ocak-Haziran),
+2023/2024 tam 12 ay. İkisi birden devreye girince naif hesap **-2,2%**
+çıkıyor (2023→2026, n=3) — bu gerçek bir düşüş DEĞİL, iki ayrı ölçüm
+biçiminin (Sanayi dahil/hariç + tam-yıl/yarım-yıl) çarpışması. **Sanayi
+hariç tutularak, iki TAM yıl (2023↔2024) karşılaştırıldığında anlamlı bir
+sonuç çıkıyor: +9,4%** — ama bu KPI-25'in tanımladığı "toplam tüketim CAGR"
+değil, "Sanayi-hariç tüketim CAGR". KPI-25'in mevcut hesaplama sorgusuna
+DOKUNULMADI (kapsam dışı, yalnız teşhis istendi) — düzeltme için ya (a)
+Sanayi'yi 2023/2024'e bir şekilde tamamlamak (kaynakta yok, mümkün değil),
+ya (b) sorguyu yalnızca TAM yıllar + tutarlı grup kümesiyle sınırlamak, ya
+da (c) "Sanayi-hariç" ayrı bir KPI-25-varyantı tanımlamak gerekiyor — ayrı
+bir karar/iş kalemi.
+
+**KPI-26 (yenilenebilir kurulu güç CAGR) — hâlâ hesaplanamıyor:**
+`fact_uretim`'de yalnızca 2026 var (T1/T4-karşılığı Word tarafında hiç
+işlenmedi, Karar 1 kapsam dışı listesinde). En az 2 farklı yıl gerekiyor
+(`cagr_seriden_hesapla()`), tek yılla `None` döner. T1/T4 işlenmeden
+KPI-26 açılamaz.
+
+**Yarından devam:**
+1. 2025 için ayrı tarif (`word_2025.py`) — 12 dosyası zaten bulundu
+   (`word_2024.py` modül notu), hiç işlenmedi.
+2. T1/T4-karşılığı (fact_uretim) — hem T13/Karar 1'in hem KPI-26'nın
+   önünü açar, öncelik kazandı.
+3. KPI-25'in Sanayi-dahil/hariç + tam-yıl/kısmi-yıl karışıklığı için bir
+   karar gerekiyor (yukarıdaki 3 seçenek) — dashboard'a yanlış bir "-2,2%"
+   sızmadan önce ele alınmalı.
+4. `word_2023.py`/`word_2024.py` için dedike pytest regresyon testi hâlâ
+   yok.

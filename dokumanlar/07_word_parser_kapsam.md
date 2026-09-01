@@ -203,24 +203,49 @@ T13-karşılığı (fact_serbest_tuketici — Word'de zaten kaynağı yok, Karar
 "açık işaretleme" mekanizması henüz somutlaştırılmadı) ve T1/T4-karşılığı
 (fact_uretim — Word tarafı hiç incelenmedi).
 
+## 2023 tarifi UYGULANDI ve gerçek Supabase'e yüklendi (2026-09-02)
+
+Bkz. `06_canli_veri_operasyon_gunlugu.md` ("2026-09-02 — 2023 Word
+raporları yüklendi") — tam sonuç orada. Özet: `worker/scripts/word_2023.py`
+yazıldı (`word_ortak.py` çekirdeğini yeniden kullanarak). **2023 tek bir
+şablon değil** — Ocak-Nisan ve Mayıs-Aralık arasında tablo numaralandırması
++ grup etiketleri farklı (yıl içi EPDK şablon geçişi); 3 yeni sürpriz sınıfı
+(grup etiketi kısaltmaları, dipnot yıldızlı il adları, inceltme-işaretli
+eski il yazımı) `word_2023.py`'ye özel çözüldü, `worker/parser.py`'a
+dokunulmadı. 12/12 ay yüklendi ve **aktif** — 4'ü otomatik (temiz), 8'i
+kullanıcı tarafından tek tek incelenip onaylandı (3'ü — Kahramanmaraş/
+Batman/Şanlıurfa, 6 Şubat 2023 deprem bölgesi — özellikle aritmetik
+doğrulamadan geçirildi).
+
+**2023 + 2024 artık ikisi de tamamen aktif ve tutarlı** (T13/T1-T4 hariç,
+Karar 1 gereği hâlâ kapsam dışı).
+
+**KPI-25/26 durumu (2026-09-02'de kontrol edildi, kod değiştirilmedi):**
+KPI-25 (tüketim CAGR) hâlâ güvenilmez — 2023/2024 (Sanayi'siz, Word) ile
+2026 (Sanayi'li, Excel, kısmi-yıl) doğrudan karşılaştırılamıyor, naif hesap
+yanıltıcı bir -2,2% veriyor. KPI-26 hâlâ hesaplanamıyor (`fact_uretim`'de
+tek yıl var). Tam detay ve seçenekler: `06_canli_veri_operasyon_gunlugu.md`
+aynı bölüm.
+
 ## Yarından devam
 
-1. ~~Ocak/Mart/Nisan 2024'ün 3 bekleyen batch'i için karar ver~~ **YAPILDI
-   (2026-09-01 kapanışı)** — üçü de elle onaylandı/aktive edildi, 2024'ün
-   12 ayı tamamen aktif ve tutarlı. Detay: `06_canli_veri_operasyon_
-   gunlugu.md` ("2026-09-01 (kapanış)").
-2. **2023 için ayrı bir tarif yaz** (`worker/scripts/word_2023.py`,
-   `word_ortak.py` çekirdeğini kullanarak — 2024'ün desenini birebir
-   kopyalama, kendi başlık/sütun farklarını doğrula).
-3. **Sonra 2025** — 12 dosyası bu turda `word_2024.py`'nin manifest
-   taramasında YAN ÜRÜN olarak zaten bulundu (bkz. o dosyanın modül notu)
-   ama hiç işlenmedi.
-4. T1/T4 (kurulu güç) tablolarının Word karşılığını incele (hiç yapılmadı).
-5. Karar 1'in somut DB/kod mekanizmasını tasarla ve uygula (T13'ün Word
+1. **2025 için ayrı bir tarif yaz** (`worker/scripts/word_2025.py`,
+   `word_ortak.py` çekirdeğini kullanarak) — 12 dosyası bu turda
+   `word_2024.py`'nin manifest taramasında YAN ÜRÜN olarak zaten bulundu
+   (bkz. o dosyanın modül notu) ama hiç işlenmedi. 2025'in kendi başlık/
+   sütun farklarını (ör. Ocak 2025'te "Tablo ." field-code'unun boş
+   render edildiği zaten biliniyor) doğrula.
+2. **KPI-25'in Sanayi-dahil/hariç + tam-yıl/kısmi-yıl karışıklığı için bir
+   karar gerekiyor** (3 seçenek `06_canli_veri_operasyon_gunlugu.md`'de) —
+   dashboard'a yanlış bir "-2,2%" sızmadan önce ele alınmalı. Öncelik
+   kazandı (2023+2024 aktif olunca ortaya çıktı).
+3. T1/T4 (kurulu güç) tablolarının Word karşılığını incele (hiç yapılmadı)
+   — hem T13/Karar 1'in hem KPI-26'nın önünü açar.
+4. Karar 1'in somut DB/kod mekanizmasını tasarla ve uygula (T13'ün Word
    dönemlerinde "kaynakta yok" olduğunu dim_tarih bayrağı mı,
    `ingestion_batch.error_summary` notu mu ile işaretleyeceğine karar ver).
-6. `word_2024.py`'nin regresyon testlerini yaz (şu an yalnız script-içi
-   assertion'lara — 81 il, beklenen satır sayısı — güveniliyor, dedike
-   pytest testi yok) — 2023 tarifine başlamadan önce ya da onunla birlikte.
-7. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
+5. `word_2023.py`/`word_2024.py`'nin regresyon testlerini yaz (şu an yalnız
+   script-içi assertion'lara — 81 il, beklenen satır sayısı — güveniliyor,
+   dedike pytest testi yok).
+6. Yıl bazlı kolon haritalarını `05_kaynak_dosya_sozlesmesi.md`'ye ek bir
    bölüm olarak ya da bu dosyanın devamı olarak yaz.
