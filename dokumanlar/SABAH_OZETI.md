@@ -1,16 +1,14 @@
-# SABAH ÖZETİ — 2016-2022 Word Aktarımı (2026-09-03/04, beş tur)
+# SABAH ÖZETİ — 2016-2022 Word Aktarımı (2026-09-03/04, altı tur) — TAMAMLANDI
 
-> **Ortam engeli ÇÖZÜLDÜ (2026-09-04).** Akıllı Uygulama Denetimi
-> (Değerlendirme modu) pip/PyPI kaynaklı `pandas`'ı engelliyordu —
-> Miniconda (`C:\Users\adama\miniconda3`, `epp` ortamı, conda-forge
-> kanalı) admin GEREKMEDEN kuruldu, imzalı derlemeler kabul ediliyor.
-> **Tüm sonraki dry-run/test/yükleme komutları `C:\Users\adama\
-> miniconda3\envs\epp\python.exe` ile çalıştırılmalı** (sistem Python'ı
-> DEĞİL). Akıllı Uygulama Denetimi KAPATILMADI. Küçük not: conda-forge'un
-> `mypy`'si de AYRI olarak engellendi (SAC dosya bazında karar veriyor) —
-> `ruff`/`pytest` yeterli, mypy'siz devam ediliyor. Taksonomi kararı hâlâ
-> ÇÖZÜLDÜ (RENAME) — tekrar sorulmamalı. **2019, 2018 ve 2017 TAMAMLANDI**,
-> sıradaki adım (SON YIL) 2016.
+> **2016-2022'NİN TAMAMI TAMAMLANDI (2026-09-04).** 7 yılın 7'si de işlendi
+> (T11/T4). Ortam engeli ÇÖZÜLDÜ: Akıllı Uygulama Denetimi (Değerlendirme
+> modu) pip/PyPI kaynaklı `pandas`'ı engelliyordu — Miniconda
+> (`C:\Users\adama\miniconda3`, `epp` ortamı, conda-forge kanalı) admin
+> GEREKMEDEN kuruldu. **Tüm dry-run/test/yükleme komutları `C:\Users\
+> adama\miniconda3\envs\epp\python.exe` ile çalıştırılmalı.** Akıllı
+> Uygulama Denetimi KAPATILMADI. Taksonomi kararı ÇÖZÜLDÜ (RENAME).
+> Sıradaki adım artık yeni bir yıl DEĞİL — aşağıdaki "Senin vereceğin
+> kararlar" bölümü (aktivasyon + T10 etkisi).
 
 **Bu dosya tek başına okunduğunda durum tam anlaşılsın diye yazıldı.**
 Detaylı teşhis/bulgular için `dokumanlar/08_word_2016_2022_kapsam.md`.
@@ -33,11 +31,13 @@ verildi, 2021/2022 tam açıldı, 2020 eklendi.
 - **2019, 2018 ve 2017 TAMAMLANDI** — üçü de T11 12/12, T10 0/12 (tüm yıl
   yapısal olarak kaynakta yok), T4 12/12. Her yılda 1-3 yeni format
   sürprizi bulundu, hepsi mekanik çözüldü (aşağıya bkz.).
-- **2016 SIRADAKİ ADIM (SON YIL)** — envanter + 07'de kısmi teşhis var,
-  T11/T10/T4 yapısı henüz kontrol edilmedi. 2016 bitince 2016-2022'nin
-  TAMAMI (84 ay) T11/T4 için işlenmiş olacak.
+- **2016 TAMAMLANDI (SON YIL) — 2016-2022'nin TAMAMI bitti.** T11 **11/12
+  ay** (Temmuz hariç — Adana verisi kaynakta GERÇEKTEN kayıp, TAHMİN
+  EDİLMEDİ), T10 **0/12 ay** (2016'da tablo HİÇ basılmamış — 2017-2020'nin
+  "il-only" sorunundan FARKLI), T4 **12/12 ay**. 9 YENİ format sürprizi
+  bulundu (İstanbul'un bazı aylarda ikiye bölünmesi dahil, aşağıya bkz.).
 - **0 batch aktive edildi** (DB'den doğrulandı) — hiçbir fact tablosunda
-  2017/2018/2019/2020/2021/2022 için `is_active=true` satır yok.
+  2016/2017/2018/2019/2020/2021/2022 için `is_active=true` satır yok.
   Aktivasyon kararı sana ait.
 
 ## Hangi yıllar ne durumda
@@ -50,7 +50,7 @@ verildi, 2021/2022 tam açıldı, 2020 eklendi.
 | 2019 | **12/12 ay** | **0/12 ay** (TÜM yıl kaynakta yok, yapısal) | **12/12 ay** |
 | 2018 | **12/12 ay** | **0/12 ay** (TÜM yıl kaynakta yok, yapısal) | **12/12 ay** |
 | 2017 | **12/12 ay** | **0/12 ay** (TÜM yıl kaynakta yok, yapısal) | **12/12 ay** |
-| 2016 | İŞLENMEDİ (envanter + 07'de kısmi teşhis var) — SIRADAKİ ADIM | — | — |
+| 2016 | **11/12 ay** (Temmuz hariç — Adana verisi kaynakta kayıp) | **0/12 ay** (tablo HİÇ basılmamış) | **12/12 ay** |
 
 **2019'a özgü 2 YENİ format sürprizi (mekanik çözüldü, word_2019.py'de
 belgelendi):**
@@ -81,8 +81,29 @@ belgelendi):**
    "Payı\n (%)") — `grup_esle_zorunlu()` artık iç boşluk/satır sonlarını
    normalize ediyor.
 
-**2016 için implementasyon/yükleme henüz yapılmadı** — sıradaki adım (SON
-YIL).
+**2016'ya özgü 9 YENİ format sürprizi (mekanik çözüldü, word_2016.py'de
+belgelendi — 2016-2022'nin EN FARKLI yılı):**
+1. T10 tablosu 2016'da HİÇ basılmamış (tüm 12 ay tam metin taramasıyla
+   doğrulandı) — 2017-2020'nin "tablo var, grup kırılımı yok" sorunundan
+   FARKLI.
+2. T11'in arama metni genişletildi ("Tablo 2.3" ile çakışmayı önlemek
+   için "İl ve Tüketici Türü Bazında Dağılımı").
+3. Ocak/Şubat/Mart 2016'da T11'de İstanbul İKİ AYRI satıra bölünmüş (ay ay
+   farklı etiketlerle) — aynı il_kodu'na TOPLANIYOR (t4_oku()'daki dict-
+   toplama deseni t11_oku()'ya da taşındı).
+4. 6/12 ayda T4'ün 0. satırı gerçek kaynak adları değil, birleştirilmiş
+   "Kaynak Türü" placeholder'ı — dinamik tespit edildi.
+5. T4'ün Toplam kolonu bazı aylarda BOŞ başlıklı — pozisyona (sonuncu
+   kolon) güvenildi.
+6. **Temmuz 2016'da ADANA'nın T11 verisi kaynakta GERÇEKTEN kayıp**
+   (başlık satırı tekrarıyla üzerine yazılmış) — TAHMİN EDİLMEDİ, o ay
+   T11 için BEKLEMEDE bırakıldı (T4 etkilenmedi, 12/12 yüklendi).
+7. "Güneş (Yoğunlaştırılmış)" ay ay 5 farklı kısaltmayla yazılmış, hepsi
+   kanonik "Güneş"e eşlendi.
+8. Şubat 2016'nın grup başlıkları TAMAMEN BÜYÜK HARF — Türkçe-güvenli
+   `normalize_label()` ile eşlendi (ham `.upper()` Türkçe İ/I'yı yanlış
+   dönüştürür).
+9. Kasım 2016'nın kapak başlığında zararsız bir yazım hatası ("Piyafsası").
 
 **Batch ID aralıkları:**
 
@@ -94,10 +115,11 @@ YIL).
 | 2019 | 213-224 | 225-236 |
 | 2018 | 237-248 | 249-260 |
 | 2017 | 261-272 | 273-284 |
+| 2016 | 285-300 (11 batch, Temmuz hariç — T4 ile paralel çalıştırıldığından iç içe geçmiş) | 288-307 (12 batch, T11/T10 ile iç içe geçmiş) |
 
 **Hiçbir batch `onayla.py`/`pipeline.batch_onayla()` ile aktive edilmedi** —
 tümü `running` durumda, DB'den doğrulandı (`fact_tuketim`/`fact_abone`/
-`fact_uretim`'de 2017-2022 için `is_active=true` satır sayısı: **0**).
+`fact_uretim`'de 2016-2022 için `is_active=true` satır sayısı: **0**).
 
 ## Taksonomi kararı — VERİLDİ (artık açık değil)
 
@@ -137,15 +159,19 @@ gerçekten yok. `isle_ay()` bunu tespit edip (`t10_oku()` ValueError
 fırlatınca) T10'u o ay için `pipeline.kapsam_disi_isaretle(fact_abone)`
 ile işaretliyor, **T11 (tüketim) bundan HİÇ etkilenmiyor** (ayrı okunuyor).
 
-- **2020:** TÜM 12 ay il-only (Ocak VE Aralık ikisi de kontrol edildi).
+- **2016:** T10 tablosu HİÇ basılmamış (2017-2020'nin "il-only" sorunundan
+  bile FARKLI — tablo kendisi yok, ne başlık ne gövde).
+- **2017, 2018, 2019, 2020:** TÜM 12 ay il-only (Ocak VE Aralık ikisi de
+  kontrol edildi, her yıl için ayrı).
 - **2021:** Ocak-Ekim il-only, **Kasım'dan itibaren** il×grup (kesin sınır
   bulundu).
 - **2022:** TÜMÜ il×grup (yalnız başlık METNİ Ocak-Nisan'da "İl Bazında"
   yazıyordu, gövde hep il×grup'tu — ayrı bir konu, madde altta).
 
-**Toplam etki:** 36 aylık (2020-2022) pencerede T10 yalnız **14/36 ay**
-(2022'nin 12'si + 2021'in 2'si) yüklenebildi, **22/36 ay** kaynakta
-gerçekten yok.
+**Toplam etki:** 84 aylık (2016-2022) pencerede T10 yalnız **14/84 ay**
+(2022'nin 12'si + 2021'in 2'si) yüklenebildi, **70/84 ay** kaynakta
+gerçekten yok (48 ay "tablo var, il-only" + 12 ay "tablo hiç yok" [2016]
++ 10 ay 2021 Ocak-Ekim).
 
 ## Diğer teknik bulgular (kod zaten düzeltti, bilgi amaçlı)
 
@@ -177,45 +203,37 @@ sana kalmış. `otomatik_onaya_uygun()` çıktıları script loglarında var
 (çoğu `True`, birkaçında 1-2 kırmızı satır — negatif "Tarımsal" değerleri,
 `kpi.dogrula_tuketim()`'in bilinen davranışı).
 
-### 2. 2016 — sıradaki adım (SON YIL, ortam engeli ÇÖZÜLDÜ)
+### 2. 2016-2022 TAMAMLANDI — yeni yıl kalmadı
 
-**Komutlar için:** `C:\Users\adama\miniconda3\envs\epp\python.exe`
-kullan, sistem `py`/`python` DEĞİL (o hâlâ pandas'ı bloklu).
-
-**2016:** envanter var + 07'de kısmi teşhis var (T4'ün 2-satırlı başlık
-istisnası — 2016 Ocak'ta gerçek kaynak adları satır 0 değil satır 1'de,
-"Lisanslı" kelimesinin Ocak'ta yokluğu — hâlâ geçerli). 2017-2020'nin
-taşıdığı desenler (kapak-paragrafı ay/yıl çapası, T10 il-only, T4
-Güneş-ayrımı, hücre-içi satır kırılması, sayfa-sonu başlık tekrarı,
-"BOŞ-VERİ-ŞEHİR" tarzı anomali satırlar) hepsi MÜMKÜN, hiçbiri
-doğrulanmadı — `word_2017.py` şablon olarak denenebilir ama önce
-Ocak/Aralık örnekleriyle kısa bir kontrol yapılmalı (2017'de yapıldığı
-gibi). En eski/en farklı yıl olduğundan diğerlerinden daha temkinli
-yaklaşılmalı. 2016 bitince 2016-2022'nin TAMAMI (84 ay) T11/T4 için
-işlenmiş olacak.
+2016 (son yıl) da tamamlandı (yukarıya bkz.) — 2016-2022'nin TAMAMI
+(84 ay) artık T11/T4 için işlenmiş durumda. Bu maddenin altında yeni bir
+"sıradaki yıl" YOK. Kalan tek açık iş, Temmuz 2016'nın T11'i (Adana verisi
+kaynakta gerçekten kayıp — bkz. yukarı, kod tarafında çözülebilecek bir
+şey değil, EPDK kaynağının kendisinde eksik).
 
 ### 3. T10'un 46/60 ay eksik olması KPI'ları nasıl etkiliyor
 
-`fact_abone`'a dayanan KPI'lar (örn. KPI-10) 2017-2022 (72 ay) için
-yalnız **14/72 ay** gerçek veriyle çalışacak (2022'nin 12'si + 2021
+`fact_abone`'a dayanan KPI'lar (örn. KPI-10) 2016-2022 (84 ay) için
+yalnız **14/84 ay** gerçek veriyle çalışacak (2022'nin 12'si + 2021
 Kasım-Aralık'ın 2'si) — bu durumun dashboard'da nasıl yansıtılacağı
 (örn. `veri_kapsam_disi` tablosunun UI'ya bağlanması, henüz yapılmadı,
 bkz. `07_word_parser_kapsam.md`'nin açık kalanlar listesi) ayrı bir karar.
 
 ## Test/kalite durumu
 
-- `worker/tests/test_word_2017.py` (11 test) + `test_word_2018.py` (9
-  test) + `test_word_2019.py` (8 test) + `test_word_2020.py` (8 test) +
-  `test_word_2021.py` (9 test) + `test_word_2022.py` (13 test) — hepsi
-  geçiyor, DATABASE_URL'e bağımlı DEĞİL (synthetic docx tabloları), CI'nin
+- `worker/tests/test_word_2016.py` (12 test) + `test_word_2017.py` (11
+  test) + `test_word_2018.py` (9 test) + `test_word_2019.py` (8 test) +
+  `test_word_2020.py` (8 test) + `test_word_2021.py` (9 test) +
+  `test_word_2022.py` (13 test) — **70 test toplam**, hepsi geçiyor,
+  DATABASE_URL'e bağımlı DEĞİL (synthetic docx tabloları), CI'nin
   'Worker' job'ında da çalışıyor.
-- `ruff check`/`ruff format --check` temiz. **`mypy` bu makinede
-  conda-forge'dan da bloklanıyor** (SAC dosya bazında karar veriyor) —
-  CI'de sorun yok (GitHub'ın temiz runner'ı etkilenmiyor), yalnız bu
-  makinede yerel mypy çalıştırılamıyor.
-- **07'nin "Açık kalanlar" madde 1'i (regresyon testi eksikliği)** 2017/
-  2018/2019/2020/2021/2022 için kapatıldı — **2023/2024/2025 hâlâ
-  testsiz.**
+- `ruff check`/`ruff format --check` temiz (repo geneli). **`mypy` bu
+  makinede conda-forge'dan da bloklanıyor** (SAC dosya bazında karar
+  veriyor) — CI'de sorun yok (GitHub'ın temiz runner'ı etkilenmiyor),
+  yalnız bu makinede yerel mypy çalıştırılamıyor.
+- **07'nin "Açık kalanlar" madde 1'i (regresyon testi eksikliği)**
+  2016/2017/2018/2019/2020/2021/2022'nin TAMAMI için kapatıldı —
+  **2023/2024/2025 hâlâ testsiz.**
 
 ## Commit'ler (hepsi ayrı, CI doğrulandı — sırayla)
 
@@ -233,20 +251,26 @@ bkz. `07_word_parser_kapsam.md`'nin açık kalanlar listesi) ayrı bir karar.
    batch 213-224, T4 batch 225-236. CI ✅
 9. `fd89146` — 2018 tarifi: T11/T10 batch 237-248, T4 batch 249-260
    ("BOŞ-VERİ-ŞEHİR" anomali-satır atlaması dahil).
-10. *(bu commit)* — 2017 tarifi: T11/T10 batch 261-272, T4 batch 273-284
+10. `05f96c0` — 2017 tarifi: T11/T10 batch 261-272, T4 batch 273-284
     (kısaltılmış T11 arama metni, grup-etiketi iç-boşluk normalizasyonu,
     sayfa-sonu başlık tekrarı atlaması dahil).
+11. *(bu commit)* — 2016 tarifi (SON YIL, 2016-2022 TAMAMLANDI): T11/T10
+    batch 285-300 (Temmuz hariç), T4 batch 288-307 (İstanbul-ikiye-bölünme
+    toplaması, T10-tablosu-hiç-yok tespiti, Adana-verisi-kayıp BEKLEMEDE'si
+    dahil).
 
 ## Kesin kurallara uyum — doğrulama
 
 - ✅ `onayla.py`/`pipeline.batch_onayla()` HİÇ çağrılmadı (DB'den
-  doğrulandı: 0 aktif satır, 2017-2022'nin TAMAMI için).
+  doğrulandı: 0 aktif satır, 2016-2022'nin TAMAMI için).
 - ✅ Tam pytest paketi canlıya karşı çalıştırılmadı — yalnız hedefli
   `-k`/dosya bazlı testler kullanıldı, tam paket yalnız CI'nin
   postgres:16'sında koştu.
 - ✅ Şema değişikliği yapılmadı (migration yok, `dim_grup`'a dokunulmadı).
-- ✅ T10'un yapısal engeline takılan aylar (2017/2018/2019/2020 tümü,
-  2021 Ocak-Ekim) BEKLEMEDE/kapsam_disi bırakıldı, uydurma yapılmadı,
-  döngüye girilmedi. T4'ün "BOŞ-VERİ-ŞEHİR" anomalisi de aynı disiplinle
-  (tahmin etmeden, açıkça atlanarak) çözüldü.
+- ✅ T10'un yapısal engeline takılan aylar (2016 tümü — tablo hiç yok;
+  2017/2018/2019/2020 tümü — il-only; 2021 Ocak-Ekim — il-only)
+  BEKLEMEDE/kapsam_disi bırakıldı, uydurma yapılmadı, döngüye girilmedi.
+  T4'ün "BOŞ-VERİ-ŞEHİR" anomalisi ve Temmuz 2016'nın kayıp Adana verisi
+  de aynı disiplinle (tahmin etmeden, açıkça atlanarak/BEKLEMEDE
+  bırakılarak) çözüldü.
 - ✅ Her mantıksal adım sonunda ayrı commit + push + CI doğrulaması yapıldı.
