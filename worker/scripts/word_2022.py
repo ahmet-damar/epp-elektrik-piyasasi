@@ -8,18 +8,17 @@ ilkesi bilinçli tercih).
 - `pipeline.batch_onayla()` / `worker/scripts/onayla.py` BU DOSYADA HİÇ
   ÇAĞRILMAZ — tüm batch'ler `running`/`is_active=false` kalır, aktivasyon
   kararı yalnız Ahmet'e ait.
-- Tüketici grubu takson risk: 2022 içinde İKİ farklı grup kümesi var
-  (dokumanlar/08, Bulgu 6): **Ocak-Nisan** eski küme (Aydınlatma, Mesken,
-  Sanayi, **Tarımsal Sulama**, **Ticarethane**), **Mayıs-Aralık** kanonik
-  küme (Aydınlatma, **Kamu ve Özel Hizmetler**, Mesken, Sanayi,
-  **Tarımsal**). "Ticarethane"/"Tarımsal Sulama" BİLİNÇLİ OLARAK
-  `_GRUP_TAKMA_ADLAR`'a EKLENMEDİ — dokumanlar/08 Bulgu 5'teki taksonomi
-  sorusu AÇIK KARAR (Ahmet'e sorulmalı), `worker/parser.py:GRUP_ESLEME`'ye
-  dokunulmadı. Bunun SONUCU: Ocak-Nisan 2022 T11/T10 işlenirken
-  `grup_esle_zorunlu()` KASITLI OLARAK ValueError fırlatır — bu bir hata
-  DEĞİL, taksonomi kararı verilene kadar bu 4 ayın BEKLEMEDE kalmasını
-  sağlayan mekanizmanın ta kendisi. Mayıs-Aralık (8 ay) kanonik kümeyle
-  eşleştiği için sorunsuz işlenir.
+- **TAKSONOMİ KARARI UYGULANDI (2026-09-03, gece-boyu turu, madde 1/2a):**
+  2022 içinde İKİ farklı grup kümesi var (dokumanlar/08, Bulgu 6):
+  **Ocak-Nisan** eski küme (Aydınlatma, Mesken, Sanayi, **Tarımsal
+  Sulama**, **Ticarethane**), **Mayıs-Aralık** kanonik küme (Aydınlatma,
+  **Kamu ve Özel Hizmetler**, Mesken, Sanayi, **Tarımsal**).
+  "Ticarethane"/"Tarımsal Sulama" artık `_GRUP_TAKMA_ADLAR`'da (RENAME
+  olarak kabul edildi) — mevsimsellik doğrulaması (2023-2025'in kanonik
+  "Tarımsal" grubu Mart→Mayıs'ta 2,8-4,2 KAT sıçrıyor, gerçek veri) bu
+  yılların arasındaki ~2,8 kat artışın taksonomi/kapsam değişikliği
+  DEĞİL, rutin sulama sezonu mevsimselliği olduğunu gösterdi. **Ocak-Nisan
+  artık T11/T10 için AÇIK.**
 
 Kapsam (2023-2025 ile AYNI): T11-karşılığı → fact_tuketim (Sanayi HARİÇ,
 Karar 2), T10-karşılığı → fact_abone (Sanayi DAHİL), T4-karşılığı →
@@ -92,12 +91,15 @@ MANIFEST_2022: dict[int, str] = {
 }
 
 # Mayıs-Aralık'ta görülen kısaltmalar — 2023 Ocak/Şubat'ın "Kamu ve Özel
-# Hiz. Sek. ile Diğer" varyantıyla AYNI aile. "Ticarethane"/"Tarımsal
-# Sulama" BİLİNÇLİ OLARAK YOK — bkz. modül notu.
+# Hiz. Sek. ile Diğer" varyantıyla AYNI aile.
 _GRUP_TAKMA_ADLAR = {
     "Kamu ve Özel Hiz. Sek. ile Diğer": "Kamu ve Özel Hizmetler",
     "Kamu ve Özel Hizmetler Sektörü ile Diğer": "Kamu ve Özel Hizmetler",
     "Tarımsal Faaliyetler": "Tarımsal",
+    # 2026-09-03 (gece-boyu turu, madde 1/2a) — taksonomi kararı UYGULANDI,
+    # bkz. word_2021.py'nin AYNI eklemesinin gerekçe notu.
+    "Ticarethane": "Kamu ve Özel Hizmetler",
+    "Tarımsal Sulama": "Tarımsal",
 }
 _ATLA_ETIKETLERI = {
     "Genel Toplam",
@@ -114,9 +116,9 @@ _ATLA_ETIKETLERI = {
 
 def grup_esle_zorunlu(metin: str) -> str | None:
     """None → bilinen bir 'atla' etiketi. Aksi halde eşleşme bulunamazsa
-    ValueError — Ocak-Nisan 2022'nin "Ticarethane"/"Tarımsal Sulama"
-    etiketleri BİLİNÇLİ OLARAK burada YOK, bu yüzden bu aylarda KASITLI
-    olarak fırlar (bkz. modül notu — taksonomi AÇIK KARAR)."""
+    ValueError. "Ticarethane"/"Tarımsal Sulama" artık `_GRUP_TAKMA_ADLAR`'da
+    (taksonomi kararı UYGULANDI, 2026-09-03 madde 1/2a) — bu fonksiyon
+    yalnız GERÇEKTEN tanınmayan (beklenmedik) bir etiket için fırlar."""
     temiz = metin.strip()
     if temiz in _ATLA_ETIKETLERI:
         return None
@@ -126,10 +128,8 @@ def grup_esle_zorunlu(metin: str) -> str | None:
     if grup is None:
         raise ValueError(
             f"Tanınmayan tüketici grubu etiketi: {temiz!r} — "
-            "'Ticarethane'/'Tarımsal Sulama' ise bu KASITLI (dokumanlar/08 "
-            "Bulgu 5, AÇIK KARAR — Ahmet'e sorulmalı, worker/parser.py:"
-            "GRUP_ESLEME'ye dokunulmadı). Başka bir etiketse "
-            "worker/scripts/word_2022.py: _GRUP_TAKMA_ADLAR'a eklenmeli mi kontrol et."
+            "worker/scripts/word_2022.py: _GRUP_TAKMA_ADLAR'a eklenmeli mi "
+            "kontrol et (yeni bir ay yeni bir kısaltma/varyant getirmiş olabilir)."
         )
     return grup
 
@@ -254,10 +254,33 @@ def t11_oku(tbl, tarih_id: int) -> pd.DataFrame:
 def t10_oku(tbl, tarih_id: int, hedef_ay_yil: str) -> pd.DataFrame:
     """T10-karşılığı: uzun format. Sanayi DAHİL. dokumanlar/08 Bulgu 6:
     Ocak-Nisan 2022'nin başlığı "İl Bazında" (grup boyutu METİNDE yok) ama
-    tablo YAPISI il×grup — bu fonksiyon başlığı DEĞİL, satır1'i (gerçek
-    kolon başlıkları) okuyor, bu yüzden etkilenmiyor."""
-    donem_satiri = [c.text.strip() for c in tbl.rows[0].cells]
-    baslik_satiri = [c.text.strip() for c in tbl.rows[1].cells]
+    tablo YAPISI il×grup — bu fonksiyon başlığı DEĞİL, gerçek kolon
+    başlıklarını (aşağıda dinamik bulunan satır) okuyor, bu yüzden
+    etkilenmiyor.
+
+    **Başlık satırı SAYISI da sabit değil (2026-09-03, gece-boyu turu, madde
+    2a'da bulundu):** Mayıs-Aralık 2 satır (yıl + 'İl Adı/Tüketici Türü/...'),
+    Ocak-Nisan 3 satır (yıl + AY ADI tekrarı + 'İl Adı/Tüketici Türü/...') —
+    sabit `tbl.rows[0]`/`tbl.rows[1]` index'i BU YÜZDEN Ocak-Nisan'da yanlış
+    satırı okuyordu. `tek_aday_bul()`/Bulgu 2 ilkesiyle AYNI: sabit index
+    yerine 'Tüketici Türü' metnini İÇEREN satır dinamik olarak bulunuyor,
+    ondan ÖNCEKİ tüm satırlar (yıl + varsa ay adı) sütun bazında birleştirilip
+    'dönem' metni olarak kullanılıyor."""
+    baslik_satir_idx = None
+    for idx, row in enumerate(tbl.rows):
+        if any("Tüketici Türü" in c.text for c in row.cells):
+            baslik_satir_idx = idx
+            break
+    if baslik_satir_idx is None:
+        raise ValueError("T10: 'Tüketici Türü' içeren başlık satırı bulunamadı")
+    baslik_satiri = [c.text.strip() for c in tbl.rows[baslik_satir_idx].cells]
+    donem_satirlari = [
+        [c.text.strip() for c in tbl.rows[i].cells] for i in range(baslik_satir_idx)
+    ]
+    donem_satiri = [
+        " ".join(satir[kolon] for satir in donem_satirlari)
+        for kolon in range(len(baslik_satiri))
+    ]
     # dokumanlar/08 Bulgu 6 devamı: kolon başlığı ay/aya göre "Tüketici
     # Sayısı" (Ekim/Aralık) ya da yalnız "Miktar" (Mayıs-Eylül/Kasım) —
     # ikisi de aynı anlamda, metin arama ile hangisi varsa o kullanılır.
@@ -274,7 +297,7 @@ def t10_oku(tbl, tarih_id: int, hedef_ay_yil: str) -> pd.DataFrame:
 
     satirlar = []
     son_il_adi = ""
-    for row in tbl.rows[2:]:
+    for row in tbl.rows[baslik_satir_idx + 1 :]:
         hucreler = [c.text.strip() for c in row.cells]
         # dokumanlar/08 Bulgu 6 devamı: bazı aylarda (örn. Ekim) İl Adı
         # hücresi yalnız o ilin İLK grup satırında dolu, sonraki grup

@@ -6,23 +6,21 @@ BAZLI AYRI TARİF ilkesi bilinçli tercih).
 **GECE-BOYU GÖZETİMSİZ ÇALIŞMA KURALLARI (2026-09-03, Ahmet'in talimatı):**
 - `pipeline.batch_onayla()` / `worker/scripts/onayla.py` BU DOSYADA HİÇ
   ÇAĞRILMAZ — tüm batch'ler `running`/`is_active=false` kalır.
-- **2021'in TÜMÜ (12/12 ay) eski tüketici-grubu taksonomisini kullanıyor**
-  (Aydınlatma, Mesken, Sanayi, **Tarımsal Sulama**, **Ticarethane**) —
-  word_2022.py'nin aksine 2021 içinde BİR şablon geçişi YOK, mekanik
-  taramayla doğrulandı (dokumanlar/08). Bu yüzden **T11/T10 (fact_tuketim/
-  fact_abone) 2021'in TÜM 12 ayında KASITLI OLARAK BEKLEMEDE kalır** —
-  `grup_esle_zorunlu()` "Ticarethane"/"Tarımsal Sulama" için ValueError
-  fırlatır (taksonomi AÇIK KARAR, `worker/parser.py:GRUP_ESLEME`'ye
-  dokunulmadı). **T4 (fact_uretim, Lisanssız) taksonomiden BAĞIMSIZ** —
-  12/12 ayda çalışması beklenir.
-- **Ek bulgu (T10 yapısı, henüz kod ETKİLEMİYOR):** 2021 Ocak'ın T10-
-  karşılığı tablosu YAPISAL OLARAK il-ONLY (grup boyutu hiç yok, 43 satır,
-  2 il yan yana), 2021 Aralık'ınki il×grup (489 satır) — 2022'nin
-  Bulgu 6'sından AYRI, İKİNCİ bir mid-year geçiş belirtisi (tam ay sınırı
-  bulunmadı). Şu an ÖNEMSİZ — T11 zaten her ay taksonomi yüzünden
-  ValueError fırlatıp isle_ay()'i T10'a hiç ULAŞTIRMADAN durduruyor
-  (isle_ay() T11'i T10'dan ÖNCE okur). Taksonomi kararı verilip T11 açılırsa
-  bu T10 yapı sorunu AYRICA çözülmeli — bkz. dokumanlar/08.
+- **TAKSONOMİ KARARI UYGULANDI (2026-09-03, madde 1/2a):** "Ticarethane"
+  ve "Tarımsal Sulama" artık `_GRUP_TAKMA_ADLAR`'da (RENAME olarak kabul
+  edildi) — mevsimsellik doğrulaması (2023-2025'in kanonik "Tarımsal"
+  grubu Mart→Mayıs'ta 2,8-4,2 KAT sıçrıyor, gerçek veri) 2021→2022'deki
+  ~2,8 kat artışın taksonomi/kapsam değişikliği DEĞİL, rutin sulama
+  sezonu mevsimselliği olduğunu gösterdi (dokumanlar/08). **2021'in TÜMÜ
+  (12/12 ay) artık T11/T10 için AÇIK.**
+- **T10 yapısal sorunu artık GERÇEK bir engel (taksonomi çözülünce ortaya
+  çıktı):** 2021 Ekim'e kadar T10-karşılığı tablo YAPISAL OLARAK il-ONLY
+  (grup boyutu hiç yok), Kasım'dan itibaren il×grup. İl-only aylarda
+  `t10_oku()` grup sütunu OLMAYAN bir hücreyi (sayısal bir değer) grup
+  etiketi sanıp `grup_esle_zorunlu()` üzerinden ValueError'la GÜVENLİ
+  ŞEKİLDE durur (sessizce yanlış veri ÜRETMEZ) — bu ayların T10'u
+  KAYNAKTA YOK sayılır (aşağıda ayrıca `kapsam_disi_isaretle()` ile
+  işaretlenir), T11 bundan ETKİLENMEZ (ayrı okunur, ayrı hata yönetimi).
 
 Kapsam (2022 ile AYNI): T11-karşılığı → fact_tuketim (Sanayi HARİÇ, Karar
 2), T10-karşılığı → fact_abone (Sanayi DAHİL), T4-karşılığı → fact_uretim
@@ -95,6 +93,17 @@ _GRUP_TAKMA_ADLAR = {
     "Kamu ve Özel Hiz. Sek. ile Diğer": "Kamu ve Özel Hizmetler",
     "Kamu ve Özel Hizmetler Sektörü ile Diğer": "Kamu ve Özel Hizmetler",
     "Tarımsal Faaliyetler": "Tarımsal",
+    # 2026-09-03 (gece-boyu turu, madde 1/2a) — taksonomi kararı UYGULANDI:
+    # mevsimsellik doğrulaması (2023-2025'in kanonik "Tarımsal" grubu,
+    # gerçek veri) Mart→Mayıs aralığında 2,8-4,2 KAT sıçramalar gösterdi
+    # (dokumanlar/08_word_2016_2022_kapsam.md) — 2021/2022'nin "Tarımsal
+    # Sulama"→"Tarımsal Faaliyetler" arasındaki ~2,8 kat artış bu aralıkta
+    # NORMALİN ALTINDA, taksonomi/kapsam değişikliği DEĞİL, rutin sulama
+    # sezonu mevsimselliği. RENAME kanıtı (EPDK'nın kendi karşılaştırma
+    # tablosu 2021'i bile yeni etiketlerle gösteriyor) ile birlikte karar:
+    # RENAME olarak kabul edilip alias'landı.
+    "Ticarethane": "Kamu ve Özel Hizmetler",
+    "Tarımsal Sulama": "Tarımsal",
 }
 _ATLA_ETIKETLERI = {
     "Genel Toplam",
@@ -106,14 +115,16 @@ _ATLA_ETIKETLERI = {
     "Pay",
     "Pay(%)",
     "Pay (%)",
+    "Pay\n(%)",
+    "Payı",
 }
 
 
 def grup_esle_zorunlu(metin: str) -> str | None:
     """None → bilinen bir 'atla' etiketi. Aksi halde eşleşme bulunamazsa
-    ValueError — 2021'in TÜM aylarının "Ticarethane"/"Tarımsal Sulama"
-    etiketleri BİLİNÇLİ OLARAK burada YOK, bu yüzden HER ay KASITLI olarak
-    fırlar (bkz. modül notu — taksonomi AÇIK KARAR)."""
+    ValueError. "Ticarethane"/"Tarımsal Sulama" artık `_GRUP_TAKMA_ADLAR`'da
+    (taksonomi kararı UYGULANDI, 2026-09-03 madde 1/2a) — bu fonksiyon
+    yalnız GERÇEKTEN tanınmayan (beklenmedik) bir etiket için fırlar."""
     temiz = metin.strip()
     if temiz in _ATLA_ETIKETLERI:
         return None
@@ -123,10 +134,8 @@ def grup_esle_zorunlu(metin: str) -> str | None:
     if grup is None:
         raise ValueError(
             f"Tanınmayan tüketici grubu etiketi: {temiz!r} — "
-            "'Ticarethane'/'Tarımsal Sulama' ise bu KASITLI (dokumanlar/08 "
-            "Bulgu 5, AÇIK KARAR — Ahmet'e sorulmalı, worker/parser.py:"
-            "GRUP_ESLEME'ye dokunulmadı). Başka bir etiketse "
-            "worker/scripts/word_2021.py: _GRUP_TAKMA_ADLAR'a eklenmeli mi kontrol et."
+            "worker/scripts/word_2021.py: _GRUP_TAKMA_ADLAR'a eklenmeli mi "
+            "kontrol et (yeni bir ay yeni bir kısaltma/varyant getirmiş olabilir)."
         )
     return grup
 
@@ -156,7 +165,21 @@ def kaynak_esle_zorunlu(metin: str) -> str | None:
 # hata tekrar bulundu — TEK seferlik değil, EPDK'nın kaynağında TEKRARLAYAN
 # bir yazım hatası (muhtemelen 2021-2022 arası birden fazla ayda kullanılan
 # bir şablon/kopyala-yapıştır kaynaklı).
-_IL_ADI_DUZELT = {"Küthahya": "Kütahya"}
+_IL_ADI_DUZELT = {
+    "Küthahya": "Kütahya",
+    # T11-karşılığı tabloda (Mart/Mayıs/Haziran-Aralık 2021) "Afyonkarahisar"
+    # yerine kısaltılmış "AFYONK." kullanılmış — worker/parser.py'nin
+    # normalize_label()'ı bu kısaltmayı tanımıyor, kanonik ada eşleniyor.
+    "AFYONK.": "Afyonkarahisar",
+    # Mart/Mayıs/Haziran-Aralık 2021'de "Kahramanmaraş" yerine kısaltılmış
+    # "K.MARAŞ" kullanılmış — AFYONK. ile AYNI aile (2021'e özgü kısaltma
+    # şablonu).
+    "K.MARAŞ": "Kahramanmaraş",
+    # Nisan 2021'de "HAKKARİ" inceltme işaretli eski yazımla ("HAKKÂRİ")
+    # geçiyor — word_2023.py'nin AYNI bulduğu sorun (Ağustos 2023), farklı
+    # bir yıl/ay'da tekrarlıyor.
+    "HAKKÂRİ": "HAKKARİ",
+}
 
 
 def _il_adi_temizle(il_adi_ham: str) -> str:
@@ -432,15 +455,29 @@ def isle_ay(
     print(f"  T10 başlık: {t10_baslik!r}")
 
     tuketim_ham = t11_oku(t11_tbl, tarih_id)
-    abone_ham = t10_oku(t10_tbl, tarih_id, ay_yil)
     print(
         f"  T11: {len(tuketim_ham)} satır, grup={sorted(tuketim_ham['grup'].unique())}, "
         f"toplam={tuketim_ham['tuketim_mwh'].sum():,.2f} MWh"
     )
-    print(
-        f"  T10: {len(abone_ham)} satır, grup={sorted(abone_ham['grup'].unique())}, "
-        f"toplam={abone_ham['abone_sayisi'].sum():,.0f} abone"
-    )
+
+    # dokumanlar/08 — Ekim 2021'e kadar T10 tablosu YAPISAL OLARAK il-ONLY
+    # (grup boyutu hiç yok). T11'İ ETKİLEMESİN diye T10 AYRI bir try/except
+    # içinde okunuyor — başarısız olursa T10 o ay için "kaynakta yok"
+    # sayılır (aşağıda kapsam_disi_isaretle), T11 normal yüklenmeye devam eder.
+    abone_ham: pd.DataFrame | None
+    try:
+        abone_ham = t10_oku(t10_tbl, tarih_id, ay_yil)
+    except ValueError as e:
+        abone_ham = None
+        print(
+            f"  [T10 KAYNAKTA YOK] bu ay için tablo yapısal olarak il-ONLY "
+            f"(grup boyutu yok) — kapsam_disi olarak işaretlenecek: {e}"
+        )
+    if abone_ham is not None:
+        print(
+            f"  T10: {len(abone_ham)} satır, grup={sorted(abone_ham['grup'].unique())}, "
+            f"toplam={abone_ham['abone_sayisi'].sum():,.0f} abone"
+        )
 
     if dry_run:
         print("  [DRY-RUN] DB'ye yazılmadı.")
@@ -485,34 +522,44 @@ def isle_ay(
         "red_satirlari": dogrulanan_t.red.to_dict("records"),
     }
 
-    dogrulanan_a = kpi.dogrula_abone(abone_ham)
-    yuklenen_a, atlanan_a = ingest.fact_abone_yukle(conn, dogrulanan_a.kabul, batch_id)
-    sonuc.tablolar["fact_abone"] = pipeline.TabloSonucu(
-        toplam=len(abone_ham),
-        red=len(dogrulanan_a.red),
-        karantina=len(dogrulanan_a.karantina),
-        yuklenen=yuklenen_a,
-        atlanan=atlanan_a,
-    )
-    audit_tablolar["fact_abone"] = {
-        "toplam": len(abone_ham),
-        "red": len(dogrulanan_a.red),
-        "karantina": len(dogrulanan_a.karantina),
-        "yuklenen": yuklenen_a,
-        "atlanan": atlanan_a,
-        "red_satirlari": dogrulanan_a.red.to_dict("records"),
-    }
+    if abone_ham is not None:
+        dogrulanan_a = kpi.dogrula_abone(abone_ham)
+        yuklenen_a, atlanan_a = ingest.fact_abone_yukle(
+            conn, dogrulanan_a.kabul, batch_id
+        )
+        sonuc.tablolar["fact_abone"] = pipeline.TabloSonucu(
+            toplam=len(abone_ham),
+            red=len(dogrulanan_a.red),
+            karantina=len(dogrulanan_a.karantina),
+            yuklenen=yuklenen_a,
+            atlanan=atlanan_a,
+        )
+        audit_tablolar["fact_abone"] = {
+            "toplam": len(abone_ham),
+            "red": len(dogrulanan_a.red),
+            "karantina": len(dogrulanan_a.karantina),
+            "yuklenen": yuklenen_a,
+            "atlanan": atlanan_a,
+            "red_satirlari": dogrulanan_a.red.to_dict("records"),
+        }
+        if dogrulanan_a.red.shape[0] or dogrulanan_a.karantina.shape[0]:
+            print(
+                f"  [DİKKAT] fact_abone: red={len(dogrulanan_a.red)} karantina={len(dogrulanan_a.karantina)}"
+            )
+    else:
+        yuklenen_a = 0
+        audit_tablolar["fact_abone"] = {
+            "toplam": 0,
+            "not": "kaynakta yok — T10 tablosu bu ay için yapısal olarak il-ONLY "
+            "(grup boyutu yok), aşağıda kapsam_disi ile işaretlendi.",
+        }
 
     if dogrulanan_t.red.shape[0] or dogrulanan_t.karantina.shape[0]:
         print(
             f"  [DİKKAT] fact_tuketim: red={len(dogrulanan_t.red)} karantina={len(dogrulanan_t.karantina)}"
         )
-    if dogrulanan_a.red.shape[0] or dogrulanan_a.karantina.shape[0]:
-        print(
-            f"  [DİKKAT] fact_abone: red={len(dogrulanan_a.red)} karantina={len(dogrulanan_a.karantina)}"
-        )
 
-    toplam_satir = len(tuketim_ham) + len(abone_ham)
+    toplam_satir = len(tuketim_ham) + (len(abone_ham) if abone_ham is not None else 0)
     toplam_yuklenen = yuklenen_t + yuklenen_a
     toplam_atlanan = toplam_satir - toplam_yuklenen
 
@@ -548,6 +595,19 @@ def isle_ay(
         "(dokumanlar/08_word_2016_2022_kapsam.md Bulgu 3).",
         karar_referansi="Karar 1",
     )
+    if abone_ham is None:
+        # dokumanlar/08 — bu ay için T10 tablosu YAPISAL OLARAK il-ONLY
+        # (grup boyutu kaynakta yok, tahmin/uydurma YAPILMADI).
+        pipeline.kapsam_disi_isaretle(
+            conn,
+            tarih_id=tarih_id,
+            fact_tablosu="fact_abone",
+            sebep="Word (.docx) kaynağındaki Tüketici Sayısı tablosu bu ay için "
+            "yapısal olarak il-ONLY (tüketici türü/grup kırılımı hiç yok) — "
+            "2021 Ekim'e kadar süren bir format dönemi "
+            "(dokumanlar/08_word_2016_2022_kapsam.md).",
+            karar_referansi="08_word_2016_2022_kapsam.md",
+        )
 
     uygun, sebep = pipeline.otomatik_onaya_uygun(sonuc)
     print(f"  otomatik_onaya_uygun() = {uygun}" + (f" ({sebep})" if sebep else ""))

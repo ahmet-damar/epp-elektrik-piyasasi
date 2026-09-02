@@ -60,16 +60,12 @@ def test_grup_esle_zorunlu_atla_etiketleri_none_doner() -> None:
     assert grup_esle_zorunlu("Pay(%)") is None
 
 
-def test_grup_esle_zorunlu_ocak_nisan_eski_takson_kasitli_engellenir() -> None:
-    """dokumanlar/08 Bulgu 5 — 'Ticarethane'/'Tarımsal Sulama' BİLİNÇLİ
-    OLARAK haritalanmadı (AÇIK KARAR, Ahmet'e sorulmalı). Bu test o
-    tasarım kararının kod seviyesinde GERÇEKTEN uygulandığını doğrular —
-    biri yanlışlıkla bir alias eklerse bu test KIRILIR, bilinçli bir
-    hatırlatma olarak."""
-    with pytest.raises(ValueError, match="KASITLI"):
-        grup_esle_zorunlu("Ticarethane")
-    with pytest.raises(ValueError, match="KASITLI"):
-        grup_esle_zorunlu("Tarımsal Sulama")
+def test_grup_esle_zorunlu_ocak_nisan_eski_takson_alias_calisir() -> None:
+    """dokumanlar/08 Bulgu 5 — 2026-09-03 (madde 1/2a): mevsimsellik
+    doğrulaması RENAME lehine sonuçlandı, 'Ticarethane'/'Tarımsal Sulama'
+    artık kanonik gruplara alias'lanıyor (Ocak-Nisan 2022 için de)."""
+    assert grup_esle_zorunlu("Ticarethane") == "Kamu ve Özel Hizmetler"
+    assert grup_esle_zorunlu("Tarımsal Sulama") == "Tarımsal"
 
 
 def test_kaynak_esle_zorunlu_bilinen_kaynaklar() -> None:
@@ -197,6 +193,41 @@ def test_t10_oku_ileri_doldurma_bos_il_hucresi() -> None:
     }
     # Hedef dönem "2022 Ekim" kolonu seçilmiş olmalı (110), önceki yıl (100) DEĞİL
     assert (df["abone_sayisi"] == 110).all()
+
+
+def test_t10_oku_ocak_nisan_uc_baslik_satirli_yapi() -> None:
+    """dokumanlar/08 — 2026-09-03 (madde 2a'da bulundu): Ocak-Nisan 2022'nin
+    T10 tablosu 3 başlık satırlı (yıl + AY ADI tekrarı + 'İl Adı/Tüketici
+    Türü/...'), Mayıs-Aralık'ın 2 satırlı yapısından FARKLI — sabit
+    tbl.rows[0]/[1] index'i BU YÜZDEN yanlış satırı okurdu. t10_oku artık
+    'Tüketici Türü' içeren satırı DİNAMİK buluyor, öncesindeki TÜM satırları
+    (yıl + ay) birleştirip dönem metni olarak kullanıyor."""
+    satirlar = [
+        ["", "", "2021", "2021", "2022", "2022", ""],
+        ["", "", "Ocak", "Ocak", "Ocak", "Ocak", ""],
+        [
+            "İl Adı",
+            "Tüketici Türü",
+            "Tüketici Sayısı",
+            "Pay(%)",
+            "Tüketici Sayısı",
+            "Pay(%)",
+            "Değişim (%)",
+        ],
+    ]
+    gruplar = ["Aydınlatma", "Mesken", "Sanayi", "Tarımsal Sulama", "Ticarethane"]
+    for il in TUM_ILLER:
+        for i, grup in enumerate(gruplar):
+            il_hucresi = il if i == 0 else ""
+            satirlar.append([il_hucresi, grup, "50", "1,0", "60", "1,0", "20,0"])
+    tbl = _tablo_ekle(satirlar)
+
+    df = t10_oku(tbl, tarih_id=202201, hedef_ay_yil="Ocak 2022")
+
+    assert len(df) == 81 * 5
+    assert df["il_kodu"].nunique() == 81
+    # Hedef "2022 Ocak" kolonu (60) seçilmeli, önceki yıl (50) DEĞİL
+    assert (df["abone_sayisi"] == 60).all()
 
 
 def test_t4_oku_eksik_il_acikca_sifirlanir_ve_genel_toplam_dogrulanir() -> None:
