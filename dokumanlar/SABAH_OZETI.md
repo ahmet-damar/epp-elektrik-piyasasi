@@ -9,8 +9,8 @@
 > DEĞİL). Akıllı Uygulama Denetimi KAPATILMADI. Küçük not: conda-forge'un
 > `mypy`'si de AYRI olarak engellendi (SAC dosya bazında karar veriyor) —
 > `ruff`/`pytest` yeterli, mypy'siz devam ediliyor. Taksonomi kararı hâlâ
-> ÇÖZÜLDÜ (RENAME) — tekrar sorulmamalı. **2019 TAMAMLANDI**, sıradaki
-> adım 2018.
+> ÇÖZÜLDÜ (RENAME) — tekrar sorulmamalı. **2019 ve 2018 TAMAMLANDI**,
+> sıradaki adım 2017.
 
 **Bu dosya tek başına okunduğunda durum tam anlaşılsın diye yazıldı.**
 Detaylı teşhis/bulgular için `dokumanlar/08_word_2016_2022_kapsam.md`.
@@ -30,14 +30,14 @@ verildi, 2021/2022 tam açıldı, 2020 eklendi.
   ile işaretlendi.
 - **T4 (lisanssız kurulu güç) — 34/36 ay yüklü** (2022 Temmuz hariç, kaynak
   raporlama hatası — açıklama aşağıda).
-- **2019 TAMAMLANDI** — T11 12/12, T10 0/12 (tüm yıl yapısal olarak
-  kaynakta yok), T4 12/12. 2 yeni format sürprizi bulundu, ikisi de
-  mekanik çözüldü (aşağıya bkz.).
-- **2016-2018 SIRADAKİ ADIM** — 2018 için kısmi teşhis zaten var
-  (2019/2020'yle yapısal aynı), 2017/2016 için yalnız envanter var.
+- **2019 ve 2018 TAMAMLANDI** — ikisi de T11 12/12, T10 0/12 (tüm yıl
+  yapısal olarak kaynakta yok), T4 12/12. Her yılda 1-2 yeni format
+  sürprizi bulundu, hepsi mekanik çözüldü (aşağıya bkz.).
+- **2016-2017 SIRADAKİ ADIM** — yalnız envanter var (2016 için 07'de
+  kısmi teşhis de var), T11/T10/T4 yapısı henüz kontrol edilmedi.
 - **0 batch aktive edildi** (DB'den doğrulandı) — hiçbir fact tablosunda
-  2019/2020/2021/2022 için `is_active=true` satır yok. Aktivasyon kararı
-  sana ait.
+  2018/2019/2020/2021/2022 için `is_active=true` satır yok. Aktivasyon
+  kararı sana ait.
 
 ## Hangi yıllar ne durumda
 
@@ -47,7 +47,7 @@ verildi, 2021/2022 tam açıldı, 2020 eklendi.
 | 2021 | **12/12 ay** | **2/12 ay** (Kasım-Aralık; Ocak-Ekim kaynakta yok, yapısal) | **12/12 ay** |
 | 2020 | **12/12 ay** | **0/12 ay** (TÜM yıl kaynakta yok, yapısal) | **12/12 ay** |
 | 2019 | **12/12 ay** | **0/12 ay** (TÜM yıl kaynakta yok, yapısal) | **12/12 ay** |
-| 2018 | İŞLENMEDİ (kısmi teşhis var, 2019'la yapısal aynı) | — | — |
+| 2018 | **12/12 ay** | **0/12 ay** (TÜM yıl kaynakta yok, yapısal) | **12/12 ay** |
 | 2017 | İŞLENMEDİ (yalnız envanter var) | — | — |
 | 2016 | İŞLENMEDİ (envanter + 07'de kısmi teşhis var) | — | — |
 
@@ -61,7 +61,15 @@ belgelendi):**
    "Güneş \n(Yoğunlş.)") — yalnız `\n\r\t` kaldırılıyor, gerçek boşluklar
    ("Genel Toplam" gibi) korunuyor.
 
-**2016-2018 için implementasyon/yükleme henüz yapılmadı** — sıradaki adım.
+**2018'e özgü 1 YENİ format sürprizi (mekanik çözüldü, word_2018.py'de
+belgelendi):** Ağustos+Eylül 2018'in T4 tablosunda EPDK'nın kendi
+kaynağında "**BOŞ-VERİ-ŞEHİR**" adlı, hiçbir gerçek il_kodu'na
+eşlenemeyen FAZLADAN bir satır var (81 gerçek ilin YANINDA — o ayın
+gerçek ili de AYRICA mevcut). Küçük bir gerçek değer taşıyor (~3,3 MW)
+ama hangi ile ait olduğu belirlenemiyor — TAHMİN EDİLMEDİ, satır AÇIKÇA
+atlandı (Genel Toplam'ın kendi toleransı bu farkı zaten kapsıyor).
+
+**2016-2017 için implementasyon/yükleme henüz yapılmadı** — sıradaki adım.
 
 **Batch ID aralıkları:**
 
@@ -71,6 +79,7 @@ belgelendi):**
 | 2021 | 173-184 | 161-172 |
 | 2020 | 189-200 | 201-212 |
 | 2019 | 213-224 | 225-236 |
+| 2018 | 237-248 | 249-260 |
 
 **Hiçbir batch `onayla.py`/`pipeline.batch_onayla()` ile aktive edilmedi** —
 tümü `running` durumda, DB'den doğrulandı (`fact_tuketim`/`fact_abone`/
@@ -154,42 +163,43 @@ sana kalmış. `otomatik_onaya_uygun()` çıktıları script loglarında var
 (çoğu `True`, birkaçında 1-2 kırmızı satır — negatif "Tarımsal" değerleri,
 `kpi.dogrula_tuketim()`'in bilinen davranışı).
 
-### 2. 2016-2018 — sıradaki adım (ortam engeli ÇÖZÜLDÜ)
+### 2. 2016-2017 — sıradaki adım (ortam engeli ÇÖZÜLDÜ)
 
 **Komutlar için:** `C:\Users\adama\miniconda3\envs\epp\python.exe`
 kullan, sistem `py`/`python` DEĞİL (o hâlâ pandas'ı bloklu).
 
-**2018:** kısmi teşhis ZATEN TAMAMLANDI (bu turun başında) — 2019/2020'yle
-YAPISAL OLARAK AYNI (eski taksonomi, kapak-paragrafı ay/yıl çapası, T10
-Ocak+Aralık'ta il-only) — `word_2019.py` doğrudan şablon, ek araştırma
-GEREKMİYOR. 2019'da T4'ün "Güneş (Fotovoltaik)"/"Güneş (Yoğunlş.)"
-ayrımına ve hücre-içi satır kırılmalarına rastlandı — 2018'de de aynı
-sürprizler çıkabilir, `word_2019.py`'nin `t4_oku()`/`_il_adi_temizle()`
-düzeltmeleri muhtemelen doğrudan taşınabilir.
+**2017:** yalnız envanter var, T11/T10/T4 yapısı HENÜZ kontrol edilmedi.
+2018/2019/2020'nin taşıdığı desenler (kapak-paragrafı ay/yıl çapası, T10
+il-only, T4 Güneş-ayrımı, hücre-içi satır kırılması, "BOŞ-VERİ-ŞEHİR"
+tarzı anomali satırlar) hepsi MÜMKÜN, hiçbiri doğrulanmadı —
+`word_2018.py` şablon olarak denenebilir ama önce Ocak/Aralık örnekleriyle
+kısa bir kontrol yapılmalı (2018'de yapıldığı gibi).
 
-**2017/2016:** yalnız envanter var, T11/T10/T4 yapısı HENÜZ kontrol
-edilmedi (2016'nın 07'deki kısmi teşhisi — T4'ün 2-satırlı başlık
-istisnası, "Lisanslı" kelimesinin Ocak'ta yokluğu — hâlâ geçerli).
+**2016:** envanter var + 07'de kısmi teşhis var (T4'ün 2-satırlı başlık
+istisnası — 2016 Ocak'ta gerçek kaynak adları satır 0 değil satır 1'de,
+"Lisanslı" kelimesinin Ocak'ta yokluğu — hâlâ geçerli). En eski/en
+farklı yıl olduğundan diğerlerinden daha temkinli yaklaşılmalı.
 
-### 3. T10'un 22/36 ay eksik olması KPI'ları nasıl etkiliyor
+### 3. T10'un 46/60 ay eksik olması KPI'ları nasıl etkiliyor
 
-`fact_abone`'a dayanan KPI'lar (örn. KPI-10) 2020-2022 için kısmi veriyle
-çalışacak — bu durumun dashboard'da nasıl yansıtılacağı (örn.
-`veri_kapsam_disi` tablosunun UI'ya bağlanması, henüz yapılmadı, bkz.
-`07_word_parser_kapsam.md`'nin açık kalanlar listesi) ayrı bir karar.
+`fact_abone`'a dayanan KPI'lar (örn. KPI-10) 2018-2022 (60 ay) için
+yalnız **14/60 ay** gerçek veriyle çalışacak (2022'nin 12'si + 2021
+Kasım-Aralık'ın 2'si) — bu durumun dashboard'da nasıl yansıtılacağı
+(örn. `veri_kapsam_disi` tablosunun UI'ya bağlanması, henüz yapılmadı,
+bkz. `07_word_parser_kapsam.md`'nin açık kalanlar listesi) ayrı bir karar.
 
 ## Test/kalite durumu
 
-- `worker/tests/test_word_2019.py` (8 test) + `test_word_2020.py` (8
-  test) + `test_word_2021.py` (9 test) + `test_word_2022.py` (13 test) —
-  hepsi geçiyor, DATABASE_URL'e bağımlı DEĞİL (synthetic docx tabloları),
-  CI'nin 'Worker' job'ında da çalışıyor.
-- `ruff check`/`ruff format --check` temiz (38 dosya). **`mypy` bu
+- `worker/tests/test_word_2018.py` (9 test) + `test_word_2019.py` (8
+  test) + `test_word_2020.py` (8 test) + `test_word_2021.py` (9 test) +
+  `test_word_2022.py` (13 test) — hepsi geçiyor, DATABASE_URL'e bağımlı
+  DEĞİL (synthetic docx tabloları), CI'nin 'Worker' job'ında da çalışıyor.
+- `ruff check`/`ruff format --check` temiz (40 dosya). **`mypy` bu
   makinede conda-forge'dan da bloklanıyor** (SAC dosya bazında karar
   veriyor) — CI'de sorun yok (GitHub'ın temiz runner'ı etkilenmiyor),
   yalnız bu makinede yerel mypy çalıştırılamıyor.
-- **07'nin "Açık kalanlar" madde 1'i (regresyon testi eksikliği)** 2019/
-  2020/2021/2022 için kapatıldı — **2023/2024/2025 hâlâ testsiz.**
+- **07'nin "Açık kalanlar" madde 1'i (regresyon testi eksikliği)** 2018/
+  2019/2020/2021/2022 için kapatıldı — **2023/2024/2025 hâlâ testsiz.**
 
 ## Commit'ler (hepsi ayrı, CI doğrulandı — sırayla)
 
@@ -203,17 +213,21 @@ istisnası, "Lisanslı" kelimesinin Ocak'ta yokluğu — hâlâ geçerli).
 6. `307752a` — 2020 tarifi: T11/T10 batch 189-200, T4 batch 201-212. CI ✅
 7. `ae125f1` — 2016-2019 envanter + kısmi teşhis, implementasyon ortam
    engeliyle DURDU (o an). CI ✅
-8. *(bu commit)* — Ortam engeli Miniconda ile ÇÖZÜLDÜ + 2019 tarifi:
-   T11/T10 batch 213-224, T4 batch 225-236.
+8. `b786538` — Ortam engeli Miniconda ile ÇÖZÜLDÜ + 2019 tarifi: T11/T10
+   batch 213-224, T4 batch 225-236. CI ✅
+9. *(bu commit)* — 2018 tarifi: T11/T10 batch 237-248, T4 batch 249-260
+   ("BOŞ-VERİ-ŞEHİR" anomali-satır atlaması dahil).
 
 ## Kesin kurallara uyum — doğrulama
 
 - ✅ `onayla.py`/`pipeline.batch_onayla()` HİÇ çağrılmadı (DB'den
-  doğrulandı: 0 aktif satır, 2020-2022'nin TAMAMI için).
+  doğrulandı: 0 aktif satır, 2018-2022'nin TAMAMI için).
 - ✅ Tam pytest paketi canlıya karşı çalıştırılmadı — yalnız hedefli
   `-k`/dosya bazlı testler kullanıldı, tam paket yalnız CI'nin
   postgres:16'sında koştu.
 - ✅ Şema değişikliği yapılmadı (migration yok, `dim_grup`'a dokunulmadı).
-- ✅ T10'un yapısal engeline takılan aylar (2020 tümü, 2021 Ocak-Ekim)
-  BEKLEMEDE/kapsam_disi bırakıldı, uydurma yapılmadı, döngüye girilmedi.
+- ✅ T10'un yapısal engeline takılan aylar (2018/2019/2020 tümü, 2021
+  Ocak-Ekim) BEKLEMEDE/kapsam_disi bırakıldı, uydurma yapılmadı, döngüye
+  girilmedi. T4'ün "BOŞ-VERİ-ŞEHİR" anomalisi de aynı disiplinle
+  (tahmin etmeden, açıkça atlanarak) çözüldü.
 - ✅ Her mantıksal adım sonunda ayrı commit + push + CI doğrulaması yapıldı.
