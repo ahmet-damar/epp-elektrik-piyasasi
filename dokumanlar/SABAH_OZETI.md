@@ -1,20 +1,16 @@
-# SABAH ÖZETİ — 2016-2022 Word Aktarımı (2026-09-03/04, üç tur)
+# SABAH ÖZETİ — 2016-2022 Word Aktarımı (2026-09-03/04, dört tur)
 
-> **DURDU (2026-09-04) — ORTAM ENGELİ, kod sorunu DEĞİL.** Bu makinede
-> `pandas`'ın derlenmiş bir bileşeni (`internals.cp313-win_amd64.pyd`) bir
-> "Uygulama Denetimi" (Application Control) politikası tarafından
-> ENGELLENMEYE başladı — `import pandas` her yerde başarısız oluyor
-> (`numpy`/`ruff` etkilenmiyor, dosya değişmemiş, birkaç kez denendi).
-> `worker.parser`'a (ve onu kullanan HER word_*.py'ye) bağımlı TÜM kod
-> (dry-run/test/yükleme) şu an ÇALIŞTIRILAMIYOR. **2016-2019 için envanter +
-> kısmi teşhis TAMAMLANDI** (2018/2019, 2020'nin YAPISAL OLARAK BİREBİR
-> AYNISI — bkz. `08_word_2016_2022_kapsam.md`'nin son bölümü) ama
-> implementasyon/test/yükleme YAPILAMADI — kod yazıp test etmeden commit
-> etmek "dry-run önce" disiplinini bozar. **Ahmet'in makine/ortam sorununu
-> çözmesi gerekiyor** (Windows Event Viewer → CodeIntegrity/AppLocker
-> günlüğüne bakılabilir) — sonra `word_2020.py` şablonuyla doğrudan devam
-> edilebilir, ek araştırma gerekmiyor. Taksonomi kararı hâlâ ÇÖZÜLDÜ
-> (RENAME) — bu tekrar sorulmamalı.
+> **Ortam engeli ÇÖZÜLDÜ (2026-09-04).** Akıllı Uygulama Denetimi
+> (Değerlendirme modu) pip/PyPI kaynaklı `pandas`'ı engelliyordu —
+> Miniconda (`C:\Users\adama\miniconda3`, `epp` ortamı, conda-forge
+> kanalı) admin GEREKMEDEN kuruldu, imzalı derlemeler kabul ediliyor.
+> **Tüm sonraki dry-run/test/yükleme komutları `C:\Users\adama\
+> miniconda3\envs\epp\python.exe` ile çalıştırılmalı** (sistem Python'ı
+> DEĞİL). Akıllı Uygulama Denetimi KAPATILMADI. Küçük not: conda-forge'un
+> `mypy`'si de AYRI olarak engellendi (SAC dosya bazında karar veriyor) —
+> `ruff`/`pytest` yeterli, mypy'siz devam ediliyor. Taksonomi kararı hâlâ
+> ÇÖZÜLDÜ (RENAME) — tekrar sorulmamalı. **2019 TAMAMLANDI**, sıradaki
+> adım 2018.
 
 **Bu dosya tek başına okunduğunda durum tam anlaşılsın diye yazıldı.**
 Detaylı teşhis/bulgular için `dokumanlar/08_word_2016_2022_kapsam.md`.
@@ -34,10 +30,14 @@ verildi, 2021/2022 tam açıldı, 2020 eklendi.
   ile işaretlendi.
 - **T4 (lisanssız kurulu güç) — 34/36 ay yüklü** (2022 Temmuz hariç, kaynak
   raporlama hatası — açıklama aşağıda).
-- **2016-2019 — envanter + kısmi teşhis TAMAMLANDI, implementasyon ORTAM
-  ENGELİYLE DURDU** (yukarıya bkz. — pandas DLL bloğu, kod sorunu değil).
+- **2019 TAMAMLANDI** — T11 12/12, T10 0/12 (tüm yıl yapısal olarak
+  kaynakta yok), T4 12/12. 2 yeni format sürprizi bulundu, ikisi de
+  mekanik çözüldü (aşağıya bkz.).
+- **2016-2018 SIRADAKİ ADIM** — 2018 için kısmi teşhis zaten var
+  (2019/2020'yle yapısal aynı), 2017/2016 için yalnız envanter var.
 - **0 batch aktive edildi** (DB'den doğrulandı) — hiçbir fact tablosunda
-  2020/2021/2022 için `is_active=true` satır yok. Aktivasyon kararı sana ait.
+  2019/2020/2021/2022 için `is_active=true` satır yok. Aktivasyon kararı
+  sana ait.
 
 ## Hangi yıllar ne durumda
 
@@ -46,13 +46,22 @@ verildi, 2021/2022 tam açıldı, 2020 eklendi.
 | 2022 | **12/12 ay** | **12/12 ay** | **11/12 ay** (Temmuz hariç — kaynak hatası) |
 | 2021 | **12/12 ay** | **2/12 ay** (Kasım-Aralık; Ocak-Ekim kaynakta yok, yapısal) | **12/12 ay** |
 | 2020 | **12/12 ay** | **0/12 ay** (TÜM yıl kaynakta yok, yapısal) | **12/12 ay** |
-| 2019 | Envanter+kısmi teşhis tamam (2020'yle YAPISAL AYNI) | — | — |
-| 2018 | Envanter+kısmi teşhis tamam (2020'yle YAPISAL AYNI) | — | — |
-| 2017 | Envanter tamam, teşhis edilmedi | — | — |
-| 2016 | Envanter tamam (07'de kısmen teşhis edilmişti) | — | — |
+| 2019 | **12/12 ay** | **0/12 ay** (TÜM yıl kaynakta yok, yapısal) | **12/12 ay** |
+| 2018 | İŞLENMEDİ (kısmi teşhis var, 2019'la yapısal aynı) | — | — |
+| 2017 | İŞLENMEDİ (yalnız envanter var) | — | — |
+| 2016 | İŞLENMEDİ (envanter + 07'de kısmi teşhis var) | — | — |
 
-**2016-2019 için implementasyon/yükleme YAPILMADI** — ortam engeli
-(pandas DLL bloğu) çözülmeden kod çalıştırılamıyor.
+**2019'a özgü 2 YENİ format sürprizi (mekanik çözüldü, word_2019.py'de
+belgelendi):**
+1. T4'te "Güneş" tek kolon değil — "Güneş (Fotovoltaik)" ve
+   "**Güneş (Yoğunlş.)**" ayrı iki kolon, ikisi AYNI kanonik "Güneş"e
+   TOPLANIYOR (`t4_oku()` kolon-bazlı değil il-başına-kaynak-toplamı
+   mantığıyla yeniden yazıldı).
+2. Ekim 2019'da hücre içi satır kırılmaları (örn. "DÜZC\nE",
+   "Güneş \n(Yoğunlş.)") — yalnız `\n\r\t` kaldırılıyor, gerçek boşluklar
+   ("Genel Toplam" gibi) korunuyor.
+
+**2016-2018 için implementasyon/yükleme henüz yapılmadı** — sıradaki adım.
 
 **Batch ID aralıkları:**
 
@@ -61,10 +70,11 @@ verildi, 2021/2022 tam açıldı, 2020 eklendi.
 | 2022 | 142-149 (Mayıs-Aralık, ilk tur) + 185-188 (Ocak-Nisan, ikinci tur) | 150-160 |
 | 2021 | 173-184 | 161-172 |
 | 2020 | 189-200 | 201-212 |
+| 2019 | 213-224 | 225-236 |
 
 **Hiçbir batch `onayla.py`/`pipeline.batch_onayla()` ile aktive edilmedi** —
 tümü `running` durumda, DB'den doğrulandı (`fact_tuketim`/`fact_abone`/
-`fact_uretim`'de 2020-2022 için `is_active=true` satır sayısı: **0**).
+`fact_uretim`'de 2019-2022 için `is_active=true` satır sayısı: **0**).
 
 ## Taksonomi kararı — VERİLDİ (artık açık değil)
 
@@ -144,23 +154,22 @@ sana kalmış. `otomatik_onaya_uygun()` çıktıları script loglarında var
 (çoğu `True`, birkaçında 1-2 kırmızı satır — negatif "Tarımsal" değerleri,
 `kpi.dogrula_tuketim()`'in bilinen davranışı).
 
-### 2. 2016-2019 — ORTAM ENGELİ önce çözülmeli, sonra sıradaki adım
+### 2. 2016-2018 — sıradaki adım (ortam engeli ÇÖZÜLDÜ)
 
-**Önce (senin yapman gereken):** bu makinedeki `pandas` DLL bloğunu çöz
-(Application Control/WDAC politikası `internals.cp313-win_amd64.pyd`'yi
-engelliyor — Windows Event Viewer → Applications and Services Logs →
-Microsoft → Windows → CodeIntegrity/AppLocker günlüğüne bakılabilir; IT/
-kurumsal politikayla ilgili olabilir). `py -c "import pandas"` başarıyla
-çalışınca devam edilebilir.
+**Komutlar için:** `C:\Users\adama\miniconda3\envs\epp\python.exe`
+kullan, sistem `py`/`python` DEĞİL (o hâlâ pandas'ı bloklu).
 
-**Sonra:** 2018/2019 için envanter + kısmi teşhis ZATEN TAMAMLANDI —
-2020'nin YAPISAL OLARAK BİREBİR AYNISI (eski taksonomi, kapak-paragrafı
-ay/yıl çapası, T10 Ocak+Aralık'ta il-only) — `word_2020.py` doğrudan
-şablon, ek araştırma GEREKMİYOR. Tek yeni fark: T4'te "Güneş" bazı
-yıllarda "Güneş (Fotovoltaik)"/"Güneş (Yoğunl.)" diye İKİ ayrı kolon —
-`kaynak_esle()`'nin bunu tanıyıp tanımadığı doğrulanmalı (muhtemelen
-worker/parser.py'de zaten var, 2019'un T4'ünde de aynı ayrım görülmüştü).
-2017/2016 için envanter var ama T11/T10/T4 yapısı henüz kontrol edilmedi.
+**2018:** kısmi teşhis ZATEN TAMAMLANDI (bu turun başında) — 2019/2020'yle
+YAPISAL OLARAK AYNI (eski taksonomi, kapak-paragrafı ay/yıl çapası, T10
+Ocak+Aralık'ta il-only) — `word_2019.py` doğrudan şablon, ek araştırma
+GEREKMİYOR. 2019'da T4'ün "Güneş (Fotovoltaik)"/"Güneş (Yoğunlş.)"
+ayrımına ve hücre-içi satır kırılmalarına rastlandı — 2018'de de aynı
+sürprizler çıkabilir, `word_2019.py`'nin `t4_oku()`/`_il_adi_temizle()`
+düzeltmeleri muhtemelen doğrudan taşınabilir.
+
+**2017/2016:** yalnız envanter var, T11/T10/T4 yapısı HENÜZ kontrol
+edilmedi (2016'nın 07'deki kısmi teşhisi — T4'ün 2-satırlı başlık
+istisnası, "Lisanslı" kelimesinin Ocak'ta yokluğu — hâlâ geçerli).
 
 ### 3. T10'un 22/36 ay eksik olması KPI'ları nasıl etkiliyor
 
@@ -171,13 +180,16 @@ worker/parser.py'de zaten var, 2019'un T4'ünde de aynı ayrım görülmüştü)
 
 ## Test/kalite durumu
 
-- `worker/tests/test_word_2020.py` (8 test) + `test_word_2021.py` (9
-  test) + `test_word_2022.py` (13 test) — hepsi geçiyor, DATABASE_URL'e
-  bağımlı DEĞİL (synthetic docx tabloları), CI'nin 'Worker' job'ında da
-  çalışıyor.
-- `ruff check`/`ruff format --check`/`mypy` temiz (34 dosya).
-- **07'nin "Açık kalanlar" madde 1'i (regresyon testi eksikliği)** 2020/
-  2021/2022 için kapatıldı — **2023/2024/2025 hâlâ testsiz.**
+- `worker/tests/test_word_2019.py` (8 test) + `test_word_2020.py` (8
+  test) + `test_word_2021.py` (9 test) + `test_word_2022.py` (13 test) —
+  hepsi geçiyor, DATABASE_URL'e bağımlı DEĞİL (synthetic docx tabloları),
+  CI'nin 'Worker' job'ında da çalışıyor.
+- `ruff check`/`ruff format --check` temiz (38 dosya). **`mypy` bu
+  makinede conda-forge'dan da bloklanıyor** (SAC dosya bazında karar
+  veriyor) — CI'de sorun yok (GitHub'ın temiz runner'ı etkilenmiyor),
+  yalnız bu makinede yerel mypy çalıştırılamıyor.
+- **07'nin "Açık kalanlar" madde 1'i (regresyon testi eksikliği)** 2019/
+  2020/2021/2022 için kapatıldı — **2023/2024/2025 hâlâ testsiz.**
 
 ## Commit'ler (hepsi ayrı, CI doğrulandı — sırayla)
 
@@ -189,6 +201,10 @@ worker/parser.py'de zaten var, 2019'un T4'ünde de aynı ayrım görülmüştü)
 5. `89c6e80` — Taksonomi kararı UYGULANDI: 2021 T11 tam + T10 kısmi (batch
    173-184), 2022 Ocak-Nisan T11/T10 (batch 185-188). CI ✅
 6. `307752a` — 2020 tarifi: T11/T10 batch 189-200, T4 batch 201-212. CI ✅
+7. `ae125f1` — 2016-2019 envanter + kısmi teşhis, implementasyon ortam
+   engeliyle DURDU (o an). CI ✅
+8. *(bu commit)* — Ortam engeli Miniconda ile ÇÖZÜLDÜ + 2019 tarifi:
+   T11/T10 batch 213-224, T4 batch 225-236.
 
 ## Kesin kurallara uyum — doğrulama
 
