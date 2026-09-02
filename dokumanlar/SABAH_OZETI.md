@@ -1,12 +1,20 @@
-# SABAH ÖZETİ — 2016-2022 Word Aktarımı (2026-09-03, iki tur)
+# SABAH ÖZETİ — 2016-2022 Word Aktarımı (2026-09-03/04, üç tur)
 
-> **Duraklatıldı (2026-09-03) — akşam buradan devam.** Sıradaki iş:
-> **2016-2019**, `word_2020.py` doğrudan şablon olarak kullanılabilir.
-> **Taksonomi kararı ARTIK ÇÖZÜLDÜ** (RENAME, mevsimsellik doğrulamasıyla
-> desteklendi — aşağıya bkz.) — akşamki tur bunu TEKRAR SORMASIN, doğrudan
-> uygulasın. Günü kapatırken doğrulandı: git temiz (son commit `97913c2`),
-> 2016-2022 için hiçbir batch `is_active=true` değil (0 satır) — her şey
-> hâlâ güvenle beklemede.
+> **DURDU (2026-09-04) — ORTAM ENGELİ, kod sorunu DEĞİL.** Bu makinede
+> `pandas`'ın derlenmiş bir bileşeni (`internals.cp313-win_amd64.pyd`) bir
+> "Uygulama Denetimi" (Application Control) politikası tarafından
+> ENGELLENMEYE başladı — `import pandas` her yerde başarısız oluyor
+> (`numpy`/`ruff` etkilenmiyor, dosya değişmemiş, birkaç kez denendi).
+> `worker.parser`'a (ve onu kullanan HER word_*.py'ye) bağımlı TÜM kod
+> (dry-run/test/yükleme) şu an ÇALIŞTIRILAMIYOR. **2016-2019 için envanter +
+> kısmi teşhis TAMAMLANDI** (2018/2019, 2020'nin YAPISAL OLARAK BİREBİR
+> AYNISI — bkz. `08_word_2016_2022_kapsam.md`'nin son bölümü) ama
+> implementasyon/test/yükleme YAPILAMADI — kod yazıp test etmeden commit
+> etmek "dry-run önce" disiplinini bozar. **Ahmet'in makine/ortam sorununu
+> çözmesi gerekiyor** (Windows Event Viewer → CodeIntegrity/AppLocker
+> günlüğüne bakılabilir) — sonra `word_2020.py` şablonuyla doğrudan devam
+> edilebilir, ek araştırma gerekmiyor. Taksonomi kararı hâlâ ÇÖZÜLDÜ
+> (RENAME) — bu tekrar sorulmamalı.
 
 **Bu dosya tek başına okunduğunda durum tam anlaşılsın diye yazıldı.**
 Detaylı teşhis/bulgular için `dokumanlar/08_word_2016_2022_kapsam.md`.
@@ -26,7 +34,8 @@ verildi, 2021/2022 tam açıldı, 2020 eklendi.
   ile işaretlendi.
 - **T4 (lisanssız kurulu güç) — 34/36 ay yüklü** (2022 Temmuz hariç, kaynak
   raporlama hatası — açıklama aşağıda).
-- **2016-2019 bu turda İŞLENMEDİ** — görev kapsamı 2020'ye kadardı.
+- **2016-2019 — envanter + kısmi teşhis TAMAMLANDI, implementasyon ORTAM
+  ENGELİYLE DURDU** (yukarıya bkz. — pandas DLL bloğu, kod sorunu değil).
 - **0 batch aktive edildi** (DB'den doğrulandı) — hiçbir fact tablosunda
   2020/2021/2022 için `is_active=true` satır yok. Aktivasyon kararı sana ait.
 
@@ -37,7 +46,13 @@ verildi, 2021/2022 tam açıldı, 2020 eklendi.
 | 2022 | **12/12 ay** | **12/12 ay** | **11/12 ay** (Temmuz hariç — kaynak hatası) |
 | 2021 | **12/12 ay** | **2/12 ay** (Kasım-Aralık; Ocak-Ekim kaynakta yok, yapısal) | **12/12 ay** |
 | 2020 | **12/12 ay** | **0/12 ay** (TÜM yıl kaynakta yok, yapısal) | **12/12 ay** |
-| 2016-2019 | İŞLENMEDİ | İŞLENMEDİ | İŞLENMEDİ |
+| 2019 | Envanter+kısmi teşhis tamam (2020'yle YAPISAL AYNI) | — | — |
+| 2018 | Envanter+kısmi teşhis tamam (2020'yle YAPISAL AYNI) | — | — |
+| 2017 | Envanter tamam, teşhis edilmedi | — | — |
+| 2016 | Envanter tamam (07'de kısmen teşhis edilmişti) | — | — |
+
+**2016-2019 için implementasyon/yükleme YAPILMADI** — ortam engeli
+(pandas DLL bloğu) çözülmeden kod çalıştırılamıyor.
 
 **Batch ID aralıkları:**
 
@@ -129,14 +144,23 @@ sana kalmış. `otomatik_onaya_uygun()` çıktıları script loglarında var
 (çoğu `True`, birkaçında 1-2 kırmızı satır — negatif "Tarımsal" değerleri,
 `kpi.dogrula_tuketim()`'in bilinen davranışı).
 
-### 2. 2016-2019 — sıradaki adım
+### 2. 2016-2019 — ORTAM ENGELİ önce çözülmeli, sonra sıradaki adım
 
-Bu turda işlenmedi (görev kapsamı 2020'ye kadardı). **Beklenti
-(doğrulanmadı):** taksonomi muhtemelen 2020'nin AYNISI (eski küme, artık
-kod hazır), T10'un yapısal durumu (il-only mi il×grup mu) HENÜZ
-BİLİNMİYOR — her yıl için ayrıca kontrol edilmeli (2021 örneğinde olduğu
-gibi yıl İÇİNDE bile geçiş olabiliyor). `word_2020.py` doğrudan şablon
-olarak kullanılabilir.
+**Önce (senin yapman gereken):** bu makinedeki `pandas` DLL bloğunu çöz
+(Application Control/WDAC politikası `internals.cp313-win_amd64.pyd`'yi
+engelliyor — Windows Event Viewer → Applications and Services Logs →
+Microsoft → Windows → CodeIntegrity/AppLocker günlüğüne bakılabilir; IT/
+kurumsal politikayla ilgili olabilir). `py -c "import pandas"` başarıyla
+çalışınca devam edilebilir.
+
+**Sonra:** 2018/2019 için envanter + kısmi teşhis ZATEN TAMAMLANDI —
+2020'nin YAPISAL OLARAK BİREBİR AYNISI (eski taksonomi, kapak-paragrafı
+ay/yıl çapası, T10 Ocak+Aralık'ta il-only) — `word_2020.py` doğrudan
+şablon, ek araştırma GEREKMİYOR. Tek yeni fark: T4'te "Güneş" bazı
+yıllarda "Güneş (Fotovoltaik)"/"Güneş (Yoğunl.)" diye İKİ ayrı kolon —
+`kaynak_esle()`'nin bunu tanıyıp tanımadığı doğrulanmalı (muhtemelen
+worker/parser.py'de zaten var, 2019'un T4'ünde de aynı ayrım görülmüştü).
+2017/2016 için envanter var ama T11/T10/T4 yapısı henüz kontrol edilmedi.
 
 ### 3. T10'un 22/36 ay eksik olması KPI'ları nasıl etkiliyor
 
