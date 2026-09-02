@@ -1,139 +1,171 @@
-# SABAH ÖZETİ — 2016-2022 Word Aktarımı, Gece Turu (2026-09-03)
+# SABAH ÖZETİ — 2016-2022 Word Aktarımı (2026-09-03, iki tur)
 
 **Bu dosya tek başına okunduğunda durum tam anlaşılsın diye yazıldı.**
 Detaylı teşhis/bulgular için `dokumanlar/08_word_2016_2022_kapsam.md`.
+Bu, ilk turun (2021/2022 kısmi + taksonomi AÇIK) devamı — taksonomi kararı
+verildi, 2021/2022 tam açıldı, 2020 eklendi.
 
 ## TL;DR
 
-- **2022** ve **2021** için kod yazıldı, gerçek Supabase'e yüklendi
-  (`is_active=false`, hiçbir batch aktive EDİLMEDİ — kural tam uyumlu).
-- **2016-2020** bu turda İŞLENMEDİ — zaman/kapsam nedeniyle 2021-2022'ye
-  odaklanıldı. Aşağıdaki "Sıradaki adım" bölümünde net bir öneri var.
-- **1 açık karar seni bekliyor** (taksonomi — aşağıda), onsuz 2016-2022
-  aralığının T11/T10 (tüketim/abone) kısmı hiç açılamaz.
+- **Taksonomi kararı VERİLDİ ve UYGULANDI** — mevsimsellik doğrulaması
+  (2023-2025'in kanonik "Tarımsal" grubu, gerçek veri) RENAME kararını
+  DESTEKLEDİ. "Ticarethane"→"Kamu ve Özel Hizmetler",
+  "Tarımsal Sulama"→"Tarımsal" artık `_GRUP_TAKMA_ADLAR`'da.
+- **2020, 2021, 2022 — T11 (tüketim) artık TAMAMI (36/36 ay) yüklü.**
+- **T10 (abone) YAPISAL bir engelle karşılaştı** (taksonomiden AYRI bir
+  sorun) — 2020 tüm yıl + 2021 Ocak-Ekim'de kaynakta GERÇEKTEN yok
+  (il×grup kırılımı hiç yayınlanmamış). Uydurulmadı, `veri_kapsam_disi`
+  ile işaretlendi.
+- **T4 (lisanssız kurulu güç) — 34/36 ay yüklü** (2022 Temmuz hariç, kaynak
+  raporlama hatası — açıklama aşağıda).
+- **2016-2019 bu turda İŞLENMEDİ** — görev kapsamı 2020'ye kadardı.
 - **0 batch aktive edildi** (DB'den doğrulandı) — hiçbir fact tablosunda
-  2021/2022 için `is_active=true` satır yok. Aktivasyon kararı tamamen sana ait.
+  2020/2021/2022 için `is_active=true` satır yok. Aktivasyon kararı sana ait.
 
 ## Hangi yıllar ne durumda
 
-| Yıl | T11/T10 (tüketim/abone) | T4 (lisanssız kurulu güç) | Batch ID |
+| Yıl | T11 (tüketim) | T10 (abone) | T4 (lisanssız kurulu güç) |
 |---|---|---|---|
-| 2022 | **8/12 ay YÜKLENDİ** (Mayıs-Aralık), 4/12 (Ocak-Nisan) BEKLEMEDE (taksonomi) | **11/12 ay YÜKLENDİ**, 1/12 (Temmuz) BEKLEMEDE (kaynak veri hatası) | T11/T10: 142-149 · T4: 150-160 |
-| 2021 | **0/12 — TÜM YIL BEKLEMEDE** (taksonomi, tüm yıl eski taksonomi) | **12/12 ay YÜKLENDİ** | T4: 161-172 |
-| 2016-2020 | İŞLENMEDİ (bu turda kod yazılmadı) | İŞLENMEDİ | — |
+| 2022 | **12/12 ay** | **12/12 ay** | **11/12 ay** (Temmuz hariç — kaynak hatası) |
+| 2021 | **12/12 ay** | **2/12 ay** (Kasım-Aralık; Ocak-Ekim kaynakta yok, yapısal) | **12/12 ay** |
+| 2020 | **12/12 ay** | **0/12 ay** (TÜM yıl kaynakta yok, yapısal) | **12/12 ay** |
+| 2016-2019 | İŞLENMEDİ | İŞLENMEDİ | İŞLENMEDİ |
+
+**Batch ID aralıkları:**
+
+| Yıl | T11/T10 batch | T4 batch |
+|---|---|---|
+| 2022 | 142-149 (Mayıs-Aralık, ilk tur) + 185-188 (Ocak-Nisan, ikinci tur) | 150-160 |
+| 2021 | 173-184 | 161-172 |
+| 2020 | 189-200 | 201-212 |
 
 **Hiçbir batch `onayla.py`/`pipeline.batch_onayla()` ile aktive edilmedi** —
 tümü `running` durumda, DB'den doğrulandı (`fact_tuketim`/`fact_abone`/
-`fact_uretim`'de 2021 ve 2022 için `is_active=true` satır sayısı: **0**).
+`fact_uretim`'de 2020-2022 için `is_active=true` satır sayısı: **0**).
 
-## Senin vereceğin kararlar (sırayla, en önemliden)
+## Taksonomi kararı — VERİLDİ (artık açık değil)
 
-### 1. Taksonomi kararı — EN ÖNEMLİSİ, çoğu kalan işi açar
+**Soru neydi:** 2021'in tümü + 2022 Ocak-Nisan + 2020'nin tümü, tüketici
+grubu etiketlerinde "**Ticarethane**" ve "**Tarımsal Sulama**" kullanıyordu
+— kanonik küme (`worker/parser.py:GRUP_ESLEME`) bunları tanımıyordu.
 
-**Soru:** 2016-2022'nin büyük bölümünde (2022 Ocak-Nisan + 2021'in TÜMÜ +
-muhtemelen 2016-2020'nin tamamı) tüketici grubu etiketleri farklı:
-"**Ticarethane**" ve "**Tarımsal Sulama**" — bugünkü kanonik küme
-(`worker/parser.py:GRUP_ESLEME`) bunları TANIMIYOR, onun yerine "Kamu ve
-Özel Hizmetler" ve "Tarımsal" var.
+**Doğrulama:** 2023-2025'in KANONİK "Tarımsal" grubu (taksonomi belirsizliği
+hiç olmayan, zaten yüklü gerçek veri) Mart→Mayıs aralığında ay-ay
+sorgulandı:
 
-**Araştırdım (madde 0), kesin cevap bulamadım — ama güçlü bir ipucu var:**
-EPDK'nın kendi "Dönemler Arası Karşılaştırma" tablosu (Mayıs 2022 dosyası)
-**2021 Mayıs verisini bile GERİYE DÖNÜK olarak YENİ etiketlerle
-gösteriyor** ("Tarımsal Faaliyetler", "Kamu ve Özel Hizmetler Sektörü ile
-Diğer") — yani EPDK'nın kendisi bunları doğrudan karşılaştırılabilir/
-eşdeğer sayıyor, iki ayrı kavram gibi değil. Grup SAYISI da değişmiyor
-(5→5, yalnız 2 isim değişiyor, Aydınlatma/Mesken/Sanayi aynen kalıyor) —
-bu bir MERGE/SPLIT'ten çok RENAME (yeniden adlandırma) izlenimi veriyor.
+| Yıl | Mart→Mayıs oranı |
+|---|---|
+| 2023 | 3,24× |
+| 2024 | 4,17× |
+| 2025 | 2,79× |
+| *(karşılaştırma) 2021→2022 taksonomi sorgusu* | 2,82× |
 
-**Ama tam kesin değil:** "Ticarethane"→"Kamu ve Özel Hizmetler" büyüklük
-olarak yakın kaldı (aynı yılın komşu aylarını karşılaştırınca +%3,6), ama
-"Tarımsal Sulama"→"Tarımsal Faaliyetler" ~3 KAT arttı — bu mevsimsel
-olabilir (sulama sezonu başlangıcı) ya da gerçek bir kapsam genişlemesi
-olabilir, tek başına belirleyici değil.
+2021→2022'nin "artışı" gerçek, taksonomi hiç değişmeyen yıllarda AYNI
+takvim aralığında görülen NORMAL (hatta bazen daha büyük) mevsimsel
+oynaklığın içinde — kapsam değişikliği değil. EPDK'nın kendi karşılaştırma
+tablosunun 2021'i bile yeni etiketlerle göstermesiyle (RENAME kanıtı)
+birleşince **karar: RENAME olarak kabul edildi.**
 
-**3 seçenek (04_kpi_sözleşmeleri tarzı, öneri değil, sana bırakıyorum):**
-- **(a) Alias'la** — "Ticarethane"→"Kamu ve Özel Hizmetler",
-  "Tarımsal Sulama"→"Tarımsal" (`worker/scripts/word_2021.py` ve
-  `word_2022.py`'deki `_GRUP_TAKMA_ADLAR`'a eklenir). En hızlı, ama
-  "Tarımsal Sulama" için büyüklük sıçraması riski taşıyor.
-- **(b) Yeni bir kanonik grup ekle** ("Ticarethane" için) — şema/KPI
-  değişikliği gerektirir, daha büyük bir iş kalemi, ama en doğru olabilir.
-- **(c) Bu yılları da "kaynakta yok" say** (Karar 2'deki Sanayi
-  mantığıyla) — en güvenli ama en az veri.
+**Uygulama:** `word_2020/2021/2022.py`'nin `_GRUP_TAKMA_ADLAR`'ına
+"Ticarethane"→"Kamu ve Özel Hizmetler", "Tarımsal Sulama"→"Tarımsal"
+eklendi. `worker/parser.py:GRUP_ESLEME` DEĞİŞMEDİ (mimari karar).
 
-**Karar verirsen ne olur:** `worker/scripts/word_2021.py` ve
-`word_2022.py`'nin `_GRUP_TAKMA_ADLAR`'ına 2 satır eklenir (seçenek a
-ise), kod BAŞKA HİÇBİR ŞEY değişmeden 2021'in 12 ayı + 2022'nin 4 ayı
-(toplam 16 ay) T11/T10 için hemen yüklenebilir hale gelir — script zaten
-hazır, yalnız bu 2 satır bekliyor.
+## T10'un yapısal engeli — taksonomiden TAMAMEN AYRI bir sorun
 
-### 2. Aktivasyon — batch 142-172 (31 batch)
+Taksonomi açılınca T10'da (tüketici SAYISI tablosu, `fact_abone`) GERÇEK
+bir yapısal sorun ortaya çıktı: **bazı ay/yıllarda kaynak tablosunun
+kendisinde tüketici-türü/grup KIRILIMI hiç yok** — yalnız il başına TOPLAM
+tüketici sayısı var, 5 gruba (Aydınlatma/Mesken/Sanayi/Tarımsal/Kamu ve
+Özel) bölünmüyor. Bu, koddan çözülebilecek bir şey DEĞİL — kaynakta
+gerçekten yok. `isle_ay()` bunu tespit edip (`t10_oku()` ValueError
+fırlatınca) T10'u o ay için `pipeline.kapsam_disi_isaretle(fact_abone)`
+ile işaretliyor, **T11 (tüketim) bundan HİÇ etkilenmiyor** (ayrı okunuyor).
+
+- **2020:** TÜM 12 ay il-only (Ocak VE Aralık ikisi de kontrol edildi).
+- **2021:** Ocak-Ekim il-only, **Kasım'dan itibaren** il×grup (kesin sınır
+  bulundu).
+- **2022:** TÜMÜ il×grup (yalnız başlık METNİ Ocak-Nisan'da "İl Bazında"
+  yazıyordu, gövde hep il×grup'tu — ayrı bir konu, madde altta).
+
+**Toplam etki:** 36 aylık (2020-2022) pencerede T10 yalnız **14/36 ay**
+(2022'nin 12'si + 2021'in 2'si) yüklenebildi, **22/36 ay** kaynakta
+gerçekten yok.
+
+## Diğer teknik bulgular (kod zaten düzeltti, bilgi amaçlı)
+
+- **2022 Ocak-Nisan'da T10'un 3 başlık satırı vardı** (Mayıs-Aralık 2
+  satır) — `t10_oku()` artık "Tüketici Türü" içeren satırı dinamik buluyor.
+- **"Küthahya" yazım hatası** (Kütahya, fazladan bir 'h') 2021
+  Kasım/Aralık VE 2022 Ocak/Şubat'ta tekrarladı — `_IL_ADI_DUZELT` ile
+  düzeltildi.
+- **"AFYONK."/"K.MARAŞ"/"HAKKÂRİ"** il-adı kısaltmaları/eski yazımları
+  2021'de bulundu, düzeltildi.
+- **Nisan 2022'nin T11 tablosu yanlış etiketli** (kendi başlığı "Mart
+  2022" diyor, veri gerçekten Nisan'a ait) — `_BILINEN_ETIKET_HATALARI`
+  ile belgelenip geçildi.
+- **Temmuz 2022 T4 — gerçek bir EPDK raporlama hatası, kalıcı olarak
+  elde edilemez:** o ayın "İllere ve Kaynaklara Göre Dağılım" tablosu bir
+  önceki tablonun (il-only) BİREBİR kopyası. `veri_kapsam_disi`'ye
+  işaretlendi (`fact_uretim`, hem Lisanssız hem Lisanslı kesiti).
+- **2020'nin ay/yıl doğrulama çapası farklı:** T11 başlığı "{Ay} {Yıl}
+  Döneminde" içermiyor, kapak paragrafından ("{Yıl} Yılı {Ay} Ayı ...
+  Genel Görünümü") doğrulanıyor.
+
+## Senin vereceğin kararlar
+
+### 1. Aktivasyon — batch 142-212 (71 batch)
 
 Hepsi `running`/`is_active=false`. Gözden geçirip
 `worker/scripts/onayla.py --batch-id <id>` ile (ya da toplu) aktive etmek
 sana kalmış. `otomatik_onaya_uygun()` çıktıları script loglarında var
 (çoğu `True`, birkaçında 1-2 kırmızı satır — negatif "Tarımsal" değerleri,
-`kpi.dogrula_tuketim()`'in bilinen davranışı, detay için
-`08_word_2016_2022_kapsam.md`'deki "2022 tarifi" bölümüne bak).
+`kpi.dogrula_tuketim()`'in bilinen davranışı).
 
-### 3. Temmuz 2022 T4 — kaynak veri hatası, "kaynakta yok" sayılabilir
+### 2. 2016-2019 — sıradaki adım
 
-O ayın Word raporunda "İllere ve Kaynaklara Göre Dağılım" tablosu
-YANLIŞLIKLA bir önceki tablonun (il-only) kopyası — EPDK'nın kendi
-raporlama hatası, kod sorunu değil (detay: 08, "2022 tarifi" bölümü).
-Kalıcı olarak elde edilemez; `veri_kapsam_disi`'ye eklenip eklenmeyeceği
-sana kalmış.
+Bu turda işlenmedi (görev kapsamı 2020'ye kadardı). **Beklenti
+(doğrulanmadı):** taksonomi muhtemelen 2020'nin AYNISI (eski küme, artık
+kod hazır), T10'un yapısal durumu (il-only mi il×grup mu) HENÜZ
+BİLİNMİYOR — her yıl için ayrıca kontrol edilmeli (2021 örneğinde olduğu
+gibi yıl İÇİNDE bile geçiş olabiliyor). `word_2020.py` doğrudan şablon
+olarak kullanılabilir.
 
-### 4. 2016-2020 — sıradaki adım
+### 3. T10'un 22/36 ay eksik olması KPI'ları nasıl etkiliyor
 
-Bu turda işlenmedi. **Beklenti (doğrulanmadı, tahmin):** 2021'in aynısı —
-muhtemelen tamamı eski taksonomi, T4 muhtemelen sorunsuz yüklenir, T11/T10
-madde 1'deki karara kadar bekler. Sıradaki oturum `word_2020.py`'den
-başlayıp geriye gidebilir (`word_2021.py` doğrudan şablon).
-
-## Bu turda bulunan, kod-dışı ilginç şeyler
-
-- **T10'un yapısal geçişi taksonomi geçişinden AYRI:** tüketici-grubu
-  isim değişikliği 2022 Nisan/Mayıs'ta oldu, ama T10 tablosunun YAPISI
-  (il-only → il×grup) 2021 Ekim/Kasım'da ZATEN değişmişti — iki ayrı
-  EPDK format kararı, aynı anda değil. Şu an pratik önemi yok (T11
-  taksonomi yüzünden zaten her ay önce durduruyor) ama taksonomi kararı
-  verilirse bu da ayrıca çözülmeli.
-- **"Küthahya" yazım hatası tekrarlayan bir kaynak hatası:** 2021
-  Kasım/Aralık VE 2022 Ocak/Şubat'ta "Kütahya" yerine yazılmış (fazladan
-  bir 'h'). Kod seviyesinde düzeltildi (`_IL_ADI_DUZELT`), ama EPDK'nın
-  kendi verisinde gerçek bir hata olduğu için not düşülüyor.
-- **Nisan 2022'nin T11 tablosu yanlış etiketli:** kendi başlığı "Mart
-  2022" diyor ama veri gerçekten Nisan'a ait (Genel Toplam'lar farklı,
-  duplikasyon değil) — muhtemelen EPDK'nın kopyala-yapıştır kalıntısı.
-  `_BILINEN_ETIKET_HATALARI` ile belgelenip geçildi.
+`fact_abone`'a dayanan KPI'lar (örn. KPI-10) 2020-2022 için kısmi veriyle
+çalışacak — bu durumun dashboard'da nasıl yansıtılacağı (örn.
+`veri_kapsam_disi` tablosunun UI'ya bağlanması, henüz yapılmadı, bkz.
+`07_word_parser_kapsam.md`'nin açık kalanlar listesi) ayrı bir karar.
 
 ## Test/kalite durumu
 
-- `worker/tests/test_word_2021.py` (6 test) + `test_word_2022.py` (12
-  test) — hepsi geçiyor, DATABASE_URL'e bağımlı DEĞİL (synthetic docx
-  tabloları), CI'nin 'Worker' job'ında da çalışıyor.
-- `ruff check`/`ruff format --check`/`mypy` temiz (30+ dosya).
-- **07'nin "Açık kalanlar" madde 1'i (regresyon testi eksikliği)** yalnız
+- `worker/tests/test_word_2020.py` (8 test) + `test_word_2021.py` (9
+  test) + `test_word_2022.py` (13 test) — hepsi geçiyor, DATABASE_URL'e
+  bağımlı DEĞİL (synthetic docx tabloları), CI'nin 'Worker' job'ında da
+  çalışıyor.
+- `ruff check`/`ruff format --check`/`mypy` temiz (34 dosya).
+- **07'nin "Açık kalanlar" madde 1'i (regresyon testi eksikliği)** 2020/
   2021/2022 için kapatıldı — **2023/2024/2025 hâlâ testsiz.**
 
-## Commit'ler (hepsi ayrı, CI doğrulandı)
+## Commit'ler (hepsi ayrı, CI doğrulandı — sırayla)
 
-1. `ee5a14f` — README Ek D'ye "tam pytest paketini canlıya karşı
-   çalıştırma" güvenlik kuralı. CI ✅
-2. `3cea052` — 2022 tarifi (kısmi): T11/T10 batch 142-149, T4 batch
-   150-160, 12 test. CI ✅
-3. `7637c83` — 2021 tarifi (yalnız T4): T4 batch 161-172, 6 test. CI ✅
+1. `ee5a14f` — README Ek D'ye güvenlik kuralı. CI ✅
+2. `3cea052` — 2022 tarifi (kısmi, ilk tur): T11/T10 batch 142-149, T4
+   batch 150-160. CI ✅
+3. `7637c83` — 2021 tarifi (yalnız T4): T4 batch 161-172. CI ✅
+4. `da5b90d` — SABAH_OZETI (ilk tur). CI ✅
+5. `89c6e80` — Taksonomi kararı UYGULANDI: 2021 T11 tam + T10 kısmi (batch
+   173-184), 2022 Ocak-Nisan T11/T10 (batch 185-188). CI ✅
+6. `307752a` — 2020 tarifi: T11/T10 batch 189-200, T4 batch 201-212. CI ✅
 
 ## Kesin kurallara uyum — doğrulama
 
 - ✅ `onayla.py`/`pipeline.batch_onayla()` HİÇ çağrılmadı (DB'den
-  doğrulandı: 0 aktif satır).
+  doğrulandı: 0 aktif satır, 2020-2022'nin TAMAMI için).
 - ✅ Tam pytest paketi canlıya karşı çalıştırılmadı — yalnız hedefli
   `-k`/dosya bazlı testler kullanıldı, tam paket yalnız CI'nin
   postgres:16'sında koştu.
 - ✅ Şema değişikliği yapılmadı (migration yok, `dim_grup`'a dokunulmadı).
-- ✅ Taksonomi kararına takılan aylar BEKLEMEDE bırakıldı, döngüye
-  girilmedi — 2021'in TÜMÜNÜN bloke olduğu HIZLICA (tek bir mekanik
-  taramayla) tespit edildi, 12 ay tek tek denenmedi.
-- ✅ Her yıl bitince ayrı commit + push yapıldı.
+- ✅ T10'un yapısal engeline takılan aylar (2020 tümü, 2021 Ocak-Ekim)
+  BEKLEMEDE/kapsam_disi bırakıldı, uydurma yapılmadı, döngüye girilmedi.
+- ✅ Her mantıksal adım sonunda ayrı commit + push + CI doğrulaması yapıldı.
