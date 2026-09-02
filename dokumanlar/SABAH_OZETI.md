@@ -1,5 +1,13 @@
 # SABAH ÖZETİ — 2016-2022 Word Aktarımı (2026-09-03, iki tur)
 
+> **Duraklatıldı (2026-09-03) — akşam buradan devam.** Sıradaki iş:
+> **2016-2019**, `word_2020.py` doğrudan şablon olarak kullanılabilir.
+> **Taksonomi kararı ARTIK ÇÖZÜLDÜ** (RENAME, mevsimsellik doğrulamasıyla
+> desteklendi — aşağıya bkz.) — akşamki tur bunu TEKRAR SORMASIN, doğrudan
+> uygulasın. Günü kapatırken doğrulandı: git temiz (son commit `97913c2`),
+> 2016-2022 için hiçbir batch `is_active=true` değil (0 satır) — her şey
+> hâlâ güvenle beklemede.
+
 **Bu dosya tek başına okunduğunda durum tam anlaşılsın diye yazıldı.**
 Detaylı teşhis/bulgular için `dokumanlar/08_word_2016_2022_kapsam.md`.
 Bu, ilk turun (2021/2022 kısmi + taksonomi AÇIK) devamı — taksonomi kararı
