@@ -122,6 +122,89 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   oluşturulmadı; yalnız `SELECT`/session-yerel `SET` çalıştırıldı, hepsi
   `ROLLBACK` edildi.
 
+- **Faz B adım 1 UYGULANDI (2026-09-05) — özel servis rolü + 3 BAĞIMSIZ ek
+  bulgu, hepsi çözüldü, `viewer` uçtan uca DOĞRULANDI:**
+
+  **1) Migration `20260819_0016`:** `postgres` YERİNE dar yetkili
+  `app_dashboard_service WITH LOGIN` oluşturuldu; `viewer`/`data_operator`/
+  `admin`'e `WITH INHERIT FALSE, SET TRUE` grantlandı (yukarıdaki kök
+  nedeni doğrudan çözer — en az ayrıcalık: varsayılan hiçbir tablo
+  erişimi yok, yalnız açık `SET ROLE` ile). Şifre migration dosyasında
+  DEĞİL — canlıya doğrudan `ALTER ROLE ... PASSWORD` ile ayrıca verildi,
+  `.env`'e yeni `DATABASE_URL_DASHBOARD` olarak eklendi (gitignored).
+  **Doğrulandı:** `SET ROLE viewer/data_operator/admin` artık hatasız.
+
+  **2) BAĞIMSIZ bulgu — Migration `20260819_0017`:** `SET ROLE` çalışır
+  hale gelince YENİ bir hata çıktı: `SELECT ... FROM fact_tuketim`
+  "permission denied for table". Kök neden: `20260819_0003_fix_grants.
+  sql`'in `REVOKE ALL PRIVILEGES ON ALL TABLES ... FROM viewer,
+  data_operator, admin;` satırı, `0002_rls_roles.sql`'in bu üç role
+  verdiği TÜM tablo grant'larını (dim_*, fact_tuketim, fact_uretim,
+  fact_abone, fact_serbest_tuketici, fact_hava_aylik, source_asset,
+  ingestion_batch, audit_log) 2026-08-19'dan beri SİLMİŞ — yalnız
+  `veri_kapsam_disi` (0012/0013) ve `fact_hava_aylik_log` (0009) dar
+  istisnalarla geri verilmiş, geri kalan HİÇ restore edilmemiş.
+  `worker/validate_role_access.py`'nin CI testi yalnız `veri_kapsam_disi`'yi
+  test ettiğinden bu boşluk hiç yakalanmamıştı. 0017, 0002'nin orijinal
+  grant'larını birebir geri veriyor.
+
+  **3) BAĞIMSIZ bulgu — auth şemasına ASLA GRANT verilemiyor, migration
+  `20260819_0018`:** 0017'den sonra bu kez `current_app_role()` içindeki
+  `auth.jwt()` çağrısı "permission denied for schema auth" ile
+  reddedildi — `20260819_0015`'in `GRANT USAGE ON SCHEMA auth TO viewer,
+  data_operator, admin;` ifadesi canlı Supabase'de HİÇ etkili olmamış
+  (hatasız çalışıyor GÖRÜNÜYOR ama `has_schema_privilege(...)` işlem
+  İÇİNDE bile false dönüyor). Kök neden: `auth` şeması `supabase_admin`'e
+  ait; `postgres` üzerinde USAGE var ama **WITH GRANT OPTION YOK**
+  (`has_schema_privilege('postgres','auth','USAGE WITH GRANT OPTION')` =
+  false) — Supabase'in yönetilen platformu `postgres`'in bu izni BAŞKA
+  rollere devretmesini sessizce engelliyor. **Çözüm — `auth` şemasına
+  DOĞRUDAN erişim vermek YERİNE**, zaten `postgres` sahipliğindeki
+  `public.current_app_role()`'ü **`SECURITY DEFINER`** yapmak (0018):
+  fonksiyon artık ÇAĞIRANIN değil SAHİBİNİN (`postgres`, kendi `auth.
+  jwt()` erişimi VAR) yetkisiyle çalışıyor — çağıranın `auth` şema
+  erişimine hiç ihtiyaç kalmıyor. Güvenlik notu: fonksiyon yalnız
+  çağıranın KENDİ oturumunun JWT'sini okuyup filtrelenmiş bir rol string'i
+  döndürüyor, ek bir yetki yükseltmesi YAPMIYOR.
+
+  **UÇTAN UCA DOĞRULAMA (canlı Supabase, `app_dashboard_service` ile,
+  2026-09-05):** `viewer` artık TAM beklenen gibi çalışıyor — JWT claim'i
+  YOKKEN `current_app_role()` NULL, `fact_tuketim` sorgusu **0 satır**;
+  DOĞRU JWT claim'iyle `current_app_role()`='viewer', sorgu **41.547
+  satır** (is_active=true kesiti) döndürüyor.
+
+  **4) YENİ, BAĞIMSIZ ve daha CİDDİ bir bulgu — HENÜZ ÇÖZÜLMEDİ, Ahmet'in
+  kararı bekliyor:** `admin`/`data_operator` için doğrulama sırasında,
+  JWT claim'i OLMADAN BİLE `fact_tuketim` sorgusunun TÜM satırları
+  (44.458) döndürdüğü görüldü — `current_app_role()` kontrolünü
+  ATLIYORLAR. Kaynağı bulundu: `pg_policy` sorgulandığında, HİÇBİR
+  migration dosyasında OLMAYAN 14 adet politika var — her fact/source
+  tablosunda (`fact_tuketim`, `fact_abone`, `fact_uretim`,
+  `fact_serbest_tuketici`, `fact_hava_aylik`, `source_asset`,
+  `ingestion_batch`) `admin_<tablo>_manage` ve `data_operator_<tablo>_
+  manage` adında, **`USING (true)` — KOŞULSUZ İZİN VEREN** politikalar.
+  Bunlar git geçmişinde HİÇ YOK — muhtemelen geçmişte birisi (yukarıdaki
+  aynı `auth` şema/SECURITY DEFINER sorununa takılıp) manuel, kayıt
+  dışı bir "çalışsın" düzeltmesi olarak eklemiş ve hiç kaldırılmamış.
+  **Şu an `admin`/`data_operator` rolüne `SET ROLE` yapabilen HERHANGİ
+  bir bağlantı, JWT kontrolünden BAĞIMSIZ olarak TAM erişime sahip.**
+  Faz 2 dashboard'u şu an bu rollere hiç `SET ROLE` yapmadığından
+  (`DATABASE_URL` ile `postgres` olarak bağlanıyor) bu şu an İŞLEVSEL bir
+  risk YARATMIYOR — ama Faz B'nin sonraki adımı (gerçek SET ROLE
+  bağlanması) öncesinde ele alınmalı. **Bu turda BİLİNÇLİ OLARAK
+  DOKUNULMADI** (kapsam dışına çıkıyordu, güvenlik-kritik bir karar) —
+  öneri: bu 14 politikanın kaldırılması (artık gereksiz — SECURITY
+  DEFINER düzeltmesiyle asıl `current_app_role()` tabanlı politikalar
+  doğru çalışıyor) ayrı bir görev/karar olarak Ahmet'e bırakılıyor.
+
+  **`app/dashboard.py`'de `st.session_state`'e geçiş:** `@st.cache_
+  resource` (parametresiz, TÜM kullanıcılar arasında TEK paylaşımlı
+  bağlantı) kaldırıldı — her Streamlit oturumu artık KENDİ bağlantısını
+  açıyor (`st.session_state`). `DATABASE_URL_DASHBOARD`/`SET ROLE` bu
+  turda dashboard'a HENÜZ BAĞLANMADI — mevcut `DATABASE_URL` davranışı
+  korunuyor, yalnız mekanizma hazırlandı (gerçek giriş ekranı ayrı bir
+  görevde gelecek).
+
 ## Değerlendirilen Alternatifler
 - **Next.js + TypeScript (şimdi):** Reddedildi — Faz 2 kapsamına göre erken;
   worker/ ile arasına bir API katmanı (FastAPI) kurmayı da gerektirirdi,
