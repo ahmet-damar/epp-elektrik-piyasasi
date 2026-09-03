@@ -24,14 +24,40 @@ KRİTİK bir bağımlılık (analytics.py olmadan dashboard çalışmaz) — bil
 olarak try/except ile yutulmuyor: sys.path doğruysa zaten başarılı olur,
 başarısız olursa net bir ModuleNotFoundError sessiz bir None'dan iyidir.
 
-Bağlantı yönetimi: @st.cache_resource ile bağlantı TEK SEFER açılır —
-Streamlit her etkileşimde script'i baştan çalıştırır; cache_resource
-olmasaydı her tıklamada yeni bir DB bağlantısı açılırdı. Sorgu sonuçları
-@st.cache_data ile cache'lenir; bağlantı parametresi `_conn` adıyla
-geçirilir çünkü Streamlit alttan çizgiyle (_) başlayan parametreleri
-HASH'LEMEZ — psycopg Connection nesnesi hash'lenemeyeceğinden bu
-isimlendirme zorunludur (adı `conn` olsaydı cache ya patlar ya sessizce
-devre dışı kalırdı).
+Bağlantı yönetimi: bağlantı OTURUM BAŞINA (`st.session_state`) açılır ve
+o oturum boyunca yeniden kullanılır — Streamlit her etkileşimde script'i
+baştan çalıştırır; session_state olmasaydı her tıklamada yeni bir DB
+bağlantısı açılırdı. Sorgu sonuçları @st.cache_data ile cache'lenir;
+bağlantı parametresi `_conn` adıyla geçirilir çünkü Streamlit alttan
+çizgiyle (_) başlayan parametreleri HASH'LEMEZ — psycopg Connection
+nesnesi hash'lenemeyeceğinden bu isimlendirme zorunludur (adı `conn`
+olsaydı cache ya patlar ya sessizce devre dışı kalırdı).
+
+**2026-09-05, KRİTİK değişiklik — `@st.cache_resource`'tan `st.session_state`'e
+geçildi:** `@st.cache_resource` PARAMETRESİZDİ, yani TÜM Streamlit
+kullanıcıları/sekmeleri TEK bir paylaşımlı psycopg bağlantısını
+KULLANIYORDU. Bu, kullanıcı bazlı `SET ROLE` (Faz B, dokumanlar/
+06_adr_dashboard_teknoloji.md) eklendiğinde KRİTİK bir sorun olurdu:
+Kullanıcı A `SET ROLE viewer` yaptığı anda Kullanıcı B'nin isteği AYNI
+bağlantı/rol durumunu görebilirdi (Supavisor'ın transaction-mode
+pooler'ının SET ROLE'ü NEDEN kısıtladığının BİREBİR AYNI sınıf sorunu,
+şimdi uygulama katmanında tekrarlanmış olurdu). `st.session_state` HER
+Streamlit OTURUMUNA kendi bağlantısını verir — bağlantılar artık
+paylaşılmıyor.
+
+**Performans/bağlantı-sayısı notu (bilinçli bir ödünleşim):** her sekme/
+oturum artık KENDİ Postgres bağlantısını açıyor — önceden tek bir
+paylaşımlı bağlantı vardı. Supabase'in (plana göre değişen) eşzamanlı
+bağlantı limiti var; çok sayıda eşzamanlı oturum bu limiti
+zorlayabilir — Supavisor pooler (bkz. `DATABASE_URL`'in pooler host'u)
+bunu bir ölçüde yumuşatır (bağlantı havuzlama), ama session-mode/direkt
+bağlantılar (`DATABASE_URL_DASHBOARD` gibi, Faz B'nin SET ROLE için
+kullanacağı) havuzlanmadığından her oturum GERÇEKTEN ayrı bir sunucu
+bağlantısı tüketir. Bu turda (Faz B adım 1) `DATABASE_URL_DASHBOARD`/
+SET ROLE HENÜZ dashboard'a BAĞLANMADI — mevcut `db_source` (`DATABASE_URL`,
+salt-okunur/paylaşılabilir) davranışı KORUNUYOR, yalnız mekanizma
+(session_state) hazırlanıyor. Gerçek giriş ekranı geldiğinde bağlantı
+limiti/havuzlama stratejisi ayrıca değerlendirilmeli.
 """
 
 from __future__ import annotations
@@ -55,12 +81,21 @@ st.set_page_config(
 )
 
 
-@st.cache_resource(show_spinner=False)
-def _baglanti_kur() -> tuple[Any | None, str]:
-    return resolve_database_or_fallback()
+def _baglanti_al() -> tuple[Any | None, str]:
+    """Bağlantıyı OTURUM BAŞINA açar (bkz. modül notu — 2026-09-05, `@st.
+    cache_resource`'un paylaşımlı-bağlantı riskinden kaçınmak için
+    `st.session_state`'e geçildi). İlk çağrıda `resolve_database_or_
+    fallback()` çalışır ve sonucu bu oturumun `session_state`'inde
+    saklar; sonraki her rerun'da (Streamlit'in normal davranışı) AYNI
+    bağlantı yeniden kullanılır, YENİDEN AÇILMAZ."""
+    if "db_handle" not in st.session_state:
+        st.session_state.db_handle, st.session_state.db_source = (
+            resolve_database_or_fallback()
+        )
+    return st.session_state.db_handle, st.session_state.db_source
 
 
-db_handle, db_source = _baglanti_kur()
+db_handle, db_source = _baglanti_al()
 # Yalnız düz psycopg (DATABASE_URL) yolu gerçek sorguyu destekler - bkz. modül notu.
 gercek_veri_var = db_handle is not None and db_source == "PostgreSQL via DATABASE_URL"
 
