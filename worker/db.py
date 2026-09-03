@@ -36,6 +36,16 @@ def get_service_role_key() -> str | None:
     return value or None
 
 
+def get_dashboard_database_url() -> str | None:
+    """Faz B (çok-kullanıcılı giriş) — `app_dashboard_service` rolüyle
+    bağlanan, session-mode/direkt (havuzlanmamış) bağlantı dizesi. Yalnız
+    `worker.auth.rol_baglantisi_ac()` tarafından kullanılır; `DATABASE_URL`
+    (pooler, `postgres` kullanıcısı) İLE KARIŞTIRILMAMALI — bkz.
+    dokumanlar/06_adr_dashboard_teknoloji.md."""
+    value = _read_env("DATABASE_URL_DASHBOARD")
+    return value or None
+
+
 def create_supabase_client() -> Any | None:
     supabase_url = get_supabase_url()
     anon_key = get_supabase_anon_key()
