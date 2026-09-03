@@ -644,3 +644,24 @@ tutulmalı ya da ayrı, atılabilir bir Supabase projesine karşı koşulmalı.
 aynı formatta not + yeni KPI-27 satırı), `07_word_parser_kapsam.md`
 ("Yarından devam" listesinde KPI-25 maddesi YAPILDI), `00_INDEX.md`
 (özet satırı) güncellendi.
+
+## 2026-09-03 (devam) — Windows Akıllı Uygulama Denetimi (SAC) bulgusu
+
+**Bu makineye özgü, kod/proje sorunu değil:** `epp` conda ortamının
+`python.exe`'si ve ardından `numpy`/`pandas`'ın conda-forge derlemeleri
+Windows Akıllı Uygulama Denetimi tarafından bloklandı (`worker/tests`
+çalıştırılırken `test_fetch_weather.py`'de `ImportError` ve
+`test_kpi_faz3.py`'de process'i çökerten bir `Windows fatal exception`
+olarak ortaya çıktı).
+
+**Çözüm bulundu:** `numpy`/`pandas`'ı conda-forge yerine
+`pip install --force-reinstall --no-cache-dir numpy pandas` ile PyPI
+wheel'inden kurmak SAC bloğunu aşıyor — aynı sürümler, farklı derleme,
+sorun tamamen çözüldü (`worker/tests/test_kpi_faz3.py` +
+`test_fetch_weather.py` ikisi de temiz geçti).
+
+**UYARI — `epp` artık karma (conda + pip) bir ortam:** `conda update`/
+`conda install` ileride `numpy`/`pandas`'ı sessizce conda-forge sürümüne
+geri alıp bloğu tekrar getirebilir. Bu iki paketi her zaman
+`pip install --force-reinstall numpy pandas` ile kur/güncelle, `conda
+install`/`conda update` ile DEĞİL.
