@@ -13,6 +13,15 @@ BAZLI AYRI TARİF ilkesi bilinçli tercih).
   ~2,8 kat artışın taksonomi/kapsam değişikliği DEĞİL, rutin sulama
   sezonu mevsimselliği olduğunu gösterdi (dokumanlar/08). **2021'in TÜMÜ
   (12/12 ay) artık T11/T10 için AÇIK.**
+- **EK DOĞRULAMA (2026-09-03, ikinci tur):** EPDK'nın kendi "Dönemler
+  Arası Karşılaştırma" tablosu (Tablo 2.2), aynı takvim döneminin
+  eski-etiket (kendi çağdaş raporu) ve yeni-etiket (bir sonraki yılın
+  raporunda geriye dönük gösterimi) değerlerini çapraz-doküman
+  karşılaştırmasıyla doğruladı: 12 örnek ayın 10'unda oran tam 1,0000
+  (2021-05/06/08/09/11/12 ve 2022-02/03/04, +2021-10 %0,01 fark) — yalnız
+  2021-07 (0,82) ve 2022-01 (~1,04) belirgin sapma gösterdi. Bu, RENAME
+  kararını mevsimsellik kanıtından BAĞIMSIZ ikinci bir yöntemle
+  destekliyor. Tam veri: dokumanlar/SABAH_OZETI.md.
 - **T10 yapısal sorunu artık GERÇEK bir engel (taksonomi çözülünce ortaya
   çıktı):** 2021 Ekim'e kadar T10-karşılığı tablo YAPISAL OLARAK il-ONLY
   (grup boyutu hiç yok), Kasım'dan itibaren il×grup. İl-only aylarda
