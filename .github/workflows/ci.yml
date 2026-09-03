@@ -96,6 +96,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0016_app_dashboard_service_role.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0017_restore_viewer_data_operator_admin_table_grants.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0018_current_app_role_security_definer.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0019_drop_undocumented_bypass_policies.sql
       - name: Run static RLS validation
         run: python worker/validate_rls_static.py
       - name: Run role-based access verification (anon vs viewer, real RLS/GRANT behavior)

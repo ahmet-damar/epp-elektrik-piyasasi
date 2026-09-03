@@ -173,29 +173,65 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   DOĞRU JWT claim'iyle `current_app_role()`='viewer', sorgu **41.547
   satır** (is_active=true kesiti) döndürüyor.
 
-  **4) YENİ, BAĞIMSIZ ve daha CİDDİ bir bulgu — HENÜZ ÇÖZÜLMEDİ, Ahmet'in
-  kararı bekliyor:** `admin`/`data_operator` için doğrulama sırasında,
-  JWT claim'i OLMADAN BİLE `fact_tuketim` sorgusunun TÜM satırları
-  (44.458) döndürdüğü görüldü — `current_app_role()` kontrolünü
-  ATLIYORLAR. Kaynağı bulundu: `pg_policy` sorgulandığında, HİÇBİR
-  migration dosyasında OLMAYAN 14 adet politika var — her fact/source
-  tablosunda (`fact_tuketim`, `fact_abone`, `fact_uretim`,
-  `fact_serbest_tuketici`, `fact_hava_aylik`, `source_asset`,
-  `ingestion_batch`) `admin_<tablo>_manage` ve `data_operator_<tablo>_
-  manage` adında, **`USING (true)` — KOŞULSUZ İZİN VEREN** politikalar.
-  Bunlar git geçmişinde HİÇ YOK — muhtemelen geçmişte birisi (yukarıdaki
-  aynı `auth` şema/SECURITY DEFINER sorununa takılıp) manuel, kayıt
-  dışı bir "çalışsın" düzeltmesi olarak eklemiş ve hiç kaldırılmamış.
-  **Şu an `admin`/`data_operator` rolüne `SET ROLE` yapabilen HERHANGİ
-  bir bağlantı, JWT kontrolünden BAĞIMSIZ olarak TAM erişime sahip.**
-  Faz 2 dashboard'u şu an bu rollere hiç `SET ROLE` yapmadığından
-  (`DATABASE_URL` ile `postgres` olarak bağlanıyor) bu şu an İŞLEVSEL bir
-  risk YARATMIYOR — ama Faz B'nin sonraki adımı (gerçek SET ROLE
-  bağlanması) öncesinde ele alınmalı. **Bu turda BİLİNÇLİ OLARAK
-  DOKUNULMADI** (kapsam dışına çıkıyordu, güvenlik-kritik bir karar) —
-  öneri: bu 14 politikanın kaldırılması (artık gereksiz — SECURITY
-  DEFINER düzeltmesiyle asıl `current_app_role()` tabanlı politikalar
-  doğru çalışıyor) ayrı bir görev/karar olarak Ahmet'e bırakılıyor.
+  **4) `admin`/`data_operator` bypass politikaları — ÇÖZÜLDÜ (2026-09-05,
+  migration `20260819_0019`):** Bir önceki turda `admin`/`data_operator`
+  için, JWT claim'i OLMADAN BİLE `fact_tuketim` sorgusunun TÜM satırlarını
+  (44.458) döndürdüğü bulunmuştu — `current_app_role()` kontrolünü
+  ATLIYORLARDI. Kaynak: `pg_policy`'de, HİÇBİR migration dosyasında
+  olmayan 14 politika — her fact/source tablosunda (`fact_tuketim`,
+  `fact_abone`, `fact_uretim`, `fact_serbest_tuketici`, `fact_hava_
+  aylik`, `source_asset`, `ingestion_batch`) `admin_<tablo>_manage` ve
+  `data_operator_<tablo>_manage` adında, **`USING (true)` — KOŞULSUZ**
+  politikalar.
+
+  **Adli inceleme (2026-09-05) KAYNAĞI KESİN OLARAK belirledi** — tahmin
+  değil, doğrudan git kanıtı: `git stash list` BOŞ (stash yok, hipotez
+  orada değil) — ama `git log --all -S"admin_fact_manage"` ile bu tam
+  isimlerin `db/schema.sql`'in EN İLK taslağında (commit `453a2d4`,
+  "Agent host session aa19b6d3-a4a3-4226-9d42-acb526deab0b - turn 1",
+  2026-08-19 00:53) BİREBİR olduğu bulundu. `git merge-base --is-ancestor
+  453a2d4 HEAD` **false** döndü — yani bu commit (ve aynı oturumun turn
+  2/turn 3'ü) `main` dalının atası DEĞİL: aynı erken oturumun SONRAKİ
+  adımında (turn 3, commit `5f7b173`) BU politikalar ÇOKTAN daha güvenli,
+  `current_app_role()`-tabanlı isimlerle (`admin_fact_tuketim_all` vb.)
+  DEĞİŞTİRİLMİŞ, ve o güvenli hâli `main`'e (PR #6, commit `b674592`)
+  birleştirilmiş — `ADR-8`'in bahsettiği `0004_fix_rls_policies.sql`/
+  `0005_harden_service_role_grants.sql` isimleriyle DOĞRUDAN eşleşme
+  YOK (farklı bir taslak/oturum), ama AYNI kalıp: erken bir taslak canlı
+  DB'ye uygulanmış, `main`'e hiç girmeden terk edilmiş. En olası açıklama:
+  ilk taslak (turn 1) aynı erken oturumda doğrudan canlı Supabase'e
+  uygulanmış; `main`'deki güvenli sürüm (AYNI dosya adı `0002_rls_roles.
+  sql`, FARKLI/daha dar içerik) sonradan AYRICA uygulanınca yeni
+  politikalar EKLENDİ ama eskiler hiç `DROP` edilmedi (migration'lar
+  yalnız `CREATE POLICY` yapar, adı farklı eski politikaları otomatik
+  temizlemez) — iki nesil politika CANLIDA YAN YANA kaldı.
+
+  **Bağımsız güvenlik teyidi (RLS'nin "şu an işlevsel risk yok" iddiası
+  DEVRALINMADI, ayrıca doğrulandı):** `worker/` ve `app/` içinde `grep`
+  ile tarandı — `admin`/`data_operator`'a `SET ROLE` yapan HİÇBİR
+  ÇALIŞTIRILABİLİR kod yolu YOK (yalnız `worker/validate_role_access.py`
+  `anon`/`viewer`'ı test ediyor — `admin`/`data_operator`'ı hiç
+  kapsamıyor; `app/dashboard.py`'deki eşleşmeler yalnız açıklayıcı YORUM
+  METNİ, çalıştırılabilir kod DEĞİL).
+
+  **Kaldırma:** `20260819_0019_drop_undocumented_bypass_policies.sql` —
+  14 politikanın HER BİRİ için AYRI, AÇIK `DROP POLICY IF EXISTS <ad> ON
+  <tablo>;` satırı (wildcard/dinamik silme yok). Canlı Supabase'e
+  uygulandı, doğrulandı: `SELECT count(*) FROM pg_policies WHERE
+  policyname LIKE '%_manage'` → **0**.
+
+  **Uçtan uca YENİDEN doğrulama (canlı, `app_dashboard_service` ile,
+  kaldırma SONRASI):**
+  - `viewer` DEĞİŞMEDİ (regresyon yok): JWT'siz 0, doğru JWT ile 41.547.
+  - `admin` artık DOĞRU şekilde gated: JWT'siz **0**, doğru JWT ile
+    **44.458** (`admin_fact_tuketim_all` politikası artık TEK başına
+    karar veriyor).
+  - `data_operator`: JWT'siz VE doğru JWT ile İKİSİNDE de **0** — bu
+    BEKLENEN davranış, regresyon DEĞİL: `0002_rls_roles.sql`'in orijinal
+    tasarımında `data_operator`'ın `fact_tuketim` üzerinde yalnız
+    `INSERT`/`UPDATE` politikası var, `SELECT`/`ALL` politikası HİÇ YOK
+    — düz bir `SELECT` sorgusu bu yüzden 0 satır görür (tasarım gereği,
+    veri operatörü yükler/günceller, `viewer` gibi taramaz).
 
   **`app/dashboard.py`'de `st.session_state`'e geçiş:** `@st.cache_
   resource` (parametresiz, TÜM kullanıcılar arasında TEK paylaşımlı
