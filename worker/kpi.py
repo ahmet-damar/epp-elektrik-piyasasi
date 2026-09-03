@@ -206,10 +206,34 @@ def kpi_10_abone_basi(
     return grup_tuketim / abone_sayisi
 
 
-def kpi_13_yoy(simdi: float, gecen_yil: float | None) -> float | None:
-    if not gecen_yil:
+def kpi_13_yoy(simdi: pd.DataFrame, gecen_yil: pd.DataFrame | None) -> float | None:
+    """Tüketim YoY (yıl-yıl değişim, %). `simdi`/`gecen_yil`:
+    `analytics.tuketim_getir()` şekli (en az `grup`, `tuketim_mwh` kolonları).
+
+    **Kapsam uyuşmazlığında `None` döner (2026-09-03, KPI-25/26 ile AYNI
+    disiplin uygulandı):** iki dönemin GRUP KÜMESİ (örn. Sanayi'nin biri
+    içerip diğerinin içermemesi) birebir aynı DEĞİLSE karşılaştırma
+    anlamsızdır — "4 grup" ile "5 grup"u karşılaştırmak sahte bir sayı
+    üretir (kanıt: 2025-06 Sanayi'siz/2026-06 Sanayi'li karşılaştırması
+    %+70,9 veriyordu, Sanayi her iki taraftan da çıkarılınca %+2,2 — asıl
+    büyüme bu). `worker/analytics.py:yillik_tuketim_serisi_getir()`/
+    `yillik_yenilenebilir_kurulu_guc_serisi_getir()`'in "kapsamı
+    uyuşmayan yılı seriye hiç katma" ilkesiyle AYNI kök nedene AYNI
+    çözüm — bu modülün genel "sahte değer üretmeme" kuralı (bkz. modül
+    notu)."""
+    if gecen_yil is None or gecen_yil.empty or simdi.empty:
         return None  # 'hesaplanamaz' (geçen yıl verisi yok)
-    return round((simdi - gecen_yil) / gecen_yil * 100, 1)
+
+    simdi_gruplari = set(simdi["grup"].unique())
+    gecen_yil_gruplari = set(gecen_yil["grup"].unique())
+    if simdi_gruplari != gecen_yil_gruplari:
+        return None  # 'hesaplanamaz' (grup kümesi uyuşmuyor — bkz. yukarıdaki not)
+
+    simdi_toplam = float(simdi["tuketim_mwh"].sum())
+    gecen_yil_toplam = float(gecen_yil["tuketim_mwh"].sum())
+    if not gecen_yil_toplam:
+        return None
+    return round((simdi_toplam - gecen_yil_toplam) / gecen_yil_toplam * 100, 1)
 
 
 # ---------------------------------------------------------------------------

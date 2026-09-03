@@ -30,8 +30,9 @@ def hesaplanan() -> dict:
     uretim = kpi.yukle_uretim(INPUT / "uretim.csv").kabul
     abone = kpi.yukle_abone(INPUT / "abone.csv").kabul
     hava = pd.read_csv(INPUT / "hava_gunluk.csv")
+    # 2026-09-03: kpi_13_yoy() artık DataFrame'lerin kendisini alıyor (grup
+    # kümesi karşılaştırması için) — bkz. worker/kpi.py modül notu.
     gecen_yil = pd.read_csv(INPUT / "tuketim_gecen_yil.csv")
-    toplam_gecen_yil = float(gecen_yil["toplam_tuketim_mwh"].iloc[0])
 
     toplam_tuketim = kpi.kpi_08_toplam_tuketim(tuketim)
 
@@ -43,7 +44,7 @@ def hesaplanan() -> dict:
         "KPI-08": toplam_tuketim,
         "KPI-09_mesken": kpi.kpi_09_grup_payi(tuketim, "Mesken"),
         "KPI-10_mesken": kpi.kpi_10_abone_basi(tuketim, abone, "Mesken"),
-        "KPI-13_yoy": kpi.kpi_13_yoy(toplam_tuketim, toplam_gecen_yil),
+        "KPI-13_yoy": kpi.kpi_13_yoy(tuketim, gecen_yil),
         "KPI-23_hdd": kpi.kpi_23_hdd(hava, hdd_baz_c=18),
         "KPI-24_cdd": kpi.kpi_24_cdd(hava, cdd_baz_c=22),
         "P0-2": kpi.p0_2_sanayi(tuketim),

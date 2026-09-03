@@ -1,2 +1,7 @@
-il,tarih_id,toplam_tuketim_mwh
-Eskişehir,202501,400000.0
+il,il_kodu,tarih_id,grup,baglanti,tuketim_mwh
+Eskişehir,26,202501,Mesken,dagitim,110000.0
+Eskişehir,26,202501,Sanayi,dagitim,80000.0
+Eskişehir,26,202501,Sanayi,iletim,130000.0
+Eskişehir,26,202501,Tarımsal,dagitim,15000.0
+Eskişehir,26,202501,Aydınlatma,dagitim,5000.0
+Eskişehir,26,202501,Kamu ve Özel Hizmetler,dagitim,60000.0

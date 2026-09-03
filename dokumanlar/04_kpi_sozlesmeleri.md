@@ -25,7 +25,18 @@ Kaynak: Ek B. Her KPI: formül + grain + kenar durum. Faz 0 production KPI'ları
 | KPI-08 Toplam tüketim (MWh) | Σ tuketim_mwh (tüm baglanti) | yoksa 0 |
 | KPI-09 Grup payı (%) | Σ tuketim(grup)/Σ tuketim ×100 | payda 0→NULL |
 | KPI-10 Abone başı tüketim (MWh) | Σ tuketim/Σ abone | abone 0→NULL |
-| KPI-13 YoY (%) | (t − t_12ay_önce)/t_12ay ×100 | geçen yıl yoksa 'hesaplanamaz' |
+| KPI-13 YoY (%) | (t − t_12ay_önce)/t_12ay ×100 | geçen yıl yoksa VEYA grup kümesi uyuşmuyorsa 'hesaplanamaz' (aşağıya bkz.) |
+
+**KPI-13'ün grup-kümesi kısıtı (2026-09-03, KPI-25/26 ile AYNI kök nedene AYNI disiplin):**
+`t` ve `t_12ay_önce`'nin GRUP KÜMESİ (örn. Sanayi'nin biri içerip diğerinin
+içermemesi) birebir aynı DEĞİLSE YoY hesaplanmaz, None ('hesaplanamaz')
+döner — bkz. worker/kpi.py `kpi_13_yoy`. Kanıt: 2025-06 (Word, Sanayi
+kaynakta yok, Karar 2) ile 2026-06 (Excel, Sanayi var) karşılaştırması
+eskiden %+70,9 gibi sahte bir YoY üretiyordu; Sanayi her iki taraftan da
+çıkarılınca gerçek artış %+2,2 çıkıyor. Bu, KPI-25/26'nın "kapsamı
+uyuşmayan yılı seriye hiç katma" stratejisinin KPI-13'e (tek bir
+dönem-karşılaştırması, yıllık seri değil) uyarlanmış hâli — aynı
+"sahte değer üretmeme" ilkesi (bkz. worker/kpi.py modül notu).
 
 ## Hava Türetimleri (Faz 0)
 | KPI | Formül |

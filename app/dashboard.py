@@ -441,12 +441,14 @@ u6.metric(
     f"%{lisanssiz_pay:.1f}" if lisanssiz_pay is not None else "veri yok",
 )
 
-simdi_toplam_tuketim = kpi.kpi_08_toplam_tuketim(tuketim)
-gecen_yil_toplam = (
-    kpi.kpi_08_toplam_tuketim(onceki_tuketim) if not onceki_tuketim.empty else None
+# 2026-09-03: kpi_13_yoy() artık ÖZET rakam değil, DataFrame'lerin kendisini
+# alıyor — iki dönemin grup kümesi uyuşmuyorsa (örn. Sanayi biri içeriyor
+# diğeri içermiyorsa) None döner (bkz. worker/kpi.py modül notu, KPI-25/26
+# ile AYNI "kapsam uyuşmuyorsa hesaplama" disiplini).
+yoy = kpi.kpi_13_yoy(tuketim, onceki_tuketim if not onceki_tuketim.empty else None)
+u7.metric(
+    "Tüketim YoY (KPI-13)", f"%{yoy:+.1f}" if yoy is not None else "hesaplanamaz"
 )
-yoy = kpi.kpi_13_yoy(simdi_toplam_tuketim, gecen_yil_toplam)
-u7.metric("Tüketim YoY (KPI-13)", f"%{yoy:+.1f}" if yoy is not None else "veri yok")
 
 st.divider()
 
