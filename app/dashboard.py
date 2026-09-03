@@ -144,6 +144,11 @@ def _yillik_yenilenebilir_kurulu_guc_serisi_cached(_conn: Any) -> pd.DataFrame:
     return analytics.yillik_yenilenebilir_kurulu_guc_serisi_getir(_conn)
 
 
+@st.cache_data(show_spinner="Sanayi-hariç tüketim serisi yükleniyor...")
+def _yillik_tuketim_sanayi_haric_serisi_cached(_conn: Any) -> pd.DataFrame:
+    return analytics.yillik_tuketim_sanayi_haric_serisi_getir(_conn)
+
+
 @st.cache_data
 def _statik_veri_hazirla() -> tuple[
     pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame
@@ -416,15 +421,18 @@ st.divider()
 
 # ---------------- KPI KARTLARI — YILLIK TRENDLER (CAGR) ----------------
 st.subheader("Yıllık Trendler")
-y1, y2 = st.columns(2)
+y1, y2, y3 = st.columns(3)
 if gercek_veri_var:
     tuketim_serisi = _yillik_tuketim_serisi_cached(db_handle)
     kpi_25 = analytics.cagr_seriden_hesapla(tuketim_serisi, "tuketim_mwh")
     kurulu_serisi = _yillik_yenilenebilir_kurulu_guc_serisi_cached(db_handle)
     kpi_26 = analytics.cagr_seriden_hesapla(kurulu_serisi, "kurulu_guc_mw")
+    tuketim_sanayi_haric_serisi = _yillik_tuketim_sanayi_haric_serisi_cached(db_handle)
+    kpi_27 = analytics.cagr_seriden_hesapla(tuketim_sanayi_haric_serisi, "tuketim_mwh")
 else:
     kpi_25 = None
     kpi_26 = None
+    kpi_27 = None
 y1.metric(
     "Tüketim CAGR (KPI-25)", f"%{kpi_25:+.1f}" if kpi_25 is not None else "hesaplanamaz"
 )
@@ -432,11 +440,20 @@ y2.metric(
     "Yenilenebilir Kurulu Güç CAGR (KPI-26)",
     f"%{kpi_26:+.1f}" if kpi_26 is not None else "hesaplanamaz",
 )
-if gercek_veri_var and (kpi_25 is None or kpi_26 is None):
+y3.metric(
+    "Sanayi-Hariç Tüketim CAGR (KPI-27)",
+    f"%{kpi_27:+.1f}" if kpi_27 is not None else "hesaplanamaz",
+)
+if gercek_veri_var and (kpi_25 is None or kpi_26 is None or kpi_27 is None):
     st.caption(
         "CAGR için en az iki farklı yıla ait aktif veri gerekir — henüz "
         "yeterli geçmiş (backfill) yüklenmemiş olabilir."
     )
+st.caption(
+    "KPI-27, Sanayi grubunu TÜM yıllardan çıkararak hesaplanır — KPI-25'in "
+    "(resmi toplam tüketim) YERİNE GEÇMEZ, yalnız ek bağlam sağlar "
+    "(dokumanlar/04_kpi_sozlesmeleri.md)."
+)
 
 st.divider()
 
