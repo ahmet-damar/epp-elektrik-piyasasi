@@ -53,10 +53,15 @@ def test_rol_baglantisi_ac_sentetik_claim_ile_dogru_rolu_uygular() -> None:
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT public.current_app_role();")
-            assert cur.fetchone()[0] == "viewer"
+            rol_satiri = cur.fetchone()
+            assert rol_satiri is not None
+            assert rol_satiri[0] == "viewer"
             cur.execute("SELECT count(*) FROM fact_tuketim;")
-            (satir_sayisi,) = cur.fetchone()
-            assert satir_sayisi >= 0  # sorgu BAŞARILI çalıştı (permission denied yok)
+            sayim_satiri = cur.fetchone()
+            assert sayim_satiri is not None
+            assert (
+                sayim_satiri[0] >= 0
+            )  # sorgu BAŞARILI çalıştı (permission denied yok)
     finally:
         conn.rollback()
         conn.close()
@@ -72,8 +77,9 @@ def test_rol_baglantisi_ac_admin_claim_ile_tum_veriye_erisir() -> None:
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT count(*) FROM fact_tuketim;")
-            (satir_sayisi,) = cur.fetchone()
-            assert satir_sayisi > 0  # admin en az bazı aktif satırları görmeli
+            sayim_satiri = cur.fetchone()
+            assert sayim_satiri is not None
+            assert sayim_satiri[0] > 0  # admin en az bazı aktif satırları görmeli
     finally:
         conn.rollback()
         conn.close()

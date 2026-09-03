@@ -29,10 +29,18 @@ CREATE ROLE app_dashboard_service WITH LOGIN;
 -- YETMEZ, bu yetkinin AÇIKÇA verilmesi gerekir (bkz. `postgres` rolünün
 -- üyeliğinde bu YOKTU — kök nedenin kendisi). Syntax PostgreSQL 16, 17
 -- (canlı Supabase'in sürümü, `SHOW server_version` ile doğrulandı) VE
--- CI'nin postgres:16 servisinde AYNI şekilde geçerli (PG16'da tanıtıldı,
--- `GRANT role TO grantee WITH { ADMIN | INHERIT | SET } { TRUE | FALSE }`).
+-- CI'nin postgres:16 servisinde AYNI şekilde geçerli, GERÇEKTEN çalıştığı
+-- canlıda kanıtlandı (PG16'da tanıtıldı, `GRANT role TO grantee WITH
+-- { ADMIN | INHERIT | SET } { TRUE | FALSE }`) — yalnız `sqlfluff==3.3.0`
+-- (bu projenin sabitlediği sürüm) PostgreSQL grameri bu PG16+ sözdizimini
+-- HENÜZ tanımıyor ("unparsable section"), bu yüzden yalnız bu ifade için
+-- lint devre dışı bırakılıyor (aşağıdaki noqa disable/enable çifti) —
+-- GEÇERSİZ SQL olduğu için DEĞİL, sqlfluff'ın kendi grameri geride
+-- kaldığı için.
+-- noqa: disable=all
 GRANT viewer, data_operator, admin
   TO app_dashboard_service
   WITH INHERIT FALSE, SET TRUE;
+-- noqa: enable=all
 
 COMMIT;
