@@ -51,13 +51,19 @@ paylaşımlı bağlantı vardı. Supabase'in (plana göre değişen) eşzamanlı
 bağlantı limiti var; çok sayıda eşzamanlı oturum bu limiti
 zorlayabilir — Supavisor pooler (bkz. `DATABASE_URL`'in pooler host'u)
 bunu bir ölçüde yumuşatır (bağlantı havuzlama), ama session-mode/direkt
-bağlantılar (`DATABASE_URL_DASHBOARD` gibi, Faz B'nin SET ROLE için
-kullanacağı) havuzlanmadığından her oturum GERÇEKTEN ayrı bir sunucu
-bağlantısı tüketir. Bu turda (Faz B adım 1) `DATABASE_URL_DASHBOARD`/
-SET ROLE HENÜZ dashboard'a BAĞLANMADI — mevcut `db_source` (`DATABASE_URL`,
-salt-okunur/paylaşılabilir) davranışı KORUNUYOR, yalnız mekanizma
-(session_state) hazırlanıyor. Gerçek giriş ekranı geldiğinde bağlantı
-limiti/havuzlama stratejisi ayrıca değerlendirilmeli.
+bağlantılar (`DATABASE_URL_DASHBOARD`, aşağıya bkz.) havuzlanmadığından
+her oturum GERÇEKTEN ayrı bir sunucu bağlantısı tüketir — çok kullanıcılı
+gerçek trafikte bu izlenmeli.
+
+**2026-09-05, Faz B SON ADIM — gerçek giriş ekranı + `SET ROLE` bağlandı:**
+`DATABASE_URL_DASHBOARD` (.env, `app_dashboard_service` rolü — bkz.
+dokumanlar/06_adr_dashboard_teknoloji.md) yapılandırılmışsa panel artık
+ZORUNLU bir giriş ekranı gösterir (`worker.auth.giris_yap()` → Supabase
+Auth). Başarılı girişte `worker.auth.rol_baglantisi_ac()` GERÇEK JWT
+claim'lerini (`app_metadata.role`) taşıyan, `SET ROLE` yapılmış YENİ bir
+bağlantı açar ve `session_state`'e koyar — eski, girişsiz `DATABASE_URL`
+yolu (paylaşılabilir/salt-okunur) YALNIZ `DATABASE_URL_DASHBOARD` hiç
+yapılandırılmamışsa (yerel/offline geliştirme) devrede kalır.
 """
 
 from __future__ import annotations
@@ -74,20 +80,82 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from data.tr_ocak2026 import TABLO2_KAYNAK, TABLO11
 from worker import analytics, ingest, kpi
-from worker.db import resolve_database_or_fallback
+from worker.auth import giris_yap, rol_baglantisi_ac
+from worker.db import get_dashboard_database_url, resolve_database_or_fallback
 
 st.set_page_config(
     page_title="EPP — Türkiye Elektrik Piyasası", layout="wide", page_icon="⚡"
 )
 
 
+def _cikis_yap() -> None:
+    """Oturumu tamamen temizler (açık bağlantıyı kapatır + session_state'i
+    sıfırlar) ve sayfayı yeniden başlatır — sidebar'daki "Çıkış Yap"
+    butonundan çağrılır."""
+    baglanti = st.session_state.get("db_handle")
+    if baglanti is not None and hasattr(baglanti, "close"):
+        try:
+            baglanti.close()
+        except Exception:  # noqa: BLE001, S110 - çıkışta kapatma hatası kullanıcıyı engellememeli
+            pass
+    for anahtar in ("db_handle", "db_source", "kullanici_email", "kullanici_rolu"):
+        st.session_state.pop(anahtar, None)
+    st.rerun()
+
+
+def _giris_ekrani_goster() -> None:
+    """E-posta/şifre formu — worker.auth.giris_yap()'a devreder. Başarısız
+    girişte "e-posta veya şifre hatalı" gibi GENEL bir mesaj gösterilir,
+    hesabın var olup olmadığı SIZDIRILMAZ (bkz. worker/auth.py modül notu).
+    Başarılı girişte worker.auth.rol_baglantisi_ac() ile rol-farkındalıklı
+    bağlantı açılır ve session_state'e konur. `st.stop()` ile çağrıldığı
+    yerden SONRASI (asıl dashboard içeriği) render EDİLMEZ — giriş
+    ekranı gösterildiği/yeniden denendiği sürece kullanıcı veriye hiç
+    erişemez."""
+    st.title("⚡ EPP — Türkiye Elektrik Piyasası Paneli")
+    st.subheader("Giriş")
+    with st.form("giris_formu"):
+        email = st.text_input("E-posta")
+        sifre = st.text_input("Şifre", type="password")
+        gonderildi = st.form_submit_button("Giriş Yap")
+    if gonderildi:
+        sonuc = giris_yap(email, sifre)
+        if sonuc is None:
+            st.error("E-posta veya şifre hatalı.")
+        else:
+            try:
+                baglanti = rol_baglantisi_ac(sonuc.jwt_claims_json, sonuc.rol)
+            except Exception as e:  # noqa: BLE001 - kullanıcıya net bir hata göstermek için
+                st.error(f"Giriş başarılı ama bağlantı açılamadı: {e}")
+            else:
+                st.session_state.db_handle = baglanti
+                st.session_state.db_source = "PostgreSQL via DATABASE_URL_DASHBOARD"
+                st.session_state.kullanici_email = sonuc.kullanici_email
+                st.session_state.kullanici_rolu = sonuc.rol
+                st.rerun()
+    st.stop()
+
+
 def _baglanti_al() -> tuple[Any | None, str]:
     """Bağlantıyı OTURUM BAŞINA açar (bkz. modül notu — 2026-09-05, `@st.
     cache_resource`'un paylaşımlı-bağlantı riskinden kaçınmak için
-    `st.session_state`'e geçildi). İlk çağrıda `resolve_database_or_
-    fallback()` çalışır ve sonucu bu oturumun `session_state`'inde
-    saklar; sonraki her rerun'da (Streamlit'in normal davranışı) AYNI
-    bağlantı yeniden kullanılır, YENİDEN AÇILMAZ."""
+    `st.session_state`'e geçildi).
+
+    **2026-09-05, Faz B son adım — giriş ZORUNLU hale geldi:**
+    `DATABASE_URL_DASHBOARD` (.env'de) YAPILANDIRILMIŞSA panel HER ZAMAN
+    kimlik doğrulaması ister — eski "girişsiz DATABASE_URL ile doğrudan
+    gerçek veri" yolu artık KULLANILMAZ (yoksa giriş ekranı dekoratif
+    kalır, gerçek erişim kontrolü sağlamaz). `DATABASE_URL_DASHBOARD`
+    HİÇ yapılandırılmamışsa (yerel/offline geliştirme — Faz B kurulmamış
+    bir ortam) eski davranış (`resolve_database_or_fallback()`: varsa
+    `DATABASE_URL`, yoksa anon-key Supabase istemcisi, o da yoksa statik
+    dosya verisi) AYNEN korunur — bu durumda giriş ekranı da HİÇ
+    gösterilmez (zaten gerçek veri yok, kimlik doğrulayacak bir şey yok)."""
+    if get_dashboard_database_url():
+        if "db_handle" not in st.session_state:
+            _giris_ekrani_goster()  # gönderilmediyse/başarısızsa st.stop() ile burada durur
+        return st.session_state.db_handle, st.session_state.db_source
+
     if "db_handle" not in st.session_state:
         st.session_state.db_handle, st.session_state.db_source = (
             resolve_database_or_fallback()
@@ -96,8 +164,21 @@ def _baglanti_al() -> tuple[Any | None, str]:
 
 
 db_handle, db_source = _baglanti_al()
-# Yalnız düz psycopg (DATABASE_URL) yolu gerçek sorguyu destekler - bkz. modül notu.
-gercek_veri_var = db_handle is not None and db_source == "PostgreSQL via DATABASE_URL"
+# İkisi de gerçek sorguyu destekler: eski (girişsiz) DATABASE_URL yolu VE
+# yeni (girişli) DATABASE_URL_DASHBOARD yolu - bkz. modül notu.
+gercek_veri_var = db_handle is not None and db_source in (
+    "PostgreSQL via DATABASE_URL",
+    "PostgreSQL via DATABASE_URL_DASHBOARD",
+)
+
+if "kullanici_email" in st.session_state:
+    with st.sidebar:
+        st.caption(
+            f"👤 {st.session_state.kullanici_email} ({st.session_state.kullanici_rolu})"
+        )
+        if st.button("Çıkış Yap", use_container_width=True):
+            _cikis_yap()
+        st.divider()
 
 if gercek_veri_var:
     st.info(f"Veri kaynağı: {db_source}")
