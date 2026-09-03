@@ -173,6 +173,52 @@ ile işaretliyor, **T11 (tüketim) bundan HİÇ etkilenmiyor** (ayrı okunuyor).
 gerçekten yok (48 ay "tablo var, il-only" + 12 ay "tablo hiç yok" [2016]
 + 10 ay 2021 Ocak-Ekim).
 
+**`veri_kapsam_disi`/`fact_abone` işaretlemesi TAMAMLANDI (2026-09-05).**
+Bu 70/84 ayın TAMAMI artık DB'de açıkça işaretli (`pipeline.kapsam_disi_
+isaretle()`, aynı Karar 1/Karar 3 mekanizması). 69/70'i zaten her yılın
+kendi `word_*.py` scriptinde otomatik işaretlenmişti; yalnız **Temmuz
+2016** eksikti (o ay T11 kendisi BEKLEMEDE kaldığından — Adana verisi
+kayıp — isle_ay() kapsam_disi çağrısına hiç ulaşamamıştı). Ayrı bir
+turda eklendi, aynı sebep/karar_referansi metniyle. Doğrulandı: 2016=12,
+2017=12, 2018=12, 2019=12, 2020=12, 2021=10 (Ocak-Ekim) satır — toplam
+**70/70**, hiçbir ayda hem gerçek veri hem kapsam_disi çakışması YOK.
+
+## Batch 142-307 triyaj raporu (2026-09-05, SORGU — aktivasyon YAPILMADI)
+
+DB'den `ingestion_batch.rejected_row_count` + `audit_log.payload` (her
+batch'in `red_satirlari` detayı) çekilerek 166 batch'in TAMAMI incelendi.
+**Hiçbir batch aktive edilmedi, `onayla.py` çağrılmadı — bu yalnız bir
+sorgu/rapor.**
+
+- **Tamamen temiz (0 red): 98/166 batch.** T4 batch'lerinin **TAMAMI**
+  (71/71) temiz — `kpi.dogrula_uretim()` bu türde bir reddetme
+  üretmiyor. T11/T10 batch'lerinin yalnız 27/95'i temiz.
+- **Kırmızı satırlı: 68/166 batch** (hepsi T11/T10 — `fact_tuketim`).
+  Toplam **191 reddedilen/atlanan satır**, iki AYRI türde:
+  - **161 satır — kpi.dogrula_tuketim() reddi, TÜMÜ NEGATİF değer**
+    (`audit_log`'da tam detay: il + grup + değer). Grup dağılımı: 133
+    "Tarımsal", 27 "Aydınlatma", 1 "Kamu ve Özel Hizmetler" — bilinen
+    davranış, çoğunlukla GAP bölgesi illeri (Batman/Bitlis/Diyarbakır/
+    Mardin/Siirt/Şanlıurfa/Şırnak) tekrarlıyor. "Sıçrama" (pozitif
+    anomali) türünde TEK BİR satır yok.
+  - **30 satır — "atlanan" (boş hücre/NULL değer), İL/GRUP DETAYI
+    KAYDEDİLMEMİŞ** (`ingest.fact_tuketim_yukle()`'in kendi içindeki bir
+    ayrım — kpi.dogrula_tuketim()'i GEÇEN ama hücresi boş olduğundan
+    DB'ye yazılamayan satırlar; orijinal script'ler bu satırların
+    il/grup'unu audit_log'a YAZMADI — gözlemlenebilirlik boşluğu, bu
+    turda DÜZELTİLMEDİ, yalnız tespit edildi). Belirgin desen: **2017'nin
+    11/12 ayı ve 2018'in 10/12 ayı** bu türden tam olarak 1 (bir ayda 2)
+    "atlanan" satır taşıyor — muhtemelen HER İKİ yılda da AYNI bir il/grup
+    hücresinin sistematik olarak boş bırakıldığına işaret ediyor, ama
+    hangi il/grup olduğu mevcut audit_log verisinden ÇIKARILAMIYOR.
+  - Batch bazında tam liste (batch_id, yıl-ay, red sayısı, il/grup/değer)
+    bu oturumun sohbet geçmişinde var — dosya olarak commit EDİLMEDİ (senin
+    talimatın gereği).
+
+**Örneklem/çapraz doğrulama gerektiren batch'ler:** 68 kırmızılı batch'in
+TAMAMI (yıl bazında dağılım: 2016→10, 2017→12, 2018→12, 2019→12, 2020→11,
+2021→5, 2022→6 batch).
+
 ## Diğer teknik bulgular (kod zaten düzeltti, bilgi amaçlı)
 
 - **2022 Ocak-Nisan'da T10'un 3 başlık satırı vardı** (Mayıs-Aralık 2
@@ -195,13 +241,19 @@ gerçekten yok (48 ay "tablo var, il-only" + 12 ay "tablo hiç yok" [2016]
 
 ## Senin vereceğin kararlar
 
-### 1. Aktivasyon — batch 142-212 (71 batch)
+### 1. Aktivasyon — batch 142-307 (166 batch, TAMAMI — triyaj raporu hazır)
 
-Hepsi `running`/`is_active=false`. Gözden geçirip
-`worker/scripts/onayla.py --batch-id <id>` ile (ya da toplu) aktive etmek
-sana kalmış. `otomatik_onaya_uygun()` çıktıları script loglarında var
-(çoğu `True`, birkaçında 1-2 kırmızı satır — negatif "Tarımsal" değerleri,
-`kpi.dogrula_tuketim()`'in bilinen davranışı).
+Hepsi `running`/`is_active=false`, hiçbiri aktive edilmedi. 2026-09-05'te
+tam bir triyaj raporu çıkarıldı (yukarıya bkz. "Batch 142-307 triyaj
+raporu") — **98/166 tamamen temiz** (0 red — bunlar için aktivasyon
+düşük riskli), **68/166 kırmızı satırlı** (T11/T10, 191 red/atlanan satır
+— 161'i negatif "Tarımsal"/"Aydınlatma" değeri, bilinen `kpi.dogrula_
+tuketim()` davranışı; 30'u boş-hücre "atlanan", detayı kayıtlı değil).
+Aktive etmek `worker/scripts/onayla.py --batch-id <id>` ile (ya da toplu)
+sana kalmış — kırmızılı 68 batch'i aktive etmeden önce örneklem/çapraz
+doğrulama önerilir (negatif değerler GAP bölgesi illerinde tekrarlıyor,
+gerçek bir kaynak-veri özelliği olabilir, parser hatası değil — ama
+tek tek doğrulanmadı).
 
 ### 2. 2016-2022 TAMAMLANDI — yeni yıl kalmadı
 
