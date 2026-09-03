@@ -446,9 +446,7 @@ u6.metric(
 # diğeri içermiyorsa) None döner (bkz. worker/kpi.py modül notu, KPI-25/26
 # ile AYNI "kapsam uyuşmuyorsa hesaplama" disiplini).
 yoy = kpi.kpi_13_yoy(tuketim, onceki_tuketim if not onceki_tuketim.empty else None)
-u7.metric(
-    "Tüketim YoY (KPI-13)", f"%{yoy:+.1f}" if yoy is not None else "hesaplanamaz"
-)
+u7.metric("Tüketim YoY (KPI-13)", f"%{yoy:+.1f}" if yoy is not None else "hesaplanamaz")
 
 st.divider()
 

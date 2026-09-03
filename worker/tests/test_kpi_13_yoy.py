@@ -28,12 +28,8 @@ def _tuketim_df(satirlar: list[tuple[str, float]]) -> pd.DataFrame:
 def test_kpi_13_yoy_ayni_grup_kumesi_hesaplanir() -> None:
     """İki dönemin grup kümesi BİREBİR aynıysa (Sanayi dahil ikisinde de)
     gerçek bir YoY hesaplanır — sahte 'hesaplanamaz' üretilmemeli."""
-    simdi = _tuketim_df(
-        [("Mesken", 120.0), ("Sanayi", 200.0), ("Tarımsal", 30.0)]
-    )
-    gecen_yil = _tuketim_df(
-        [("Mesken", 100.0), ("Sanayi", 180.0), ("Tarımsal", 20.0)]
-    )
+    simdi = _tuketim_df([("Mesken", 120.0), ("Sanayi", 200.0), ("Tarımsal", 30.0)])
+    gecen_yil = _tuketim_df([("Mesken", 100.0), ("Sanayi", 180.0), ("Tarımsal", 20.0)])
     # simdi toplam=350, gecen_yil toplam=300 -> %+16.7
     assert kpi.kpi_13_yoy(simdi, gecen_yil) == 16.7
 
@@ -43,9 +39,7 @@ def test_kpi_13_yoy_sanayi_bir_tarafta_yok_hesaplanamaz() -> None:
     Sanayi içeriyor, geçen yılın aynı dönemi içermiyor (Word kaynağının
     Karar 2 kısıtı) — grup kümesi uyuşmuyor, None dönmeli (KAPSAM
     UYUŞMAZLIĞI, gerçek bir düşüş/artış DEĞİL)."""
-    simdi = _tuketim_df(
-        [("Mesken", 120.0), ("Sanayi", 200.0), ("Tarımsal", 30.0)]
-    )
+    simdi = _tuketim_df([("Mesken", 120.0), ("Sanayi", 200.0), ("Tarımsal", 30.0)])
     gecen_yil_sanayisiz = _tuketim_df([("Mesken", 100.0), ("Tarımsal", 20.0)])
     assert kpi.kpi_13_yoy(simdi, gecen_yil_sanayisiz) is None
 
