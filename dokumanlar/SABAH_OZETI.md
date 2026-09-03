@@ -31,11 +31,13 @@ verildi, 2021/2022 tam açıldı, 2020 eklendi.
 - **2019, 2018 ve 2017 TAMAMLANDI** — üçü de T11 12/12, T10 0/12 (tüm yıl
   yapısal olarak kaynakta yok), T4 12/12. Her yılda 1-3 yeni format
   sürprizi bulundu, hepsi mekanik çözüldü (aşağıya bkz.).
-- **2016 TAMAMLANDI (SON YIL) — 2016-2022'nin TAMAMI bitti.** T11 **11/12
-  ay** (Temmuz hariç — Adana verisi kaynakta GERÇEKTEN kayıp, TAHMİN
-  EDİLMEDİ), T10 **0/12 ay** (2016'da tablo HİÇ basılmamış — 2017-2020'nin
-  "il-only" sorunundan FARKLI), T4 **12/12 ay**. 9 YENİ format sürprizi
-  bulundu (İstanbul'un bazı aylarda ikiye bölünmesi dahil, aşağıya bkz.).
+- **2016 TAMAMLANDI (SON YIL) — 2016-2022'nin TAMAMI bitti.** T11 **12/12
+  ay** (Temmuz dahil — Adana verisi kaynakta kayıptı, ama 2026-09-05'te
+  iki bağımsız EPDK tablosunun Genel Toplam'ından TÜRETİLDİ, tahmin
+  DEĞİL — aşağıya bkz.), T10 **0/12 ay** (2016'da tablo HİÇ basılmamış —
+  2017-2020'nin "il-only" sorunundan FARKLI), T4 **12/12 ay**. 9 YENİ
+  format sürprizi bulundu (İstanbul'un bazı aylarda ikiye bölünmesi
+  dahil, aşağıya bkz.).
 - **0 batch aktive edildi** (DB'den doğrulandı) — hiçbir fact tablosunda
   2016/2017/2018/2019/2020/2021/2022 için `is_active=true` satır yok.
   Aktivasyon kararı sana ait.
@@ -50,7 +52,7 @@ verildi, 2021/2022 tam açıldı, 2020 eklendi.
 | 2019 | **12/12 ay** | **0/12 ay** (TÜM yıl kaynakta yok, yapısal) | **12/12 ay** |
 | 2018 | **12/12 ay** | **0/12 ay** (TÜM yıl kaynakta yok, yapısal) | **12/12 ay** |
 | 2017 | **12/12 ay** | **0/12 ay** (TÜM yıl kaynakta yok, yapısal) | **12/12 ay** |
-| 2016 | **11/12 ay** (Temmuz hariç — Adana verisi kaynakta kayıp) | **0/12 ay** (tablo HİÇ basılmamış) | **12/12 ay** |
+| 2016 | **12/12 ay** (Temmuz'un Adana'sı Genel Toplam'dan türetildi) | **0/12 ay** (tablo HİÇ basılmamış) | **12/12 ay** |
 
 **2019'a özgü 2 YENİ format sürprizi (mekanik çözüldü, word_2019.py'de
 belgelendi):**
@@ -115,7 +117,7 @@ belgelendi — 2016-2022'nin EN FARKLI yılı):**
 | 2019 | 213-224 | 225-236 |
 | 2018 | 237-248 | 249-260 |
 | 2017 | 261-272 | 273-284 |
-| 2016 | 285-300 (11 batch, Temmuz hariç — T4 ile paralel çalıştırıldığından iç içe geçmiş) | 288-307 (12 batch, T11/T10 ile iç içe geçmiş) |
+| 2016 | 285-300 + 308 (12 batch — 308, Temmuz'un Adana-türetme düzeltmesiyle 2026-09-05'te ayrı eklendi; 285-300 T4 ile paralel çalıştırıldığından iç içe geçmiş) | 288-307 (12 batch, T11/T10 ile iç içe geçmiş) |
 
 **Hiçbir batch `onayla.py`/`pipeline.batch_onayla()` ile aktive edilmedi** —
 tümü `running` durumda, DB'den doğrulandı (`fact_tuketim`/`fact_abone`/
@@ -182,6 +184,9 @@ kayıp — isle_ay() kapsam_disi çağrısına hiç ulaşamamıştı). Ayrı bir
 turda eklendi, aynı sebep/karar_referansi metniyle. Doğrulandı: 2016=12,
 2017=12, 2018=12, 2019=12, 2020=12, 2021=10 (Ocak-Ekim) satır — toplam
 **70/70**, hiçbir ayda hem gerçek veri hem kapsam_disi çakışması YOK.
+(Not: bu madde `fact_abone`/T10 içindi — Temmuz 2016'nın T11'i, YUKARIDA
+anlatıldığı gibi, AYRICA 2026-09-05'te Genel Toplam'dan türetilerek
+12/12'ye tamamlandı; ikisi bağımsız düzeltmeler.)
 
 ## Batch 142-307 triyaj raporu (2026-09-05, SORGU — aktivasyon YAPILMADI)
 
@@ -255,13 +260,15 @@ doğrulama önerilir (negatif değerler GAP bölgesi illerinde tekrarlıyor,
 gerçek bir kaynak-veri özelliği olabilir, parser hatası değil — ama
 tek tek doğrulanmadı).
 
-### 2. 2016-2022 TAMAMLANDI — yeni yıl kalmadı
+### 2. 2016-2022 TAMAMLANDI — yeni yıl kalmadı, açık iş de kalmadı
 
 2016 (son yıl) da tamamlandı (yukarıya bkz.) — 2016-2022'nin TAMAMI
-(84 ay) artık T11/T4 için işlenmiş durumda. Bu maddenin altında yeni bir
-"sıradaki yıl" YOK. Kalan tek açık iş, Temmuz 2016'nın T11'i (Adana verisi
-kaynakta gerçekten kayıp — bkz. yukarı, kod tarafında çözülebilecek bir
-şey değil, EPDK kaynağının kendisinde eksik).
+(84 ay) artık T11/T4 için TAM (84/84) işlenmiş durumda. Bu maddenin
+altında yeni bir "sıradaki yıl" YOK. Temmuz 2016'nın T11'i (Adana
+verisi kaynakta gerçekten kayıptı) 2026-09-05'te çözüldü — kaynağın
+kendi iki bağımsız tablosunun Genel Toplam'ından matematiksel olarak
+türetildi (tahmin DEĞİL, ±0,00 MWh farkla çapraz doğrulandı), artık
+T11/T10 batch 308'de yüklü.
 
 ### 3. T10'un 46/60 ay eksik olması KPI'ları nasıl etkiliyor
 
@@ -273,10 +280,10 @@ bkz. `07_word_parser_kapsam.md`'nin açık kalanlar listesi) ayrı bir karar.
 
 ## Test/kalite durumu
 
-- `worker/tests/test_word_2016.py` (12 test) + `test_word_2017.py` (11
+- `worker/tests/test_word_2016.py` (14 test) + `test_word_2017.py` (11
   test) + `test_word_2018.py` (9 test) + `test_word_2019.py` (8 test) +
   `test_word_2020.py` (8 test) + `test_word_2021.py` (9 test) +
-  `test_word_2022.py` (13 test) — **70 test toplam**, hepsi geçiyor,
+  `test_word_2022.py` (13 test) — **72 test toplam**, hepsi geçiyor,
   DATABASE_URL'e bağımlı DEĞİL (synthetic docx tabloları), CI'nin
   'Worker' job'ında da çalışıyor.
 - `ruff check`/`ruff format --check` temiz (repo geneli). **`mypy` bu
@@ -306,10 +313,18 @@ bkz. `07_word_parser_kapsam.md`'nin açık kalanlar listesi) ayrı bir karar.
 10. `05f96c0` — 2017 tarifi: T11/T10 batch 261-272, T4 batch 273-284
     (kısaltılmış T11 arama metni, grup-etiketi iç-boşluk normalizasyonu,
     sayfa-sonu başlık tekrarı atlaması dahil).
-11. *(bu commit)* — 2016 tarifi (SON YIL, 2016-2022 TAMAMLANDI): T11/T10
-    batch 285-300 (Temmuz hariç), T4 batch 288-307 (İstanbul-ikiye-bölünme
-    toplaması, T10-tablosu-hiç-yok tespiti, Adana-verisi-kayıp BEKLEMEDE'si
-    dahil).
+11. `05f96c0` — 2016 tarifi (SON YIL, 2016-2022 TAMAMLANDI — ilk tur):
+    T11/T10 batch 285-300 (Temmuz hariç), T4 batch 288-307 (İstanbul-
+    ikiye-bölünme toplaması, T10-tablosu-hiç-yok tespiti, Adana-verisi-
+    kayıp BEKLEMEDE'si dahil).
+12. `42f87b4` — T10 kapsam_disi tamamlandı (Temmuz 2016'nın eksik
+    `fact_abone` satırı eklendi, 70/70) + batch 142-307 triyaj raporu
+    (SORGU, aktivasyon yok).
+13. *(bu commit)* — Temmuz 2016 T11/Adana: TAHMİN değil, kaynağın iki
+    bağımsız tablosunun Genel Toplam'ından GENELLEŞTİRİLMİŞ bir
+    mekanizmayla türetildi (±0,00 MWh çapraz doğrulama), T11/T10 batch
+    308 ile 2016 artık 12/12 tamamlandı; güvenlik ağı (2+ il eksik / Genel
+    Toplam yok → hâlâ ValueError) korunuyor.
 
 ## Kesin kurallara uyum — doğrulama
 
@@ -318,11 +333,15 @@ bkz. `07_word_parser_kapsam.md`'nin açık kalanlar listesi) ayrı bir karar.
 - ✅ Tam pytest paketi canlıya karşı çalıştırılmadı — yalnız hedefli
   `-k`/dosya bazlı testler kullanıldı, tam paket yalnız CI'nin
   postgres:16'sında koştu.
-- ✅ Şema değişikliği yapılmadı (migration yok, `dim_grup`'a dokunulmadı).
+- ✅ Şema değişikliği yapılmadı (migration yok, `dim_grup`'a dokunulmadı,
+  `fact_tuketim`'e yeni kolon eklenmedi — türetme bilgisi yalnız
+  `audit_log` JSON'ında).
 - ✅ T10'un yapısal engeline takılan aylar (2016 tümü — tablo hiç yok;
   2017/2018/2019/2020 tümü — il-only; 2021 Ocak-Ekim — il-only)
-  BEKLEMEDE/kapsam_disi bırakıldı, uydurma yapılmadı, döngüye girilmedi.
-  T4'ün "BOŞ-VERİ-ŞEHİR" anomalisi ve Temmuz 2016'nın kayıp Adana verisi
-  de aynı disiplinle (tahmin etmeden, açıkça atlanarak/BEKLEMEDE
-  bırakılarak) çözüldü.
+  kapsam_disi ile işaretlendi (TAMAMI, 70/70), uydurma yapılmadı. T4'ün
+  "BOŞ-VERİ-ŞEHİR" anomalisi aynı disiplinle (tahmin etmeden, açıkça
+  atlanarak) çözüldü. Temmuz 2016'nın Adana verisi TAHMİN EDİLMEDİ —
+  kaynağın kendi yayınladığı Genel Toplam'dan, iki bağımsız tabloyla
+  çapraz doğrulanarak TÜRETİLDİ (matematiksel çıkarım, tahmin değil);
+  güvenlik ağı (2+ il eksik ya da Genel Toplam yoksa) korunuyor.
 - ✅ Her mantıksal adım sonunda ayrı commit + push + CI doğrulaması yapıldı.

@@ -5,8 +5,11 @@ tabloları, DATABASE_URL bağımsız). word_2016'ya özgü farklar: T11'de
 İstanbul'un bazı aylarda iki AYRI satıra bölünmesi (aynı il_kodu'na TOPLANIR),
 T4'te bazı ayların 0. satırının birleştirilmiş "Kaynak Türü" placeholder'ı
 taşıması (gerçek başlık 1. satırda), T4'ün Toplam kolonunun bazı aylarda BOŞ
-başlıklı olması (pozisyona güvenilir) ve grup etiketlerinin bazı aylarda
-TAMAMEN BÜYÜK HARF olması (Türkçe-güvenli normalize_label ile eşlenir).
+başlıklı olması (pozisyona güvenilir), grup etiketlerinin bazı aylarda
+TAMAMEN BÜYÜK HARF olması (Türkçe-güvenli normalize_label ile eşlenir) ve
+Temmuz 2016'da TEK bir ilin (Adana) tablonun kendi Genel Toplam satırından
+TÜRETİLMESİ (dokumanlar/08 — tahmin değil, matematiksel çıkarım; t11_oku()
+artık `(df, turetilmis_kayitlari)` tuple'ı döner).
 """
 
 from __future__ import annotations
@@ -103,10 +106,11 @@ def test_t11_oku_81_il_dogru_toplam_ve_sanayi_haric() -> None:
         satirlar.append([il, "1,0", "2,0", "999,0", "3,0", "4,0", "1009,0"])
     tbl = _tablo_ekle(satirlar)
 
-    df = t11_oku(tbl, tarih_id=201609)
+    df, turetilmis = t11_oku(tbl, tarih_id=201609)
 
     assert len(df) == 81 * 4
     assert "Sanayi" not in set(df["grup"])
+    assert turetilmis is None  # 81 ilin hepsi mevcut, türetme YOK
 
 
 def test_t11_oku_istanbul_bolunmus_satirlari_tek_satira_toplanir() -> None:
@@ -131,9 +135,10 @@ def test_t11_oku_istanbul_bolunmus_satirlari_tek_satira_toplanir() -> None:
             satirlar.append([il, "1,0", "2,0", "999,0", "3,0", "4,0"])
     tbl = _tablo_ekle(satirlar)
 
-    df = t11_oku(tbl, tarih_id=201601)
+    df, turetilmis = t11_oku(tbl, tarih_id=201601)
 
     assert len(df) == 81 * 4  # İstanbul tek il olarak sayılmalı, 82 değil
+    assert turetilmis is None  # 81 ilin hepsi mevcut (İstanbul toplanmış), türetme YOK
     istanbul_kodu = next(kod for kod, ad in _IL_ADI_KANONIK.items() if ad == "İstanbul")
     istanbul_satirlari = df[df["il_kodu"] == istanbul_kodu]
     assert len(istanbul_satirlari) == 4  # tek satır/grup, iki AYRI değil
@@ -141,10 +146,88 @@ def test_t11_oku_istanbul_bolunmus_satirlari_tek_satira_toplanir() -> None:
     assert aydinlatma["tuketim_mwh"].iloc[0] == pytest.approx(2.0)  # 1,0+1,0 TOPLANMIŞ
 
 
-def test_t11_oku_eksik_il_tahmin_etmez_hata_verir() -> None:
+def test_t11_oku_tek_il_eksikse_genel_toplamdan_turetilir() -> None:
     """dokumanlar/08 — Temmuz 2016'da ADANA satırı kaynakta GERÇEKTEN kayıp
-    (başlık tekrarıyla üzerine yazılmış). t11_oku() TAHMİN ETMEMELİ, 81
-    ilin altında kalınca ValueError fırlatmalı (ay BEKLEMEDE işaretlenir)."""
+    (başlık tekrarıyla üzerine yazılmış), ama tablo kendi Genel Toplam
+    satırını basıyor. TEK il eksikken + Genel Toplam satırı VARKEN
+    t11_oku() artık TAHMİN ETMEZ ama TÜRETİR (kaynağın kendi Genel
+    Toplam'ından diğer 80 ilin farkı — matematiksel çıkarım, dokumanlar/08).
+    80 il sabit değer taşıyor, Genel Toplam bu 80'in toplamı + rastgele bir
+    'Adana payı' (10/20/30/40) olacak şekilde kurulmuş; türetilen değerin
+    tam olarak bu paya eşit olduğu doğrulanıyor."""
+    baslik = [
+        "İLLER",
+        "Aydınlatma",
+        "Mesken",
+        "Sanayi",
+        "Tarımsal Sulama",
+        "Ticarethane",
+    ]
+    satirlar = [baslik]
+    diger_iller = [il for il in TUM_ILLER if il != "Adana"]
+    assert len(diger_iller) == 80
+    for il in diger_iller:
+        satirlar.append([il, "1,0", "2,0", "999,0", "3,0", "4,0"])
+    # Adana satırı yerine sayfa-sonu başlık tekrarı (gerçek kaynak deseni)
+    satirlar.append(["İLLER", "", "", "", "", ""])
+    # Genel Toplam = 80 ilin toplamı + Adana payı (10,0 / 20,0 / 999*80+x / 30,0 / 40,0)
+    satirlar.append(["Genel Toplam", "90,0", "180,0", "80019,0", "270,0", "360,0"])
+    tbl = _tablo_ekle(satirlar)
+
+    df, turetilmis = t11_oku(tbl, tarih_id=201607)
+
+    assert len(df) == 81 * 4  # artık TAM 81 il (Adana türetildi)
+    assert turetilmis is not None
+    assert len(turetilmis) == 4  # Sanayi hariç 4 grup
+
+    adana_kodu = next(kod for kod, ad in _IL_ADI_KANONIK.items() if ad == "Adana")
+    adana_satirlari = df[df["il_kodu"] == adana_kodu]
+    assert len(adana_satirlari) == 4
+    beklenen = {
+        "Aydınlatma": 10.0,
+        "Mesken": 20.0,
+        "Tarımsal": 30.0,
+        "Kamu ve Özel Hizmetler": 40.0,  # Ticarethane RENAME
+    }
+    for grup, beklenen_deger in beklenen.items():
+        satir = adana_satirlari[adana_satirlari["grup"] == grup]
+        assert satir["tuketim_mwh"].iloc[0] == pytest.approx(beklenen_deger)
+
+    # turetilmis_kayitlari da AYNI değerleri taşımalı (audit_log'a gidecek)
+    turetilen_gruplar = {k["grup"]: k["tuketim_mwh"] for k in turetilmis}
+    for grup, beklenen_deger in beklenen.items():
+        assert turetilen_gruplar[grup] == pytest.approx(beklenen_deger)
+        assert all(k["il_kodu"] == adana_kodu for k in turetilmis)
+
+
+def test_t11_oku_iki_il_eksikse_hala_tahmin_etmez_hata_verir() -> None:
+    """Güvenlik ağı — 2+ il eksikken payı dağıtmanın matematiksel bir yolu
+    YOK, türetme YAPILMAMALI, ValueError fırlatılmalı (regresyon riski en
+    yüksek nokta)."""
+    baslik = [
+        "İLLER",
+        "Aydınlatma",
+        "Mesken",
+        "Sanayi",
+        "Tarımsal Sulama",
+        "Ticarethane",
+    ]
+    satirlar = [baslik]
+    for il in TUM_ILLER:
+        if il in ("Adana", "Bursa"):
+            continue  # İKİ il eksik
+        satirlar.append([il, "1,0", "2,0", "999,0", "3,0", "4,0"])
+    satirlar.append(["Genel Toplam", "790,0", "1580,0", "78921,0", "2370,0", "3160,0"])
+    tbl = _tablo_ekle(satirlar)
+
+    with pytest.raises(ValueError, match="beklenen satır"):
+        t11_oku(tbl, tarih_id=201607)
+
+
+def test_t11_oku_genel_toplam_yoksa_tek_il_eksik_bile_hata_verir() -> None:
+    """Güvenlik ağı — Genel Toplam satırı hiç yoksa türetme için gerekli
+    çapa da yok, TEK il eksik olsa bile ValueError (türetme için Genel
+    Toplam ZORUNLU)."""
     baslik = [
         "İLLER",
         "Aydınlatma",
@@ -156,9 +239,8 @@ def test_t11_oku_eksik_il_tahmin_etmez_hata_verir() -> None:
     satirlar = [baslik]
     for il in TUM_ILLER:
         if il == "Adana":
-            satirlar.append(["İLLER", "", "", "", "", ""])  # başlık tekrarı, veri YOK
-        else:
-            satirlar.append([il, "1,0", "2,0", "999,0", "3,0", "4,0"])
+            continue  # eksik, ama Genel Toplam satırı da HİÇ yok
+        satirlar.append([il, "1,0", "2,0", "999,0", "3,0", "4,0"])
     tbl = _tablo_ekle(satirlar)
 
     with pytest.raises(ValueError, match="beklenen satır"):

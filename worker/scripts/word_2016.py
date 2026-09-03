@@ -52,11 +52,21 @@ epp\\python.exe`.
    sırada Adana'nın olması gereken yerde tablo kendi başlık satırını
    İKİNCİ KEZ tekrarlıyor (gerçek Adana verisi YOK, sayfa-sonu
    tekrarıyla ÜZERİNE YAZILMIŞ görünüyor — gerçek bir EPDK kaynak
-   hatası). Kod TAHMİN ETMİYOR: başlık-tekrarı satırı atlanınca (81
-   değil 80 il kalır) `t11_oku()`'nun kendi satır-sayısı doğrulaması
-   ValueError fırlatır, ay `isle_ay()`'in dış try/except'i tarafından
-   BEKLEMEDE işaretlenip atlanır (yalnız Temmuz T11 — T4 ayrı bir tablo/
-   batch, etkilenmedi, doğrulandı).
+   hatası). **ÇÖZÜLDÜ (2026-09-05) — TAHMİN DEĞİL, TÜRETME:** hem
+   Tablo 2.2 (il-toplam) hem Tablo 2.4 (il×grup) bağımsız olarak Adana
+   satırını basmıyor, ama İKİSİ de kendi "Genel Toplam" satırını
+   basıyor; iki bağımsız tablonun Genel Toplam'ından diğer 80 ilin
+   farkı alındığında BİREBİR aynı rakama varılıyor (dokumanlar/08'de tam
+   çapraz doğrulama kaydı var). `t11_oku()` bu durumu GENELLEŞTİRİLMİŞ
+   bir mekanizmayla ele alıyor: Genel Toplam satırının grup-bazlı
+   değerleri ayrıca toplanıyor, döngü sonunda TAM 1 il eksikse (ve Genel
+   Toplam satırı bulunduysa) o ilin her grup değeri `Genel Toplam -
+   (görülen illerin toplamı)` ile TÜRETİLİYOR (`[TÜRETİLMİŞ]` diye
+   açıkça loglanıyor, `audit_log`'a `turetilmis=true` ile işaretleniyor
+   — ham kaynak veriyle karıştırılmasın diye, şema değişikliği YOK).
+   **Güvenlik ağı korunuyor:** 2+ il eksikse (payı dağıtmanın
+   matematiksel bir yolu yok) ya da Genel Toplam satırı yoksa, ESKİ
+   davranış AYNEN geçerli — ValueError, TAHMİN YOK, ay BEKLEMEDE.
 7. **Kaynak alias — "Güneş (Yoğunlaştırılmış)"** (TAM kelime, kısaltma
    DEĞİL — 2017-2019'un "Güneş (Yoğunlş.)" kısaltmasından FARKLI bir
    varyant) Ocak-Mayıs arasında görülüyor, Ekim'den itibaren kısaltılmış
@@ -85,8 +95,14 @@ from docx import Document
 
 from worker import ingest, kpi, pipeline
 from worker.db import get_database_url  # import yan etkisi: .env yüklenir
+from worker.parser import (
+    _IL_ADI_KANONIK,
+    il_kodu_bul,
+    kaynak_esle,
+    normalize_label,
+    parse_sayi,
+)
 from worker.parser import grup_esle as _excel_grup_esle
-from worker.parser import il_kodu_bul, kaynak_esle, normalize_label, parse_sayi
 from worker.scripts.word_ortak import (
     basliklari_topla,
     t4_tablosunu_bul,
@@ -250,14 +266,31 @@ def _ay_yil_dogrula_kapak(
     )
 
 
-def t11_oku(tbl, tarih_id: int) -> pd.DataFrame:
+def t11_oku(tbl, tarih_id: int) -> tuple[pd.DataFrame, list[dict] | None]:
     """T11-karşılığı: wide format. Karar 2: Sanayi HARİÇ.
 
     word_2017.py:t11_oku()'dan FARKLI: 2016 Ocak/Şubat/Mart'ta İstanbul iki
     AYRI satıra bölündüğünden (bkz. modül notu), aynı il_kodu'na eşlenen
     birden fazla satır OLABİLİR — bu yüzden t4_oku()'daki AYNI
     il-başına-grup-toplamı (dict) deseni kullanılıyor, kolon sayısı kadar
-    satır DOĞRUDAN değil."""
+    satır DOĞRUDAN değil.
+
+    dokumanlar/08 devamı — Temmuz 2016'da (modül notu madde 6) ADANA
+    satırı kaynakta TAMAMEN kayıp, ama tablo kendi "Genel Toplam" satırını
+    basıyor. Bu GENELLEŞTİRİLMİŞ mekanizma yalnız Temmuz/Adana'ya
+    hardcode DEĞİL — TAM 1 il eksikse VE Genel Toplam satırı bulunduysa,
+    o ilin her grup değeri `Genel Toplam - (görülen illerin toplamı)` ile
+    TÜRETİLİR (tahmin DEĞİL — kaynağın kendi yayınladığı toplamdan
+    matematiksel çıkarım, iki bağımsız EPDK tablosuyla [Tablo 2.2/Tablo
+    2.4] çapraz doğrulandı, dokumanlar/08). **Güvenlik ağı korunur:** 2+
+    il eksikse (payı dağıtmanın matematiksel bir yolu yok) ya da Genel
+    Toplam satırı yoksa, TÜRETME YAPILMAZ — aşağıdaki satır-sayısı
+    doğrulaması ValueError fırlatır, TAHMİN EDİLMEZ.
+
+    Döner: `(df, turetilmis_kayitlari)` — ikinci eleman türetme
+    YAPILMADIYSA `None`, yapıldıysa `{il_kodu, il_adi, grup, tuketim_mwh}`
+    kayıtlarının listesi (audit_log'a `turetilmis=true` ile yazılsın diye,
+    ham kaynak veriyle KARIŞTIRILMASIN)."""
     baslik_satir = [c.text.strip() for c in tbl.rows[0].cells]
     grup_kolonlari: list[tuple[int, str]] = []
     for idx, hucre in enumerate(baslik_satir):
@@ -271,21 +304,23 @@ def t11_oku(tbl, tarih_id: int) -> pd.DataFrame:
         raise ValueError(f"T11: hiç grup kolonu bulunamadı, başlık={baslik_satir}")
 
     il_toplamlari: dict[tuple[int, str], float] = {}
+    genel_toplam_grup: dict[str, float] | None = None
     for row in tbl.rows[1:]:
         hucreler = [c.text.strip() for c in row.cells]
         il_adi_ham = _il_adi_temizle(hucreler[0])
+        if il_adi_ham.upper() in ("GENEL TOPLAM", "TOPLAM"):
+            # dokumanlar/08 devamı — Genel Toplam satırının grup-bazlı
+            # değerleri, olası tek-il-eksik türetmesi için ayrıca toplanır.
+            genel_toplam_grup = {
+                grup: (parse_sayi(hucreler[kolon_idx]) or 0.0)
+                for kolon_idx, grup in grup_kolonlari
+            }
+            continue
         # dokumanlar/08 devamı — Temmuz 2016'da ADANA'nın olması gereken
         # yerde tablo kendi başlık satırını ("İLLER") İKİNCİ KEZ
-        # tekrarlıyor (gerçek Adana verisi kaynakta YOK) — "GENEL TOPLAM"/
-        # "TOPLAM" ile AYNI şekilde atlanır. Bu durumda toplam il sayısı
-        # 81'in altında kalır, aşağıdaki satır-sayısı doğrulaması bunu
-        # yakalar (ay BEKLEMEDE işaretlenir, TAHMİN EDİLMEZ).
-        if not il_adi_ham or il_adi_ham.upper() in (
-            "GENEL TOPLAM",
-            "TOPLAM",
-            "İLLER",
-            "İL",
-        ):
+        # tekrarlıyor (gerçek Adana verisi kaynakta YOK) — atlanır, eksik
+        # kalan il aşağıda (varsa) türetilir ya da doğrulama hatası verir.
+        if not il_adi_ham or il_adi_ham.upper() in ("İLLER", "İL"):
             continue
         il_kodu = il_kodu_bul(il_adi_ham)
         if il_kodu is None:
@@ -296,6 +331,33 @@ def t11_oku(tbl, tarih_id: int) -> pd.DataFrame:
             il_toplamlari[anahtar] = il_toplamlari.get(anahtar, 0.0) + (
                 deger if deger is not None else 0.0
             )
+
+    gorulen_iller = {il_kodu for il_kodu, _ in il_toplamlari}
+    eksik_iller = TUM_IL_KODLARI - gorulen_iller
+    turetilmis_kayitlari: list[dict] | None = None
+    if len(eksik_iller) == 1 and genel_toplam_grup is not None:
+        eksik_il_kodu = next(iter(eksik_iller))
+        eksik_il_adi = _IL_ADI_KANONIK.get(eksik_il_kodu, str(eksik_il_kodu))
+        turetilmis_kayitlari = []
+        for _kolon_idx, grup in grup_kolonlari:
+            diger_toplam = sum(
+                deger for (il_kodu, g), deger in il_toplamlari.items() if g == grup
+            )
+            turetilen_deger = genel_toplam_grup[grup] - diger_toplam
+            il_toplamlari[(eksik_il_kodu, grup)] = turetilen_deger
+            turetilmis_kayitlari.append(
+                {
+                    "il_kodu": eksik_il_kodu,
+                    "il_adi": eksik_il_adi,
+                    "grup": grup,
+                    "tuketim_mwh": turetilen_deger,
+                }
+            )
+        print(
+            f"  [TÜRETİLMİŞ] {eksik_il_adi}: Genel Toplam'dan diğer "
+            f"{len(gorulen_iller)} ilin farkı ile hesaplandı (kaynakta satır "
+            "kaybı, dokumanlar/08_word_2016_2022_kapsam.md)."
+        )
 
     satirlar = [
         {
@@ -314,10 +376,11 @@ def t11_oku(tbl, tarih_id: int) -> pd.DataFrame:
     if len(df) != beklenen:
         raise ValueError(
             f"T11: beklenen satır {beklenen} (81 il × {len(grup_kolonlari)} grup), "
-            f"gerçek {len(df)} — bir il eksik/kayıp olabilir (dokumanlar/08, "
-            "Temmuz 2016 örneği gibi), TAHMİN EDİLMEDİ."
+            f"gerçek {len(df)} — {len(eksik_iller)} il eksik/kayıp (dokumanlar/08). "
+            "TEK il + Genel Toplam satırı varsa türetilir; birden fazla il "
+            "eksikse ya da Genel Toplam satırı yoksa TAHMİN EDİLMEZ."
         )
-    return df
+    return df, turetilmis_kayitlari
 
 
 def t4_oku(tbl, tarih_id: int) -> pd.DataFrame:
@@ -478,7 +541,7 @@ def isle_ay(
     )
     print(f"  T11 başlık: {t11_baslik!r}")
 
-    tuketim_ham = t11_oku(t11_tbl, tarih_id)
+    tuketim_ham, turetilmis_kayitlari = t11_oku(t11_tbl, tarih_id)
     print(
         f"  T11: {len(tuketim_ham)} satır, grup={sorted(tuketim_ham['grup'].unique())}, "
         f"toplam={tuketim_ham['tuketim_mwh'].sum():,.2f} MWh"
@@ -548,6 +611,20 @@ def isle_ay(
         "atlanan": atlanan_t,
         "red_satirlari": dogrulanan_t.red.to_dict("records"),
     }
+    if turetilmis_kayitlari is not None:
+        # dokumanlar/08 devamı — bir il TAHMİN değil, kaynağın kendi Genel
+        # Toplam'ından TÜRETİLDİ (bkz. t11_oku() modül notu) — ham kaynak
+        # veriyle sonradan KARIŞTIRILMASIN diye audit_log'da AÇIKÇA
+        # işaretleniyor. Şema değişikliği YOK (fact_tuketim'e yeni kolon
+        # eklenmedi), bu bilgi yalnız audit_log JSON'ında kalıyor.
+        audit_tablolar["fact_tuketim"]["turetilmis"] = True
+        audit_tablolar["fact_tuketim"]["turetilmis_kayitlari"] = turetilmis_kayitlari
+        audit_tablolar["fact_tuketim"]["turetilmis_yontem"] = (
+            "Kaynakta tamamen kayıp TEK bir il için, tablonun kendi Genel "
+            "Toplam satırından diğer 80 ilin farkı alınarak hesaplandı "
+            "(iki bağımsız EPDK tablosuyla [Tablo 2.2/Tablo 2.4] çapraz "
+            "doğrulandı, dokumanlar/08_word_2016_2022_kapsam.md)."
+        )
     audit_tablolar["fact_abone"] = {
         "toplam": 0,
         "not": "kaynakta yok — 2016 raporunda Tüketici Sayısı tablosu hiç "
