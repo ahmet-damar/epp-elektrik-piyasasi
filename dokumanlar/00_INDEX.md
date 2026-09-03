@@ -21,7 +21,7 @@ kod üretirken bu dosyaları bağlam (context) olarak okuyabilmesi.
 | `07_word_parser_kapsam.md` | Word (.docx) EPDK raporları — teşhis + kapsam kararları; T11/T10/T4 36 ay TAM aktif (T4 batch 53-88 aktive edildi). T13 (Karar 1) + T1 (Karar 3) kapsam dışı — artık `veri_kapsam_disi` tablosuyla açıkça işaretli (72 satır). KPI-26 ve KPI-25 düzeltildi, yeni KPI-27 (Sanayi-hariç tüketim CAGR) eklendi | — (2026-09-03) |
 | `08_word_2016_2022_kapsam.md` | Word (.docx) EPDK raporları 2016-2022 — teşhis + TAM implementasyon. 2016-2022'nin TAMAMI (T11/T4) işlendi, T10 yapısal olarak çoğunlukla kaynakta yok (kapsam_disi ile işaretli), taksonomi kararı (RENAME) verildi ve uygulandı | — (2026-09-05) |
 | `09_PROJE_DURUMU.md` | **Projenin GÜNCEL, canlı DB'ye karşı doğrulanmış tam durum raporu** — tamamlanan işler, aktivasyon durumu (yıl × tablo), geriye kalanlar, güvenilirlik notu. `SABAH_OZETI.md`'nin YERİNE bakılmalı | — (2026-09-05) |
-| `SABAH_OZETI.md` | **TARİHSEL — artık güncel değil.** Yalnız 2016-2022 Word aktarımının gece-turu dizisinin notuydu (2026-09-03/05). Silinmedi (referans/iz için duruyor), ama proje durumu için **bkz. `09_PROJE_DURUMU.md`** | — (2026-08-30, son güncelleme 2026-09-05) |
+| ~~`SABAH_OZETI.md`~~ | **SİLİNDİ (2026-09-03)** — 2016-2022 Word aktarımının gece-turu dizisinin geçici notuydu, bazı iddiaları (2021/2022 T11-T10 aktivasyon durumu) DB'yle karşılaştırıldığında yanlış çıktı. Proje durumu için **bkz. `09_PROJE_DURUMU.md`** | — (2026-08-30, silindi 2026-09-03) |
 
 ## Copilot İçin Kullanım
 Chat'te bağlam vermek için:
