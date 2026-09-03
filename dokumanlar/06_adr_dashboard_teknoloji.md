@@ -68,6 +68,59 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   kullanılmalı. Detay/tekrar üretme adımları: `dokumanlar/
   06_canli_veri_operasyon_gunlugu.md` (2026-09-02, "auth schema USAGE"
   bölümü).
+- **RLS notu, KESİN KÖK NEDEN bulundu (2026-09-05, yalnız TEST — kod/şema
+  değişikliği YAPILMADI):** Yukarıdaki "transaction-mode pooler kısıtlıyor"
+  hipotezi **YANLIŞ ÇIKTI** — session-mode bir bağlantıyla (aynı Supavisor
+  pooler host'u, port 5432, transaction-mode'un 6543'ünden farklı; bkz.
+  `.env`'deki `DATABASE_URL_DIRECT`) `postgres` kullanıcısıyla `SET ROLE
+  viewer` **AYNI hatayla** ("permission denied to set role") reddedildi —
+  yani sorun pooler modu DEĞİL, aşağıdaki gerçek neden:
+
+  **Gerçek kök neden — PostgreSQL 17'nin (canlı DB'nin sürümü, `SHOW
+  server_version` ile doğrulandı) ayrık `SET` yetkisi:** `pg_auth_members`
+  (PG16+'da üç ayrı sütun taşıyor: `admin_option`, `inherit_option`,
+  `set_option`) sorgulandığında, `postgres`'in `viewer`/`data_operator`/
+  `admin`'e üyeliği **`admin_option=true` ama `inherit_option=false` VE
+  `set_option=false`** — buna karşılık `authenticated`/`service_role`
+  üyelikleri **`inherit_option=true` VE `set_option=true`** (Supabase'in
+  kendi yönettiği roller, farklı grantlanmış). `SET ROLE`/`SET SESSION
+  AUTHORIZATION` PG16+'da AÇIKÇA `set_option=true` gerektirir — üyelik
+  (`pg_has_role(...,'MEMBER')`) VARLIĞI tek başına YETMİYOR. Bu proje
+  `20260819_0002_rls_roles.sql`'de `viewer`/`data_operator`/`admin`
+  rollerini muhtemelen düz `GRANT role TO grantee;` (varsayılan `SET`
+  seçeneği grantee'nin KENDİ `rolinherit`'inden BAĞIMSIZ, PG'nin kendi
+  varsayılanına göre `false` kalabiliyor) ile grantlamış — bu satır
+  `WITH SET TRUE` içermiyor.
+
+  **JWT/`current_app_role()` mekanizmasının KENDİSİ ÇALIŞIYOR** (bu kısım
+  test edildi ve BAŞARILI): `auth.jwt()`'nin gerçek tanımı sorgulandı
+  (varsayılmadı) — `coalesce(current_setting('request.jwt.claim',true),
+  current_setting('request.jwt.claims',true))::jsonb` okuyor. Aynı
+  session'da `SET request.jwt.claims = '{"app_metadata":{"role":
+  "viewer"}}';` çalıştırılıp `SELECT public.current_app_role();` çağrıldı
+  — **`'viewer'` DÖNDÜ, doğru çalıştı.**
+
+  **Yapısal ek bulgu:** RLS politikaları `FOR SELECT TO viewer USING
+  (current_app_role()='viewer' AND ...)` şeklinde **ÇİFT kapılı** — hem
+  PostgreSQL'in FİZİKSEL rol hedeflemesi (`TO viewer`, oturumun GERÇEKTEN
+  `viewer` rolüne geçmiş/onu miras almış olmasını gerektirir) HEM
+  `current_app_role()`'ün (JWT claim okuyan) doğru değeri döndürmesi
+  gerekiyor. Standart bir Supabase Auth oturumu `authenticated` rolüyle
+  bağlanır — bu politikaların GERÇEKTEN tetiklenmesi için ya backend'in
+  elle `SET ROLE viewer` yapması ya da PostgREST'in `db-role-claim-key`
+  mekanizmasının (JWT claim'ine göre örtük `SET ROLE` yapar) devrede
+  olması gerekir — İKİSİ de AYNI eksik `set_option=true` grantına takılır.
+
+  **Sonuç — Faz B'yi planlarken:** Engel connection-mode/pooler DEĞİL,
+  TEK bir migration'lık bir grant eksikliği: `viewer`/`data_operator`/
+  `admin` rollerinin ilgili tarafa (muhtemelen `authenticated`, karar
+  Ahmet'e ait) `WITH SET TRUE` (muhtemelen `WITH INHERIT TRUE, SET TRUE`)
+  granti verilmesi gerekiyor. **Bu görevde UYGULANMADI** (kod/şema
+  değişikliği bu görevin kapsamı dışıydı) — yalnız teşhis edildi. Test
+  scripti (`worker/scripts/gecici_rol_testi.py`) GEÇİCİYDİ, iş bitince
+  silindi, commit'lenmedi. Hiçbir gerçek kullanıcı/rol/`auth.users` satırı
+  oluşturulmadı; yalnız `SELECT`/session-yerel `SET` çalıştırıldı, hepsi
+  `ROLLBACK` edildi.
 
 ## Değerlendirilen Alternatifler
 - **Next.js + TypeScript (şimdi):** Reddedildi — Faz 2 kapsamına göre erken;
