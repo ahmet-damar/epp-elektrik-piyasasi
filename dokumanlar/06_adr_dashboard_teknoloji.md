@@ -236,10 +236,66 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   **`app/dashboard.py`'de `st.session_state`'e geçiş:** `@st.cache_
   resource` (parametresiz, TÜM kullanıcılar arasında TEK paylaşımlı
   bağlantı) kaldırıldı — her Streamlit oturumu artık KENDİ bağlantısını
-  açıyor (`st.session_state`). `DATABASE_URL_DASHBOARD`/`SET ROLE` bu
-  turda dashboard'a HENÜZ BAĞLANMADI — mevcut `DATABASE_URL` davranışı
-  korunuyor, yalnız mekanizma hazırlandı (gerçek giriş ekranı ayrı bir
-  görevde gelecek).
+  açıyor (`st.session_state`).
+
+- **Faz B — TAMAMLANDI (2026-09-05): gerçek giriş ekranı + Ahmet'in admin
+  hesabı.** Panel artık uçtan uca kimlik doğrulamalı — mekanizma:
+
+  1. **`worker/auth.py`** (framework-agnostik, ADR-7 ilkesi): `giris_yap
+     (email, sifre)` Supabase Auth'a (`sign_in_with_password`) karşı
+     doğrular, başarılı oturumun GERÇEK JWT'sini çözüp `app_metadata.
+     role`'ü okur (rol bilinen üçlüden [viewer/data_operator/admin]
+     biri DEĞİLSE erişim reddedilir, sessizce `viewer` VARSAYILMAZ).
+     `rol_baglantisi_ac(jwt_claims_json, rol)` `DATABASE_URL_DASHBOARD`
+     (`app_dashboard_service`) ile YENİ bir bağlantı açar, `request.
+     jwt.claims`'i gerçek JWT ile set eder, `SET ROLE <rol>` yapar —
+     `rol` HER ZAMAN whitelist'e karşı doğrulanır (whitelist dışıysa
+     `SET ROLE`'e hiç ulaşmadan `ValueError`; ayrıca `psycopg.sql.
+     Identifier`/`Literal` kullanılır, ham string birleştirme YOK).
+  2. **`app/dashboard.py`:** `DATABASE_URL_DASHBOARD` yapılandırılmışsa
+     panel HER ZAMAN bir giriş ekranı (`st.form`, e-posta+şifre) gösterir
+     — eski, girişsiz `DATABASE_URL` yolu ARTIK KULLANILMAZ (yoksa giriş
+     ekranı dekoratif kalırdı). `DATABASE_URL_DASHBOARD` hiç
+     yapılandırılmamışsa (yerel/offline geliştirme) eski davranış AYNEN
+     korunur, giriş ekranı da hiç gösterilmez. Başarısız girişte GENEL
+     bir hata ("E-posta veya şifre hatalı") — hesabın var olup olmadığı
+     SIZDIRILMAZ. Sidebar'da "Çıkış Yap" butonu (bağlantıyı kapatır,
+     `session_state`'i temizler, `st.rerun()`).
+  3. **Ahmet'in hesabı** — Supabase Admin API (`auth.admin.create_user()`,
+     GERÇEK `service_role` key ile — `.env`'deki `SUPABASE_SERVICE_ROLE_
+     KEY` başlangıçta yanlışlıkla anon key'in kopyasıydı, Ahmet'in
+     dashboard'dan aldığı gerçek değerle düzeltildi) ile oluşturuldu:
+     `a.damar61@windowslive.com`, `app_metadata.role="admin"`,
+     `email_confirm=true`, rastgele üretilmiş güçlü bir şifre (yalnız
+     terminalde Ahmet'e gösterildi — hiçbir commit/log/PR'a yazılmadı).
+     Oluşturma script'i GEÇİCİYDİ (repo dışında, scratchpad'de
+     çalıştırıldı), iş bitince silindi.
+
+  **Uçtan uca CANLI doğrulama (2026-09-05):** Ahmet'in gerçek hesabıyla
+  `giris_yap()` çağrıldı → `rol='admin'` doğru okundu →
+  `rol_baglantisi_ac()` ile açılan bağlantıda `current_app_role()`→
+  `'admin'`, `fact_tuketim`→**44.458** satır, `fact_abone`→**25.110**
+  satır erişilebilir (migration 0019'un kaldırdığı 14 bypass
+  politikasından SONRAKİ, DOĞRU `current_app_role()`-gated erişimle).
+  Yanlış şifre VE var olmayan e-posta — İKİSİ de `giris_yap()`'tan
+  `None` döndü (aynı, ayırt edilemeyen sonuç — hangi durumun
+  gerçekleştiği sızdırılmadı). `worker/validate_role_access.py` CI'da
+  hâlâ geçiyor (bu turda hiçbir migration/politika değişmedi).
+
+  **Yeni kullanıcı eklemek (script silindiği için — adımlar, kod DEĞİL):**
+  1. Supabase dashboard → Authentication → Users → **Add user** (ya da
+     Admin API'den `auth.admin.create_user()` — `email`, güçlü bir geçici
+     şifre, `Auto Confirm User` işaretli).
+  2. Kullanıcı oluşunca, **User Management** panelinde o kullanıcıyı aç →
+     **User Metadata** DEĞİL, **App Metadata**'ya şunu ekle:
+     `{"role": "viewer"}` (ya da `"data_operator"`/`"admin"` — YALNIZ bu
+     üç değer geçerli, `worker/auth.py:GECERLI_ROLLER`).
+  3. Kullanıcıya geçici şifreyi güvenli bir kanaldan ilet — panelin kendi
+     "şifre sıfırlama" akışı henüz yok, ilk girişte Supabase dashboard'dan
+     elle bir yeni şifre atanabilir (**Reset password**).
+  4. Kod değişikliği/deploy GEREKMEZ — `worker/auth.py` `app_metadata.
+     role`'ü DİNAMİK okur, yeni kullanıcı bir sonraki girişinde otomatik
+     çalışır.
 
 ## Değerlendirilen Alternatifler
 - **Next.js + TypeScript (şimdi):** Reddedildi — Faz 2 kapsamına göre erken;

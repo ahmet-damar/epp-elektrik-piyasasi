@@ -30,6 +30,23 @@ pre-commit install --hook-type commit-msg
 pre-commit run --all-files
 ```
 
+## Panel Nasıl Çalıştırılır + Giriş (Faz B, 2026-09-05)
+```bash
+streamlit run app/dashboard.py
+```
+`.env`'de `DATABASE_URL_DASHBOARD` yapılandırılmışsa (canlı Supabase
+kurulumunda böyledir) panel **e-posta/şifre girişi ister** — Supabase
+Auth hesabınla giriş yaparsın, rolün (`app_metadata.role` — `viewer`/
+`data_operator`/`admin`) veriye erişimini otomatik belirler (bkz.
+`dokumanlar/06_adr_dashboard_teknoloji.md`, "Faz B — TAMAMLANDI"
+bölümü). `DATABASE_URL_DASHBOARD` HİÇ yapılandırılmamışsa (yerel/offline
+geliştirme) giriş İSTENMEZ, panel yerel dosya verisiyle (ya da varsa
+`DATABASE_URL`) çalışır.
+
+**Yeni kullanıcı eklemek** bir kod değişikliği DEĞİL, Supabase Admin
+API'sinden tek bir çağrı — adımlar `dokumanlar/06_adr_dashboard_
+teknoloji.md`'de yazılı.
+
 ## GitHub Ayarları
 - Branch protection (main): PR + "Quality Gate" required check + signed commits
 - Code security: Secret scanning + Push protection, Dependabot, Trivy (fs+deps)
