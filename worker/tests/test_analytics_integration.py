@@ -142,6 +142,33 @@ def test_iller_getir_81_il(conn) -> None:  # type: ignore[no-untyped-def]
     assert "Eskişehir" in df["il_adi"].tolist()
 
 
+def test_kapsam_disi_getir_isaretli_kaydi_dondurur(conn, aktif_batch) -> None:  # type: ignore[no-untyped-def]
+    """Aşama 7 (dokumanlar/06_canli_veri_operasyon_gunlugu.md) — dashboard'un
+    'bu dönem için kaynakta yok' bilgi kutusunun beslediği fonksiyon."""
+    from worker import pipeline
+
+    pipeline.kapsam_disi_isaretle(
+        conn,
+        tarih_id=202601,
+        fact_tablosu="fact_serbest_tuketici",
+        sebep="Word kaynağında T13 hiç yok (Karar 1).",
+        karar_referansi="Karar 1",
+    )
+
+    df = analytics.kapsam_disi_getir(conn, 202601)
+
+    assert len(df) == 1
+    assert df.iloc[0]["fact_tablosu"] == "fact_serbest_tuketici"
+    assert df.iloc[0]["nitelik"] == "(tumu)"
+    assert "Karar 1" in df.iloc[0]["sebep"] or "T13" in df.iloc[0]["sebep"]
+
+
+def test_kapsam_disi_getir_isaretli_kayit_yoksa_bos_doner(conn, aktif_batch) -> None:  # type: ignore[no-untyped-def]
+    df = analytics.kapsam_disi_getir(conn, 202601)
+    assert df.empty
+    assert list(df.columns) == ["fact_tablosu", "nitelik", "sebep"]
+
+
 # ---------------------------------------------------------------------------
 # Faz 3 (hava normalizasyonu): sistem_parametre, hava_getir (UPSERT modeli),
 # kpi_11_12_hesapla, yıllık seriler + CAGR.

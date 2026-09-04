@@ -465,6 +465,24 @@ def donemler_getir(conn: Connection) -> pd.DataFrame:
     return pd.DataFrame(satirlar, columns=["tarih_id", "yil_ay"])
 
 
+def kapsam_disi_getir(conn: Connection, tarih_id: int) -> pd.DataFrame:
+    """Seçili dönem için `veri_kapsam_disi`'de işaretli kayıtları döndürür
+    (Aşama 7, dokumanlar/06_canli_veri_operasyon_gunlugu.md): dashboard
+    boş/'veri yok' göstermek YERİNE, o verinin kaynakta neden mevcut
+    olmadığını (Karar 1/3, kalıcı kaynak hataları vb.) açıkça göstersin
+    diye. Kolonlar: fact_tablosu, nitelik, sebep."""
+    sorgu = """
+        SELECT fact_tablosu, nitelik, sebep
+        FROM veri_kapsam_disi
+        WHERE tarih_id = %s
+        ORDER BY fact_tablosu, nitelik
+    """
+    with conn.cursor() as cur:
+        cur.execute(sorgu, [tarih_id])
+        satirlar = cur.fetchall()
+    return pd.DataFrame(satirlar, columns=["fact_tablosu", "nitelik", "sebep"])
+
+
 def iller_getir(conn: Connection) -> pd.DataFrame:
     """İl filtresi için dim_il'in tamamı (81 il)."""
     with conn.cursor() as cur:

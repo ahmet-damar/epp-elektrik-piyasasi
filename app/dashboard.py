@@ -237,6 +237,11 @@ def _sistem_parametre_getir_cached(_conn: Any) -> dict[str, float]:
     return analytics.sistem_parametre_getir(_conn)
 
 
+@st.cache_data(show_spinner=False)
+def _kapsam_disi_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
+    return analytics.kapsam_disi_getir(_conn, tarih_id)
+
+
 @st.cache_data(show_spinner="Hava normalizasyonu (KPI-11/12) hesaplanıyor...")
 def _kpi_11_12_hesapla_cached(
     _conn: Any, il_kodu: int, tarih_id: int, hava_norm_yil: int, tuketim_norm_yil: int
@@ -328,6 +333,7 @@ if gercek_veri_var:
     abone = _abone_getir_cached(db_handle, secili_tarih_id)
     serbest = _serbest_tuketici_getir_cached(db_handle, secili_tarih_id)
     hava = _hava_getir_cached(db_handle, secili_tarih_id)
+    kapsam_disi = _kapsam_disi_getir_cached(db_handle, secili_tarih_id)
 
     # KPI-13 (YoY): bir önceki yılın aynı ayı aktifse kullan, yoksa 'veri yok'.
     onceki_tarih_id = secili_tarih_id - 100
@@ -356,6 +362,7 @@ else:
     # statik yedekte sistem_parametre'ye erişim yok - migration 20260819_0004
     # seed değerleriyle aynı (Faz 2 dashboard notunda da böyleydi).
     hdd_baz_c, cdd_baz_c, hava_norm_yil, tuketim_norm_yil = 18.0, 22.0, 10, 5
+    kapsam_disi = pd.DataFrame(columns=["fact_tablosu", "nitelik", "sebep"])
     with st.sidebar:
         st.header("Dönem")
         st.selectbox("Ay/Yıl", [donem_etiketi], disabled=True)
@@ -363,6 +370,23 @@ else:
 # ---------------- BAŞLIK ----------------
 st.title("⚡ Türkiye Elektrik Piyasası Paneli")
 st.caption(f"EPDK Elektrik Piyasası Sektör Raporu — {donem_etiketi} · 81 İl")
+
+# Aşama 7 (dokumanlar/06_canli_veri_operasyon_gunlugu.md): seçili dönem
+# için veri_kapsam_disi'de işaretli bir kayıt varsa (T13/T1/T4-Temmuz2022
+# gibi "kaynakta yok" durumları), ilgili KPI kartlarının boş/"veri yok"
+# görünmesi kullanıcıya AÇIKLAMASIZ kalmasın diye burada tek bir bilgi
+# kutusunda özetlenir — sahte bir eksiklik izlenimi vermemek için.
+if not kapsam_disi.empty:
+    satirlar = [
+        f"**{r.fact_tablosu}**"
+        + (f" ({r.nitelik})" if r.nitelik != "(tumu)" else "")
+        + f" — {r.sebep}"
+        for r in kapsam_disi.itertuples()
+    ]
+    st.info(
+        "ℹ️ Bu dönem için kaynakta mevcut olmayan veriler:\n\n"
+        + "\n\n".join(f"- {s}" for s in satirlar)
+    )
 
 # ---------------- FİLTRE (kenar çubuğu) ----------------
 with st.sidebar:
