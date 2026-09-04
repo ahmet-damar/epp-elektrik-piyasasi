@@ -738,3 +738,30 @@ hatırlamaya bırakılamayacağını gösterdi.
 Commit'ler: `a78b26d` (0001), migration sırası itibarıyla 0002-0004 aynı
 oturumda ayrı commit'lerle push edildi (`047473f` dahil) — tam liste için
 `git log --oneline` bu tarih aralığında.
+
+## 2026-09-03 (karar kaydı, geriye taşındı) — Taksonomi kararı: "Ticarethane"/
+"Tarımsal Sulama" RENAME olarak kabul edildi
+
+**Bu giriş, silinen `SABAH_OZETI.md`'den bu operasyon günlüğüne taşındı**
+(2026-09-04, Aşama 8 temizliği) — tam analiz hâlâ
+`dokumanlar/08_word_2016_2022_kapsam.md`'de (Bulgu 5) duruyor, burada
+yalnız kısa bir karar kaydı.
+
+**Soru:** 2020 tam yıl + 2021 tam yıl + 2022 Ocak-Nisan, tüketici grubu
+etiketlerinde kanonik kümede (`worker/parser.py:GRUP_ESLEME`) olmayan
+"Ticarethane" ve "Tarımsal Sulama" kullanıyordu — bu bir yeniden
+adlandırma (RENAME) mı, yoksa gerçek bir kapsam/taksonomi değişikliği mi?
+
+**Kanıt 1 (mevsimsellik):** Taksonomi belirsizliği hiç olmayan 2023-2025
+verisinde "Tarımsal" grubu Mart→Mayıs arasında zaten 2,79×-4,17×
+sıçrıyor — 2021→2022'nin "Tarımsal Sulama"→"Tarımsal Faaliyetler"
+arasındaki 2,82× artış bu aralığın İÇİNDE, kapsam değişikliği değil.
+**Kanıt 2 (çapraz-doküman, ayrıca doğrulandı):** EPDK'nın kendi
+"Dönemler Arası Karşılaştırma" tablosu, aynı takvim döneminin eski/yeni
+etiketli değerlerini 12 örnek ayın 10'unda tam 1,0000 oranıyla eşleştirdi.
+
+**Karar: RENAME.** Uygulama: `word_2020/2021/2022.py`'nin
+`_GRUP_TAKMA_ADLAR`'ına "Ticarethane"→"Kamu ve Özel Hizmetler",
+"Tarımsal Sulama"→"Tarımsal" eklendi. `worker/parser.py:GRUP_ESLEME`
+DEĞİŞMEDİ (mimari karar — bkz. Karar 2/3 ile aynı ilke, yıla özel
+tarifler kanonik şemayı bozmadan farklılıkları emer).
