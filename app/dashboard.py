@@ -33,6 +33,15 @@ bağlantı parametresi `_conn` adıyla geçirilir çünkü Streamlit alttan
 nesnesi hash'lenemeyeceğinden bu isimlendirme zorunludur (adı `conn`
 olsaydı cache ya patlar ya sessizce devre dışı kalırdı).
 
+**2026-09-05, tüm @st.cache_data'lara `ttl=1800` (30 dk) eklendi:**
+önceden TTL yoktu — yeni veri (örn. yeni bir batch aktive edilince)
+görünmesi için Streamlit Cloud'da elle "Reboot app" gerekiyordu
+(süreç tazelenmeden cache asla düşmüyordu). 30 dk, "aşırı sık yeniden
+sorgulama" ile "saatlerce bayat kalma" arasında bir denge — bu veri
+en fazla günde birkaç kez (yeni ay aktivasyonu) değişiyor, agresif bir
+TTL gerekmiyor. `_statik_veri_hazirla()` (yerel dosya, DB değil)
+BİLİNÇLİ OLARAK TTL'siz bırakıldı — çalışma süresince hiç değişmiyor.
+
 **2026-09-05, KRİTİK değişiklik — `@st.cache_resource`'tan `st.session_state`'e
 geçildi:** `@st.cache_resource` PARAMETRESİZDİ, yani TÜM Streamlit
 kullanıcıları/sekmeleri TEK bir paylaşımlı psycopg bağlantısını
@@ -197,52 +206,52 @@ else:
 # _conn: bkz. modül notu - Streamlit alttan çizgili parametreleri hash'lemez.
 
 
-@st.cache_data(show_spinner="Dönemler yükleniyor...")
+@st.cache_data(show_spinner="Dönemler yükleniyor...", ttl=1800)
 def _donemler_getir_cached(_conn: Any) -> pd.DataFrame:
     return analytics.donemler_getir(_conn)
 
 
-@st.cache_data(show_spinner="İller yükleniyor...")
+@st.cache_data(show_spinner="İller yükleniyor...", ttl=1800)
 def _iller_getir_cached(_conn: Any) -> pd.DataFrame:
     return analytics.iller_getir(_conn)
 
 
-@st.cache_data(show_spinner="Üretim verisi yükleniyor...")
+@st.cache_data(show_spinner="Üretim verisi yükleniyor...", ttl=1800)
 def _uretim_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
     return analytics.uretim_getir(_conn, tarih_id)
 
 
-@st.cache_data(show_spinner="Tüketim verisi yükleniyor...")
+@st.cache_data(show_spinner="Tüketim verisi yükleniyor...", ttl=1800)
 def _tuketim_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
     return analytics.tuketim_getir(_conn, tarih_id)
 
 
-@st.cache_data(show_spinner="Abone verisi yükleniyor...")
+@st.cache_data(show_spinner="Abone verisi yükleniyor...", ttl=1800)
 def _abone_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
     return analytics.abone_getir(_conn, tarih_id)
 
 
-@st.cache_data(show_spinner="Serbest tüketici verisi yükleniyor...")
+@st.cache_data(show_spinner="Serbest tüketici verisi yükleniyor...", ttl=1800)
 def _serbest_tuketici_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
     return analytics.serbest_tuketici_getir(_conn, tarih_id)
 
 
-@st.cache_data(show_spinner="Hava verisi yükleniyor...")
+@st.cache_data(show_spinner="Hava verisi yükleniyor...", ttl=1800)
 def _hava_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
     return analytics.hava_getir(_conn, tarih_id)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl=1800)
 def _sistem_parametre_getir_cached(_conn: Any) -> dict[str, float]:
     return analytics.sistem_parametre_getir(_conn)
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl=1800)
 def _kapsam_disi_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
     return analytics.kapsam_disi_getir(_conn, tarih_id)
 
 
-@st.cache_data(show_spinner="Hava normalizasyonu (KPI-11/12) hesaplanıyor...")
+@st.cache_data(show_spinner="Hava normalizasyonu (KPI-11/12) hesaplanıyor...", ttl=1800)
 def _kpi_11_12_hesapla_cached(
     _conn: Any, il_kodu: int, tarih_id: int, hava_norm_yil: int, tuketim_norm_yil: int
 ) -> dict[str, float | None]:
@@ -255,17 +264,17 @@ def _kpi_11_12_hesapla_cached(
     )
 
 
-@st.cache_data(show_spinner="Yıllık tüketim serisi yükleniyor...")
+@st.cache_data(show_spinner="Yıllık tüketim serisi yükleniyor...", ttl=1800)
 def _yillik_tuketim_serisi_cached(_conn: Any) -> pd.DataFrame:
     return analytics.yillik_tuketim_serisi_getir(_conn)
 
 
-@st.cache_data(show_spinner="Yıllık kurulu güç serisi yükleniyor...")
+@st.cache_data(show_spinner="Yıllık kurulu güç serisi yükleniyor...", ttl=1800)
 def _yillik_yenilenebilir_kurulu_guc_serisi_cached(_conn: Any) -> pd.DataFrame:
     return analytics.yillik_yenilenebilir_kurulu_guc_serisi_getir(_conn)
 
 
-@st.cache_data(show_spinner="Sanayi-hariç tüketim serisi yükleniyor...")
+@st.cache_data(show_spinner="Sanayi-hariç tüketim serisi yükleniyor...", ttl=1800)
 def _yillik_tuketim_sanayi_haric_serisi_cached(_conn: Any) -> pd.DataFrame:
     return analytics.yillik_tuketim_sanayi_haric_serisi_getir(_conn)
 
