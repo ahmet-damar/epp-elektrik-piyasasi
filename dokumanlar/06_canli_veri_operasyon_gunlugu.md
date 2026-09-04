@@ -665,3 +665,76 @@ sorun tamamen çözüldü (`worker/tests/test_kpi_faz3.py` +
 geri alıp bloğu tekrar getirebilir. Bu iki paketi her zaman
 `pip install --force-reinstall numpy pandas` ile kur/güncelle, `conda
 install`/`conda update` ile DEĞİL.
+
+## 2026-09-04 — `20260819_0002_rls_roles.sql`'in GRANT/RLS kapsamı eksik
+çıktı: dashboard `permission denied`/sessiz-boş-sonuç zincirinden geçti,
+4 migration'la kapatıldı
+
+**Tetikleyen belirti:** Streamlit dashboard'da (`app/dashboard.py`,
+`DATABASE_URL` → `admin` rolüne `SET ROLE`) `donemler_getir()`
+`permission denied for table dim_tarih` fırlattı. Kök neden ADR-7'de
+("RLS notu, ek bulgu") daha önce not düşülen pooler/`SET ROLE` sorunuyla
+KARIŞTIRILDI ama farklı çıktı — `SET ROLE admin` sorunsuz çalışıyordu,
+sorun tamamen GRANT eksikliğiydi.
+
+**Kök neden:** `20260819_0002_rls_roles.sql`'in `GRANT`/`ENABLE ROW LEVEL
+SECURITY` kapsamı baştan eksikti — yalnız `dim_*` tabloları `viewer`'a
+GRANT edilmiş, `data_operator`/`admin` hiç almamıştı; `sistem_parametre`,
+`kpi_esik`, `job_status` ise migration'ın GRANT listesinde hiç yoktu
+(sıfır rol, `authenticated` dahil hiçbiri). Ayrıca `dim_tarih`, `dim_il`,
+`dim_kaynak`, `dim_tuketici_grubu`, `dim_lisans`, `sistem_parametre`,
+`kpi_esik`, `job_status`'ta RLS migration DIŞINDA (muhtemelen Supabase
+Dashboard'un "Enable RLS" uyarısından) sonradan AÇILMIŞ ama hiç policy
+eklenmemişti — bu durumda Postgres, owner/BYPASSRLS dışındaki her role
+hatasız ama SESSİZCE 0 satır döndürür (permission denied değil), bu da
+`sistem_parametre_getir()`'in boş `{}` dönmesine yol açtı.
+
+**Düzeltme, 4 ayrı migration (whack-a-mole değil, her turda "eksik ne
+varsa hepsi" taraması yapılarak):**
+1. `20260904_0001_dim_grants_fix.sql` — 5 `dim_*` tablosuna
+   `data_operator`+`admin` için `GRANT SELECT`.
+2. `20260904_0002_dim_rls_disable.sql` — aynı 5 `dim_*` tablosunda
+   policy'siz açık kalmış RLS'i `DISABLE`.
+3. `20260904_0003_missing_grants.sql` — 18 public tablonun tamamı
+   tarandı, `sistem_parametre`/`kpi_esik`/`job_status` hiç grant almamış
+   bulundu; `sistem_parametre`/`kpi_esik` SELECT, `job_status`
+   `ingestion_batch` ile aynı desende INSERT/UPDATE (data_operator) +
+   DELETE (admin, `worker/ingest.py`/`job_worker.py`'nin gerçek yazma
+   deseni doğrulanarak).
+4. `20260904_0004_sistem_kpi_job_rls_disable.sql` — 0003 doğrulanırken
+   aynı "policy'siz RLS" deseni bu 3 tabloda da bulundu, RLS `DISABLE`.
+
+**Canlıya uygulama notu:** 0001'i uygularken `dim_tarih` üzerinde
+`AccessShareLock` tutan, ~8,5 dakikadır idle-in-transaction kalmış bir
+oturum (`app_dashboard_service`, sorgusu `donemler_getir()` ile birebir
+aynı — muhtemelen bu hatanın kendisine takılıp donmuş bir Streamlit Cloud
+oturumu) migration'ı bloklamıştı; kullanıcı onayıyla
+`pg_terminate_backend()` ile temizlendi (yalnız SELECT yapıyordu, veri
+kaybı yok).
+
+**Doğrulama (gerçek DB'ye karşı, hem `admin` hem `viewer`):**
+`dim_tarih` 126, `dim_il` 81, `dim_kaynak` 13, `dim_tuketici_grubu` 5,
+`dim_lisans` 2, `sistem_parametre` 4, `job_status` 8 satır (ikisinde de);
+`kpi_esik` 0 satır — **bu bir hata değil**, `03_veri_modeli.md`'de
+`job_status`'un aksine "Faz 1'de kullanımda" notu yok, yani KPI eşik/
+trafik-ışığı config'i henüz UYGULAMA TARAFINDAN TÜKETİLMİYOR, tablo
+bilinçli olarak boş; `donemler_getir()` 126 dönem, `sistem_parametre_getir()`
+4 anahtarı (hdd_baz_c/cdd_baz_c/hava_norm_yil/tuketim_norm_yil) doğru
+döndürüyor. Dashboard'da (Streamlit Cloud "Manage app → Reboot app" ile
+`@st.cache_data`/`@st.cache_resource` temizlenerek doğrulandı — sekme
+yenilemesi TEK BAŞINA yetmiyor, cache sunucu tarafında, TTL yok) 2026-06
+dönemi hatasız yüklendi.
+
+**Ders/gelecek için not:** `20260819_0002_rls_roles.sql` ilk yazıldığında
+kapsamı public şemadaki TÜM tablolara göre değil, o anda akla gelen
+tablo listesine göre çıkarılmış görünüyor. **İleride yeni bir tablo
+eklenirse**, o migration'a GRANT+RLS eklemek "hatırlanması gereken bir
+adım" değil, `information_schema.tables` (public şema) ile
+`information_schema.role_table_grants`'i karşılaştıran bir kontrolün
+(CI'da veya elle) rutine alınması daha güvenli olur — bu tur 4 ayrı
+sürprizle (dim_*, sistem_parametre, kpi_esik, job_status) bunun elle
+hatırlamaya bırakılamayacağını gösterdi.
+
+Commit'ler: `a78b26d` (0001), migration sırası itibarıyla 0002-0004 aynı
+oturumda ayrı commit'lerle push edildi (`047473f` dahil) — tam liste için
+`git log --oneline` bu tarih aralığında.
