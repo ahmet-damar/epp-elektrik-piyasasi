@@ -483,6 +483,66 @@ def kapsam_disi_getir(conn: Connection, tarih_id: int) -> pd.DataFrame:
     return pd.DataFrame(satirlar, columns=["fact_tablosu", "nitelik", "sebep"])
 
 
+def son_batchler_getir(conn: Connection, limit: int = 20) -> pd.DataFrame:
+    """Dashboard 'Sistem Durumu' bölümü için: en son N `ingestion_batch`
+    kaydı, `source_asset`'ten dosya adı/kaynak türü ile birleştirilmiş.
+    Şema DEĞİŞMEDİ, salt okuma. Kolonlar: batch_id, source_type, file_name,
+    source_period, status, accepted_row_count, rejected_row_count,
+    error_summary, created_at."""
+    sorgu = """
+        SELECT ib.batch_id, sa.source_type, sa.file_name, sa.source_period,
+               ib.status, ib.accepted_row_count, ib.rejected_row_count,
+               ib.error_summary, ib.created_at
+        FROM ingestion_batch ib
+        JOIN source_asset sa ON sa.source_asset_id = ib.source_asset_id
+        ORDER BY ib.batch_id DESC
+        LIMIT %s
+    """
+    with conn.cursor() as cur:
+        cur.execute(sorgu, [limit])
+        satirlar = cur.fetchall()
+    return pd.DataFrame(
+        satirlar,
+        columns=[
+            "batch_id",
+            "source_type",
+            "file_name",
+            "source_period",
+            "status",
+            "accepted_row_count",
+            "rejected_row_count",
+            "error_summary",
+            "created_at",
+        ],
+    )
+
+
+def son_job_durumlari_getir(conn: Connection, limit: int = 20) -> pd.DataFrame:
+    """Dashboard 'Sistem Durumu' bölümü için: en son N `job_status` kaydı
+    (Faz 1 asenkron kuyruk). Şema DEĞİŞMEDİ, salt okuma. Kolonlar: job_id,
+    correlation_id, status, attempt_count, next_retry_at, updated_at."""
+    sorgu = """
+        SELECT job_id, correlation_id, status, attempt_count, next_retry_at, updated_at
+        FROM job_status
+        ORDER BY job_id DESC
+        LIMIT %s
+    """
+    with conn.cursor() as cur:
+        cur.execute(sorgu, [limit])
+        satirlar = cur.fetchall()
+    return pd.DataFrame(
+        satirlar,
+        columns=[
+            "job_id",
+            "correlation_id",
+            "status",
+            "attempt_count",
+            "next_retry_at",
+            "updated_at",
+        ],
+    )
+
+
 def iller_getir(conn: Connection) -> pd.DataFrame:
     """İl filtresi için dim_il'in tamamı (81 il)."""
     with conn.cursor() as cur:

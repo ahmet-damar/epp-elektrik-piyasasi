@@ -251,6 +251,16 @@ def _kapsam_disi_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
     return analytics.kapsam_disi_getir(_conn, tarih_id)
 
 
+@st.cache_data(show_spinner=False, ttl=300)
+def _son_batchler_getir_cached(_conn: Any) -> pd.DataFrame:
+    return analytics.son_batchler_getir(_conn)
+
+
+@st.cache_data(show_spinner=False, ttl=300)
+def _son_job_durumlari_getir_cached(_conn: Any) -> pd.DataFrame:
+    return analytics.son_job_durumlari_getir(_conn)
+
+
 @st.cache_data(show_spinner="Hava normalizasyonu (KPI-11/12) hesaplanıyor...", ttl=1800)
 def _kpi_11_12_hesapla_cached(
     _conn: Any, il_kodu: int, tarih_id: int, hava_norm_yil: int, tuketim_norm_yil: int
@@ -679,5 +689,30 @@ if not serbest.empty:
 # ---------------- VERİ TABLOSU ----------------
 with st.expander("📋 Ham veriyi göster"):
     st.dataframe(f.sort_values("tuketim_mwh", ascending=False), width="stretch")
+
+# ---------------- SİSTEM DURUMU ----------------
+# Yalnız gerçek DB modunda anlamlı (ingestion_batch/job_status statik
+# yedekte hiç yok). Diğer önbelleklerden (ttl=1800) FARKLI olarak burada
+# ttl=300 (5 dk) kullanılıyor — bu, "az önce yüklenen bir batch'in durumu
+# ne oldu" gibi operasyonel bir izleme amacı taşıyor, KPI kartlarının
+# aksine daha taze kalması bekleniyor.
+if gercek_veri_var:
+    st.divider()
+    with st.expander("🔧 Sistem Durumu (son batch'ler + iş kuyruğu)"):
+        st.caption("Son 20 ingestion_batch")
+        batchler = _son_batchler_getir_cached(db_handle)
+        if batchler.empty:
+            st.caption("Hiç batch bulunamadı.")
+        else:
+            st.dataframe(batchler, width="stretch", hide_index=True)
+
+        st.caption("Son 20 job_status (Faz 1 asenkron kuyruk)")
+        joblar = _son_job_durumlari_getir_cached(db_handle)
+        if joblar.empty:
+            st.caption(
+                "Hiç iş kaydı bulunamadı (Faz 1 kuyruğu bu ortamda hiç kullanılmamış olabilir)."
+            )
+        else:
+            st.dataframe(joblar, width="stretch", hide_index=True)
 
 st.caption("EPP — EPDK Elektrik Piyasası Veri & Dashboard Platformu · Faz 2")

@@ -169,6 +169,28 @@ def test_kapsam_disi_getir_isaretli_kayit_yoksa_bos_doner(conn, aktif_batch) -> 
     assert list(df.columns) == ["fact_tablosu", "nitelik", "sebep"]
 
 
+def test_son_batchler_getir_aktif_batch_gorunur(conn, aktif_batch) -> None:  # type: ignore[no-untyped-def]
+    """Dashboard 'Sistem Durumu' bölümünün beslediği fonksiyon."""
+    df = analytics.son_batchler_getir(conn, limit=20)
+    assert (df["batch_id"] == aktif_batch).any()
+    satir = df.loc[df["batch_id"] == aktif_batch].iloc[0]
+    assert satir["status"] == "succeeded"
+    assert satir["source_type"] == "epdk_aylik"
+
+
+def test_son_job_durumlari_getir_kuyruklanmis_is_gorunur(conn, aktif_batch) -> None:  # type: ignore[no-untyped-def]
+    from worker import ingest
+
+    job_id = ingest.is_kaydi_olustur(conn, str(aktif_batch))
+
+    df = analytics.son_job_durumlari_getir(conn, limit=20)
+
+    assert (df["job_id"] == job_id).any()
+    satir = df.loc[df["job_id"] == job_id].iloc[0]
+    assert satir["status"] == "queued"
+    assert satir["correlation_id"] == str(aktif_batch)
+
+
 # ---------------------------------------------------------------------------
 # Faz 3 (hava normalizasyonu): sistem_parametre, hava_getir (UPSERT modeli),
 # kpi_11_12_hesapla, yıllık seriler + CAGR.
