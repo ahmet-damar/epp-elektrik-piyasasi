@@ -420,3 +420,37 @@ hesaplanamıyor.
    — 2022'nin 12 dosyası da bu session'da yan ürün olarak zaten bulundu
    (bkz. `word_2024.py`/`word_2023.py`'nin manifest taramaları) ama hiç
    işlenmedi.
+
+## İleride araştırılabilir — Sanayi tüketimi Word kaynağında gerçekte nerede?
+
+**Kısa araştırma (2026-09-04, kod DEĞİŞMEDİ, yalnız teşhis):** "Sanayi
+neden hiç T11'e (fact_tuketim) girmiyor" sorusu — Karar 2 zaten "baglanti/
+iletim-dağıtım ayrımı kaynakta yok" diyordu, ama bu turda GERÇEKTEN
+doğrulandı: 2024 Mart'ın ham T11 tablosu (`_PortalAdmin_Uploads_Content_
+FastAccess_1e16f2f785735.docx`) doğrudan açılıp başlık satırı okundu —
+**"Sanayi" sütunu TABLODA GERÇEKTEN VAR** (`['İller', 'Aydınlatma', 'Kamu/
+Özel/Diğer', 'Mesken', 'Sanayi', 'Tarımsal Faaliyetler', 'Genel Toplam',
+'Pay']`), yalnız TEK bir birleşik değer olarak — Excel'deki gibi ayrı
+"Sanayi-iletim"/"Sanayi-dağıtım" satırları YOK. `word_ortak.py`'nin
+`t11_oku()`'su bu sütunu GÖRÜYOR ama Karar 2 gereği bilinçli olarak
+atlıyor (`if grup is None or grup == "Sanayi": continue`) — P0 kuralı
+("sahte veri üretme") gereği, kaynakta olmayan bir iletim/dağıtım
+ayrımını UYDURMAK yerine, Sanayi'nin TAMAMI dışlanıyor.
+
+**fact_serbest_tuketici (T13) içinde de yok** — canlı DB'de doğrulandı,
+`fact_serbest_tuketici`'de "Sanayi" grubu YALNIZ 2026 (Excel) verisinde
+var, 2023-2025 (Word) için sıfır satır — Karar 1 zaten T13'ü Word
+yıllarında tamamen kapsam dışı sayıyor, bu tutarlı.
+
+**Araştırılmamış/açık kalan olası bir üçüncü yol — T7:**
+`dokumanlar/06_canli_veri_operasyon_gunlugu.md`'nin 2026-08-31 girdisinde
+bahsedilen "Tablo 7 çoklu-ay format" (ülke geneli mutabakat tablosu,
+şu an SADECE mutabakat kontrolü için kullanılıyor, fact tablosuna hiç
+yazılmıyor) Sanayi'nin il kırılımı OLMAYAN, yalnız ülke-geneli bir
+toplamını içeriyor olabilir mi — bu tur incelenmedi. Eğer öyleyse,
+Sanayi'nin en azından ülke-geneli (il bazlı DEĞİL) bir tutarı Word
+kaynağından yine de elde edilebilir olabilir (KPI-25/27'nin bugünkü
+"kaynakta yok" varsayımını kısmen yumuşatabilir) — ama il×grup grain'i
+gerektiren `fact_tuketim`'e yazılamaz, olsa olsa ayrı bir ülke-geneli
+seri/KPI için kullanılabilir. **Bu ayrı bir oturumun konusu** — bu turda
+yalnız işaretlendi, hiçbir T7 kodu incelenmedi/yazılmadı.
