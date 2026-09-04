@@ -765,3 +765,54 @@ etiketli değerlerini 12 örnek ayın 10'unda tam 1,0000 oranıyla eşleştirdi.
 "Tarımsal Sulama"→"Tarımsal" eklendi. `worker/parser.py:GRUP_ESLEME`
 DEĞİŞMEDİ (mimari karar — bkz. Karar 2/3 ile aynı ilke, yıla özel
 tarifler kanonik şemayı bozmadan farklılıkları emer).
+
+## 2026-09-04/05 — Scheduled Refresh (Open-Meteo) kök nedeni bulundu:
+eksik GitHub secret, kod hatası DEĞİL — 6 ay hava verisi backfill edildi
+
+**Belirti:** `.github/workflows/scheduled-refresh.yml` ("Open-Meteo hava
+verisi çek") en az 2026-08-31'den beri her çalıştığında ~26 saniyede
+başarısız oluyordu. Bu, Şubat-Ağustos 2026 hava verisinin (`fact_hava_aylik`)
+hiç çekilmemiş olmasının (yalnız Ocak 2026 vardı) gerçek sebebiydi.
+
+**Kök neden (gerçek log kanıtıyla doğrulandı, `gh run view --log`):**
+Her başarısız çalıştırmada `env:` bloğunda `DATABASE_URL:` **tamamen
+boştu** — `secrets.PROD_DATABASE_URL` repo'da tanımlı değildi.
+`psycopg.connect()` boş DATABASE_URL ile yerel Unix socket'e bağlanmaya
+çalışıp "No such file or directory" ile patlıyordu. **Open-Meteo API'siyle
+hiç ilgisi yoktu, kod hatası da değildi.**
+
+**Daha çarpıcı bir bulgu:** Bu adım aslında hiç başarıyla çalışmamıştı —
+`2026-08-19`'dan `2026-08-30` akşamına (commit `99ac617`) kadar `if: false`
+ile kasıtlı olarak KAPALIYDI (`worker/jobs/fetch_weather.py` henüz
+yazılmamıştı). Önceki "✅ success" run'lar bu adım hiç çalışmadığı için
+yeşildi. Adım gerçekten açılınca (ilk deneme 2026-08-31) hemen bu secret
+eksikliğiyle karşılaştı.
+
+**Düzeltme:** `PROD_DATABASE_URL` GitHub Actions secret'i eklendi (Ahmet
+tarafından, GitHub arayüzünden — Claude Code'un `gh` token'ının hem
+`secrets` hem `workflow_dispatch` yazma izni yoktu, ikisi de 403 ile
+reddedildi). İlk denemede secret içeriğine yanlışlıkla `DATABASE_URL=`
+öneki dahil edilmişti (`psycopg.ProgrammingError: invalid connection
+option "DATABASE_URL"`) — düzeltilip yalnız çıplak `postgresql://...`
+string'i bırakıldı. Elle tetiklenen (`workflow_dispatch`) çalıştırma
+sonunda **✅ başarılı** — `tarih_id=202608: 81 il yazıldı`.
+
+**Backfill (bu turda elle, `python -m worker.jobs.fetch_weather --tarih-id
+<YYYYMM>`):** 202602-202607 (6 ay), her biri 81/81 il, Open-Meteo'dan
+sıfır hata. `fact_hava_aylik`'in `is_active` kavramı YOK (UPSERT modeli,
+doğrulandı) — aktivasyon gerekmedi, doğrudan aktif. Sonuç: `fact_hava_aylik`
+artık 2026-01'den 2026-08'e kadar (8/8 ay) dolu.
+
+**Doğrulama:** KPI-23/24 (HDD/CDD) artık Ocak dışındaki tüm aylarda
+gerçek değer veriyor (örn. 202603: HDD=960,15; 202606: HDD=21,33,
+CDD=96,76). **KPI-11/12 hâlâ 'hesaplanamaz'** — bu YENİ bir sorun DEĞİL,
+ayrı ve beklenen bir kısıt: β/γ regresyonu (`min_gozlem=12`) tuketim+hava
+İKİSİNİN birlikte var olduğu ay sayısına bakıyor, bu da şu an yalnız
+**6** (202601-202606 — tuketim verisi 2026'da hâlâ yalnız 6 ay,
+hava 8 ay olsa da JOIN 6'da kalıyor). 12'ye ulaşmak için ya 2026'nın
+kalan aylarının tuketim verisi EPDK'dan yayınlanmalı, ya da 2016-2025'in
+hava verisi de backfill edilmeli (ayrı, çok daha büyük bir iş kalemi —
+bu turun kapsamı dışında, gelecekte değerlendirilebilir).
+
+**Kod/şema değişikliği YAPILMADI** — kök neden bir secret eksikliğiydi,
+`worker/jobs/fetch_weather.py`'ye dokunulmadı.
