@@ -170,11 +170,17 @@ def test_kapsam_disi_getir_isaretli_kayit_yoksa_bos_doner(conn, aktif_batch) -> 
 
 
 def test_son_batchler_getir_aktif_batch_gorunur(conn, aktif_batch) -> None:  # type: ignore[no-untyped-def]
-    """Dashboard 'Sistem Durumu' bölümünün beslediği fonksiyon."""
+    """Dashboard 'Sistem Durumu' bölümünün beslediği fonksiyon.
+
+    `aktif_batch` fixture'ı yalnız `ingest.aktivasyon_yap()` çağırıyor
+    (fact tablolarını is_active=true yapıyor) — `batch_onayla()`'yı HİÇ
+    çağırmıyor, o yüzden `ingestion_batch.status` 'running' kalır
+    (`batch_sahiplen()`'in queued->running geçişinden beri hiç
+    değişmedi). 'succeeded' beklemek YANLIŞ bir varsayımdı — düzeltildi."""
     df = analytics.son_batchler_getir(conn, limit=20)
     assert (df["batch_id"] == aktif_batch).any()
     satir = df.loc[df["batch_id"] == aktif_batch].iloc[0]
-    assert satir["status"] == "succeeded"
+    assert satir["status"] == "running"
     assert satir["source_type"] == "epdk_aylik"
 
 
