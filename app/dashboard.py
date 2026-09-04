@@ -261,6 +261,18 @@ def _son_job_durumlari_getir_cached(_conn: Any) -> pd.DataFrame:
     return analytics.son_job_durumlari_getir(_conn)
 
 
+@st.cache_data(
+    show_spinner="Hava normalizasyonu (KPI-11/12, Türkiye Geneli) hesaplanıyor...",
+    ttl=1800,
+)
+def _kpi_11_12_ulusal_hesapla_cached(
+    _conn: Any, tarih_id: int, hava_norm_yil: int, tuketim_norm_yil: int
+) -> dict[str, float | int | None]:
+    return analytics.kpi_11_12_ulusal_hesapla(
+        _conn, tarih_id, hava_norm_yil=hava_norm_yil, tuketim_norm_yil=tuketim_norm_yil
+    )
+
+
 @st.cache_data(show_spinner="Hava normalizasyonu (KPI-11/12) hesaplanıyor...", ttl=1800)
 def _kpi_11_12_hesapla_cached(
     _conn: Any, il_kodu: int, tarih_id: int, hava_norm_yil: int, tuketim_norm_yil: int
@@ -287,6 +299,30 @@ def _yillik_yenilenebilir_kurulu_guc_serisi_cached(_conn: Any) -> pd.DataFrame:
 @st.cache_data(show_spinner="Sanayi-hariç tüketim serisi yükleniyor...", ttl=1800)
 def _yillik_tuketim_sanayi_haric_serisi_cached(_conn: Any) -> pd.DataFrame:
     return analytics.yillik_tuketim_sanayi_haric_serisi_getir(_conn)
+
+
+@st.cache_data(show_spinner=False, ttl=1800)
+def _kpi_esikleri_getir_cached(_conn: Any) -> dict[str, dict[str, float | str]]:
+    return analytics.kpi_esikleri_getir(_conn)
+
+
+_RENK_EMOJI = {"yesil": "🟢", "sari": "🟡", "kirmizi": "🔴"}
+
+
+def _trafik_isigi(
+    deger: float | None, kpi_id: str, esikler: dict[str, dict[str, float | str]]
+) -> str:
+    """Görev 3 (2026-09-05): `kpi_esik`'te tanımlı bir KPI için trafik ışığı
+    emoji'si döndürür, tanımlı değilse ya da değer 'hesaplanamaz'/'veri yok'
+    ise boş string (kart eskisi gibi renksiz kalır — kod YOKSA sahte bir
+    renk üretilmez, worker/kpi.py:esik_rengi() ile aynı ilke)."""
+    esik = esikler.get(kpi_id)
+    if esik is None or deger is None:
+        return ""
+    renk = kpi.esik_rengi(
+        deger, float(esik["yesil_alt"]), float(esik["sari_alt"]), str(esik["yon"])
+    )
+    return f"{_RENK_EMOJI.get(renk, '')} " if renk else ""
 
 
 @st.cache_data
@@ -353,6 +389,7 @@ if gercek_veri_var:
     serbest = _serbest_tuketici_getir_cached(db_handle, secili_tarih_id)
     hava = _hava_getir_cached(db_handle, secili_tarih_id)
     kapsam_disi = _kapsam_disi_getir_cached(db_handle, secili_tarih_id)
+    esikler = _kpi_esikleri_getir_cached(db_handle)
 
     # KPI-13 (YoY): bir önceki yılın aynı ayı aktifse kullan, yoksa 'veri yok'.
     onceki_tarih_id = secili_tarih_id - 100
@@ -382,6 +419,7 @@ else:
     # seed değerleriyle aynı (Faz 2 dashboard notunda da böyleydi).
     hdd_baz_c, cdd_baz_c, hava_norm_yil, tuketim_norm_yil = 18.0, 22.0, 10, 5
     kapsam_disi = pd.DataFrame(columns=["fact_tablosu", "nitelik", "sebep"])
+    esikler = {}
     with st.sidebar:
         st.header("Dönem")
         st.selectbox("Ay/Yıl", [donem_etiketi], disabled=True)
@@ -475,7 +513,10 @@ u4.metric("Kapasite Faktörü (KPI-05)", f"%{kf:.1f}" if kf is not None else "ve
 u5, u6, u7 = st.columns(3)
 hhi = kpi.kpi_06_hhi(uretim)
 u5.metric(
-    "Kaynak Yoğunlaşması (KPI-06 HHI)", f"{hhi:.3f}" if hhi is not None else "veri yok"
+    "Kaynak Yoğunlaşması (KPI-06 HHI)",
+    f"{_trafik_isigi(hhi, 'KPI-06', esikler)}{hhi:.3f}"
+    if hhi is not None
+    else "veri yok",
 )
 
 lisanssiz_pay = kpi.kpi_07_lisanssiz_pay(uretim) if lisans_var else None
@@ -489,7 +530,12 @@ u6.metric(
 # diğeri içermiyorsa) None döner (bkz. worker/kpi.py modül notu, KPI-25/26
 # ile AYNI "kapsam uyuşmuyorsa hesaplama" disiplini).
 yoy = kpi.kpi_13_yoy(tuketim, onceki_tuketim if not onceki_tuketim.empty else None)
-u7.metric("Tüketim YoY (KPI-13)", f"%{yoy:+.1f}" if yoy is not None else "hesaplanamaz")
+u7.metric(
+    "Tüketim YoY (KPI-13)",
+    f"{_trafik_isigi(yoy, 'KPI-13', esikler)}%{yoy:+.1f}"
+    if yoy is not None
+    else "hesaplanamaz",
+)
 
 st.divider()
 
@@ -559,22 +605,49 @@ if secili_il_kodu is not None:
         if kpi_11_12["arindirilmis"] is not None
         else "hesaplanamaz",
     )
+    _kpi_12_deger = kpi_11_12["kpi_12"]
+    # yön=alcelik SAPMANIN BÜYÜKLÜĞÜNE bakar, işaretine değil (bkz. worker/
+    # kpi.py:esik_rengi() sözleşmesi) — bu yüzden abs() geçiriliyor.
+    _kpi_12_abs = abs(_kpi_12_deger) if _kpi_12_deger is not None else None
     h4.metric(
         "Norm Sapması (KPI-12)",
-        f"%{kpi_11_12['kpi_12']:+.1f}"
-        if kpi_11_12["kpi_12"] is not None
+        f"{_trafik_isigi(_kpi_12_abs, 'KPI-12', esikler)}%{_kpi_12_deger:+.1f}"
+        if _kpi_12_deger is not None
         else "hesaplanamaz",
     )
+elif gercek_veri_var:
+    # Görev 4 (2026-09-05, Seçenek A — dokumanlar/06_canli_veri_operasyon_
+    # gunlugu.md): "Türkiye Geneli" artık 81 ilin KENDİ regresyonlarının
+    # toplamıyla hesaplanıyor, ayrı bir "ulusal HDD/CDD" uydurulmuyor.
+    kpi_11_12_ulusal = _kpi_11_12_ulusal_hesapla_cached(
+        db_handle, secili_tarih_id, hava_norm_yil, tuketim_norm_yil
+    )
+    h3.metric(
+        "Arındırılmış Tüketim (KPI-11, Türkiye Geneli)",
+        f"{kpi_11_12_ulusal['arindirilmis']:,.0f} MWh"
+        if kpi_11_12_ulusal["arindirilmis"] is not None
+        else "hesaplanamaz",
+    )
+    _kpi_12_ulusal_deger = kpi_11_12_ulusal["kpi_12"]
+    _kpi_12_ulusal_abs = (
+        abs(_kpi_12_ulusal_deger) if _kpi_12_ulusal_deger is not None else None
+    )
+    h4.metric(
+        "Norm Sapması (KPI-12, Türkiye Geneli)",
+        f"{_trafik_isigi(_kpi_12_ulusal_abs, 'KPI-12', esikler)}%{_kpi_12_ulusal_deger:+.1f}"
+        if _kpi_12_ulusal_deger is not None
+        else "hesaplanamaz",
+    )
+    if kpi_11_12_ulusal["kapsam_il_sayisi"]:
+        st.caption(
+            f"81 ilin {kpi_11_12_ulusal['kapsam_il_sayisi']}'i yeterli geçmişe "
+            "sahip olduğu için ulusal toplama dahil edildi (Görev 4, Seçenek A "
+            "— her il kendi β/γ regresyonuyla hesaplanıp toplanır, tek bir "
+            "'ulusal HDD/CDD' uydurulmaz)."
+        )
 else:
     h3.metric("Arındırılmış Tüketim (KPI-11)", "hesaplanamaz")
     h4.metric("Norm Sapması (KPI-12)", "hesaplanamaz")
-    if gercek_veri_var:
-        st.caption(
-            "KPI-11/12 (hava normalizasyonu) il bazlı çalışır — sidebar'dan "
-            "'Türkiye Geneli' yerine belirli bir İl seçin. Ayrıca yeterli "
-            "geçmiş (β/γ regresyonu + hava/tüketim normu) yoksa 'hesaplanamaz' "
-            "kalır — bu, sahte bir değer üretmemek için bilinçli bir davranıştır."
-        )
 
 st.divider()
 
@@ -593,15 +666,22 @@ else:
     kpi_26 = None
     kpi_27 = None
 y1.metric(
-    "Tüketim CAGR (KPI-25)", f"%{kpi_25:+.1f}" if kpi_25 is not None else "hesaplanamaz"
+    "Tüketim CAGR (KPI-25)",
+    f"{_trafik_isigi(kpi_25, 'KPI-25', esikler)}%{kpi_25:+.1f}"
+    if kpi_25 is not None
+    else "hesaplanamaz",
 )
 y2.metric(
     "Yenilenebilir Kurulu Güç CAGR (KPI-26)",
-    f"%{kpi_26:+.1f}" if kpi_26 is not None else "hesaplanamaz",
+    f"{_trafik_isigi(kpi_26, 'KPI-26', esikler)}%{kpi_26:+.1f}"
+    if kpi_26 is not None
+    else "hesaplanamaz",
 )
 y3.metric(
     "Sanayi-Hariç Tüketim CAGR (KPI-27)",
-    f"%{kpi_27:+.1f}" if kpi_27 is not None else "hesaplanamaz",
+    f"{_trafik_isigi(kpi_27, 'KPI-27', esikler)}%{kpi_27:+.1f}"
+    if kpi_27 is not None
+    else "hesaplanamaz",
 )
 if gercek_veri_var and (kpi_25 is None or kpi_26 is None or kpi_27 is None):
     st.caption(

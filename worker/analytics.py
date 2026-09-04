@@ -549,3 +549,73 @@ def iller_getir(conn: Connection) -> pd.DataFrame:
         cur.execute("SELECT il_kodu, il_adi FROM dim_il ORDER BY il_adi")
         satirlar = cur.fetchall()
     return pd.DataFrame(satirlar, columns=["il_kodu", "il_adi"])
+
+
+def kpi_11_12_ulusal_hesapla(
+    conn: Connection, tarih_id: int, hava_norm_yil: int = 10, tuketim_norm_yil: int = 5
+) -> dict[str, float | int | None]:
+    """Görev 4 (2026-09-05, Seçenek A — dokumanlar/06_canli_veri_operasyon_
+    gunlugu.md): "Türkiye Geneli" seçiliyken KPI-11/12'yi 81 ilin KENDİ
+    regresyonlarını (`kpi_11_12_hesapla`, HİÇ DEĞİŞTİRİLMEDİ) topla(ştır)
+    arak hesaplar — Seçenek B (tek bir "ulusal HDD/CDD" uydurup ayrı bir
+    regresyon) BİLİNÇLİ OLARAK reddedildi: İstanbul'u Hakkari'yle eşit
+    ağırlıklandırmak fiziksel olarak anlamsız olurdu, gerçek bölgesel
+    iklim tepkisini bulanıklaştırırdı.
+
+    KPI-11 (arındırılmış tüketim) toplanabilir bir büyüklük — doğrudan
+    81 ilin toplamı. KPI-12 (norm sapması, %) toplanamaz — payı
+    (arındırılmış) VE paydayı (tüketim_norm) AYRI AYRI topla(ştır)ıp
+    `kpi.kpi_12_norm_sapmasi()`'yi TOPLAMLAR üzerinde BİR KEZ çağırıyoruz
+    (81 ilin kendi yüzdelerini ortalamak YERİNE — o, büyük illeri küçük
+    illerle eşit ağırlıklandırır, yanlış olurdu).
+
+    Yeterli geçmişi olmayan iller (`kpi_11_12_hesapla` None döndürür)
+    toplamdan SESSİZCE değil, `kapsam_il_sayisi` ile GÖRÜNÜR şekilde
+    dışlanır — çağıran (`app/dashboard.py`) bunu kullanıcıya
+    gösterebilir (örn. "81 ilin 74'ü dahil edildi")."""
+    il_listesi = iller_getir(conn)
+    arindirilmis_toplam = 0.0
+    tuketim_norm_toplam = 0.0
+    kapsam_il_sayisi = 0
+    for il_kodu in il_listesi["il_kodu"]:
+        sonuc = kpi_11_12_hesapla(
+            conn, int(il_kodu), tarih_id, hava_norm_yil, tuketim_norm_yil
+        )
+        if sonuc["arindirilmis"] is None or sonuc["tuketim_norm"] is None:
+            continue
+        arindirilmis_toplam += sonuc["arindirilmis"]
+        tuketim_norm_toplam += sonuc["tuketim_norm"]
+        kapsam_il_sayisi += 1
+
+    if kapsam_il_sayisi == 0:
+        return {"arindirilmis": None, "kpi_12": None, "kapsam_il_sayisi": 0}
+
+    kpi_12_ulusal = kpi.kpi_12_norm_sapmasi(arindirilmis_toplam, tuketim_norm_toplam)
+    return {
+        "arindirilmis": arindirilmis_toplam,
+        "kpi_12": kpi_12_ulusal,
+        "kapsam_il_sayisi": kapsam_il_sayisi,
+    }
+
+
+def kpi_esikleri_getir(
+    conn: Connection, surum: str = "v1"
+) -> dict[str, dict[str, float | str]]:
+    """Dashboard trafik ışığı (Görev 3, 2026-09-05) için `kpi_esik`
+    satırlarını `kpi_id`'ye göre bir sözlüğe çevirir. `kirmizi_alt` KASITLI
+    OLARAK sözlüğe dahil edilmiyor (worker/kpi.py:esik_rengi() yalnız
+    yesil_alt/sari_alt/yon kullanıyor — bkz. o fonksiyonun sözleşme notu).
+    Bir KPI için satır yoksa (eşik tanımlanmamış) o KPI sözlükte hiç
+    görünmez — çağıran `.get(kpi_id)` ile kontrol etmeli."""
+    sorgu = """
+        SELECT kpi_id, yesil_alt, sari_alt, yon
+        FROM kpi_esik
+        WHERE surum = %s
+    """
+    with conn.cursor() as cur:
+        cur.execute(sorgu, [surum])
+        satirlar = cur.fetchall()
+    return {
+        kpi_id: {"yesil_alt": float(yesil_alt), "sari_alt": float(sari_alt), "yon": yon}
+        for kpi_id, yesil_alt, sari_alt, yon in satirlar
+    }

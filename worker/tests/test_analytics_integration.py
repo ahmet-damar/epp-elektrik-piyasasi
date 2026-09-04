@@ -520,3 +520,57 @@ def test_yillik_yenilenebilir_kurulu_guc_serisi_yil_sonu_alir(conn) -> None:  # 
     assert satir["kurulu_guc_mw"].iloc[0] == pytest.approx(
         200.0
     )  # aralık (en son ay), 300 (toplam) DEĞİL
+
+
+# ---------------------------------------------------------------------------
+# Görev 3/4 (2026-09-05): kpi_esik + KPI-11/12 "Türkiye Geneli" (Seçenek A)
+# ---------------------------------------------------------------------------
+
+
+def test_kpi_esikleri_getir_seed_verisi(conn) -> None:  # type: ignore[no-untyped-def]
+    """20260905_0001_kpi_esik_seed.sql'in canlıya uygulandığını varsaymaz —
+    yalnız BU testin kendi satırını ekleyip okuyarak fonksiyonu doğrular
+    (migration'ın kendisi ayrı, canlıda elle doğrulanacak)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO kpi_esik (kpi_id, surum, yesil_alt, sari_alt, yon) "
+            "VALUES ('KPI-99-TEST', 'v1', 3.0, 0.0, 'yukselik')"
+        )
+
+    esikler = analytics.kpi_esikleri_getir(conn)
+
+    assert "KPI-99-TEST" in esikler
+    assert esikler["KPI-99-TEST"] == {
+        "yesil_alt": 3.0,
+        "sari_alt": 0.0,
+        "yon": "yukselik",
+    }
+
+
+def test_kpi_11_12_ulusal_hesapla_tek_il_gecmisiyle(conn) -> None:  # type: ignore[no-untyped-def]
+    """Görev 4, Seçenek A: yalnız 1 ilin (26=Eskişehir) yeterli geçmişi
+    varken, ulusal toplamın O İLİN kendi sonucuyla BİREBİR eşleşmesi
+    gerekir (diğer 80 il veri yokluğundan sessizce dışlanır,
+    kapsam_il_sayisi=1 ile GÖRÜNÜR şekilde işaretlenir)."""
+    il_kodu = _tuketim_hava_gecmisi_kur(conn)
+    tekil = analytics.kpi_11_12_hesapla(
+        conn, il_kodu, 209301, hava_norm_yil=3, tuketim_norm_yil=2
+    )
+
+    ulusal = analytics.kpi_11_12_ulusal_hesapla(
+        conn, 209301, hava_norm_yil=3, tuketim_norm_yil=2
+    )
+
+    assert ulusal["kapsam_il_sayisi"] == 1
+    assert ulusal["arindirilmis"] == pytest.approx(tekil["arindirilmis"], abs=0.01)
+    assert ulusal["kpi_12"] == pytest.approx(tekil["kpi_12"], abs=0.01)
+
+
+def test_kpi_11_12_ulusal_hesapla_hic_gecmis_yoksa_hesaplanamaz(conn) -> None:  # type: ignore[no-untyped-def]
+    """Sentinel bir dönemde HİÇBİR ilin geçmişi yoksa (81 il de dışlanır)
+    sahte bir 0 MWh/0.0 YERİNE None ('hesaplanamaz') dönmeli."""
+    ingest.dim_tarih_getir_veya_olustur(conn, 209401)
+
+    ulusal = analytics.kpi_11_12_ulusal_hesapla(conn, 209401)
+
+    assert ulusal == {"arindirilmis": None, "kpi_12": None, "kapsam_il_sayisi": 0}

@@ -334,6 +334,43 @@ def kpi_cagr(ilk: float | None, son: float | None, n: int) -> float | None:
     return round(((son / ilk) ** (1 / n) - 1) * 100, 1)
 
 
+def esik_rengi(
+    deger: float | None, yesil_alt: float, sari_alt: float, yon: str
+) -> str | None:
+    """`kpi_esik` tablosundaki bir eşik satırına göre trafik ışığı rengi
+    döndürür — 'yesil'/'sari'/'kirmizi', deger None ise None ('hesaplanamaz'
+    olan bir KPI'ye renk verilmez, sahte bir 'kırmızı' üretilmez).
+
+    Sözleşme (2026-09-05, kpi_esik'in ilk gerçek tüketicisi — bu kod
+    yazılırken serbestçe tanımlandı, tabloyu daha önce hiçbir şey
+    tüketmiyordu): yalnız İKİ gerçek kırılım noktası var, `kirmizi_alt`
+    KASITLI OLARAK kullanılmıyor/NULL bırakılıyor (üçüncü bir sayı icat
+    etmek yerine "sarı bandın dışı = kırmızı" kuralı yeterli):
+    - `yon='yukselik'` (yüksek değer iyi, örn. CAGR): deger>=yesil_alt
+      → yeşil; deger>=sari_alt → sarı; aksi → kırmızı.
+    - `yon='alcelik'` (düşük değer iyi, örn. HHI, |norm sapması|):
+      deger<=yesil_alt → yeşil; deger<=sari_alt → sarı; aksi → kırmızı.
+    Simetrik sapma metrikleri (örn. KPI-12) için çağıran `abs(deger)`
+    geçirmeli — bu fonksiyon işareti kendisi yorumlamaz."""
+    if deger is None:
+        return None
+    if yon == "yukselik":
+        if deger >= yesil_alt:
+            return "yesil"
+        if deger >= sari_alt:
+            return "sari"
+        return "kirmizi"
+    if yon == "alcelik":
+        if deger <= yesil_alt:
+            return "yesil"
+        if deger <= sari_alt:
+            return "sari"
+        return "kirmizi"
+    raise ValueError(
+        f"Bilinmeyen yön: {yon!r} — yalnız 'yukselik'/'alcelik' kabul edilir."
+    )
+
+
 # ---------------------------------------------------------------------------
 # P0-2 — Sanayi iletim/dağıtım ayrımı (fact_tuketim.baglanti)
 # ---------------------------------------------------------------------------
