@@ -885,3 +885,44 @@ gelecekte kendiliğinden çözülecek (her yeni ay pencereyi ileri kaydırır).
 **Kod/şema değişikliği YAPILMADI** — yalnızca mevcut
 `worker/jobs/fetch_weather.py:hava_verisi_cek_ve_yaz()` script'ten tekrar
 tekrar çağrıldı.
+
+## 2026-09-05 — fact_tuketim_ulke_geneli: DURAKLATILDI (canlıya uygulanmadı,
+onay bekliyor)
+
+**Durum:** Migration + parser (10 yıl dosyası) + `worker/ingest.py`
+loader'ı + 7 yeni test — main'de, CI'da (disposable postgres:16) tam
+yeşil (commit `4163bff` + dokümantasyon `91eb1f1`). **CANLI Supabase'e
+HENÜZ hiçbir şey uygulanmadı** — migration çalıştırılmadı, backfill/
+aktivasyon/mutabakat hiçbiri gerçek DB'ye karşı ÇALIŞTIRILMADI. Bu,
+kullanıcının açık talimatıyla güvenli bir duraklama noktası.
+
+**Bulunan tasarım:** EPDK Word raporlarının her ayı için ayrı bir
+"karşılaştırma tablosu" aramak yerine, fact_tuketim için zaten bulunan
+T11 (il×grup) tablosunun KENDİ "Genel Toplam" satırından Sanayi DAHİL
+tüm grupların ülke geneli değeri okunuyor — 120 ayın (2016-2025)
+TAMAMINDA gerçek docx'lere karşı doğrulandı, sıfır hata. Detay:
+`dokumanlar/07_word_parser_kapsam.md` ("Sanayi tüketimi ... KAPANDI"
+bölümü) ve `dokumanlar/03_veri_modeli.md`.
+
+**Sıralama düzeltmesi (kullanıcı, 2026-09-05) — UYGULANDI (kodda,
+henüz ÇALIŞTIRILMADI):** Backfill script'inin (scratchpad, repo'ya DAHİL
+DEĞİL) akışı **mutabakat kontrolünü aktivasyondan ÖNCE** çalıştıracak
+şekilde düzeltildi — mutabakat sorgusu artık `is_active` filtresi
+KULLANMIYOR (yeni yüklenen batch'ler henüz `is_active=false`), doğrudan
+bu backfill'in yazdığı batch'lere (`parser_version LIKE 'word-%-ulke-
+geneli-v1'`) göre kontrol ediyor; yalnız mutabakatı GEÇEN batch'ler
+aktive edilecek, uyumsuz olanlar `running` kalıp elle incelenecek.
+
+**Sıradaki adımlar (aynen kalıyor, onay sonrası sırayla):**
+1. Migration'ı canlı Supabase'e uygula.
+2. 120 ay backfill (`python -m worker.scripts.word_20XX --ulke-geneli`,
+   ayrı batch zinciri — mevcut fact_tuketim batch'lerine dokunmaz).
+3. Mutabakat kontrolü (aktivasyondan ÖNCE, yukarıdaki düzeltmeyle).
+4. Yalnız mutabakatı geçen batch'lerin aktivasyonu.
+5. Son dokümantasyon (bu dosyaya gerçek sayılarla kapanış kaydı,
+   `09_PROJE_DURUMU.md` güncellemesi).
+
+**git/CI durumu (2026-09-05 duraklama anında doğrulandı):** `git status`
+temiz, `main` `origin/main` ile senkron, son commit (`91eb1f1`) CI'da
+(Worker/SQL lint/Schema+RLS/Security) tam yeşil. Açıkta commit
+edilmemiş/push edilmemiş hiçbir üretim kodu değişikliği yok.
