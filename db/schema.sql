@@ -126,6 +126,24 @@ CREATE TABLE IF NOT EXISTS fact_serbest_tuketici (
   CONSTRAINT uq_fact_serbest_tuketici_batch UNIQUE (il_kodu, tarih_id, tur, grup_id, ingestion_batch_id)
 );
 
+-- fact_tuketim_ulke_geneli (migration 20260905_0002) — EPDK Word T11
+-- tablosunun KENDİ "Genel Toplam" satırından, il kırılımı OLMAYAN, ülke
+-- geneli TÜM tüketici türü (Sanayi DAHİL) değerleri. Karar 2 (Sanayi
+-- fact_tuketim'e yazılmaz) DEĞİŞMEDİ — bu ayrı bir tablo/amaç.
+CREATE TABLE IF NOT EXISTS fact_tuketim_ulke_geneli (
+  id BIGSERIAL PRIMARY KEY,
+  tarih_id INT NOT NULL REFERENCES dim_tarih(tarih_id) ON DELETE RESTRICT,
+  grup_id INT NOT NULL REFERENCES dim_tuketici_grubu(grup_id) ON DELETE RESTRICT,
+  tuketim_mwh NUMERIC(16,3) NOT NULL CHECK (tuketim_mwh >= 0),
+  ingestion_batch_id BIGINT NOT NULL REFERENCES ingestion_batch(batch_id) ON DELETE RESTRICT,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT uq_fact_tuketim_ulke_geneli_batch UNIQUE (tarih_id, grup_id, ingestion_batch_id)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_fact_tuketim_ulke_geneli_active
+  ON fact_tuketim_ulke_geneli (tarih_id, grup_id) WHERE is_active;
+
 -- fact_hava_aylik DİĞER fact tablolarından FARKLI bir sürümleme modeli
 -- kullanır (dokumanlar/02_srs_ozet.md SÜRÜMLEME KURALI): batch-versiyonlama
 -- + is_active YOK, UPSERT ile TEK güncel satır (il_kodu, tarih_id başına).
@@ -270,6 +288,7 @@ ALTER TABLE fact_tuketim ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fact_uretim ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fact_abone ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fact_serbest_tuketici ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fact_tuketim_ulke_geneli ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fact_hava_aylik ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fact_hava_aylik_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
@@ -296,6 +315,10 @@ CREATE POLICY viewer_fact_abone_select ON fact_abone
   USING (public.current_app_role() = 'viewer' AND is_active = true);
 
 CREATE POLICY viewer_fact_serbest_tuketici_select ON fact_serbest_tuketici
+  FOR SELECT TO viewer
+  USING (public.current_app_role() = 'viewer' AND is_active = true);
+
+CREATE POLICY viewer_fact_tuketim_ulke_geneli_select ON fact_tuketim_ulke_geneli
   FOR SELECT TO viewer
   USING (public.current_app_role() = 'viewer' AND is_active = true);
 
@@ -357,6 +380,15 @@ CREATE POLICY data_operator_fact_serbest_tuketici_update ON fact_serbest_tuketic
   USING (public.current_app_role() = 'data_operator')
   WITH CHECK (public.current_app_role() = 'data_operator');
 
+CREATE POLICY data_operator_fact_tuketim_ulke_geneli_insert ON fact_tuketim_ulke_geneli
+  FOR INSERT TO data_operator
+  WITH CHECK (public.current_app_role() = 'data_operator');
+
+CREATE POLICY data_operator_fact_tuketim_ulke_geneli_update ON fact_tuketim_ulke_geneli
+  FOR UPDATE TO data_operator
+  USING (public.current_app_role() = 'data_operator')
+  WITH CHECK (public.current_app_role() = 'data_operator');
+
 CREATE POLICY data_operator_fact_hava_aylik_insert ON fact_hava_aylik
   FOR INSERT TO data_operator
   WITH CHECK (public.current_app_role() = 'data_operator');
@@ -402,6 +434,11 @@ CREATE POLICY admin_fact_abone_all ON fact_abone
   WITH CHECK (public.current_app_role() = 'admin');
 
 CREATE POLICY admin_fact_serbest_tuketici_all ON fact_serbest_tuketici
+  FOR ALL TO admin
+  USING (public.current_app_role() = 'admin')
+  WITH CHECK (public.current_app_role() = 'admin');
+
+CREATE POLICY admin_fact_tuketim_ulke_geneli_all ON fact_tuketim_ulke_geneli
   FOR ALL TO admin
   USING (public.current_app_role() = 'admin')
   WITH CHECK (public.current_app_role() = 'admin');
@@ -452,11 +489,11 @@ CREATE POLICY admin_veri_kapsam_disi_all ON veri_kapsam_disi
 
 GRANT USAGE ON SCHEMA public TO viewer, data_operator, admin;
 GRANT SELECT ON TABLE dim_tarih, dim_il, dim_kaynak, dim_tuketici_grubu, dim_lisans TO viewer;
-GRANT SELECT ON TABLE source_asset, ingestion_batch, fact_tuketim, fact_uretim, fact_abone, fact_serbest_tuketici, fact_hava_aylik TO viewer;
+GRANT SELECT ON TABLE source_asset, ingestion_batch, fact_tuketim, fact_uretim, fact_abone, fact_serbest_tuketici, fact_tuketim_ulke_geneli, fact_hava_aylik TO viewer;
 GRANT SELECT, INSERT, UPDATE ON TABLE source_asset, ingestion_batch TO data_operator;
-GRANT SELECT, INSERT, UPDATE ON TABLE fact_tuketim, fact_uretim, fact_abone, fact_serbest_tuketici, fact_hava_aylik TO data_operator;
+GRANT SELECT, INSERT, UPDATE ON TABLE fact_tuketim, fact_uretim, fact_abone, fact_serbest_tuketici, fact_tuketim_ulke_geneli, fact_hava_aylik TO data_operator;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE source_asset, ingestion_batch TO admin;
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE fact_tuketim, fact_uretim, fact_abone, fact_serbest_tuketici, fact_hava_aylik TO admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE fact_tuketim, fact_uretim, fact_abone, fact_serbest_tuketici, fact_tuketim_ulke_geneli, fact_hava_aylik TO admin;
 GRANT SELECT, INSERT ON TABLE audit_log TO admin;
 GRANT SELECT, INSERT ON TABLE fact_hava_aylik_log TO data_operator, admin;
 GRANT SELECT ON TABLE veri_kapsam_disi TO viewer;
@@ -468,6 +505,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE veri_kapsam_disi TO admin;
 -- DEGISTIRMEDEN (tarihsel/muhurlu dosya), burada, db/schema.sql'de saglanir.
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE veri_kapsam_disi TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE veri_kapsam_disi TO service_role;
+-- fact_tuketim_ulke_geneli (migration 20260905_0002) - ayni admin FOR ALL
+-- + authenticated/service_role deseni.
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE fact_tuketim_ulke_geneli TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE fact_tuketim_ulke_geneli TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE fact_tuketim_ulke_geneli_id_seq TO authenticated, service_role;
+REVOKE ALL ON TABLE fact_tuketim_ulke_geneli FROM anon;
 
 BEGIN;
 
@@ -482,6 +525,7 @@ ALTER TABLE public.fact_tuketim ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fact_uretim ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fact_abone ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fact_serbest_tuketici ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fact_tuketim_ulke_geneli ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fact_hava_aylik ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fact_hava_aylik_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dim_tarih ENABLE ROW LEVEL SECURITY;

@@ -102,6 +102,7 @@ jobs:
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260904_0003_missing_grants.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260904_0004_sistem_kpi_job_rls_disable.sql
           psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260905_0001_kpi_esik_seed.sql
+          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260905_0002_fact_tuketim_ulke_geneli.sql
       - name: Run static RLS validation
         run: python worker/validate_rls_static.py
       - name: Run role-based access verification (anon vs viewer, real RLS/GRANT behavior)

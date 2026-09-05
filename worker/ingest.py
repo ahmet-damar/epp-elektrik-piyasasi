@@ -371,6 +371,36 @@ def fact_tuketim_yukle(
     return yuklenen, atlanan
 
 
+def fact_tuketim_ulke_geneli_yukle(
+    conn: Connection, df: pd.DataFrame, batch_id: int
+) -> tuple[int, int]:
+    """fact_tuketim_yukle() ile AYNI desen — tek fark: il_kodu/baglanti
+    YOK (grain: tarih_id × grup_id yalnız), çünkü kaynak (T11 tablosunun
+    kendi Genel Toplam satırı, bkz. worker/scripts/word_ortak.py:
+    genel_toplam_satirini_oku()) zaten il kırılımsız. is_active=false
+    yazar (aktivasyon adımı P0-4/P0-5 ile AYNI, bkz. aktivasyon_yap())."""
+    yuklenen = 0
+    atlanan = 0
+    with conn.cursor() as cur:
+        for satir in df.itertuples(index=False):
+            deger = _sayisal_temiz(satir.tuketim_mwh)
+            if deger is None:  # fact_tuketim_ulke_geneli.tuketim_mwh NOT NULL
+                atlanan += 1
+                continue
+            grup_id = dim_grup_id_bul(conn, satir.grup)
+            cur.execute(
+                """
+                INSERT INTO fact_tuketim_ulke_geneli
+                    (tarih_id, grup_id, tuketim_mwh, ingestion_batch_id, is_active)
+                VALUES (%s, %s, %s, %s, false)
+                ON CONFLICT ON CONSTRAINT uq_fact_tuketim_ulke_geneli_batch DO NOTHING
+                """,
+                (satir.tarih_id, grup_id, deger, batch_id),
+            )
+            yuklenen += 1
+    return yuklenen, atlanan
+
+
 def fact_uretim_yukle(
     conn: Connection, df: pd.DataFrame, batch_id: int
 ) -> tuple[int, int]:
@@ -546,6 +576,7 @@ _DOGAL_ANAHTAR = {
     "fact_uretim": ["il_kodu", "tarih_id", "kaynak_id", "lisans_id"],
     "fact_abone": ["il_kodu", "tarih_id", "grup_id"],
     "fact_serbest_tuketici": ["il_kodu", "tarih_id", "tur", "grup_id"],
+    "fact_tuketim_ulke_geneli": ["tarih_id", "grup_id"],
 }
 
 

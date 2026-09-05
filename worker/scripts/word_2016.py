@@ -105,6 +105,8 @@ from worker.parser import (
 from worker.parser import grup_esle as _excel_grup_esle
 from worker.scripts.word_ortak import (
     basliklari_topla,
+    genel_toplam_satirini_oku,
+    grup_kolonlarini_coz,
     t4_tablosunu_bul,
     tek_aday_bul,
 )
@@ -292,16 +294,12 @@ def t11_oku(tbl, tarih_id: int) -> tuple[pd.DataFrame, list[dict] | None]:
     kayıtlarının listesi (audit_log'a `turetilmis=true` ile yazılsın diye,
     ham kaynak veriyle KARIŞTIRILMASIN)."""
     baslik_satir = [c.text.strip() for c in tbl.rows[0].cells]
-    grup_kolonlari: list[tuple[int, str]] = []
-    for idx, hucre in enumerate(baslik_satir):
-        if idx == 0:
-            continue
-        grup = grup_esle_zorunlu(hucre)
-        if grup is None or grup == "Sanayi":
-            continue
-        grup_kolonlari.append((idx, grup))
+    grup_kolonlari_tam = grup_kolonlarini_coz(baslik_satir, grup_esle_zorunlu)
+    grup_kolonlari = [(idx, g) for idx, g in grup_kolonlari_tam if g != "Sanayi"]
     if not grup_kolonlari:
-        raise ValueError(f"T11: hiç grup kolonu bulunamadı, başlık={baslik_satir}")
+        raise ValueError(
+            f"T11: hiç grup kolonu bulunamadı (Sanayi hariç), başlık={baslik_satir}"
+        )
 
     il_toplamlari: dict[tuple[int, str], float] = {}
     genel_toplam_grup: dict[str, float] | None = None
@@ -825,6 +823,154 @@ def isle_ay_t4(
     return sonuc
 
 
+def isle_ay_ulke_geneli(
+    conn,
+    *,
+    klasor: Path,
+    ay: int,
+    actor_name: str,
+    dry_run: bool = False,
+) -> pipeline.IslemSonucu | None:
+    """fact_tuketim_ulke_geneli için AYRI batch — T4'ünkiyle (isle_ay_t4)
+    AYNI desen: kendi parser_version'ı ile YENİ ve BAĞIMSIZ bir batch
+    zinciri, zaten onaylı fact_tuketim batch'lerine DOKUNMAZ. T11
+    tablosu BURADA YENİDEN bulunur (aynı icerir/etiket, fact_tuketim
+    yazımıyla hiç etkileşmez) ve worker/scripts/word_ortak.py:
+    genel_toplam_satirini_oku() ile (t11_oku() ile AYNI grup_esle_zorunlu
+    + parse_sayi) Genel Toplam satırından TÜM gruplar (Sanayi DAHİL)
+    okunur. Karar 2 DEĞİŞMEDİ - fact_tuketim'e hiçbir şey yazılmaz."""
+    dosya_adi = MANIFEST_2016[ay]
+    yol = klasor / dosya_adi
+    yil = 2016
+    tarih_id = yil * 100 + ay
+    ay_adi = ingest.AY_ADLARI[ay]
+    source_period = f"{yil}-{ay:02d}"
+    parser_version = "word-2016-ulke-geneli-v1"
+
+    print(f"\n=== Ülke Geneli {ay_adi} {yil} — {dosya_adi} ===")
+
+    if not dry_run:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT ib.batch_id, ib.status FROM ingestion_batch ib
+                JOIN source_asset sa ON sa.source_asset_id = ib.source_asset_id
+                WHERE sa.source_type = 'epdk_aylik_word' AND sa.source_period = %s
+                  AND ib.parser_version = %s AND ib.status != 'failed'
+                ORDER BY ib.batch_id
+                """,
+                (source_period, parser_version),
+            )
+            mevcut = cur.fetchall()
+        if mevcut:
+            print(f"  [ATLA] Ülke Geneli {source_period} zaten işlenmiş: {mevcut}")
+            return None
+
+    icerik = yol.read_bytes()
+    doc = Document(BytesIO(icerik))
+    basliklar = basliklari_topla(doc)
+
+    t11_tbl, t11_baslik = tek_aday_bul(
+        basliklar,
+        icerir=["İl ve Tüketici Türü Bazında Dağılımı"],
+        etiket="T11",
+    )
+    print(f"  T11 başlık: {t11_baslik!r}")
+
+    degerler = genel_toplam_satirini_oku(t11_tbl, grup_esle_zorunlu)
+    ulke_geneli_ham = pd.DataFrame(
+        [
+            {"tarih_id": tarih_id, "grup": grup, "tuketim_mwh": deger}
+            for grup, deger in degerler.items()
+        ],
+        columns=["tarih_id", "grup", "tuketim_mwh"],
+    )
+    print(
+        f"  Ülke Geneli: {len(ulke_geneli_ham)} satır, gruplar={sorted(degerler)}, "
+        f"Sanayi={degerler.get('Sanayi')}"
+    )
+
+    if dry_run:
+        print("  [DRY-RUN] DB'ye yazılmadı.")
+        return None
+
+    source_asset_id = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="epdk_aylik_word",
+        dosya_adi=dosya_adi,
+        icerik=icerik,
+        donem_tipi="aylik",
+        source_period=source_period,
+        uploaded_by=None,
+    )
+    batch_id = ingest.batch_olustur(conn, source_asset_id, parser_version, "1")
+    if not ingest.batch_sahiplen(conn, batch_id):
+        print(f"  [ATLA] batch_id={batch_id} zaten sahiplenilmiş/işlenmiş.")
+        return None
+
+    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+
+    sonuc = pipeline.IslemSonucu(batch_id=batch_id)
+    dogrulanan = kpi.dogrula_tuketim(ulke_geneli_ham)
+    yuklenen, atlanan = ingest.fact_tuketim_ulke_geneli_yukle(
+        conn, dogrulanan.kabul, batch_id
+    )
+    sonuc.tablolar["fact_tuketim_ulke_geneli"] = pipeline.TabloSonucu(
+        toplam=len(ulke_geneli_ham),
+        red=len(dogrulanan.red),
+        karantina=len(dogrulanan.karantina),
+        yuklenen=yuklenen,
+        atlanan=atlanan,
+    )
+    audit_tablolar = {
+        "fact_tuketim_ulke_geneli": {
+            "toplam": len(ulke_geneli_ham),
+            "red": len(dogrulanan.red),
+            "karantina": len(dogrulanan.karantina),
+            "yuklenen": yuklenen,
+            "atlanan": atlanan,
+            "red_satirlari": dogrulanan.red.to_dict("records"),
+        }
+    }
+    if dogrulanan.red.shape[0] or dogrulanan.karantina.shape[0]:
+        print(
+            f"  [DİKKAT] fact_tuketim_ulke_geneli: red={len(dogrulanan.red)} "
+            f"karantina={len(dogrulanan.karantina)}"
+        )
+
+    ingest.batch_durumu_guncelle(
+        conn,
+        batch_id,
+        "running",
+        total_row_count=len(ulke_geneli_ham),
+        accepted_row_count=yuklenen,
+        rejected_row_count=len(ulke_geneli_ham) - yuklenen,
+    )
+    ingest.audit_log_yaz(
+        conn,
+        table_name="ingestion_batch",
+        record_id=batch_id,
+        action_type="INSERT",
+        actor_name=actor_name,
+        payload={
+            "olay": "ingest_tamamlandi",
+            "tarih_id": tarih_id,
+            "kaynak": "word_2016_ulke_geneli",
+            "tablolar": audit_tablolar,
+            "not": "T11 tablosunun kendi Genel Toplam satırından, il kırılımı "
+            "olmayan ülke geneli değerler (Sanayi DAHİL) — bkz. dokumanlar/"
+            "06_canli_veri_operasyon_gunlugu.md 2026-09-05 kaydı.",
+        },
+    )
+
+    uygun, sebep = pipeline.otomatik_onaya_uygun(sonuc)
+    print(f"  otomatik_onaya_uygun() = {uygun}" + (f" ({sebep})" if sebep else ""))
+    print(
+        "  [NOT] onayla ÇAĞRILMADI (gece-boyu kural) — batch running/is_active=false kalıyor."
+    )
+    return sonuc
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="EPP: 2016 Word raporlarını yükle (tek seferlik)"
@@ -836,11 +982,20 @@ def main() -> int:
         "--dry-run", action="store_true", help="Yalnız parse et, DB'ye YAZMA"
     )
     ap.add_argument("--t4", action="store_true", help="T11/T10 yerine YALNIZ T4'ü işle")
+    ap.add_argument(
+        "--ulke-geneli",
+        action="store_true",
+        help="T11/T10 yerine YALNIZ fact_tuketim_ulke_geneli'yi işle (ayrı batch)",
+    )
     # KESİN KURAL: --onayla YOK, BİLİNÇLİ OLARAK.
     args = ap.parse_args()
 
     aylar = [args.ay] if args.ay else sorted(MANIFEST_2016)
-    isleyici = isle_ay_t4 if args.t4 else isle_ay
+    isleyici = (
+        isle_ay_ulke_geneli
+        if args.ulke_geneli
+        else (isle_ay_t4 if args.t4 else isle_ay)
+    )
 
     if args.dry_run:
         for ay in aylar:
