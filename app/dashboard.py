@@ -123,7 +123,13 @@ def _cikis_yap(mesaj: str | None = None) -> None:
             baglanti.close()
         except Exception:  # noqa: BLE001, S110 - çıkışta kapatma hatası kullanıcıyı engellememeli
             pass
-    for anahtar in ("db_handle", "db_source", "kullanici_email", "kullanici_rolu", "giris_zamani"):
+    for anahtar in (
+        "db_handle",
+        "db_source",
+        "kullanici_email",
+        "kullanici_rolu",
+        "giris_zamani",
+    ):
         st.session_state.pop(anahtar, None)
     st.rerun()
 
@@ -158,7 +164,9 @@ def _giris_ekrani_goster() -> None:
             sonuc = giris_yap(email, sifre)
         except GirisKilitli as e:
             dakika = math.ceil(e.kalan_sn / 60)
-            st.error(f"Çok fazla başarısız deneme. Lütfen {dakika} dakika sonra tekrar deneyin.")
+            st.error(
+                f"Çok fazla başarısız deneme. Lütfen {dakika} dakika sonra tekrar deneyin."
+            )
         else:
             if sonuc is None:
                 st.error("E-posta veya şifre hatalı.")
@@ -202,8 +210,13 @@ def _baglanti_al() -> tuple[Any | None, str]:
     if get_dashboard_database_url():
         if "db_handle" in st.session_state:
             giris_zamani = st.session_state.get("giris_zamani")
-            if giris_zamani is not None and (time.time() - giris_zamani) > GIRIS_SURESI_SN:
-                _cikis_yap(mesaj="Oturum süresi doldu (8 saat) — lütfen tekrar giriş yapın.")
+            if (
+                giris_zamani is not None
+                and (time.time() - giris_zamani) > GIRIS_SURESI_SN
+            ):
+                _cikis_yap(
+                    mesaj="Oturum süresi doldu (8 saat) — lütfen tekrar giriş yapın."
+                )
         if "db_handle" not in st.session_state:
             _giris_ekrani_goster()  # gönderilmediyse/başarısızsa st.stop() ile burada durur
         return st.session_state.db_handle, st.session_state.db_source
