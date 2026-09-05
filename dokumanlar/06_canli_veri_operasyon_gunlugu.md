@@ -816,3 +816,72 @@ bu turun kapsamı dışında, gelecekte değerlendirilebilir).
 
 **Kod/şema değişikliği YAPILMADI** — kök neden bir secret eksikliğiydi,
 `worker/jobs/fetch_weather.py`'ye dokunulmadı.
+
+## 2026-09-05 — 2016-2025 fact_hava_aylik tam backfill (120 ay) +
+Open-Meteo'nun gerçek (dokümante edilmemiş) saatlik kotası bulundu
+
+**Amaç:** Yukarıdaki 2026-09-04/05 kaydında belirtilen kısıt ("KPI-11/12
+hâlâ hesaplanamaz, çünkü hava verisi 2016-2025 için yok") giderilmek
+üzere, `worker/jobs/fetch_weather.py`'nin mevcut `hava_verisi_cek_ve_yaz()`
+fonksiyonu HİÇ DEĞİŞTİRİLMEDEN, 2016-01'den 2025-12'ye kadar 120 ay için
+tek tek (script ile) çağrıldı. `fact_hava_aylik` UPSERT modelinde
+olduğundan (`is_active` yok) aktivasyon adımı gerekmedi.
+
+**Ön araştırma (kod değişikliği öncesi, onay için sunuldu):** Open-Meteo
+`archive-api.open-meteo.com/v1/archive` uç noktası ay başına 81 ili TEK
+istekte (çoklu-konum `latitude`/`longitude` parametreleri) çekiyor — 81
+ayrı çağrı değil. Resmi dokümantasyon (open-meteo.com/en/pricing) 600
+çağrı/dk, 5.000/saat, 10.000/gün, 300.000/ay diyordu; 120 çağrı bunun
+çok altında görünüyordu. Tarihsel veri kapsamı 1940'a kadar doğrulandı
+(canlı, salt-okunur test çağrısıyla: 201601 için 81/81 il, 31/31 gün,
+0 eksik değer).
+
+**Gerçek bulgu (tahmin değil, canlı API yanıtıyla doğrulandı):** Resmi
+limitler YANILTICI çıktı. 61. istekte (2016-01→2021-01 başarılı,
+2021-02'de) `429 Too Many Requests` alındı. İlk iki düzeltme
+denemesi (3 deneme/5sn, sonra 5 deneme/30-60-120-120-120sn artan
+backoff — toplam ~7,5 dk bekleme) SORUNU ÇÖZMEDİ; aynı istek her
+denemede yine 429 döndü. Yanıt gövdesi doğrudan okunduğunda gerçek
+sebep ortaya çıktı: `{"reason":"Hourly API request limit exceeded.
+Please try again in the next hour.","error":true}` — yani bu bir
+"burst" limiti değil, GERÇEK ve dokümante edilmemiş bir **saatlik
+kota** (muhtemelen 81 il × ~30 günlük "ağır" çoklu-konum isteklerin iç
+ağırlıklandırması, dokümandaki 5.000/saatlik basit çağrı sayacından
+çok daha düşük bir eşiğe denk geliyor). Kısa backoff'ların hiçbiri
+saatlik pencereyi sıfırlamaya yetmiyordu.
+
+**Nihai çözüm:** Script v3 — işe başlamadan önce 65 dk bekleme (saatlik
+pencerenin kesin sıfırlanması için), her 45 istekte bir otomatik 65 dk
+mola, 429 durumunda kısa backoff yerine yine 65 dk bekleyip AYNI ayı
+tekrar deneme. Bu yaklaşımla 2021-02'den 2025-12'ye kalan 59 ay sıfır
+hata ile tamamlandı.
+
+**Sonuç (DB'den doğrulandı):**
+```
+120 ay özet (ay_sayısı, min_il, max_il): (120, 81, 81)
+eksik aylar: YOK — 120/120 tam
+81 ilden farklı olan aylar: YOK — hepsi tam 81
+```
+`fact_hava_aylik` artık 2016-01'den 2025-12'ye (120/120 ay) + önceki
+kayıttaki 2026-01'den 2026-08'e (8/8 ay) kadar kesintisiz dolu.
+
+**Toplam gerçek süre:** ~3 saat 2 dakika (10:09-13:12, iki başarısız
+deneme + tanı süresi dahil; asıl v3 çalıştırması kendi içinde 148,2 dk
+sürdü, büyük kısmı 65 dk'lık iki zorunlu bekleme).
+
+**KPI-11/12 doğrulaması** (`worker/analytics.kpi_11_12_hesapla()`,
+dashboard'a login gerekmeden doğrudan çağrılarak): 10 yıllık hava normu
+penceresi (`hava_norm_yil=10`, SABİT pencere) artık 2016-2025'i tam
+kapsadığından, bu pencerenin ilk kez tam dolduğu dönemler (2026-02 ila
+2026-06, tüketim verisi bu aylara kadar mevcut) için KPI-12 artık
+`None` ("hesaplanamaz") DEĞİL, gerçek sayısal değer veriyor. Örnek
+(Ankara, il_kodu=6): 202602→%66,9, 202603→%66,6, 202604→%71,2,
+202605→%52,0, 202606→%81,1. 2016-2025'in kendi içindeki aylar (örn.
+202512) hâlâ `None` — beklenen davranış, çünkü 10 yıllık SABİT pencere
+hedef yıldan ÖNCEKİ 10 yılı istiyor (2015-2024) ve 2015 verisi hiç yok;
+bu kısıt hava verisiyle değil, verinin 2016'da başlamasıyla ilgili ve
+gelecekte kendiliğinden çözülecek (her yeni ay pencereyi ileri kaydırır).
+
+**Kod/şema değişikliği YAPILMADI** — yalnızca mevcut
+`worker/jobs/fetch_weather.py:hava_verisi_cek_ve_yaz()` script'ten tekrar
+tekrar çağrıldı.
