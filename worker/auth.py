@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import base64
 import json
+import time
 from dataclasses import dataclass
 
 import psycopg
@@ -41,6 +42,54 @@ from worker.db import create_supabase_client, get_dashboard_database_url
 # 06_adr_dashboard_teknoloji.md, migration 20260819_0002/0016) — bu
 # kümenin DIŞINDA hiçbir değer SET ROLE'e asla ulaşmaz.
 GECERLI_ROLLER = frozenset({"viewer", "data_operator", "admin"})
+
+# Aşama 2 (2026-09-05, dokumanlar/06_adr_dashboard_teknoloji.md) — login
+# rate-limiting. Supabase Auth'un KENDİ rate-limit'i (resmi dokümantasyonu
+# doğrudan kontrol edildi, varsayılmadı) sign-in-with-password için ayrı/
+# dokümante edilmiş bir deneme sınırı SAĞLAMIYOR (yalnız OTP/anonim-giriş/
+# e-posta gönderimi için var) — panel açık internette (Streamlit Community
+# Cloud) barındırıldığından bu proje kendi başarısız-deneme sayacını
+# uyguluyor. Süreç-içi (in-memory) — DB migration'ı GEREKTİRMEZ; Streamlit
+# Community Cloud bir uygulamayı TEK süreçte çalıştırdığından bu, tüm
+# oturumlar arasında paylaşılan tutarlı bir sayaç sağlar (süreç yeniden
+# başlarsa/redeploy olursa sıfırlanır — kabul edilebilir, esas tehdit
+# modeli tek bir çalışan sürecin ömrü boyunca art arda deneme).
+_RATE_LIMIT_MAX_DENEME = 5
+_RATE_LIMIT_PENCERE_SN = 15 * 60  # 15 dakika
+_basarisiz_denemeler: dict[str, list[float]] = {}
+
+
+class GirisKilitli(Exception):
+    """`_RATE_LIMIT_MAX_DENEME` başarısız denemeden sonra `_RATE_LIMIT_
+    PENCERE_SN` boyunca aynı e-posta için giriş engellenir. Bu, hesabın
+    var olup olmadığını SIZDIRMAZ — sayaç e-postanın KENDİSİNE (var olsun
+    olmasın) bağlıdır, gerçek/sahte hesap için AYNI şekilde tetiklenir."""
+
+    def __init__(self, kalan_sn: float) -> None:
+        self.kalan_sn = kalan_sn
+        super().__init__(f"Çok fazla başarısız deneme, {kalan_sn:.0f} sn kilitli.")
+
+
+def _rate_limit_kontrol_et(email_anahtari: str) -> None:
+    """Pencere dışına düşen eski denemeleri temizler; sınır aşıldıysa
+    `GirisKilitli` fırlatır (Supabase'e HİÇ istek atmadan — hem gereksiz
+    dış çağrıyı önler hem Supabase'in kendi rate-limit'ini gereksiz
+    tüketmez)."""
+    simdi = time.monotonic()
+    denemeler = _basarisiz_denemeler.get(email_anahtari, [])
+    denemeler = [t for t in denemeler if simdi - t < _RATE_LIMIT_PENCERE_SN]
+    _basarisiz_denemeler[email_anahtari] = denemeler
+    if len(denemeler) >= _RATE_LIMIT_MAX_DENEME:
+        kalan_sn = _RATE_LIMIT_PENCERE_SN - (simdi - denemeler[0])
+        raise GirisKilitli(kalan_sn)
+
+
+def _basarisiz_deneme_kaydet(email_anahtari: str) -> None:
+    _basarisiz_denemeler.setdefault(email_anahtari, []).append(time.monotonic())
+
+
+def _basarili_giriste_sifirla(email_anahtari: str) -> None:
+    _basarisiz_denemeler.pop(email_anahtari, None)
 
 
 @dataclass(frozen=True)
@@ -68,7 +117,15 @@ def giris_yap(email: str, sifre: str) -> AuthSonucu | None:
     bilinen üçlüden biri DEĞİLSE) `None` döner — çağıran (app/dashboard.py)
     "e-posta veya şifre hatalı" gibi GENEL bir mesaj göstermeli, hangi
     durumun gerçekleştiğini (hesap yok / şifre yanlış / rol atanmamış)
-    kullanıcıya SIZDIRMAMALI."""
+    kullanıcıya SIZDIRMAMALI.
+
+    5 başarısız denemeden sonra AYNI e-posta için 15 dk `GirisKilitli`
+    fırlatılır (Aşama 2 rate-limiting — bkz. modül başındaki not).
+    E-posta anahtarı normalize edilir (`strip().lower()`) — büyük/küçük
+    harf veya baştaki/sondaki boşlukla sayaç bypass edilemez."""
+    email_anahtari = email.strip().lower()
+    _rate_limit_kontrol_et(email_anahtari)
+
     client = create_supabase_client()
     if client is None:
         return None
@@ -78,10 +135,16 @@ def giris_yap(email: str, sifre: str) -> AuthSonucu | None:
     try:
         yanit = client.auth.sign_in_with_password({"email": email, "password": sifre})
     except AuthApiError:
+        _basarisiz_deneme_kaydet(email_anahtari)
         return None
 
     if yanit.session is None or yanit.user is None:
+        _basarisiz_deneme_kaydet(email_anahtari)
         return None
+
+    # Kimlik bilgileri (Supabase'e göre) DOĞRU — rol whitelist dışı olsa
+    # bile bu bir kaba-kuvvet/tahmin denemesi DEĞİL, sayaç sıfırlanır.
+    _basarili_giriste_sifirla(email_anahtari)
 
     claims = _jwt_payload_coz(yanit.session.access_token)
     rol = (claims.get("app_metadata") or {}).get("role")

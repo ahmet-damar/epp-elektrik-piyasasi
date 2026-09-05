@@ -297,6 +297,48 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
      role`'ü DİNAMİK okur, yeni kullanıcı bir sonraki girişinde otomatik
      çalışır.
 
+- **Aşama 2 — departman ölçeği sertleştirme, UYGULANDI (2026-09-05):**
+  Panel Streamlit Community Cloud'da AÇIK internette barındırıldığından
+  (VPN/intranet DEĞİL), çok-kullanıcılı geçiş planının araştırma turunda
+  bulunan iki gerçek açık kapatıldı:
+
+  1. **8 saatlik mutlak oturum süresi** (`app/dashboard.py:GIRIS_SURESI_SN`):
+     `worker/auth.py:rol_baglantisi_ac()` JWT'yi yalnız GİRİŞ ANINDA
+     bağlantıya gömdüğünden, Supabase'in kendi JWT süresi (resmi
+     dokümantasyonu kontrol edildi — varsayılan 1 saat) bu bağlantı
+     ÜZERİNDE hiç uygulanmıyordu; giriş açık bırakılan bir sekme
+     süresiz erişimi korurdu. `st.session_state.giris_zamani` login
+     anında kaydedilir, `_baglanti_al()` her çalıştırmada süreyi
+     kontrol eder, dolmuşsa `_cikis_yap()` ile ZORLA çıkış yaptırır.
+
+  2. **Login rate-limiting** (`worker/auth.py`, `_RATE_LIMIT_MAX_DENEME=5`,
+     `_RATE_LIMIT_PENCERE_SN=15*60`): Supabase Auth'un rate-limit
+     dokümantasyonu doğrudan kontrol edildi (varsayılmadı) —
+     sign-in-with-password için AYRI/dokümante edilmiş bir deneme
+     sınırı YOK (yalnız OTP/anonim-giriş/e-posta gönderimi için var,
+     bkz. `https://supabase.com/docs/guides/auth/rate-limits`). Süreç-içi
+     (in-memory, migration GEREKTİRMEZ) bir sayaç eklendi: e-posta
+     başına 15 dk içinde 5 başarısız denemeden sonra `GirisKilitli`
+     fırlatılır, Supabase'e hiç istek atılmadan reddedilir. E-posta
+     anahtarı normalize edilir (`strip().lower()`) — büyük/küçük harf
+     veya boşlukla bypass edilemez. Hesabın var olup olmadığını
+     SIZDIRMAZ (sayaç e-postanın kendisine bağlı, gerçek/sahte hesap
+     için aynı şekilde tetiklenir). Doğru kimlik bilgisiyle (rol
+     whitelist dışı olsa bile) sayaç sıfırlanır — bu bir kaba-kuvvet
+     denemesi sayılmaz. Streamlit Community Cloud bir uygulamayı TEK
+     süreçte çalıştırdığından bu, tüm oturumlar arasında paylaşılan
+     tutarlı bir sayaç sağlar (süreç yeniden başlarsa/redeploy olursa
+     sıfırlanır — kabul edilen bir ödünleşim).
+
+  **Kapsam dışı bırakılan (bilinçli, ayrı karar bekliyor):** Şifre
+  sıfırlama akışı elle süreç olarak kalıyor (madde 3'teki "Yeni kullanıcı
+  eklemek" adımlarına bkz.) — panelin kendi bir akışı yok, henüz
+  gerekmiyor. Admin rol-atama UI'ı (kullanıcı sayısı gerçekten artınca
+  ayrı bir iş kalemi) ve tam veri girişi ekranı (`data_operator` için —
+  onay disiplinini kırma riski nedeniyle ayrı bir tasarım turu
+  gerektiriyor; şimdilik yalnız `app/dashboard.py`'de bu rol için açık
+  bir bilgi mesajı var) bu turun kapsamı DIŞINDA bırakıldı.
+
 ## Değerlendirilen Alternatifler
 - **Next.js + TypeScript (şimdi):** Reddedildi — Faz 2 kapsamına göre erken;
   worker/ ile arasına bir API katmanı (FastAPI) kurmayı da gerektirirdi,

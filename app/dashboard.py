@@ -77,7 +77,9 @@ yapılandırılmamışsa (yerel/offline geliştirme) devrede kalır.
 
 from __future__ import annotations
 
+import math
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -89,25 +91,39 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from data.tr_ocak2026 import TABLO2_KAYNAK, TABLO11
 from worker import analytics, ingest, kpi
-from worker.auth import giris_yap, rol_baglantisi_ac
+from worker.auth import GirisKilitli, giris_yap, rol_baglantisi_ac
 from worker.db import get_dashboard_database_url, resolve_database_or_fallback
+
+# Aşama 2 (2026-09-05, dokumanlar/06_adr_dashboard_teknoloji.md) — bir iş
+# günü uzunluğunda mutlak oturum süresi. `worker/auth.py:rol_baglantisi_ac()`
+# JWT'yi yalnız GİRİŞ ANINDA okuyup bağlantıya gömdüğünden, Supabase'in
+# kendi JWT süresi (varsayılan 1 saat) bu bağlantı ÜZERİNDE hiç
+# uygulanmıyor — bu yüzden süre sonu burada, uygulama katmanında elle
+# takip edilir.
+GIRIS_SURESI_SN = 8 * 60 * 60
 
 st.set_page_config(
     page_title="EPP — Türkiye Elektrik Piyasası", layout="wide", page_icon="⚡"
 )
 
 
-def _cikis_yap() -> None:
+def _cikis_yap(mesaj: str | None = None) -> None:
     """Oturumu tamamen temizler (açık bağlantıyı kapatır + session_state'i
     sıfırlar) ve sayfayı yeniden başlatır — sidebar'daki "Çıkış Yap"
-    butonundan çağrılır."""
+    butonundan VEYA `_baglanti_al()`'ın oturum-süresi-doldu kontrolünden
+    çağrılır. `mesaj` verilirse (örn. süre dolduğunda) session_state'e
+    ayrı bir anahtarla yazılır — `st.rerun()` sayfayı SIFIRDAN çalıştırdığı
+    için bu anahtar aşağıdaki pop döngüsüne DAHİL EDİLMEZ, `_giris_ekrani_
+    goster()` sıradaki çalıştırmada okuyup gösterir ve temizler."""
+    if mesaj is not None:
+        st.session_state["giris_sonrasi_mesaj"] = mesaj
     baglanti = st.session_state.get("db_handle")
     if baglanti is not None and hasattr(baglanti, "close"):
         try:
             baglanti.close()
         except Exception:  # noqa: BLE001, S110 - çıkışta kapatma hatası kullanıcıyı engellememeli
             pass
-    for anahtar in ("db_handle", "db_source", "kullanici_email", "kullanici_rolu"):
+    for anahtar in ("db_handle", "db_source", "kullanici_email", "kullanici_rolu", "giris_zamani"):
         st.session_state.pop(anahtar, None)
     st.rerun()
 
@@ -120,7 +136,17 @@ def _giris_ekrani_goster() -> None:
     bağlantı açılır ve session_state'e konur. `st.stop()` ile çağrıldığı
     yerden SONRASI (asıl dashboard içeriği) render EDİLMEZ — giriş
     ekranı gösterildiği/yeniden denendiği sürece kullanıcı veriye hiç
-    erişemez."""
+    erişemez.
+
+    5 başarısız denemeden sonra `worker.auth.GirisKilitli` fırlatılır
+    (Aşama 2 rate-limiting) — bu durumda "hatalı şifre" yerine kalan
+    süreyi gösteren AYRI bir mesaj gösterilir (bu, hesabın var olup
+    olmadığını sızdırmaz — sayaç e-postanın kendisine bağlı, gerçek/sahte
+    hesap için aynı şekilde tetiklenir, bkz. worker/auth.py)."""
+    onceki_mesaj = st.session_state.pop("giris_sonrasi_mesaj", None)
+    if onceki_mesaj:
+        st.info(onceki_mesaj)
+
     st.title("⚡ EPP — Türkiye Elektrik Piyasası Paneli")
     st.subheader("Giriş")
     with st.form("giris_formu"):
@@ -128,20 +154,26 @@ def _giris_ekrani_goster() -> None:
         sifre = st.text_input("Şifre", type="password")
         gonderildi = st.form_submit_button("Giriş Yap")
     if gonderildi:
-        sonuc = giris_yap(email, sifre)
-        if sonuc is None:
-            st.error("E-posta veya şifre hatalı.")
+        try:
+            sonuc = giris_yap(email, sifre)
+        except GirisKilitli as e:
+            dakika = math.ceil(e.kalan_sn / 60)
+            st.error(f"Çok fazla başarısız deneme. Lütfen {dakika} dakika sonra tekrar deneyin.")
         else:
-            try:
-                baglanti = rol_baglantisi_ac(sonuc.jwt_claims_json, sonuc.rol)
-            except Exception as e:  # noqa: BLE001 - kullanıcıya net bir hata göstermek için
-                st.error(f"Giriş başarılı ama bağlantı açılamadı: {e}")
+            if sonuc is None:
+                st.error("E-posta veya şifre hatalı.")
             else:
-                st.session_state.db_handle = baglanti
-                st.session_state.db_source = "PostgreSQL via DATABASE_URL_DASHBOARD"
-                st.session_state.kullanici_email = sonuc.kullanici_email
-                st.session_state.kullanici_rolu = sonuc.rol
-                st.rerun()
+                try:
+                    baglanti = rol_baglantisi_ac(sonuc.jwt_claims_json, sonuc.rol)
+                except Exception as e:  # noqa: BLE001 - kullanıcıya net bir hata göstermek için
+                    st.error(f"Giriş başarılı ama bağlantı açılamadı: {e}")
+                else:
+                    st.session_state.db_handle = baglanti
+                    st.session_state.db_source = "PostgreSQL via DATABASE_URL_DASHBOARD"
+                    st.session_state.kullanici_email = sonuc.kullanici_email
+                    st.session_state.kullanici_rolu = sonuc.rol
+                    st.session_state.giris_zamani = time.time()
+                    st.rerun()
     st.stop()
 
 
@@ -159,8 +191,19 @@ def _baglanti_al() -> tuple[Any | None, str]:
     bir ortam) eski davranış (`resolve_database_or_fallback()`: varsa
     `DATABASE_URL`, yoksa anon-key Supabase istemcisi, o da yoksa statik
     dosya verisi) AYNEN korunur — bu durumda giriş ekranı da HİÇ
-    gösterilmez (zaten gerçek veri yok, kimlik doğrulayacak bir şey yok)."""
+    gösterilmez (zaten gerçek veri yok, kimlik doğrulayacak bir şey yok).
+
+    **2026-09-05, Aşama 2 — 8 saatlik mutlak oturum süresi:** `worker/
+    auth.py:rol_baglantisi_ac()` JWT'yi yalnız GİRİŞ ANINDA bağlantıya
+    gömdüğünden, Supabase'in kendi JWT süresi (1 saat) bu bağlantı
+    ÜZERİNDE hiç uygulanmaz — süre burada elle takip edilir. Süre
+    dolduysa `_cikis_yap()` ile ZORLA çıkış yapılır (bağlantı kapatılır,
+    kullanıcı yeniden giriş ekranını görür)."""
     if get_dashboard_database_url():
+        if "db_handle" in st.session_state:
+            giris_zamani = st.session_state.get("giris_zamani")
+            if giris_zamani is not None and (time.time() - giris_zamani) > GIRIS_SURESI_SN:
+                _cikis_yap(mesaj="Oturum süresi doldu (8 saat) — lütfen tekrar giriş yapın.")
         if "db_handle" not in st.session_state:
             _giris_ekrani_goster()  # gönderilmediyse/başarısızsa st.stop() ile burada durur
         return st.session_state.db_handle, st.session_state.db_source
