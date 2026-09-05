@@ -421,36 +421,53 @@ hesaplanamıyor.
    (bkz. `word_2024.py`/`word_2023.py`'nin manifest taramaları) ama hiç
    işlenmedi.
 
-## İleride araştırılabilir — Sanayi tüketimi Word kaynağında gerçekte nerede?
+## Sanayi tüketimi Word kaynağında gerçekte nerede? — KAPANDI (2026-09-05)
 
 **Kısa araştırma (2026-09-04, kod DEĞİŞMEDİ, yalnız teşhis):** "Sanayi
 neden hiç T11'e (fact_tuketim) girmiyor" sorusu — Karar 2 zaten "baglanti/
 iletim-dağıtım ayrımı kaynakta yok" diyordu, ama bu turda GERÇEKTEN
-doğrulandı: 2024 Mart'ın ham T11 tablosu (`_PortalAdmin_Uploads_Content_
-FastAccess_1e16f2f785735.docx`) doğrudan açılıp başlık satırı okundu —
-**"Sanayi" sütunu TABLODA GERÇEKTEN VAR** (`['İller', 'Aydınlatma', 'Kamu/
-Özel/Diğer', 'Mesken', 'Sanayi', 'Tarımsal Faaliyetler', 'Genel Toplam',
-'Pay']`), yalnız TEK bir birleşik değer olarak — Excel'deki gibi ayrı
-"Sanayi-iletim"/"Sanayi-dağıtım" satırları YOK. `word_ortak.py`'nin
-`t11_oku()`'su bu sütunu GÖRÜYOR ama Karar 2 gereği bilinçli olarak
-atlıyor (`if grup is None or grup == "Sanayi": continue`) — P0 kuralı
-("sahte veri üretme") gereği, kaynakta olmayan bir iletim/dağıtım
-ayrımını UYDURMAK yerine, Sanayi'nin TAMAMI dışlanıyor.
+doğrulandı: 2023 Haziran'ın ham T11 tablosu (`_PortalAdmin_Uploads_
+Content_FastAccess_1e16f2f785735.docx` — **DÜZELTME (2026-09-05): bu
+dosya `MANIFEST_2023[6]`'dadır, önceki sürümde yanlışlıkla "2024 Mart"
+etiketlenmişti, `worker/scripts/word_2023.py`'den doğrudan grep ile
+doğrulandı**) doğrudan açılıp başlık satırı okundu — **"Sanayi" sütunu
+TABLODA GERÇEKTEN VAR** (`['İller', 'Aydınlatma', 'Kamu/Özel/Diğer',
+'Mesken', 'Sanayi', 'Tarımsal Faaliyetler', 'Genel Toplam', 'Pay']`),
+yalnız TEK bir birleşik değer olarak — Excel'deki gibi ayrı "Sanayi-
+iletim"/"Sanayi-dağıtım" satırları YOK. `word_ortak.py`'nin `t11_oku()`'su
+bu sütunu GÖRÜYOR ama Karar 2 gereği bilinçli olarak atlıyor (`if grup is
+None or grup == "Sanayi": continue`) — P0 kuralı ("sahte veri üretme")
+gereği, kaynakta olmayan bir iletim/dağıtım ayrımını UYDURMAK yerine,
+Sanayi'nin TAMAMI dışlanıyor. **Bu karar DEĞİŞMEDİ, hâlâ geçerli.**
 
 **fact_serbest_tuketici (T13) içinde de yok** — canlı DB'de doğrulandı,
 `fact_serbest_tuketici`'de "Sanayi" grubu YALNIZ 2026 (Excel) verisinde
 var, 2023-2025 (Word) için sıfır satır — Karar 1 zaten T13'ü Word
 yıllarında tamamen kapsam dışı sayıyor, bu tutarlı.
 
-**Araştırılmamış/açık kalan olası bir üçüncü yol — T7:**
-`dokumanlar/06_canli_veri_operasyon_gunlugu.md`'nin 2026-08-31 girdisinde
-bahsedilen "Tablo 7 çoklu-ay format" (ülke geneli mutabakat tablosu,
-şu an SADECE mutabakat kontrolü için kullanılıyor, fact tablosuna hiç
-yazılmıyor) Sanayi'nin il kırılımı OLMAYAN, yalnız ülke-geneli bir
-toplamını içeriyor olabilir mi — bu tur incelenmedi. Eğer öyleyse,
-Sanayi'nin en azından ülke-geneli (il bazlı DEĞİL) bir tutarı Word
-kaynağından yine de elde edilebilir olabilir (KPI-25/27'nin bugünkü
-"kaynakta yok" varsayımını kısmen yumuşatabilir) — ama il×grup grain'i
-gerektiren `fact_tuketim`'e yazılamaz, olsa olsa ayrı bir ülke-geneli
-seri/KPI için kullanılabilir. **Bu ayrı bir oturumun konusu** — bu turda
-yalnız işaretlendi, hiçbir T7 kodu incelenmedi/yazılmadı.
+**Çözüm bulundu (2026-09-05) — T11'in KENDİ "Genel Toplam" satırı:**
+Yukarıdaki "üçüncü yol T7" varsayımı (ayrı bir çoklu-ay mutabakat
+tablosunun ülke geneli bir toplam taşıyabileceği) ARANMADI/gerekmedi —
+çünkü T11 tablosunun (fact_tuketim için zaten her ay bulunan AYNI
+tablo) kendi "Genel Toplam" SATIRI, il kırılımı olmayan, TÜM gruplar
+(Sanayi DAHİL) için ülke geneli tek-ay tüketim değerini ZATEN veriyor —
+ayrıca bir tablo aramaya hiç gerek yok. 2016-2025'in TAMAMINDA (120 ay,
+gerçek docx'lere karşı) doğrulandı: sıfır eksik ay, sıfır format hatası,
+her ayın kendi Genel Toplam satırı tablonun kendi toplam kolonuyla %0,1
+tolerans içinde tutarlı. Bu değer artık ayrı bir tabloya
+(`fact_tuketim_ulke_geneli`, migration `20260905_0002`, bkz.
+`03_veri_modeli.md`) yazılıyor — `fact_tuketim`'e Sanayi YAZILMIYOR,
+Karar 2 DEĞİŞMEDİ; bu yalnız KPI-25/27'nin "Sanayi dahil" hesapları için
+AYRI bir veri hazırlığı (KPI formülü bu turda değiştirilmedi).
+
+**Önemli bir uyarı, aynı araştırmada bulundu (2026-09-05):** 2021'den
+itibaren EPDK raporları AYRICA bir "Dönemler Arası Karşılaştırması"
+tablosu (Tablo 2.2/2.3 gibi) da basıyor — bu tablo o AYIN değerini
+DEĞİL, o ay + BİR ÖNCEKİ YILIN aynı ayını YAN YANA (iki dönem sütunu)
+gösteriyor. Bu tabloların YANLIŞ (birinci/eski) sütunu okunursa değer
+tam 1 yıl KAYDIRILMIŞ olur — 2024-10 için somut örnek: bu tablonun ilk
+sütunu 9.836.481,54 (aslında 2023 Ekim), doğru (2024 Ekim) değer ise
+9.692.839,43'tür (T11'in kendi Genel Toplam satırından doğrulandı).
+`genel_toplam_satirini_oku()` bu karşılaştırma tablolarını HİÇ
+ARAMAZ/OKUMAZ — yalnız T11'in kendi tablosunu kullanır, bu risk
+YAPISAL OLARAK yoktur.

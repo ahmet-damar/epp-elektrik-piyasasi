@@ -97,6 +97,41 @@ CREATE UNIQUE INDEX uq_fact_tuketim_active
   20260819_0008) hesaplanır — il geneli ağırlıklı ortalama DEĞİL, tek bir
   temsili nokta (il merkezi/şehir merkezi).
 
+### fact_tuketim_ulke_geneli (2026-09-05, migration 20260905_0002)
+```sql
+CREATE TABLE fact_tuketim_ulke_geneli (
+  id BIGSERIAL PRIMARY KEY,
+  tarih_id INT NOT NULL REFERENCES dim_tarih(tarih_id),
+  grup_id INT NOT NULL REFERENCES dim_tuketici_grubu(grup_id),
+  tuketim_mwh NUMERIC(16,3),
+  ingestion_batch_id BIGINT NOT NULL REFERENCES ingestion_batch(batch_id),
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  CONSTRAINT uq_fact_tuketim_ulke_geneli_batch
+    UNIQUE (tarih_id, grup_id, ingestion_batch_id)
+);
+CREATE UNIQUE INDEX uq_fact_tuketim_ulke_geneli_active
+  ON fact_tuketim_ulke_geneli (tarih_id, grup_id) WHERE is_active;
+```
+fact_tuketim'den GRAIN'i FARKLI: `il_kodu`/`baglanti` YOK — yalnız
+`tarih_id × grup_id`. Kaynak: EPDK Word T11 (il×grup) tablosunun KENDİ
+"Genel Toplam" satırı (`worker/scripts/word_ortak.py:genel_toplam_
+satirini_oku()`) — il kırılımı zaten yok, ayrıca hesaplanmaz.
+
+**Neden ayrı bir tablo:** Karar 2 (`07_word_parser_kapsam.md`) Sanayi'nin
+`fact_tuketim`'e (il×grup×baglanti grain'i) yazılmasını engelliyor —
+kaynakta iletim/dağıtım ayrımı YOK. Bu kısıt il kırılımı istemeyen bir
+ÜLKE GENELİ seri için geçerli değil (Genel Toplam satırı zaten il/baglanti
+ayrımı taşımıyor) — bu yüzden Sanayi DAHİL TÜM gruplar (Aydınlatma/Kamu ve
+Özel Hizmetler/Mesken/Sanayi/Tarımsal) buraya yazılabiliyor. Amaç:
+KPI-25/27'nin "Sanayi dahil" hesapları için veri hazırlamak (KPI formülü
+BU TURDA değiştirilmedi, yalnız veri — bkz. `06_canli_veri_operasyon_
+gunlugu.md` 2026-09-05 kaydı).
+
+**Doğrulama (120 ay, 2016-2025, gerçek docx'lere karşı):** her ayın kendi
+T11 tablosunda tam 1 "Genel Toplam" satırı bulundu, 5 kanonik grup (Sanayi
+dahil) okundu, satır toplamı tablonun kendi "Genel Toplam" kolonuyla
+%0,1 tolerans içinde tutarlı — sıfır istisna.
+
 ## İşlem & Config Tabloları
 - **job_status:** correlation_id, status CHECK(queued/running/succeeded/failed/retrying/dead_letter),
   attempt_count, locked_by, heartbeat_at, next_retry_at
