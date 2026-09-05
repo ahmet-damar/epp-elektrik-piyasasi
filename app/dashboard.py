@@ -201,6 +201,21 @@ else:
         "Supabase/PostgreSQL erişimi bulunamadı. Yerel dosya verisiyle çalışmaya devam ediliyor."
     )
 
+if st.session_state.get("kullanici_rolu") == "data_operator":
+    # data_operator RLS'te yalnız INSERT/UPDATE politikalarına sahip (bkz.
+    # supabase/migrations/20260819_0002_rls_roles.sql) — SELECT politikası
+    # YOK, bu yüzden aşağıdaki KPI sorguları bu rol için sessizce 0 satır
+    # dönerdi (boş/bozuk görünen bir ekran). Veri girişi UI'ı henüz
+    # yapılmadı (dokumanlar/06_adr_dashboard_teknoloji.md, "Faz B sonrası"
+    # kararı) — kafa karıştırıcı boş ekran yerine AÇIK bir bilgi mesajı
+    # gösterip burada dur.
+    st.info(
+        "Bu rol (data_operator) için henüz bir veri girişi ekranı yok. "
+        "Veri yükleme işlemleri şimdilik `worker/jobs/` altındaki "
+        "script'lerle yapılıyor."
+    )
+    st.stop()
+
 
 # ---------------- Önbellekli sorgu sarmalayıcıları (DB modu) ----------------
 # _conn: bkz. modül notu - Streamlit alttan çizgili parametreleri hash'lemez.
