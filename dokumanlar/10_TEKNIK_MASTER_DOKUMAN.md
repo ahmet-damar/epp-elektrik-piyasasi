@@ -573,10 +573,15 @@ sırasıyla):**
 1. 26/26 migration uygulandı, `validate_rls_static.py` + yeni tamlık
    kontrolü geçti: **"19 tablonun TAMAMI RLS açık + en az 1 policy'e
    sahip"**.
-2. **Negatif test:** politika/RLS'siz sahte bir tablo (`sahte_test_
-   tablosu`) eklenip yeni kontrol tekrar çalıştırıldı — **gerçekten
-   FAIL etti** (`AssertionError: ... sahte_test_tablosu (RLS=KAPALI, 0
-   policy)`, exit code 1), sonra tablo kaldırıldı.
+2. **Negatif test — hem yerel drill'de hem GERÇEK CI'da:** politika/
+   RLS'siz sahte bir tablo eklenip yeni kontrol tekrar çalıştırıldı —
+   **gerçekten FAIL etti** (`AssertionError: ... sahte_test_tablosu_c4
+   (RLS=KAPALI, 0 policy)`). Gerçek GitHub Actions koşusu (run
+   34159900787): `integration` job'ının "Run role-based access
+   verification" adımı X ile durdu, downstream adımlar (`ingest/
+   pipeline/job_worker/analytics/fetch_weather_integration.py`,
+   `Quality Gate`) atlandı — tam beklenen "sessizce geçme YOK" davranışı.
+   Test dosyası bir sonraki commit'te geri alındı.
 3. **Dashboard yolu ayrıca test edildi** (yalnız doğrudan `SET ROLE`
    değil) — `worker/auth.py:rol_baglantisi_ac()` gerçek fonksiyonu
    `app_dashboard_service` üzerinden çağrılarak: viewer/data_operator/
