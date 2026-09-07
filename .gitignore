@@ -31,3 +31,7 @@ node_modules/
 Thumbs.db
 *.log
 Claude outputs/
+
+# worker/scripts/backup.py çıktısı — canlı veri dump'ı, git'e GİRMEZ
+yedekler/
+*.dump

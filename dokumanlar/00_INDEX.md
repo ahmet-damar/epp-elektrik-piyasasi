@@ -22,6 +22,7 @@ kod üretirken bu dosyaları bağlam (context) olarak okuyabilmesi.
 | `08_word_2016_2022_kapsam.md` | Word (.docx) EPDK raporları 2016-2022 — teşhis + TAM implementasyon. 2016-2022'nin TAMAMI (T11/T4) işlendi, T10 yapısal olarak çoğunlukla kaynakta yok (kapsam_disi ile işaretli), taksonomi kararı (RENAME) verildi ve uygulandı | — (2026-09-05) |
 | `09_PROJE_DURUMU.md` | **Projenin GÜNCEL, canlı DB'ye karşı doğrulanmış tam durum raporu** — tamamlanan işler, aktivasyon durumu (yıl × tablo), geriye kalanlar, güvenilirlik notu. `SABAH_OZETI.md`'nin YERİNE bakılmalı | — (2026-09-05) |
 | `10_TEKNIK_MASTER_DOKUMAN.md` | **Teknik Master Doküman** — Faz 0'dan bugüne HER ŞEYİN (mimari, veri modeli, parser, pipeline, KPI, güvenlik, CI/CD, kronolojik faz geçmişi, açık maddeler, sözlük) tek dosyada, gerçek koda/git'e karşı doğrulanmış hâli. Diğer tüm `dokumanlar/` dosyalarının ÜST ÖZETİ — yeni başlayan biri (insan ya da Claude oturumu) için TEK giriş noktası | — (2026-09-07) |
+| `11_yedekleme_runbook.md` | **Yedekleme + geri yükleme runbook** — Supabase Free plan'de otomatik yedek YOK; `worker/scripts/backup.py` (pg_dump --data-only) + GERÇEKTEN denenmiş bir restore drilinin kanıtı (19/19 tablo eşleşti, 0 hata) | — (2026-09-07) |
 | ~~`SABAH_OZETI.md`~~ | **SİLİNDİ (2026-09-03)** — 2016-2022 Word aktarımının gece-turu dizisinin geçici notuydu, bazı iddiaları (2021/2022 T11-T10 aktivasyon durumu) DB'yle karşılaştırıldığında yanlış çıktı. Proje durumu için **bkz. `09_PROJE_DURUMU.md`** | — (2026-08-30, silindi 2026-09-03) |
 
 ## Copilot İçin Kullanım

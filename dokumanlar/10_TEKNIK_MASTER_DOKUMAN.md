@@ -27,6 +27,8 @@ kaynak kodu, canlı Supabase sorgusu) karşı yeniden doğrulandı. Bir
 | v1.2 | 2026-09-07 | 13 dokümanlık dış denetim (ChatGPT/Gemini/Sonnet analizleriyle çapraz) — §4.2/§4.3/§14.1 (T8'in "düzeltmesi" geri alındı, T8 de T12 gibi parse edilmiyor), §7.5 (KPI-28 numara çakışması notu), §12.4 (`prepare_threshold` notu eklendi), tüm "2026-09-08" tarihleri "2026-09-07"ye düzeltildi (git log'a karşı doğrulandı — commit `ecba6b5` dahil hepsi 09-07) | `grep -rn "T8" worker/parser.py worker/pipeline.py`, `grep -rn "KPI-28" worker/`, `git log --format='%cd' --date=iso` (tüm commit'ler 2026-09-07); ayrıca `05_kaynak_dosya_sozlesmesi.md`, `03_veri_modeli.md`, `01_kavramsal_tasarim.md`, `00_INDEX.md`, `.github/copilot-instructions.md`, `09_PROJE_DURUMU.md` bu turda düzeltildi (bu dosyanın kapsamı dışı, kendi commit'lerinde ayrı listelenir) |
 | v1.3 | 2026-09-07 | Aşama 1 (operasyonel güvenlik) başladı — C2: `worker/tests/conftest.py` ile prod DB'ye karşı test guard'ı KOD SEVİYESİNDE eklendi, §9.4'e not düşüldü | Sahte `pooler.supabase.com` URL'i ile pytest exit code 3 ile durduruldu; aynı URL + `ALLOW_DESTRUCTIVE_TESTS=true` ile 276 test normal toplandı; DB env'siz 227 test hatasız koştu (regresyon yok) |
 | v1.4 | 2026-09-07 | B2: `ci.yml`'in `integration` job'ı artık `deploy.yml` ile AYNI glob mantığını kullanıyor + uygulanan/toplam migration sayısı karşılaştırması eklendi (§9.1/§9.3) | Gerçek CI koşusu (run 34157349173): sahte bir migration dosyası hiçbir listeye eklenmeden glob'a yakalandı, kendi `RAISE NOTICE`'ı loga düştü, `Uygulanan: 26 / Toplam dosya: 26` doğrulaması geçti; test dosyası sonraki commit'te geri alındı |
+| v1.5 | 2026-09-07 | C1: `worker/scripts/backup.py` + `dokumanlar/11_yedekleme_runbook.md` eklendi (§8.5) — Supabase Free plan'de otomatik yedek YOK | Gerçek disaster-recovery drill'i (disposable postgres:17, WSL/Docker): migration'lardan şema + `pg_restore --data-only` ile veri geri yüklendi, 19/19 tablo canlı Supabase'in `COUNT(*)` değerleriyle birebir eşleşti, 0 hata (ikinci denemede — ilk denemedeki 6 seed-tablosu hatası `--exclude-table` ile düzeltildi) |
+| v1.6 | 2026-09-07 | C3: `worker/jobs/fetch_weather.py:main()` 0 satır yazılırsa FAIL ediyor + `scheduled-refresh.yml`'e `if: failure()` özet adımı eklendi (§9.3) | `yaml.safe_load` ile sözdizimi doğrulandı, ruff/mypy temiz; GitHub'ın scheduled-workflow bildirim davranışı resmi dokümantasyondan doğrulandı (cron'u oluşturan kullanıcıya gider — `git log` ile bu proje için repo sahibi olduğu teyit edildi), kişisel bildirim AÇIK mı kod seviyesinde doğrulanamadığı için elle teyit gerektiği not edildi |
 
 ---
 
@@ -570,6 +572,28 @@ DEĞİL — Supabase Dashboard'dan `app_metadata.role` elle set edilir.
   `GirisKilitli`, Supabase'e hiç istek atmadan reddedilir. Hesap
   varlığını SIZDIRMAZ (sayaç e-postanın kendisine bağlı).
 
+### 8.5 Yedekleme (C1, 2026-09-07) — tam runbook: `11_yedekleme_runbook.md`
+Bu proje **Supabase Free plan**'de — Supabase'in kendi otomatik günlük
+yedeği **YOK** (yalnız Pro+'da var, bkz. runbook). Tüm sorumluluk elle
+prosedürde: `worker/scripts/backup.py` (`pg_dump --schema=public
+--data-only`, 6 seed tablosu — `dim_il`/`dim_kaynak`/`dim_lisans`/
+`dim_tuketici_grubu`/`kpi_esik`/`sistem_parametre` — hariç, çünkü bunlar
+zaten migration'larla yeniden oluşuyor). Şema geri yükleme için AYRICA
+gerekmiyor — `supabase/migrations/`'ın kendisi zaten DDL kaynağı.
+
+**GERÇEKTEN denendi (2026-09-07, tek seferlik disaster-recovery
+drill'i):** disposable `postgres:17`'ye migration'lar uygulanıp
+(`ci.yml`'in `integration` job'ıyla AYNI sıra) dump `pg_restore` ile geri
+yüklendi — **19/19 tablo canlı Supabase'in `COUNT(*)` değerleriyle
+BİREBİR eşleşti, 0 hata** (ilk denemede 6 seed tablosu dump'a dahildi ve
+zararsız "duplicate key" hataları verdi — bu, `--exclude-table` eklenip
+düzeltildi, ikinci deneme temizdi). Detaylı tablo + adım adım komutlar:
+`11_yedekleme_runbook.md`.
+
+**Bilinen sınırlama:** otomatik/zamanlı yedekleme (cron/Actions ile
+günlük) henüz KURULMADI — bu tur yalnız elle çalıştırılabilir, gerçekten
+doğrulanmış bir prosedür sağladı, otomasyon kapsam dışı bırakıldı.
+
 ---
 
 ## 9. CI/CD
@@ -647,6 +671,20 @@ Haftalık cron (`0 6 * * 1`) + her push/PR.
   `if: false` ile KAPALIYDI; gerçekten açılınca `PROD_DATABASE_URL`
   secret'inin repo'da hiç tanımlı olmadığı ortaya çıktı — kod hatası
   DEĞİL, eksik bir GitHub secret'tı (bkz. §10).
+  **C3 düzeltmesi (2026-09-07):** aynı sessiz-başarısızlık deseninin
+  tekrarını önlemek için iki katman eklendi — (1) `worker/jobs/
+  fetch_weather.py:main()` artık 0 satır yazılırsa `SystemExit` ile
+  job'ı FAIL ettiriyor (önceden yalnız log basıp sessizce çıkıyordu;
+  pratikte `yazilan=0` yalnız `dim_il` boşsa mümkün, o da zaten ayrı bir
+  `RuntimeError` fırlatıyor — bu, gelecekteki bir refactor'e karşı son
+  savunma hattı), (2) `if: failure()` bir adım, başarısızlığı Actions
+  özetinde (`$GITHUB_STEP_SUMMARY`) görünür kılıyor. GitHub'ın kendi
+  scheduled-workflow e-posta bildirimi zamanlanmış cron'u OLUŞTURAN
+  kullanıcıya gider (resmi GitHub dokümantasyonu doğrulandı) — bu proje
+  için o kullanıcı `git log`'a göre repo sahibinin kendisi (2026-08-19'da
+  oluşturdu); kişisel bildirim tercihinin (github.com/settings/
+  notifications → Actions) açık olduğu KOD SEVİYESİNDE doğrulanamaz,
+  elle teyit gerekir.
 
 ### 9.4 Test Stratejisi
 25 dosya, **248 benzersiz `def test_*`** fonksiyonu (19 unit/regresyon +

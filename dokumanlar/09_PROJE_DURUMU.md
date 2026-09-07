@@ -64,6 +64,12 @@ yansıtıldı.**
   grupların ülke geneli değerini veriyor (yukarıdaki madde) — `07_word_
   parser_kapsam.md`'deki "ileride araştırılabilir" notu artık geçerli
   değil, kapatıldı.
+- **Aşama 1 (operasyonel güvenlik, 2026-09-07) — devam ediyor:** prod DB'ye
+  karşı test guard'ı kod seviyesinde eklendi (C2), CI/deploy migration
+  asimetrisi kapatıldı (B2), yedekleme runbook'u GERÇEK bir restore
+  drill'iyle doğrulandı (C1 — Supabase Free plan'de otomatik yedek YOK,
+  bkz. `11_yedekleme_runbook.md`). Detay: `10_TEKNIK_MASTER_DOKUMAN.md`
+  §8.5/§9.1/§9.4, Sürüm Geçmişi v1.3-v1.5.
 
 ## Tablo — Yıl × Tablo Aktivasyon Durumu
 

@@ -217,6 +217,18 @@ def main() -> None:
         f"[fetch_weather] tarih_id={tarih_id}: {sonuc['yazilan']} il yazıldı "
         f"({sonuc['veri_yok']} il için Open-Meteo veri döndürmedi)."
     )
+    if sonuc["yazilan"] == 0:
+        # 2026-09-07 (C3): "yeşil ama hiçbir şey yapmadı" durumu yeşil
+        # sayılmasın diye ek güvenlik — hava_verisi_cek_ve_yaz() normal
+        # şartlarda dim_il'deki her il için ayrı satır yazdığından bu satır
+        # pratikte hiç tetiklenmez (dim_il boşsa zaten RuntimeError fırlar),
+        # ama gelecekteki bir refactor'ün sessizce 0 satır üretmesine karşı
+        # açık bir son savunma hattı.
+        raise SystemExit(
+            f"[fetch_weather] tarih_id={tarih_id}: 0 satır yazıldı — bu "
+            "beklenmeyen bir durum, iş BAŞARISIZ sayılıyor (bkz. "
+            "dokumanlar/10_TEKNIK_MASTER_DOKUMAN.md §9.3, C3)."
+        )
 
 
 if __name__ == "__main__":

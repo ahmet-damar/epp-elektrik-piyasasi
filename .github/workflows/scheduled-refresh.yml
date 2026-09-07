@@ -21,3 +21,20 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
         run: python -m worker.jobs.fetch_weather --incremental
+      - name: Başarısızlık özeti (C3, 2026-09-07)
+        # Gerçek olay (2026-09-04/05): bu adım aylarca `if: false` ile
+        # KAPALIYDI, workflow "başarılı" görünüyordu ama fiilen HİÇBİR ŞEY
+        # yapmıyordu; açılınca PROD_DATABASE_URL secret'inin hiç tanımlı
+        # olmadığı ortaya çıktı. Artık üstteki adım GERÇEKTEN çalışıyor
+        # (`if: false` yok) VE 0 satır yazarsa kendi başına FAIL ediyor
+        # (worker/jobs/fetch_weather.py:main()) - bu adım yalnız o
+        # başarısızlığı Actions özetinde GÖRÜNÜR kılıyor (GitHub'ın kendi
+        # e-posta bildirimi zaten devrede olmalı - bkz. runbook notu).
+        if: failure()
+        run: |
+          echo "## ⚠️ Scheduled Refresh BAŞARISIZ" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`fetch_weather --incremental\` adımı başarısız oldu ya da" >> "$GITHUB_STEP_SUMMARY"
+          echo "0 satır yazdı. Muhtemel sebepler: \`PROD_DATABASE_URL\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "secret'i tanımsız/yanlış, Open-Meteo API erişilemez, ya da" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`dim_il\` boş. Yukarıdaki adımın loguna bakın." >> "$GITHUB_STEP_SUMMARY"
