@@ -26,7 +26,7 @@ kaynak kodu, canlı Supabase sorgusu) karşı yeniden doğrulandı. Bir
 | v1.1 | 2026-09-07 | §9.4/Ek A test sayısı düzeltmesi | v1.0'ın "230 pytest ID non-integration" rakamı YANLIŞTI — temiz bir kabukta (`env -i`, `.env` erişilemez) doğrudan doğrulandı: 19 unit/regresyon dosyası TEK BAŞINA **227** ID veriyor (`skipif` toplamayı değil çalıştırmayı engelliyor, bu iki kavramın karışması hataya sebep olmuştu). 230, bu oturumun WSL koşusuna ÖZGÜ bir rakam (227 yerel + 3 gerçek `test_auth_integration.py` çağrısı) — genel/ortam-bağımsız bir sabit DEĞİL |
 | v1.2 | 2026-09-07 | 13 dokümanlık dış denetim (ChatGPT/Gemini/Sonnet analizleriyle çapraz) — §4.2/§4.3/§14.1 (T8'in "düzeltmesi" geri alındı, T8 de T12 gibi parse edilmiyor), §7.5 (KPI-28 numara çakışması notu), §12.4 (`prepare_threshold` notu eklendi), tüm "2026-09-08" tarihleri "2026-09-07"ye düzeltildi (git log'a karşı doğrulandı — commit `ecba6b5` dahil hepsi 09-07) | `grep -rn "T8" worker/parser.py worker/pipeline.py`, `grep -rn "KPI-28" worker/`, `git log --format='%cd' --date=iso` (tüm commit'ler 2026-09-07); ayrıca `05_kaynak_dosya_sozlesmesi.md`, `03_veri_modeli.md`, `01_kavramsal_tasarim.md`, `00_INDEX.md`, `.github/copilot-instructions.md`, `09_PROJE_DURUMU.md` bu turda düzeltildi (bu dosyanın kapsamı dışı, kendi commit'lerinde ayrı listelenir) |
 | v1.3 | 2026-09-07 | Aşama 1 (operasyonel güvenlik) başladı — C2: `worker/tests/conftest.py` ile prod DB'ye karşı test guard'ı KOD SEVİYESİNDE eklendi, §9.4'e not düşüldü | Sahte `pooler.supabase.com` URL'i ile pytest exit code 3 ile durduruldu; aynı URL + `ALLOW_DESTRUCTIVE_TESTS=true` ile 276 test normal toplandı; DB env'siz 227 test hatasız koştu (regresyon yok) |
-| v1.4 | 2026-09-07 | B2: `ci.yml`'in `integration` job'ı artık `deploy.yml` ile AYNI glob mantığını kullanıyor + uygulanan/toplam migration sayısı karşılaştırması eklendi (§9.1/§9.3) | `yaml.safe_load` ile sözdizimi doğrulandı; gerçek CI koşusunda sahte bir migration dosyası eklenip glob'a otomatik yakalandığı ve sayı doğrulamasının geçtiği görüldü, sonra geri alındı (bkz. ilgili commit çifti) |
+| v1.4 | 2026-09-07 | B2: `ci.yml`'in `integration` job'ı artık `deploy.yml` ile AYNI glob mantığını kullanıyor + uygulanan/toplam migration sayısı karşılaştırması eklendi (§9.1/§9.3) | Gerçek CI koşusu (run 34157349173): sahte bir migration dosyası hiçbir listeye eklenmeden glob'a yakalandı, kendi `RAISE NOTICE`'ı loga düştü, `Uygulanan: 26 / Toplam dosya: 26` doğrulaması geçti; test dosyası sonraki commit'te geri alındı |
 
 ---
 
@@ -609,9 +609,14 @@ tekrarlanan bir gerçek disiplin sorunu, bkz. §10). Artık `integration`
 job'ı da `deploy.yml` ile AYNI glob + sıralama mantığını kullanıyor, ARTI
 uygulanan dosya sayısı `supabase/migrations/*.sql` sayısıyla karşılaştırılıp
 eşit değilse job FAIL ediyor — "listeye eklemeyi unutma" riski yapısal
-olarak ortadan kalktı. Doğrulandı: kasıtlı eklenen sahte bir migration
-dosyası CI'da glob'a otomatik yakalanıp uygulandı ve sayı doğrulaması
-geçti (bkz. `git log`'daki test commit'i), sonra geri alındı.
+olarak ortadan kalktı. **Gerçek CI koşusuyla doğrulandı (run 34157349173,
+2026-09-07):** hiçbir listeye eklenmeden bırakılan sahte bir migration
+dosyası (`20260907_9999_b2_gecici_dogrulama_testi.sql`) glob'a otomatik
+yakalandı — CI logunda `>> supabase/migrations/20260907_9999_...sql`
+satırı ve dosyanın kendi `RAISE NOTICE` çıktısı ("bu migration glob ile
+YAKALANDI") göründü, sayı doğrulaması `Uygulanan: 26 / Toplam dosya: 26`
+ile geçti. Test dosyası bir sonraki commit'te geri alındı, canlıya hiç
+uygulanmadı (deploy.yml'in `migrate` job'ı zaten devre dışı, bkz. §9.3).
 
 ### 9.2 `security.yml` — 6 İş
 `gitleaks` (secret tarama, PR'larda `pull-requests:read` gerekiyor —
