@@ -49,6 +49,7 @@ def main() -> int:
     with psycopg.connect(database_url) as conn:
         conn.autocommit = False
         try:
+            _test_tum_tablolarda_rls_ve_policy_var(conn)
             _hazirla(conn)
             _test_anon_table_level_denied(conn)
             _test_viewer_claimsiz_sifir_satir(conn)
@@ -58,6 +59,56 @@ def main() -> int:
 
     print("\nRol bazlı erişim doğrulaması TAMAMEN geçti.")
     return 0
+
+
+def _test_tum_tablolarda_rls_ve_policy_var(conn: psycopg.Connection) -> None:
+    """C4 (2026-09-07): 'public' şemasındaki HER tabloda RLS AÇIK ve EN AZ
+    1 policy VAR — istisnasız. worker/validate_rls_static.py'nin metin
+    taraması (yalnız 3 sabit dosyaya bakar) bunu YAKALAYAMAZ; bu yüzden
+    canlı DB'nin (ya da CI'nin disposable postgres:16'sının) gerçek
+    `pg_class`/`pg_policies` durumuna karşı DİNAMİK olarak kontrol edilir
+    — hangi migration'ın RLS'i açtığı/kapattığı önemsiz, yalnız SONUÇ
+    durumu önemli. 2026-09-04'teki 8 tablolık "RLS açık ama policy'siz"
+    kör noktasının (dim_*/sistem_parametre/kpi_esik/job_status) sebebi
+    tam olarak böyle bir kontrolün hiç var olmamasıydı — bu fonksiyon o
+    boşluğu kapatır. İleride eklenen HER yeni tablo bu kontrolden geçmek
+    zorunda; istisna listesi YOK."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT c.relname,
+                   c.relrowsecurity,
+                   COUNT(p.polname)
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            LEFT JOIN pg_policy p ON p.polrelid = c.oid
+            WHERE n.nspname = 'public' AND c.relkind = 'r'
+            GROUP BY c.relname, c.relrowsecurity
+            ORDER BY c.relname
+        """)
+        satirlar = cur.fetchall()
+    if not satirlar:
+        raise AssertionError(
+            "public şemasında hiç tablo bulunamadı - beklenmeyen boş sonuç"
+        )
+    sorunlu = [
+        (ad, rls_acik, policy_sayisi)
+        for ad, rls_acik, policy_sayisi in satirlar
+        if not rls_acik or policy_sayisi == 0
+    ]
+    if sorunlu:
+        detay = "; ".join(
+            f"{ad} (RLS={'açık' if rls else 'KAPALI'}, {n} policy)"
+            for ad, rls, n in sorunlu
+        )
+        raise AssertionError(
+            f"{len(sorunlu)} tabloda RLS kapalı ve/veya hiç policy yok "
+            f"(istisna YOK - her public tablo RLS açık + ≥1 policy'e "
+            f"sahip olmalı): {detay}"
+        )
+    print(
+        f"[OK] public şemasındaki {len(satirlar)} tablonun TAMAMI RLS açık "
+        "+ en az 1 policy'e sahip (istisna yok)"
+    )
 
 
 def _hazirla(conn: psycopg.Connection) -> None:

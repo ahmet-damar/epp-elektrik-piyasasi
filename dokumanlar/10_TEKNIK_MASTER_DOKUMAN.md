@@ -543,6 +543,51 @@ girmemiş 14 adet belgesiz `USING(true)` bypass politikası temizlendi
 (migration `20260819_0019`, git-arkeolojisiyle kaynağı bulundu — bkz.
 `06_adr_dashboard_teknoloji.md`).
 
+**C4 düzeltmesi (2026-09-07) — DISABLE bir istisnaydı, hiç karar olarak
+yazılmamıştı:** Yukarıdaki `20260904_0002`/`0004`'ün "RLS DISABLE" çözümü
+8 tabloyu (`dim_tarih`/`dim_il`/`dim_kaynak`/`dim_tuketici_grubu`/
+`dim_lisans`/`sistem_parametre`/`kpi_esik`/`job_status`) `02_srs_ozet.md`'nin
+"TÜM uygulama tablolarında RLS zorunlu, deny-by-default" P0 kuralının
+**belgelenmemiş bir istisnası** yapmıştı. `20260907_0001_dim_config_job_
+rls_restore.sql` bunu tersine çevirdi — RLS 8 tabloda da tekrar açıldı,
+körlemesine `USING (true) FOR ALL` DEĞİL, gerçek erişim niyetini kodlayan
+İKİ katmanlı politika ile: `SELECT` → viewer+data_operator+admin
+(`USING (true)` — bu tablolar gerçekten satır filtresi gerektirmeyen
+referans/config verisi, formalite değil), `INSERT/UPDATE/DELETE` →
+yalnız admin. `02_srs_ozet.md`'ye DOKUNULMADI — kural zaten doğruydu,
+yalnız gerçeklik ona uydurulmadı; artık uyuyor.
+
+**Yeni, istisnasız bir tamlık kontrolü** eklendi
+(`worker/validate_role_access.py:_test_tum_tablolarda_rls_ve_policy_var`)
+— `worker/validate_rls_static.py`'nin metin taraması (yalnız 3 sabit
+dosyaya bakar, hiçbir migration listesini KENDİLİĞİNDEN takip etmez) bu
+tür bir eksikliği YAKALAYAMAZDI; yeni kontrol canlı/disposable DB'nin
+gerçek `pg_class.relrowsecurity` + `pg_policies` durumuna bakar — hangi
+migration'ın ne yaptığı önemsiz, yalnız SONUÇ durumu. İstisna listesi
+YOK: `public` şemasındaki HER tablo RLS açık + ≥1 policy'e sahip olmak
+zorunda.
+
+**Doğrulama (canlıya uygulamadan ÖNCE, disposable postgres:16'da — WSL/
+Docker, `ci.yml`'in `integration` job'ıyla BİREBİR aynı migration
+sırasıyla):**
+1. 26/26 migration uygulandı, `validate_rls_static.py` + yeni tamlık
+   kontrolü geçti: **"19 tablonun TAMAMI RLS açık + en az 1 policy'e
+   sahip"**.
+2. **Negatif test:** politika/RLS'siz sahte bir tablo (`sahte_test_
+   tablosu`) eklenip yeni kontrol tekrar çalıştırıldı — **gerçekten
+   FAIL etti** (`AssertionError: ... sahte_test_tablosu (RLS=KAPALI, 0
+   policy)`, exit code 1), sonra tablo kaldırıldı.
+3. **Dashboard yolu ayrıca test edildi** (yalnız doğrudan `SET ROLE`
+   değil) — `worker/auth.py:rol_baglantisi_ac()` gerçek fonksiyonu
+   `app_dashboard_service` üzerinden çağrılarak: viewer/data_operator/
+   admin'in üçü de `dim_il`'i (81 satır) SELECT edebildi; admin `dim_il`
+   üzerinde gerçek bir UPDATE yapabildi (1 satır, rollback ile temiz);
+   viewer aynı UPDATE'i deneyince `InsufficientPrivilege` ile reddedildi
+   (beklenen — yalnız admin'e write GRANT'i var).
+4. `worker/jobs/*.py`'nin `job_status`'a kendi yazması ETKİLENMEDİ —
+   `DATABASE_URL` (postgres, service rolü) RLS'ten muaf (BYPASSRLS),
+   ayrıca doğrulanmadı (kod değişmedi, davranış zaten böyleydi).
+
 ### 8.3 Supabase Auth Entegrasyonu (Faz B, 2026-09-05)
 `worker/auth.py` (framework-agnostik): `giris_yap(email, sifre)`
 Supabase Auth'a (`sign_in_with_password`) doğrular, JWT'yi ÇÖZER (imza
