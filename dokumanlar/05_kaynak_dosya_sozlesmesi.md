@@ -1,5 +1,9 @@
 # EPP — Kaynak Dosya Sözleşmesi (Parser)
 
+> **STATUS: ACTIVE (sözleşme)** — kolon/tablo haritasını tutar; değişen
+> durum bilgisi için `09_PROJE_DURUMU.md`/`10_TEKNIK_MASTER_DOKUMAN.md`'ye
+> bakın (2026-09-07 denetimi).
+
 Kaynak: Ek F. EPDK dosyalarının parser için kolon/tablo haritası.
 NOT: v0.1 — Faz 0'da gerçek 2016+ dosyalarla doğrulanacak.
 
@@ -11,21 +15,39 @@ Parser SABİT hücreye güvenmez; değişmez etiketleri arar:
 - Normalizasyon: trim + BÜYÜK harf + Türkçe sadeleştir (İ→I)
 
 ## Aylık Ek (xlsx) — 13 Tablo
-| Tablo | İçerik | Hedef |
-|-------|--------|-------|
-| T1 | Lisanslı kurulu güç (il×kaynak) | fact_uretim |
-| T2/T3 | Lisanslı üretim (kaynak/il) | fact_uretim |
-| T4/T5/T6 | Lisanssız kurulu güç/üretim | fact_uretim |
-| T7 | Faturalanan tüketim (tür) | fact_tuketim |
-| T8 | Faturalanan tüketim (il) | fact_tuketim |
-| T9/T10 | Tüketici sayısı | fact_abone |
-| **T11** | **Tüketim (iletim/dağıtım!)** | **fact_tuketim.baglanti** |
-| T12 | Tüketim (dağıtım şirketi) | **parse edilmiyor — bkz. not** |
-| T13 | Serbest tüketici (il×tur×grup) | fact_serbest_tuketici — bkz. not |
+
+**Durum kolonu (2026-09-07, `worker/parser.py`/`worker/pipeline.py`'ye karşı
+doğrulandı; bkz. A1 düzeltmesi):** "Hedef" tek başına yanıltıcıdır — bazı
+tablolar bir fact tablosuyla aynı grain'i paylaşsa da GERÇEKTEN parse
+edilmez (kaynakta o kesişim yok ya da başka bir tabloyla redundant). Yazan
+tablo sayısı tam **5**'tir: T1/T4/T10/T11/T13.
+
+| Tablo | İçerik | Hedef | Durum |
+|-------|--------|-------|-------|
+| T1 | Lisanslı kurulu güç (il×kaynak) | fact_uretim | Parse edilir, **YAZAR** |
+| T2/T3 | Lisanslı üretim (kaynak/il) | fact_uretim | Parse edilmez — il×kaynak kesişimi kaynakta yok |
+| T4 | Lisanssız kurulu güç | fact_uretim | Parse edilir, **YAZAR** |
+| T5/T6 | Lisanssız üretim (kaynak/il) | fact_uretim | Parse edilmez — T2/T3 ile aynı sebep |
+| T7 | Faturalanan tüketim (tür, ülke geneli) | fact_tuketim | Parse edilir ama **YAZMAZ** — yalnız mutabakat |
+| T8 | Faturalanan tüketim (il) | fact_tuketim | **Parse edilmez — T11 ile redundant** (bkz. T12 notu) |
+| T9 | Tüketici sayısı (tür, ülke geneli) | fact_abone | Parse edilir ama **YAZMAZ** — yalnız mutabakat |
+| T10 | Tüketici sayısı (il) | fact_abone | Parse edilir, **YAZAR** |
+| **T11** | **Tüketim (iletim/dağıtım!)** | **fact_tuketim.baglanti** | Parse edilir, **YAZAR** (+ kendi Genel Toplam satırı → `fact_tuketim_ulke_geneli`) |
+| T12 | Tüketim (dağıtım şirketi) | parse edilmiyor | **Parse edilmez — T11 ile redundant** (bkz. not) |
+| T13 | Serbest tüketici (il×tur×grup) | fact_serbest_tuketici | Parse edilir, **YAZAR** — bkz. not
 
 **P0-2 KRİTİK:** Tablo 11, 'Sanayi-İLETİM' ve 'Sanayi-DAĞITIM' sütunlarını
 içeren TEK tablodur → fact_tuketim.baglanti'yi besler. Diğer tüketim
 tablolarında baglanti='dagitim' varsayılır; iletim yalnız T11'den gelir.
+
+**T8 NOTU (2026-09-07, `worker/parser.py` satır 17-24'e karşı doğrulandı —
+bkz. A1 düzeltmesi):** T8, T11 ile birebir aynı il×tüketici-grubu verisini
+tekrarlıyor (T11 ayrıca Sanayi'yi iletim/dağıtım olarak ayırıyor, T8
+ayırmıyor) → T8 hiçbir yeni bilgi taşımıyor, bu yüzden implemente edilmedi.
+**Bu, T12 ile birebir aynı gerekçe** — ikisi de "T11 ile redundant" sınıfına
+girer. (Daha önce `10_TEKNIK_MASTER_DOKUMAN.md`'de bu not yanlışlıkla "T8
+aslında parse ediliyor" şeklinde 'düzeltilmişti' — o kayıt geri alındı,
+bkz. o dokümanın §14 Çelişki Kayıtları.)
 
 **T12 NOTU (2026-08-30, gerçek dosyayla doğrulandı):** Doküman başlığı
 "dağıtım bölgesi" diyor ama gerçek kolon adı 'Lisans Unvanı' — grain aslında

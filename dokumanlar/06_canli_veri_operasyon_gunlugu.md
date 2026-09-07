@@ -1,5 +1,10 @@
 # EPP — Canlı Veri Operasyon Günlüğü
 
+> **STATUS: HISTORICAL (append-only olay günlüğü)** — geçmişteki elle
+> müdahaleleri kronolojik sırayla kaydeder, GÜNCELLENMEZ/yeniden
+> yazılmaz, yalnız yeni girdi eklenir. Güncel proje durumu için buraya
+> değil `09_PROJE_DURUMU.md`'ye bakın (2026-09-07 denetimi).
+
 Faz 0'da onay için ayrı bir UI yok (bkz. `worker/pipeline.py` modül notu) —
 `otomatik_onaya_uygun()` eşiği tutmadığında elle onay verilir: **artık
 `worker/scripts/onayla.py --batch-id N --actor "..."` ile resmi
@@ -967,7 +972,7 @@ bloğu görülürse:** önce bu dosyadaki 2026-09-03 kaydındaki hafif çözüm�
 (`pip install --force-reinstall --no-cache-dir <paket>`) dene — yalnız o
 işe yaramazsa WSL/Dev Container'a geç (daha ağır ama kesin çözüm).
 
-**Sıradaki adımlar (o anda açık bırakılmıştı — 2026-09-08'de kapandı,
+**Sıradaki adımlar (o anda açık bırakılmıştı — 2026-09-07'de kapandı,
 aşağıdaki kayda bkz.):**
 1. ~~39 uyumsuz ayın `fact_tuketim`'deki kök nedenini araştırmak.~~
 2. ~~Kök neden düzeltilip/doğrulanıp bu 39 ay için mutabakat + aktivasyon
@@ -975,7 +980,7 @@ aşağıdaki kayda bkz.):**
 3. KPI-25/27 formülünün bu yeni tabloyu kullanıp kullanmayacağı — HALA
    ayrı bir karar, bu turda değiştirilmedi.
 
-## 2026-09-08 — fact_tuketim_ulke_geneli: 39 ay mutabakat sapmasının kök
+## 2026-09-07 — fact_tuketim_ulke_geneli: 39 ay mutabakat sapmasının kök
 nedeni bulundu, DÜZELTİLDİ, 120/120 ay aktif
 
 **Kök neden (kanıtlı, tahmin değil):** 39 ayın hiçbiri parser_version

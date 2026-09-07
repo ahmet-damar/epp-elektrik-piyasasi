@@ -1,5 +1,9 @@
 # ADR-7 — Sunum Katmanı: Streamlit (Faz 2), Next.js Ertelendi
 
+> **STATUS: ACTIVE (karar/ADR)** — mimari kararı tutar; güncel durum için
+> `09_PROJE_DURUMU.md`/`10_TEKNIK_MASTER_DOKUMAN.md`'ye bakın (2026-09-07
+> denetimi).
+
 **Tarih:** 2026-08-30 · **Durum:** Kabul edildi
 
 ## Bağlam

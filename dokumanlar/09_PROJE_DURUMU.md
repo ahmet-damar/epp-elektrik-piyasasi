@@ -1,6 +1,11 @@
 # 09 — Proje Durumu (GÜNCEL, DB'den doğrulandı — 2026-09-04, 2026-09-07'de
 fact_tuketim_ulke_geneli eklemesiyle güncellendi)
 
+> **STATUS: LIVE (güncel durum)** — bu dosya ve `10_TEKNIK_MASTER_
+> DOKUMAN.md`, değişen sayı/durumun YAŞADIĞI tek iki yerdir; diğer
+> `dokumanlar/` dosyaları yalnız değişmeyen sözleşmeyi tutar (2026-09-07
+> denetimi, bkz. D bölümü).
+
 **Bu dosya, canlı Supabase'e karşı salt-okunur sorgularla ve `pytest`
 çalıştırılarak bu turda TAZE DOĞRULANMIŞ bulgulara dayanır — önceki
 (2026-09-03 tarihli) sürümün sayıları devralınmadı, hepsi yeniden
@@ -39,9 +44,11 @@ yansıtıldı.**
   tüketim" CAGR) yalnız Sanayi'yi içeren tam yılları sayıyor (bugün
   itibarıyla tek yıl olduğu için 'hesaplanamaz'); KPI-27 (Sanayi-hariç,
   ayrı bir metrik) tüm yıllarda tutarlı grain ile çalışıyor.
-- **pytest** (`worker/tests`, 6 `*_integration.py` hariç): **205/205
-  geçti**, 0 hata (bu turda çalıştırıldı).
-- **fact_tuketim_ulke_geneli — TAMAMLANDI (2026-09-08).** EPDK T11
+- **pytest** (`worker/tests`, 6 `*_integration.py` hariç): temiz bir
+  ortamda (`env -i`, DB env değişkeni yok) **227/227 geçti**, 0 hata —
+  bkz. "Test durumu" bölümü ve `10_TEKNIK_MASTER_DOKUMAN.md` §9.4
+  (v1.1'de 227 vs 230 karışıklığı çözüldü).
+- **fact_tuketim_ulke_geneli — TAMAMLANDI (2026-09-07).** EPDK T11
   tablosunun kendi "Genel Toplam" satırından, il kırılımı olmayan,
   Sanayi DAHİL tüm grupların ülke geneli serisi. 2016-2025'in 120 ayının
   TAMAMI aktif (599 satır) — yalnız 2016-12 4/5 grupla (Tarımsal o ay
@@ -50,7 +57,7 @@ yansıtıldı.**
   neden bulundu (veri hatası DEĞİL, `dogrula_tuketim()`'in negatif değer
   reddi il vs ülke seviyesinde bağımsız uygulanmasının beklenen sonucu),
   `worker/scripts/mutabakat_ulke_geneli.py` ile kalıcı olarak düzeltildi.
-  Detay: `06_canli_veri_operasyon_gunlugu.md` 2026-09-05/07 ve 2026-09-08
+  Detay: `06_canli_veri_operasyon_gunlugu.md` 2026-09-05/07 ve 2026-09-07
   kayıtları.
 - **Sanayi'nin Word kaynağında neden T11'e girmediği sorusu — KAPANDI.**
   Cevap: T11'in kendi Genel Toplam satırı zaten Sanayi dahil tüm
@@ -108,19 +115,27 @@ Doğrulandı (bu turda yeniden sorgulandı): `public` şemasındaki 18
 tablonun hiçbiri artık ne grant'sız ne RLS-açık-policy'siz. Detay:
 `dokumanlar/06_canli_veri_operasyon_gunlugu.md`, 2026-09-04 girdisi.
 
-## Test durumu (2026-09-07'de yeniden çalıştırıldı, güncel)
+## Test durumu (2026-09-07'de temiz bir kabukta yeniden doğrulandı)
 
 ```
-python -m pytest worker/tests -q  (5 *_integration.py HARİÇ — README Ek D kuralı)
-230 passed in 21.13s
+env -i PATH=... HOME=/root python -m pytest worker/tests --collect-only -q
+# 19 non-integration dosya TEK BAŞINA:
+227 tests collected
 ```
+
+**Not (bkz. `10_TEKNIK_MASTER_DOKUMAN.md` §9.4/v1.1):** Bu oturumun daha
+önceki bir WSL koşusunda görülen "230 passed" rakamı **yanlış değildi ama
+genel bir sabit de değildi** — o koşuda `test_auth_integration.py`
+(`DATABASE_URL_DASHBOARD` tanımlı olduğu için) yanlışlıkla dışlanmadan
+gerçekten çalışmış ve 3/3 geçmişti (227 yerel + 3 gerçek Supabase Auth
+çağrısı = 230). README Ek D kuralına göre **6** `*_integration.py`
+dosyasının tamamı normal koşuda hariç tutulur; standart/ortam-bağımsız
+rakam **227**'dir.
+
 (2026-09-04'teki 205'ten artış: `test_word_ulke_geneli.py` (7),
 `test_auth.py`'ye eklenen rate-limit testleri (6), ve aradaki diğer
-turlarda eklenen testler.)
-
-`*_integration.py` (6 dosya) canlı Supabase'e karşı bilinçli
-çalıştırılmadı (README'deki "Canlı Supabase'e Karşı Test Çalıştırma
-Kuralı").
+turlarda eklenen testler — tam kırılım doğrulanmadı, yalnız toplam 227
+`--collect-only` ile teyit edildi.)
 
 ## Sıradaki adımlar (teknik borç DEĞİL — ürün/kapsam kararları)
 
@@ -139,14 +154,26 @@ Kuralı").
 
 ## Güvenilirlik notu
 
-Bu dosyadaki TÜM sayılar bu turda (2026-09-04) canlı Supabase'e karşı
+Bu dosyadaki sayılar birden fazla turda canlı Supabase'e karşı
 çalıştırılan salt-okunur SQL sorgularından (`fact_tuketim`/`fact_abone`/
 `fact_uretim`/`veri_kapsam_disi`/`information_schema.role_table_grants`/
-`pg_policies`) ve gerçek bir `pytest` çalıştırmasından geliyor — hiçbir
-sayı önceki dokümandan devralınmadı. Bu turda hiçbir batch aktive
-edilmedi, hiçbir kod/şema değiştirilmedi (yalnız bu doküman güncellendi).
+`pg_policies`) ve gerçek `pytest` çalıştırmalarından geliyor — hiçbir
+sayı körlemesine önceki dokümandan devralınmadı, her turda yeniden
+sorgulandı:
 
-**2026-09-07 eklemesi:** `fact_tuketim_ulke_geneli` bölümündeki sayılar
-(81/120 ay aktif, 405 satır, 39 ay uyumsuz) AYNI şekilde canlı Supabase'e
-karşı, `SET ROLE`+gerçek JWT claim'iyle doğrulandı — bkz.
-`06_canli_veri_operasyon_gunlugu.md` 2026-09-05/07 kaydı.
+- **2026-09-04 turu:** GRANT/RLS düzeltme zinciri (4 migration) + 36 yeni
+  regresyon testi (2016-2022 için) canlıda doğrulandı; bu turda hiçbir
+  batch aktive edilmedi.
+- **2026-09-05/07 turu:** `fact_tuketim_ulke_geneli` migration'ı canlıya
+  uygulandı, 120 aylık backfill çalıştırıldı; ilk mutabakat kontrolünde
+  81/120 ay aktive edilebildi, 39 ay `running` bırakılıp kullanıcıya
+  rapor edildi (bkz. `06_canli_veri_operasyon_gunlugu.md` 2026-09-05/07
+  kaydı) — bu, **geçici bir ara durumdu**, kalıcı sonuç değil.
+- **2026-09-07 turu (son, GÜNCEL durum):** 39 aylık uyumsuzluğun kök
+  nedeni bulundu (veri hatası değil — `dogrula_tuketim()`'in negatif
+  değer reddinin il vs ülke seviyesinde bağımsız uygulanmasının beklenen
+  sonucu), mutabakat sorgusu kalıcı olarak düzeltildi
+  (`worker/scripts/mutabakat_ulke_geneli.py`), kalan 39 ay (2016-12 hariç
+  4/5 grupla) aktive edildi → **120/120 ay aktif, 599 satır** — TL;DR'deki
+  sayı budur ve güncel/nihai olandır. RLS admin+viewer JWT ile yeniden
+  doğrulandı.

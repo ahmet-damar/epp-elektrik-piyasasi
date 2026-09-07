@@ -1,5 +1,9 @@
 # EPP — Kavramsal Tasarım
 
+> **STATUS: ACTIVE (sözleşme)** — değişmeyen mimari/kavram kararlarını
+> tutar; değişen sayı/durum bilgisi için `09_PROJE_DURUMU.md` ve
+> `10_TEKNIK_MASTER_DOKUMAN.md`'ye bakın (2026-09-07 denetimi).
+
 ## 1. Amaç
 EPDK Elektrik Piyasası Sektör Raporu (aylık + yıllık) verilerini bir veri
 tabanına yükleyen, hava durumu (Open-Meteo) ile zenginleştiren, KPI'lar üreten
@@ -14,7 +18,9 @@ ve dashboard'a dönüştüren **açık kaynak** web platformu.
 ## 3. Mimari (3 Katman)
 ```
 SUNUM      : Streamlit (app/dashboard.py)     — dashboard (Faz 2); Next.js+TS "Son Faz"'a ertelendi
-İŞLEM      : Python + FastAPI (worker/)       — parser, KPI, jobs
+İŞLEM      : Python worker modülleri (worker/) — parser, KPI, jobs;
+             framework-agnostik (ADR-7); FastAPI KULLANILMIYOR, gerekirse
+             ileride adaptör katmanı olarak eklenebilir
 VERİ       : PostgreSQL (db/)                 — yıldız şema + batch
 ```
 Tüm bileşenler açık kaynak; Docker ile self-host edilebilir.
@@ -41,7 +47,7 @@ bilinçli olarak ertelendi.
 | Katman | Seçim | Lisans |
 |--------|-------|--------|
 | Web | Streamlit (Faz 2); Next.js + TypeScript ("Son Faz") | Apache-2.0 / MIT |
-| Backend | Python 3.12 + FastAPI | PSF/MIT |
+| Backend | Python 3.12 (framework-agnostik worker/, FastAPI kullanılmıyor) | PSF/MIT |
 | DB | PostgreSQL | PostgreSQL |
 | Parser | pandas, openpyxl, python-docx | BSD/MIT |
 | Hava | Open-Meteo | CC BY 4.0 |

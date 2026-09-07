@@ -1,5 +1,9 @@
 # EPP — KPI Sözleşmeleri (Faz 0)
 
+> **STATUS: ACTIVE (sözleşme)** — KPI formüllerini/kenar durumlarını tutar;
+> güncel hesaplanabilirlik durumu için `09_PROJE_DURUMU.md` ve
+> `10_TEKNIK_MASTER_DOKUMAN.md` §7/§11.2'ye bakın (2026-09-07 denetimi).
+
 Kaynak: Ek B. Her KPI: formül + grain + kenar durum. Faz 0 production KPI'ları.
 
 ## Ortak Kurallar

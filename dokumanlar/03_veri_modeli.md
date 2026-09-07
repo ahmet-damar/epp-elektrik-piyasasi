@@ -1,5 +1,9 @@
 # EPP — Veri Modeli (Yıldız Şema)
 
+> **STATUS: ACTIVE (sözleşme)** — tablo/kolon/ilişki tanımlarını tutar;
+> değişen satır sayıları buradan çıkarıldı (2026-09-07 denetimi, bkz. A4) —
+> güncel sayı için `09_PROJE_DURUMU.md`'ye bakın.
+
 Kaynak: SRS Böl. 5 + Ek C (Veri Sözlüğü). Kod üretiminde ESAS ALINIR.
 
 ## Boyut Tabloları
@@ -187,8 +191,11 @@ dahil) okundu, satır toplamı tablonun kendi "Genel Toplam" kolonuyla
   (`'(tumu)'` = tüm tablo, örn. Karar 1; `'lisans_durumu=Lisanslı'` gibi
   bir kesit, örn. Karar 3). Amaç: "parser hatası yüzünden 0 satır" ile
   "kaynakta gerçekten yok" durumunu KPI/dashboard seviyesinde ayırt
-  edebilmek. Faz 0'da bu tur yalnız MEKANİZMAYI kurdu (2023-2025'in 36
-  ayı için 72 satır yazıldı) — Faz 2 dashboard'unda henüz TÜKETİLMİYOR.
+  edebilmek. **Kapsam ve tüketim durumu (kalıcı ifade — güncel sayı için
+  `09_PROJE_DURUMU.md`'ye bakın, burada tekrarlanmıyor çünkü her turda
+  eskiyor):** 2016-2025'in TAMAMI için işaretli; Faz 2 dashboard'una
+  Aşama 7'de (2026-09-04) bağlandı — seçili dönemde kaynakta olmayan veri
+  için panel artık sessiz boşluk yerine açıklayıcı bilgi kutusu gösterir.
 
 ## İlişki Özeti
 - dim_tarih 1→N tüm fact · dim_il 1→N tüm fact

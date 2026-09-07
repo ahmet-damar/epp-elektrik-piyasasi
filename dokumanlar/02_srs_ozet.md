@@ -1,5 +1,9 @@
 # EPP — SRS v1.5 Özet + Kritik P0 Kuralları
 
+> **STATUS: ACTIVE (sözleşme, ASLA ihlal edilmez)** — değişen sayı/durum
+> bilgisi için `09_PROJE_DURUMU.md` ve `10_TEKNIK_MASTER_DOKUMAN.md`'ye
+> bakın (2026-09-07 denetimi).
+
 Bu dosya, kod üretiminde ASLA ihlal edilmemesi gereken kuralları içerir.
 Kaynak: EPP_SRS_Teknik-Gereksinim_v1.5.
 

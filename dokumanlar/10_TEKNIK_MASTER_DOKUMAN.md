@@ -1,5 +1,11 @@
 # EPP — Teknik Master Doküman
 
+> **STATUS: LIVE (güncel durum) + MASTER (üst özet)** — bu dosya ve
+> `09_PROJE_DURUMU.md`, değişen sayı/durumun YAŞADIĞI tek iki yerdir;
+> diğer `dokumanlar/` dosyaları yalnız değişmeyen sözleşmeyi tutar
+> (2026-09-07 denetimi, bkz. D bölümü — bu kural henüz bu dokümana ayrı
+> bir bölüm olarak eklenmedi, yalnız etiketlendi).
+
 **Bu doküman**, Faz 0'dan bugüne EPP (EPDK Elektrik Piyasası Platformu)
 projesinde yapılan HER ŞEYİN tek bir yerde, gerçek koda/migration'a/git
 geçmişine karşı doğrulanmış hâlidir. Amaç: hem mevcut durumun tek
@@ -16,8 +22,9 @@ kaynak kodu, canlı Supabase sorgusu) karşı yeniden doğrulandı. Bir
 
 | Sürüm | Tarih | Değişiklik | Doğrulama kapsamı |
 |---|---|---|---|
-| v1.0 | 2026-09-08 | İlk yazım | 141 commit (2026-08-18→09-07), 25 migration + 2 ci-only, 11 worker/*.py + 10 yıllık word_20XX.py + 5 diğer script, 25 test dosyası (248 `def test_`, 230 pytest ID non-integration / 276 tüm dosyalar), 4 GitHub Actions workflow, 11 mevcut `dokumanlar/` dosyası, canlı Supabase (RLS/GRANT) doğrudan sorgulandı |
-| v1.1 | 2026-09-08 | §9.4/Ek A test sayısı düzeltmesi | v1.0'ın "230 pytest ID non-integration" rakamı YANLIŞTI — temiz bir kabukta (`env -i`, `.env` erişilemez) doğrudan doğrulandı: 19 unit/regresyon dosyası TEK BAŞINA **227** ID veriyor (`skipif` toplamayı değil çalıştırmayı engelliyor, bu iki kavramın karışması hataya sebep olmuştu). 230, bu oturumun WSL koşusuna ÖZGÜ bir rakam (227 yerel + 3 gerçek `test_auth_integration.py` çağrısı) — genel/ortam-bağımsız bir sabit DEĞİL |
+| v1.0 | 2026-09-07 | İlk yazım | 141 commit (2026-08-18→09-07), 25 migration + 2 ci-only, 11 worker/*.py + 10 yıllık word_20XX.py + 5 diğer script, 25 test dosyası (248 `def test_`, 230 pytest ID non-integration / 276 tüm dosyalar), 4 GitHub Actions workflow, 11 mevcut `dokumanlar/` dosyası, canlı Supabase (RLS/GRANT) doğrudan sorgulandı |
+| v1.1 | 2026-09-07 | §9.4/Ek A test sayısı düzeltmesi | v1.0'ın "230 pytest ID non-integration" rakamı YANLIŞTI — temiz bir kabukta (`env -i`, `.env` erişilemez) doğrudan doğrulandı: 19 unit/regresyon dosyası TEK BAŞINA **227** ID veriyor (`skipif` toplamayı değil çalıştırmayı engelliyor, bu iki kavramın karışması hataya sebep olmuştu). 230, bu oturumun WSL koşusuna ÖZGÜ bir rakam (227 yerel + 3 gerçek `test_auth_integration.py` çağrısı) — genel/ortam-bağımsız bir sabit DEĞİL |
+| v1.2 | 2026-09-07 | 13 dokümanlık dış denetim (ChatGPT/Gemini/Sonnet analizleriyle çapraz) — §4.2/§4.3/§14.1 (T8'in "düzeltmesi" geri alındı, T8 de T12 gibi parse edilmiyor), §7.5 (KPI-28 numara çakışması notu), §12.4 (`prepare_threshold` notu eklendi), tüm "2026-09-08" tarihleri "2026-09-07"ye düzeltildi (git log'a karşı doğrulandı — commit `ecba6b5` dahil hepsi 09-07) | `grep -rn "T8" worker/parser.py worker/pipeline.py`, `grep -rn "KPI-28" worker/`, `git log --format='%cd' --date=iso` (tüm commit'ler 2026-09-07); ayrıca `05_kaynak_dosya_sozlesmesi.md`, `03_veri_modeli.md`, `01_kavramsal_tasarim.md`, `00_INDEX.md`, `.github/copilot-instructions.md`, `09_PROJE_DURUMU.md` bu turda düzeltildi (bu dosyanın kapsamı dışı, kendi commit'lerinde ayrı listelenir) |
 
 ---
 
@@ -69,7 +76,7 @@ altyapı var, UI yok, bkz. §11), yöneticiler (`admin`).
 | Faz 3 | Hava normalizasyonu (KPI-11/12/23/24 production) | ✅ TAMAMLANDI |
 | Faz B | Çok-kullanıcılı Supabase Auth girişi | ✅ TAMAMLANDI (2026-09-05) |
 | — | 2016-2025 tarihsel Word genişlemesi (T11/T10/T4) | ✅ TAMAMLANDI |
-| — | `fact_tuketim_ulke_geneli` (Sanayi dahil ülke geneli) | ✅ TAMAMLANDI (2026-09-08) |
+| — | `fact_tuketim_ulke_geneli` (Sanayi dahil ülke geneli) | ✅ TAMAMLANDI (2026-09-07) |
 | Faz 4 | Tahminleme (ML, zaman serisi) | ⛔ Başlamadı |
 | Faz 5 | EPİAŞ entegrasyonu | ⛔ Başlamadı |
 | Faz 6 | TEİAŞ projeksiyon | ⛔ Başlamadı |
@@ -224,26 +231,36 @@ satır etiketleri ('TÜRKİYE', 'Genel Toplam'). Normalizasyon: trim +
 BÜYÜK harf + Türkçe sadeleştirme (İ→I).
 
 ### 4.2 T1-T13 Tam Harita
-| Tablo | İçerik | Hedef |
-|---|---|---|
-| T1 | Lisanslı kurulu güç (il×kaynak) | `fact_uretim` |
-| T2/T3 | Lisanslı üretim (kaynak/il) | `fact_uretim` |
-| T4/T5/T6 | Lisanssız kurulu güç/üretim | `fact_uretim` |
-| T7 | Faturalanan tüketim (tür) | `fact_tuketim` |
-| **T8** | **Faturalanan tüketim (il)** | **`fact_tuketim`** |
-| T9/T10 | Tüketici sayısı | `fact_abone` |
-| **T11** | **Tüketim (iletim/dağıtım!)** | **`fact_tuketim.baglanti`** (P0-2) |
-| T12 | Tüketim (dağıtım şirketi) | **parse edilmiyor** — bkz. §4.3 |
-| T13 | Serbest tüketici (il×tür×grup) | `fact_serbest_tuketici` (yalnız Excel yılları, bkz. §4.4) |
+Yazan tablo sayısı tam **5**'tir (T1/T4/T10/T11/T13) — "Hedef" kolonu tek
+başına yanıltıcı olabildiği için bir **Durum** kolonu eklendi (bkz.
+`05_kaynak_dosya_sozlesmesi.md`, aynı doğrulamayla senkron):
 
-**Düzeltme notu (2026-09-08 taslak onayında istenen teyit):** Bu
-dokümanın bir önceki taslağında "T12, T8 gibi atlanıyor" varsayımı
-vardı — bu **YANLIŞTI**. Gerçek kaynak (`05_kaynak_dosya_sozlesmesi.md`
-satır 20) T8'in **gerçekten parse edildiğini ve `fact_tuketim`'i
-beslediğini** gösteriyor; bilinçli olarak parse EDİLMEYEN tablo yalnız
-**T12**'dir (T11 ile redundant olduğu için — bkz. §4.3).
+| Tablo | İçerik | Hedef | Durum |
+|---|---|---|---|
+| T1 | Lisanslı kurulu güç (il×kaynak) | `fact_uretim` | Parse edilir, **YAZAR** |
+| T2/T3 | Lisanslı üretim (kaynak/il) | `fact_uretim` | Parse edilmez — il×kaynak kesişimi kaynakta yok |
+| T4 | Lisanssız kurulu güç | `fact_uretim` | Parse edilir, **YAZAR** |
+| T5/T6 | Lisanssız üretim (kaynak/il) | `fact_uretim` | Parse edilmez — T2/T3 ile aynı sebep |
+| T7 | Faturalanan tüketim (tür, ülke geneli) | `fact_tuketim` | Parse edilir ama **YAZMAZ** — yalnız mutabakat |
+| T8 | Faturalanan tüketim (il) | `fact_tuketim` | **Parse edilmez — T11 ile redundant** (bkz. §4.3) |
+| T9 | Tüketici sayısı (tür, ülke geneli) | `fact_abone` | Parse edilir ama **YAZMAZ** — yalnız mutabakat |
+| T10 | Tüketici sayısı (il) | `fact_abone` | Parse edilir, **YAZAR** |
+| **T11** | **Tüketim (iletim/dağıtım!)** | **`fact_tuketim.baglanti`** (P0-2) | Parse edilir, **YAZAR** (+ Genel Toplam satırı → `fact_tuketim_ulke_geneli`) |
+| T12 | Tüketim (dağıtım şirketi) | **parse edilmiyor** — bkz. §4.3 | **Parse edilmez — T11 ile redundant** |
+| T13 | Serbest tüketici (il×tür×grup) | `fact_serbest_tuketici` (yalnız Excel yılları, bkz. §4.4) | Parse edilir, **YAZAR** |
 
-### 4.3 Bilinçli Parse Edilmeyen: T12
+**Düzeltme notu (2026-09-07, geri alındı — bkz. §14.1):** v1.0 taslağı
+burada "T12, T8 gibi atlanıyor notu YANLIŞTI, T8 gerçekten parse
+ediliyor" diye bir "düzeltme" içeriyordu. Bu **düzeltmenin kendisi
+yanlıştı** — kaynak olarak gösterilen `05_kaynak_dosya_sozlesmesi.md`
+satır 20 yalnızca **hedef haritası** (plan), aynı dosyanın satır 105'i
+ise kodun (`worker/parser.py`, `worker/pipeline.py`) T8'i **hiç
+implemente etmediğini** açıkça söylüyor. Doğrusu: **T8 de T12 gibi
+parse edilmiyor**, ikisi de T11 ile redundant. Bu, dokümanın kendi
+yöntem kuralının ("çelişkide kod esas alınır, doküman değil") burada
+ihlal edildiği somut bir örnektir.
+
+### 4.3 Bilinçli Parse Edilmeyen: T8 ve T12
 2026-08-30'da gerçek dosyayla doğrulandı: T12'nin grain'i doküman
 başlığının ima ettiği "dağıtım bölgesi" değil, gerçek kolon adı 'Lisans
 Unvanı' — **dağıtım şirketi** (21 şirket + ulusal "İLETİMDEN BAĞLI
@@ -253,6 +270,11 @@ redundant, hiçbir yeni bilgi taşımıyor** — bu yüzden `worker/parser.py`'d
 hiç implemente edilmedi. İleride dağıtım-şirketi-bazlı bir KPI
 gerekirse, statik bir `dim_il → dagitim_sirketi` eşleme tablosuyla
 T11'in il bazlı verisinden türetilebilir (bilgi kaybı yok).
+
+**T8 aynı sınıfa girer:** T11 ile birebir aynı il×tüketici-grubu verisini
+tekrarlıyor (T11 ayrıca Sanayi'yi iletim/dağıtım olarak ayırıyor, T8
+ayırmıyor) → hiçbir yeni bilgi taşımadığı için o da implemente
+edilmedi (`worker/parser.py` satır 17-24).
 
 ### 4.4 Word (2016-2025) Kapsamı — 3 Bilinçli Dışlama Kararı
 EPDK'nın 2023 öncesi aylık raporları **Word (.docx)** formatındaydı
@@ -342,7 +364,7 @@ aynı batch'i iki worker aynı anda işleyemez.
 edilmez, `worker/validate_rls_static.py` bunu statik olarak doğrular).
 Her önemli olay (`ingest_tamamlandi`, `batch_onaylandi`) bir JSONB
 `payload` ile kaydedilir — **reddedilen (`red_satirlari`) satırların TAM
-İÇERİĞİ dahil**. Bu tasarım kararı 2026-09-08'de kritik önem kazandı:
+İÇERİĞİ dahil**. Bu tasarım kararı 2026-09-07'de kritik önem kazandı:
 reddedilen satırların audit_log'da saklanmış olması, aylar sonra
 "neden bu il/grup eksik" sorusunun GERÇEK VERİYLE (tahminle değil)
 yanıtlanabilmesini sağladı (bkz. §6.4).
@@ -357,7 +379,7 @@ yanıtlanabilmesini sağladı (bkz. §6.4).
 `otomatik_onaya_uygun()` red=0 VE karantina=0 VE mutabakat≠False
 şartını arar; tutmazsa elle onay beklenir.
 
-### 6.4 VAKA — 39 Aylık "Mutabakat Uyumsuzluğu" (2026-09-08)
+### 6.4 VAKA — 39 Aylık "Mutabakat Uyumsuzluğu" (2026-09-07)
 `fact_tuketim_ulke_geneli`'nin 120 aylık backfill'inden sonra, 39 ay
 `fact_tuketim`'in il bazlı toplamıyla (Sanayi hariç 4 grup, `baglanti`
 SUM ile katlanmış) ≤%0,5 tolerans dışında çıktı. **Kök neden araştırıldı
@@ -385,7 +407,7 @@ gelecekteki her yeni ay için de aynı durum (bir ilde negatif düzeltme)
 tekrar çıkabilir — bu BEKLENEN bir davranıştır, `mutabakat_ulke_geneli.py`
 standart mantığı bunu otomatik hesaba katar, tekrar "bulunmasına" gerek
 yoktur. (Tam detay: `dokumanlar/06_canli_veri_operasyon_gunlugu.md`
-2026-09-08 kaydı.)
+2026-09-07 kaydı.)
 
 ### 6.5 `job_worker.py` — Faz 1 Asenkron Kuyruk
 Harici broker YOK (Redis/Celery/RabbitMQ) — salt Postgres polling
@@ -467,6 +489,16 @@ Jenerik formül: `(son/ilk)^(1/n) − 1` (`kpi_cagr`).
   TOPLANMAZ, yılın son ayı alınır). Yalnız Lisanslı verisi (T1) OLAN
   yıllar seriye girer — Word 2023-2025'te T1 yok (Karar 3), filtre
   olmasaydı sahte CAGR üretilirdi (AYNI kök neden KPI-25 ile).
+
+**KPI-28 numara notu (2026-09-07, denetimde bulundu):** `05_kaynak_
+dosya_sozlesmesi.md` ("Yıllık Rapor" bölümü), yıllık-aylık toplam sapması
+için **KPI-28** numarasını ayırmış — ama bu **yalnız doküman satırı**,
+`grep -rn "kpi_28\|KPI-28" worker/` sıfır sonuç verir: kodda hiç
+implemente edilmedi. Yani KPI-28 **tanımlı ama uygulanmamış** bir slot.
+Yeni bir KPI eklenecekse (örn. "Veri Kapsam Tamlığı") bu numarayla
+**çakışmasın diye KPI-29'dan başlanmalı**; KPI-28 ileride gerçekten
+implemente edilirse yukarıdaki tanım (yıllık toplam OD-4 ile otoriter,
+aylık toplamla sapma → uyarı) esas alınmalı.
 
 ### 7.6 `kpi_esik` — Trafik Işığı Renk Eşikleri
 Migration `20260905_0001_kpi_esik_seed.sql` ile eklendi (OD-3: eşikler
@@ -604,7 +636,7 @@ Haftalık cron (`0 6 * * 1`) + her push/PR.
 sayıyla raporlanır, hepsi doğru — ölçüm kapsamı farklı:
 - **227**: pytest'in 19 unit/regresyon dosyasından TEK BAŞINA topladığı
   test ID sayısı (parametrize genişlemesiyle 199 def → 227 ID) —
-  **doğrudan doğrulandı (2026-09-08):** temiz bir kabukta, `.env`
+  **doğrudan doğrulandı (2026-09-07):** temiz bir kabukta, `.env`
   hiç erişilebilir DEĞİLKEN (`env -i`) ve `DATABASE_URL`/
   `DATABASE_URL_DASHBOARD` set EDİLMEDEN `pytest worker/tests
   --collect-only` çalıştırıldı — 6 `*_integration.py` HARİÇ tutulunca
@@ -828,6 +860,19 @@ bootstrap → auth stub → 25 migration → validate script'leri) kendi
 |---|---|---|---|
 | `DATABASE_URL` | `postgres` (service, RLS'ten muaf) | transaction-mode, port 6543 | Script'ler, backfill, `worker/analytics.py`'nin doğrudan sorguları |
 | `DATABASE_URL_DASHBOARD` | `app_dashboard_service` (dar yetkili) | **session-mode, port 5432** | Yalnız `worker/auth.py:rol_baglantisi_ac()` — `SET ROLE`/GUC kalıcılığı için session-mode ZORUNLU |
+
+**`prepare_threshold=None` — transaction-pooler ile ilişkili boşluk
+(2026-09-07 denetiminde eklendi):** `DATABASE_URL`'nin transaction-mode
+pooler'ı (pgbouncer, port 6543), her sorguyu farklı bir fiziksel bağlantıya
+yönlendirebildiği için psycopg'nin varsayılan prepared-statement önbelleği
+ile çakışıyordu — canlıda `psycopg.errors.DuplicatePreparedStatement`
+hatasına yol açmıştı (bkz. `06_canli_veri_operasyon_gunlugu.md` satır
+189-193). Kalıcı çözüm: `psycopg.connect(..., prepare_threshold=None)` —
+bu, `worker/db.py:get_db_connection()`'daki tek merkezi noktadan başlayıp,
+kendi bağlantısını açan HER script'e (auth.py, job_worker.py,
+fetch_weather.py, backfill/onayla/mutabakat/word_20XX.py) tek tek
+uygulandı. `DATABASE_URL_DASHBOARD` (session-mode) bu sorunu yaşamıyor
+ama tutarlılık için orada da aynı parametre kullanılıyor.
 Bu ikisini KARIŞTIRMAMAK kritik — `DATABASE_URL` ile `SET ROLE viewer`
 `permission denied` verir (bkz. §8.2).
 
@@ -879,12 +924,21 @@ exec` ile interaktif çalışılabilir.
 Bu doküman yazılırken bulunan, önceki notlarla gerçek kod/git arasındaki
 çelişkiler — hepsi KOD/GİT esas alınarak çözüldü:
 
-1. **T8/T12 karışıklığı** (bu doküman taslağının onay turunda kullanıcı
-   tarafından da işaretlendi): önceki bir özet notu "T12, T8 gibi
-   parse edilmiyor" diyordu. Gerçek kaynak (`05_kaynak_dosya_sozlesmesi.md`)
-   **T8'in gerçekten parse edilip `fact_tuketim`'i beslediğini**
-   gösteriyor — yalnız **T12** (T11 ile redundant olduğu için) bilinçli
-   olarak parse edilmiyor. Düzeltildi, bkz. §4.2/§4.3.
+1. **T8/T12 karışıklığı — bu maddenin İLK hâli (v1.0) YANLIŞTI, 2026-09-07
+   denetiminde geri alındı:** Önceki bir özet notu "T12, T8 gibi parse
+   edilmiyor" diyordu. v1.0 bunu, `05_kaynak_dosya_sozlesmesi.md` satır
+   20'yi (dosyanın **hedef haritası**, yani plan — kod değil) kaynak
+   göstererek "YANLIŞ, T8 gerçekten parse edilip `fact_tuketim`'i
+   besliyor" diye "düzeltmişti". Bu düzeltmenin kendisi yanlıştı: aynı
+   dosyanın satır 105'i ve `worker/parser.py`/`worker/pipeline.py`'nin
+   kendisi, T8'in **hiç implemente edilmediğini** açıkça söylüyor —
+   `grep -rn "T8" worker/parser.py worker/pipeline.py` bunu doğrudan
+   doğruluyor. **Doğrusu orijinal nota daha yakın:** hem T8 hem T12,
+   T11 ile redundant olduğu için parse edilmiyor (aralarındaki tek fark:
+   T12'nin grain'i farklı — dağıtım şirketi — ama sonucu aynı). v1.0'ın
+   hatası, dokümanın kendi yöntem kuralını ("çelişkide kod esas alınır")
+   burada ihlal edip bir hedef/plan satırını kod sanmasıydı. Düzeltildi,
+   bkz. §4.2/§4.3 (v1.1).
 2. **"2026 Excel format uyumu doğrulanacak" varsayımı**: bu doküman
    taslağının §11 planında "açık madde" olarak öngörülmüştü — araştırma
    `worker/parser.py`'nin zaten 6 gerçek 2026 ayıyla (202601-202606)
@@ -938,5 +992,5 @@ Bu doküman yazılırken bulunan, önceki notlarla gerçek kod/git arasındaki
 | `dokumanlar/*.md` (bu dosya hariç) | 11 | `00_INDEX` → `09_PROJE_DURUMU` |
 | Fact tablosu | 7 | `fact_tuketim`, `fact_uretim`, `fact_abone`, `fact_serbest_tuketici`, `fact_hava_aylik(+log)`, `fact_tuketim_ulke_geneli` |
 | Dim tablosu | 5 | `dim_tarih`, `dim_il`, `dim_kaynak`, `dim_tuketici_grubu`, `dim_lisans` |
-| KPI (Faz 0-3 production) | 20 | KPI-01..13, 23..27 (KPI-14..22 SRS'te tanımlı değil/bu repoda hiç geçmiyor) |
+| KPI (Faz 0-3 production) | 20 | KPI-01..13, 23..27 (KPI-14..22 SRS'te tanımlı değil/bu repoda hiç geçmiyor; **KPI-28** `05_kaynak_dosya_sozlesmesi.md`'de tanımlı ama kodda implemente edilmemiş — bkz. §7.5, yeni KPI KPI-29'dan başlamalı) |
 

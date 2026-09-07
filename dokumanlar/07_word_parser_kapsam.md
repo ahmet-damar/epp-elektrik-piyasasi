@@ -1,5 +1,9 @@
 # EPP — Word (.docx) EPDK Raporları: Teşhis + Kapsam Kararları
 
+> **STATUS: HISTORICAL (olay günlüğü — o anki teşhis/karar süreci)** —
+> güncel aktivasyon durumu için `09_PROJE_DURUMU.md`'ye bakın (2026-09-07
+> denetimi).
+
 **Tarih:** 2026-08-31 · **Durum:** Teşhis tamamlandı, kod YAZILMADI — uygulama
 ayrı bir oturumda başlayacak. Bu dosya, o oturumun başlangıç noktasıdır.
 
