@@ -60,13 +60,20 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Migration uygula (sıralı, ON_ERROR_STOP)
+        # ci.yml'in integration job'ı AYNI glob + sıralama mantığını
+        # kullanır (2026-09-07, B2) — CI'da test edilenle prod'a uygulanan
+        # migration seti garanti aynı sırada aynı dosyaları kapsar.
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
         run: |
+          set -euo pipefail
+          uygulanan=0
           for f in $(ls supabase/migrations/*.sql | sort); do
             echo ">> $f"
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+            uygulanan=$((uygulanan + 1))
           done
+          echo "Uygulanan migration sayısı: $uygulanan"
 
   deploy-ssh:
     name: Deploy (self-host via SSH)

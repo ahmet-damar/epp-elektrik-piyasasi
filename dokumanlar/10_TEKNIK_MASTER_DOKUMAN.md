@@ -26,6 +26,7 @@ kaynak kodu, canlı Supabase sorgusu) karşı yeniden doğrulandı. Bir
 | v1.1 | 2026-09-07 | §9.4/Ek A test sayısı düzeltmesi | v1.0'ın "230 pytest ID non-integration" rakamı YANLIŞTI — temiz bir kabukta (`env -i`, `.env` erişilemez) doğrudan doğrulandı: 19 unit/regresyon dosyası TEK BAŞINA **227** ID veriyor (`skipif` toplamayı değil çalıştırmayı engelliyor, bu iki kavramın karışması hataya sebep olmuştu). 230, bu oturumun WSL koşusuna ÖZGÜ bir rakam (227 yerel + 3 gerçek `test_auth_integration.py` çağrısı) — genel/ortam-bağımsız bir sabit DEĞİL |
 | v1.2 | 2026-09-07 | 13 dokümanlık dış denetim (ChatGPT/Gemini/Sonnet analizleriyle çapraz) — §4.2/§4.3/§14.1 (T8'in "düzeltmesi" geri alındı, T8 de T12 gibi parse edilmiyor), §7.5 (KPI-28 numara çakışması notu), §12.4 (`prepare_threshold` notu eklendi), tüm "2026-09-08" tarihleri "2026-09-07"ye düzeltildi (git log'a karşı doğrulandı — commit `ecba6b5` dahil hepsi 09-07) | `grep -rn "T8" worker/parser.py worker/pipeline.py`, `grep -rn "KPI-28" worker/`, `git log --format='%cd' --date=iso` (tüm commit'ler 2026-09-07); ayrıca `05_kaynak_dosya_sozlesmesi.md`, `03_veri_modeli.md`, `01_kavramsal_tasarim.md`, `00_INDEX.md`, `.github/copilot-instructions.md`, `09_PROJE_DURUMU.md` bu turda düzeltildi (bu dosyanın kapsamı dışı, kendi commit'lerinde ayrı listelenir) |
 | v1.3 | 2026-09-07 | Aşama 1 (operasyonel güvenlik) başladı — C2: `worker/tests/conftest.py` ile prod DB'ye karşı test guard'ı KOD SEVİYESİNDE eklendi, §9.4'e not düşüldü | Sahte `pooler.supabase.com` URL'i ile pytest exit code 3 ile durduruldu; aynı URL + `ALLOW_DESTRUCTIVE_TESTS=true` ile 276 test normal toplandı; DB env'siz 227 test hatasız koştu (regresyon yok) |
+| v1.4 | 2026-09-07 | B2: `ci.yml`'in `integration` job'ı artık `deploy.yml` ile AYNI glob mantığını kullanıyor + uygulanan/toplam migration sayısı karşılaştırması eklendi (§9.1/§9.3) | `yaml.safe_load` ile sözdizimi doğrulandı; gerçek CI koşusunda sahte bir migration dosyası eklenip glob'a otomatik yakalandığı ve sayı doğrulamasının geçtiği görüldü, sonra geri alındı (bkz. ilgili commit çifti) |
 
 ---
 
@@ -580,7 +581,7 @@ Kaynak: `.github/workflows/{ci,security,deploy,scheduled-refresh}.yml`
 | Job | İçerik |
 |---|---|
 | `worker` (Worker: lint · types · validation) | ruff check + format, mypy, `worker/validate_rls_static.py`, `worker/dogrula.py` (golden veri karşılaştırma), `pytest worker/tests -v` (bu job DATABASE_URL/DATABASE_URL_DASHBOARD hiç SET ETMEZ → `pytestmark skipif` ile TÜM 6 `*_integration.py` otomatik atlanır), `compileall` |
-| `integration` (Schema validation + static RLS validation) | `worker`'a `needs` bağımlı. Disposable `postgres:16` servisi → `supabase/ci-only/01_roles_bootstrap.sql` (anon/authenticated/service_role taklit) → `00_auth_stub.sql` (auth şema stub) → **TÜM 25 migration sırayla** (`ON_ERROR_STOP=1`) → `validate_rls_static.py` + `validate_role_access.py` (GERÇEK `SET ROLE`+sorgu ile RLS davranışı) + yalnız **5** `*_integration.py` dosyası isimle tek tek çağrılır (`test_ingest/pipeline/job_worker/analytics/fetch_weather_integration.py`) — **`test_auth_integration.py` bu listede YOK** (bkz. not) |
+| `integration` (Schema validation + static RLS validation) | `worker`'a `needs` bağımlı. Disposable `postgres:16` servisi → `supabase/ci-only/01_roles_bootstrap.sql` (anon/authenticated/service_role taklit) → `0001_init_schema.sql` (roller) → `00_auth_stub.sql` (auth şema stub) → **kalan TÜM migration'lar glob ile sırayla** (`ON_ERROR_STOP=1`, uygulanan sayı `supabase/migrations/*.sql` sayısıyla karşılaştırılıp eşit değilse job FAIL eder — bkz. not) → `validate_rls_static.py` + `validate_role_access.py` (GERÇEK `SET ROLE`+sorgu ile RLS davranışı) + yalnız **5** `*_integration.py` dosyası isimle tek tek çağrılır (`test_ingest/pipeline/job_worker/analytics/fetch_weather_integration.py`) — **`test_auth_integration.py` bu listede YOK** (bkz. not) |
 
 **`test_auth_integration.py` — CI'da HİÇ ÇALIŞMAZ, manuel-only:** Diğer
 5 dosya `DATABASE_URL`'e göre `skipif` yapar (CI'nin disposable
@@ -598,11 +599,19 @@ test PASSED (gerçek Supabase Auth'a karşı, `giris_yap` yanlış kimlik/
 | `sql` (SQL lint) | `sqlfluff lint db supabase/migrations supabase/ci-only --dialect postgres` |
 | `quality-gate` | `worker`+`integration`+`supabase-tooling`+`sql`'e `needs` — branch protection'ın ZORUNLU kontrolü budur |
 
-**Migration listesi ELLE, glob DEĞİL:** `integration` job'ı her migration
-dosyasını TEK TEK, isimle `psql -f` çağırır — yeni bir migration
-eklendiğinde bu listeye DE elle eklenmezse CI o migration'ı hiç
-uygulamaz (defalarca tekrarlanan bir gerçek disiplin: her yeni migration
-turu bunu unutmamak zorunda kaldı, bkz. §10).
+**Migration listesi artık GLOB, elle DEĞİL (2026-09-07 düzeltmesi, B2):**
+2026-09-07'ye kadar `integration` job'ı her migration dosyasını TEK TEK,
+isimle `psql -f` çağırıyordu — `deploy.yml`'in `migrate` job'ı ise HER
+ZAMAN glob ile TÜMÜNÜ uyguluyordu (bkz. §9.3). Bu asimetri, yeni bir
+migration ci.yml'in listesine eklenmeyi unutulursa **CI'da hiç test
+edilmeden prod'a uygulanabileceği** anlamına geliyordu (defalarca
+tekrarlanan bir gerçek disiplin sorunu, bkz. §10). Artık `integration`
+job'ı da `deploy.yml` ile AYNI glob + sıralama mantığını kullanıyor, ARTI
+uygulanan dosya sayısı `supabase/migrations/*.sql` sayısıyla karşılaştırılıp
+eşit değilse job FAIL ediyor — "listeye eklemeyi unutma" riski yapısal
+olarak ortadan kalktı. Doğrulandı: kasıtlı eklenen sahte bir migration
+dosyası CI'da glob'a otomatik yakalanıp uygulandı ve sayı doğrulaması
+geçti (bkz. `git log`'daki test commit'i), sonra geri alındı.
 
 ### 9.2 `security.yml` — 6 İş
 `gitleaks` (secret tarama, PR'larda `pull-requests:read` gerekiyor —
@@ -621,9 +630,12 @@ Haftalık cron (`0 6 * * 1`) + her push/PR.
 - **deploy.yml** (ADR-5): `build-push` (GHCR) job'ı **`if: false` ile
   DEVRE DIŞI** — `web/` klasörü ve Dockerfile'lar henüz yok. `migrate`
   (`PROD_DATABASE_URL` ile TÜM migration'ları glob'la sırayla uygular —
-  ci.yml'in aksine BURADA glob kullanılıyor), `deploy-ssh` (self-host,
+  2026-09-07'den beri `ci.yml`'in `integration` job'ı da AYNI glob
+  mantığını kullanıyor, bkz. §9.1), `deploy-ssh` (self-host,
   Coolify alternatifi yorumda), `smoke` job'ları `build-push`'a
-  `needs` bağımlı olduğundan OTOMATİK skip ediliyor.
+  `needs` bağımlı olduğundan OTOMATİK skip ediliyor — yani bu job'lar şu
+  an fiilen HİÇ ÇALIŞMIYOR, B2 düzeltmesi şu an için teorik bir riski
+  kapatıyor (ama `build-push` aktive edildiğinde anında devreye girecek).
 - **scheduled-refresh.yml**: her gün 04:00 UTC, `python -m worker.jobs.
   fetch_weather --incremental` (bir önceki tam ay). **Gerçek olay
   (2026-09-04/05):** bu adım aylarca "başarılı" görünüyordu çünkü

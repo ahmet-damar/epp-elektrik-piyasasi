@@ -75,34 +75,34 @@ jobs:
         # viewer/data_operator/admin from 0001) exist for the stub's GRANTs.
         run: psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/ci-only/00_auth_stub.sql
       - name: Apply schema + RLS + dimension seed to test PostgreSQL
-        # ALL migrations now apply here (2026-09-02) - the roles bootstrap step
-        # above means 0003/0010/0011/0013 (anon/authenticated/service_role
-        # grants) no longer need to be excluded for "role does not exist".
+        # 2026-09-07 (B2 - dis denetim): ONCEDEN her migration burada ismiyle
+        # tek tek cagriliyordu - deploy.yml'in migrate job'i ise HER ZAMAN
+        # glob ile TUMUNU uyguluyordu (supabase/migrations/*.sql | sort).
+        # Asimetri riski: yeni bir migration bu listeye eklenmeyi unutulursa
+        # CI'da HIC test edilmeden prod'a uygulanabiliyordu. Artik ayni glob
+        # mantigi burada da kullaniliyor + uygulanan dosya sayisi ile
+        # supabase/migrations/*.sql sayisi karsilastirilip esit degilse job
+        # FAIL ediyor (cift guvenlik: hem glob "unutmayi" imkansiz kilar hem
+        # sayim assertion'i script hatasini yakalar).
+        # 0001 zaten yukarida (ci-only auth stub'dan ONCE) ayri uygulandigi
+        # icin burada atlaniyor.
         run: |
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0002_rls_roles.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0003_fix_grants.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0004_seed_dimensions.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0005_uretim_mwh_nullable.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0006_fact_serbest_tuketici_grain.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0007_dim_kaynak_motorin_nafta.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0008_dim_il_koordinat.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0009_fact_hava_aylik_upsert_model.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0010_fact_hava_aylik_log_supabase_grants.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0011_fact_hava_aylik_log_anon_revoke.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0012_veri_kapsam_disi.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0013_veri_kapsam_disi_authenticated_grants.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0014_current_app_role_viewer_grants.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0015_auth_schema_usage_viewer_grants.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0016_app_dashboard_service_role.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0017_restore_viewer_data_operator_admin_table_grants.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0018_current_app_role_security_definer.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260819_0019_drop_undocumented_bypass_policies.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260904_0001_dim_grants_fix.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260904_0002_dim_rls_disable.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260904_0003_missing_grants.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260904_0004_sistem_kpi_job_rls_disable.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260905_0001_kpi_esik_seed.sql
-          psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f supabase/migrations/20260905_0002_fact_tuketim_ulke_geneli.sql
+          set -euo pipefail
+          uygulanan=1  # 0001 zaten yukarida uygulandi
+          for f in $(ls supabase/migrations/*.sql | sort); do
+            if [[ "$f" == *"20260819_0001_init_schema.sql" ]]; then
+              continue
+            fi
+            echo ">> $f"
+            psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f "$f"
+            uygulanan=$((uygulanan + 1))
+          done
+          toplam=$(ls supabase/migrations/*.sql | wc -l)
+          echo "Uygulanan: $uygulanan / Toplam dosya: $toplam"
+          if [[ "$uygulanan" -ne "$toplam" ]]; then
+            echo "::error::Uygulanan migration sayisi ($uygulanan) supabase/migrations/*.sql sayisiyla ($toplam) uyusmuyor!"
+            exit 1
+          fi
       - name: Run static RLS validation
         run: python worker/validate_rls_static.py
       - name: Run role-based access verification (anon vs viewer, real RLS/GRANT behavior)
