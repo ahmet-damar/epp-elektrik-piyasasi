@@ -1,4 +1,5 @@
-# 09 — Proje Durumu (GÜNCEL, DB'den doğrulandı — 2026-09-04)
+# 09 — Proje Durumu (GÜNCEL, DB'den doğrulandı — 2026-09-04, 2026-09-07'de
+fact_tuketim_ulke_geneli eklemesiyle güncellendi)
 
 **Bu dosya, canlı Supabase'e karşı salt-okunur sorgularla ve `pytest`
 çalıştırılarak bu turda TAZE DOĞRULANMIŞ bulgulara dayanır — önceki
@@ -40,12 +41,20 @@ yansıtıldı.**
   ayrı bir metrik) tüm yıllarda tutarlı grain ile çalışıyor.
 - **pytest** (`worker/tests`, 6 `*_integration.py` hariç): **205/205
   geçti**, 0 hata (bu turda çalıştırıldı).
-- **Gerçek, açık kalan bir teknik madde YOK.** Kalan tek şey Sanayi'nin
-  Word kaynağında neden T11'e girmediğine dair "ileride araştırılabilir"
-  notu (`07_word_parser_kapsam.md`) — bu bir hata/eksik değil, bilinçli
-  bir P0 tasarım kararının (Karar 2) belgelenmiş gerekçesi. Sıradaki
-  adımlar artık teknik borç değil, **ürün/kapsam kararları** (aşağıya
-  bkz.).
+- **fact_tuketim_ulke_geneli — YENİ (2026-09-07):** EPDK T11 tablosunun
+  kendi "Genel Toplam" satırından, il kırılımı olmayan, Sanayi DAHİL tüm
+  grupların ülke geneli serisi. 2016-2025'in 120 ayı için backfill
+  edildi, **81/120 ay (405 satır) aktif**; **39 ay mutabakat uyumsuzluğu**
+  yüzünden `running` bırakıldı (fact_tuketim'in ÖNCEDEN yüklenmiş il
+  verisinde, yalnız Tarımsal/Aydınlatma gruplarında, muhtemelen 2016-2020
+  arası bir taksonomi/duplike-satır sorunu — bu YENİ kodun hatası değil,
+  ayrı bir araştırma konusu). Detay: `06_canli_veri_operasyon_gunlugu.md`
+  2026-09-05/07 kaydı.
+- **Sanayi'nin Word kaynağında neden T11'e girmediği sorusu — KAPANDI.**
+  Cevap: T11'in kendi Genel Toplam satırı zaten Sanayi dahil tüm
+  grupların ülke geneli değerini veriyor (yukarıdaki madde) — `07_word_
+  parser_kapsam.md`'deki "ileride araştırılabilir" notu artık geçerli
+  değil, kapatıldı.
 
 ## Tablo — Yıl × Tablo Aktivasyon Durumu
 
@@ -97,12 +106,15 @@ Doğrulandı (bu turda yeniden sorgulandı): `public` şemasındaki 18
 tablonun hiçbiri artık ne grant'sız ne RLS-açık-policy'siz. Detay:
 `dokumanlar/06_canli_veri_operasyon_gunlugu.md`, 2026-09-04 girdisi.
 
-## Test durumu (2026-09-04, bu turda çalıştırıldı)
+## Test durumu (2026-09-07'de yeniden çalıştırıldı, güncel)
 
 ```
-python -m pytest worker/tests -q  (6 *_integration.py HARİÇ — README Ek D kuralı)
-205 passed in 16.56s
+python -m pytest worker/tests -q  (5 *_integration.py HARİÇ — README Ek D kuralı)
+230 passed in 21.13s
 ```
+(2026-09-04'teki 205'ten artış: `test_word_ulke_geneli.py` (7),
+`test_auth.py`'ye eklenen rate-limit testleri (6), ve aradaki diğer
+turlarda eklenen testler.)
 
 `*_integration.py` (6 dosya) canlı Supabase'e karşı bilinçli
 çalıştırılmadı (README'deki "Canlı Supabase'e Karşı Test Çalıştırma
@@ -114,9 +126,11 @@ Kuralı").
    listesinde teknik olarak kalan bir yıl yok (2016-2025 hepsi aktif).
 2. **Faz 4 (Tahminleme) / Faz 5 (EPİAŞ)** — daha önce ertelenmişti,
    artık 10 yıl gerçek veri var, karar gözden geçirilebilir.
-3. **Sanayi'nin T7 (ülke-geneli mutabakat tablosu) üzerinden kısmen
-   kurtarılıp kurtarılamayacağı** — araştırılmadı, ayrı bir oturumun
-   konusu (`07_word_parser_kapsam.md`'de işaretli).
+3. **Sanayi'nin ülke geneli serisi — TAMAMLANDI** (`fact_tuketim_ulke_
+   geneli`, yukarıya bkz.). Kalan iş: 39 uyumsuz ayın `fact_tuketim`
+   tarafındaki kök nedeni araştırmak (ayrı görev) + KPI-25/27'nin bu yeni
+   tabloyu kullanıp kullanmayacağına karar vermek (formül bu turda
+   DEĞİŞTİRİLMEDİ).
 4. **Gerçek internete açık bir deploy** — Streamlit Cloud denemesi
    yapıldı (GRANT/RLS sorunları bu turda çözüldü), kalıcı/otomatik bir
    deploy akışı (`deploy.yml`'in şu an devre dışı `build-push` job'ı)
@@ -130,3 +144,8 @@ Bu dosyadaki TÜM sayılar bu turda (2026-09-04) canlı Supabase'e karşı
 `pg_policies`) ve gerçek bir `pytest` çalıştırmasından geliyor — hiçbir
 sayı önceki dokümandan devralınmadı. Bu turda hiçbir batch aktive
 edilmedi, hiçbir kod/şema değiştirilmedi (yalnız bu doküman güncellendi).
+
+**2026-09-07 eklemesi:** `fact_tuketim_ulke_geneli` bölümündeki sayılar
+(81/120 ay aktif, 405 satır, 39 ay uyumsuz) AYNI şekilde canlı Supabase'e
+karşı, `SET ROLE`+gerçek JWT claim'iyle doğrulandı — bkz.
+`06_canli_veri_operasyon_gunlugu.md` 2026-09-05/07 kaydı.

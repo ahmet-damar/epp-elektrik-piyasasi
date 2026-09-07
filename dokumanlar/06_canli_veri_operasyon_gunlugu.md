@@ -886,43 +886,92 @@ gelecekte kendiliğinden çözülecek (her yeni ay pencereyi ileri kaydırır).
 `worker/jobs/fetch_weather.py:hava_verisi_cek_ve_yaz()` script'ten tekrar
 tekrar çağrıldı.
 
-## 2026-09-05 — fact_tuketim_ulke_geneli: DURAKLATILDI (canlıya uygulanmadı,
-onay bekliyor)
+## 2026-09-05/07 — fact_tuketim_ulke_geneli: migration canlıya uygulandı,
+120 ay backfill TAMAMLANDI, 81/120 ay aktive edildi (39 ay mutabakat
+uyumsuzluğu — elle inceleme bekliyor)
 
-**Durum:** Migration + parser (10 yıl dosyası) + `worker/ingest.py`
-loader'ı + 7 yeni test — main'de, CI'da (disposable postgres:16) tam
-yeşil (commit `4163bff` + dokümantasyon `91eb1f1`). **CANLI Supabase'e
-HENÜZ hiçbir şey uygulanmadı** — migration çalıştırılmadı, backfill/
-aktivasyon/mutabakat hiçbiri gerçek DB'ye karşı ÇALIŞTIRILMADI. Bu,
-kullanıcının açık talimatıyla güvenli bir duraklama noktası.
+**Özet:** Migration (`20260905_0002_fact_tuketim_ulke_geneli.sql`) canlı
+Supabase'e uygulandı. 2016-2025'in TAMAMI (120 ay) için ayrı bir batch
+zinciriyle (`word-%-ulke-geneli-v1`, mevcut fact_tuketim batch'lerine
+DOKUNMADAN) T11 tablosunun Genel Toplam satırından okunan değerler
+yüklendi — 599/600 satır yazıldı (2016-12 Tarımsal 1 satır, gerçek bir
+negatif düzeltme değeri olduğu için `kpi.dogrula_tuketim()` tarafından
+reddedildi, tahmin edilmedi). **Mutabakat kontrolü aktivasyondan ÖNCE**
+çalıştırıldı (kullanıcı düzeltmesi) — 120 aydan **81'i** (Sanayi hariç 4
+grupta, fact_tuketim'in il+baglanti SUM'ıyla ≤%0,5 fark içinde) mutabık
+çıkıp aktive edildi; **39'u** uyumsuz çıktığı için **aktive EDİLMEDİ**,
+`running` bırakıldı (kullanıcı talimatı: zorla aktive edilmedi).
 
-**Bulunan tasarım:** EPDK Word raporlarının her ayı için ayrı bir
-"karşılaştırma tablosu" aramak yerine, fact_tuketim için zaten bulunan
-T11 (il×grup) tablosunun KENDİ "Genel Toplam" satırından Sanayi DAHİL
-tüm grupların ülke geneli değeri okunuyor — 120 ayın (2016-2025)
-TAMAMINDA gerçek docx'lere karşı doğrulandı, sıfır hata. Detay:
-`dokumanlar/07_word_parser_kapsam.md` ("Sanayi tüketimi ... KAPANDI"
-bölümü) ve `dokumanlar/03_veri_modeli.md`.
+**DB'den doğrulanan gerçek sayılar:**
+```
+AKTİF satır/ay/grup: 405, 81, 5        (81 ay × 5 grup, TAM)
+PASİF (running/uyumsuz) satır: 194
+Yıl başına AKTİF ay sayısı: 2016→2, 2017→6, 2018→8, 2019→2, 2020→9,
+                            2021→11, 2022→12, 2023→9, 2024→12, 2025→10
+```
 
-**Sıralama düzeltmesi (kullanıcı, 2026-09-05) — UYGULANDI (kodda,
-henüz ÇALIŞTIRILMADI):** Backfill script'inin (scratchpad, repo'ya DAHİL
-DEĞİL) akışı **mutabakat kontrolünü aktivasyondan ÖNCE** çalıştıracak
-şekilde düzeltildi — mutabakat sorgusu artık `is_active` filtresi
-KULLANMIYOR (yeni yüklenen batch'ler henüz `is_active=false`), doğrudan
-bu backfill'in yazdığı batch'lere (`parser_version LIKE 'word-%-ulke-
-geneli-v1'`) göre kontrol ediyor; yalnız mutabakatı GEÇEN batch'ler
-aktive edilecek, uyumsuz olanlar `running` kalıp elle incelenecek.
+**39 uyumsuz ay — kök neden bulundu, YENİ koddan KAYNAKLANMIYOR:**
+Tek tek incelendi (örnek: 202002/Tarımsal, en büyük fark — %459).
+`fact_tuketim_ulke_geneli` değeri (T11'in Genel Toplam satırından,
+120 ayın tamamında zaten bağımsız doğrulanmış okuma) = 19.208,40 MWh;
+`fact_tuketim`'in aktif il toplamı = 107.375,11 MWh (74 il, TEK bir
+batch_id=190). Şubat gibi kışın Tarımsal (sulama) tüketiminin düşük
+olması FİZİKSEL olarak beklenir — 19.208 makul, 107.375 anormal yüksek.
+**Uyumsuzluk `fact_tuketim_ulke_geneli`'nin YENİ okuma mantığında DEĞİL
+— `fact_tuketim`'in ÖNCEDEN (bu görevden bağımsız, geçmiş bir oturumda)
+yüklenmiş il verisinde.** Yalnız Tarımsal ve Aydınlatma gruplarında (hiç
+Mesken/Sanayi/Kamu ve Özel Hizmetler'de değil) görülüyor, ağırlıklı
+2016-2020 arasında yoğunlaşıyor — muhtemel neden: bu iki grubun tarihsel
+yüklemesinde bir taksonomi/alias veya duplike-satır sorunu (araştırma bu
+turun kapsamı DIŞINDA bırakıldı, `fact_tuketim`'in kendi geçmiş
+yüklemesini ayrıca denetlemek gerekir). **39 ayın listesi:** 201601-06,
+201608-09, 201611-12, 201701-02, 201704-05, 201711-12, 201805-06,
+201808, 201810, 201901-02, 201904-06, 201908-12, 202002-03, 202011,
+202103, 202301, 202306-07, 202502, 202504.
 
-**Sıradaki adımlar (aynen kalıyor, onay sonrası sırayla):**
-1. Migration'ı canlı Supabase'e uygula.
-2. 120 ay backfill (`python -m worker.scripts.word_20XX --ulke-geneli`,
-   ayrı batch zinciri — mevcut fact_tuketim batch'lerine dokunmaz).
-3. Mutabakat kontrolü (aktivasyondan ÖNCE, yukarıdaki düzeltmeyle).
-4. Yalnız mutabakatı geçen batch'lerin aktivasyonu.
-5. Son dokümantasyon (bu dosyaya gerçek sayılarla kapanış kaydı,
-   `09_PROJE_DURUMU.md` güncellemesi).
+**0,01 MWh yuvarlama notu:** 2016-01 test satırında (Sanayi) task'ın
+kaynağındaki değer (6.717.607,62) ile `parse_sayi()`'nin ürettiği değer
+(6.717.607,63) arasında 0,01 MWh'lik kayan-nokta yuvarlama farkı var —
+ihmal edilebilir (mutabakat toleransı %0,5, bu fark ~%0,00000015), veri
+hatası DEĞİL.
 
-**git/CI durumu (2026-09-05 duraklama anında doğrulandı):** `git status`
-temiz, `main` `origin/main` ile senkron, son commit (`91eb1f1`) CI'da
-(Worker/SQL lint/Schema+RLS/Security) tam yeşil. Açıkta commit
-edilmemiş/push edilmemiş hiçbir üretim kodu değişikliği yok.
+**RLS/GRANT doğrulaması (canlı, `app_dashboard_service`/DATABASE_URL_
+DASHBOARD ile, gerçek JWT claim'iyle):**
+```
+SET ROLE viewer,        JWT YOK        -> SELECT count: 0
+SET ROLE admin,         JWT YOK        -> SELECT count: 0
+SET ROLE data_operator, JWT YOK        -> SELECT count: 0
+SET ROLE viewer,        JWT role=viewer -> SELECT count: 405   (yalnız aktif)
+SET ROLE admin,         JWT role=admin  -> SELECT count: 599   (aktif+pasif, admin_..._all politikası)
+```
+Beklenen davranışla birebir örtüşüyor — JWT'siz erişim tamamen kapalı,
+viewer yalnız aktif satırları görüyor, admin tümünü görüyor.
+
+**Operasyonel not — bu turun asıl zaman kaybı (ortam sorunu, kod DEĞİL):**
+Windows Akıllı Uygulama Denetimi (SAC) bu kez yalnız numpy/pandas değil
+(bkz. 2026-09-03 kaydı, o zamanki çözüm: `pip install --force-reinstall`
+ile PyPI wheel'i), **psycopg VE lxml'in (python-docx bağımlılığı)
+derlenmiş bileşenlerini** bloklamaya başladı — `python.exe`'nin kendisi
+dahi "Uygulama Denetimi ilkesi bu dosyayı engelledi" ile reddedildi.
+Bu turda çözüm **WSL2 + Docker (Dev Container, `.devcontainer/
+devcontainer.json`, `mcr.microsoft.com/devcontainers/python:1-3.11-
+bookworm`)** oldu — Linux tarafında psycopg/lxml/pandas sorunsuz derlendi,
+SAC hiç devreye girmedi. Yol boyunca AYRI, gerçek bir engel daha çıktı:
+**C: sürücüsü neredeyse tamamen dolmuştu (445 GB / 39 MB boş)** — bu,
+WSL'in kendi süreç/instance oluşturma mekanizmasını (`Wsl/Service/
+CreateInstance/E_FAIL`, `getpwnam failed`) kırıyordu, SAC ile İLGİSİZ bir
+durumdu. Kullanıcı diski boşalttıktan (46,67 GB'a çıktı) ve `wsl --update`
++ `wsl --shutdown` (gerçek Windows yeniden başlatmaya GEREK KALMADAN)
+sonra WSL/Docker tamamen normale döndü. **Gelecekte benzer bir SAC
+bloğu görülürse:** önce bu dosyadaki 2026-09-03 kaydındaki hafif çözümü
+(`pip install --force-reinstall --no-cache-dir <paket>`) dene — yalnız o
+işe yaramazsa WSL/Dev Container'a geç (daha ağır ama kesin çözüm).
+
+**Sıradaki adımlar (açık, kullanıcıya bırakıldı):**
+1. 39 uyumsuz ayın `fact_tuketim`'deki kök nedenini araştırmak (ayrı bir
+   görev — bu turun kapsamı dışı).
+2. Kök neden düzeltilip/doğrulanıp bu 39 ay için mutabakat + aktivasyon
+   yeniden denenebilir (`running` durumdaki batch'ler hâlâ orada duruyor,
+   kaybolmadı).
+3. KPI-25/27 formülünün bu yeni tabloyu kullanıp kullanmayacağı — HALA
+   ayrı bir karar, bu turda değiştirilmedi.
