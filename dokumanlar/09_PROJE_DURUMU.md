@@ -41,15 +41,17 @@ yansıtıldı.**
   ayrı bir metrik) tüm yıllarda tutarlı grain ile çalışıyor.
 - **pytest** (`worker/tests`, 6 `*_integration.py` hariç): **205/205
   geçti**, 0 hata (bu turda çalıştırıldı).
-- **fact_tuketim_ulke_geneli — YENİ (2026-09-07):** EPDK T11 tablosunun
-  kendi "Genel Toplam" satırından, il kırılımı olmayan, Sanayi DAHİL tüm
-  grupların ülke geneli serisi. 2016-2025'in 120 ayı için backfill
-  edildi, **81/120 ay (405 satır) aktif**; **39 ay mutabakat uyumsuzluğu**
-  yüzünden `running` bırakıldı (fact_tuketim'in ÖNCEDEN yüklenmiş il
-  verisinde, yalnız Tarımsal/Aydınlatma gruplarında, muhtemelen 2016-2020
-  arası bir taksonomi/duplike-satır sorunu — bu YENİ kodun hatası değil,
-  ayrı bir araştırma konusu). Detay: `06_canli_veri_operasyon_gunlugu.md`
-  2026-09-05/07 kaydı.
+- **fact_tuketim_ulke_geneli — TAMAMLANDI (2026-09-08).** EPDK T11
+  tablosunun kendi "Genel Toplam" satırından, il kırılımı olmayan,
+  Sanayi DAHİL tüm grupların ülke geneli serisi. 2016-2025'in 120 ayının
+  TAMAMI aktif (599 satır) — yalnız 2016-12 4/5 grupla (Tarımsal o ay
+  kaynakta negatif çıktığı için hiç yüklenmedi, kullanıcı onayıyla kabul
+  edildi). İlk backfill'de 39 ay mutabakat "uyumsuz" görünmüştü — kök
+  neden bulundu (veri hatası DEĞİL, `dogrula_tuketim()`'in negatif değer
+  reddi il vs ülke seviyesinde bağımsız uygulanmasının beklenen sonucu),
+  `worker/scripts/mutabakat_ulke_geneli.py` ile kalıcı olarak düzeltildi.
+  Detay: `06_canli_veri_operasyon_gunlugu.md` 2026-09-05/07 ve 2026-09-08
+  kayıtları.
 - **Sanayi'nin Word kaynağında neden T11'e girmediği sorusu — KAPANDI.**
   Cevap: T11'in kendi Genel Toplam satırı zaten Sanayi dahil tüm
   grupların ülke geneli değerini veriyor (yukarıdaki madde) — `07_word_
@@ -126,11 +128,10 @@ Kuralı").
    listesinde teknik olarak kalan bir yıl yok (2016-2025 hepsi aktif).
 2. **Faz 4 (Tahminleme) / Faz 5 (EPİAŞ)** — daha önce ertelenmişti,
    artık 10 yıl gerçek veri var, karar gözden geçirilebilir.
-3. **Sanayi'nin ülke geneli serisi — TAMAMLANDI** (`fact_tuketim_ulke_
-   geneli`, yukarıya bkz.). Kalan iş: 39 uyumsuz ayın `fact_tuketim`
-   tarafındaki kök nedeni araştırmak (ayrı görev) + KPI-25/27'nin bu yeni
-   tabloyu kullanıp kullanmayacağına karar vermek (formül bu turda
-   DEĞİŞTİRİLMEDİ).
+3. **Sanayi'nin ülke geneli serisi — TAMAMEN TAMAMLANDI** (`fact_tuketim_
+   ulke_geneli`, 120/120 ay aktif, yukarıya bkz.). Kalan tek karar:
+   KPI-25/27'nin bu yeni tabloyu kullanıp kullanmayacağı (formül bu
+   turda DEĞİŞTİRİLMEDİ, ayrı bir karar konusu).
 4. **Gerçek internete açık bir deploy** — Streamlit Cloud denemesi
    yapıldı (GRANT/RLS sorunları bu turda çözüldü), kalıcı/otomatik bir
    deploy akışı (`deploy.yml`'in şu an devre dışı `build-push` job'ı)

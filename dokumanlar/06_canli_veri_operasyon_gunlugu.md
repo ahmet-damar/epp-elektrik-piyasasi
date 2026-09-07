@@ -967,11 +967,79 @@ bloğu görülürse:** önce bu dosyadaki 2026-09-03 kaydındaki hafif çözüm�
 (`pip install --force-reinstall --no-cache-dir <paket>`) dene — yalnız o
 işe yaramazsa WSL/Dev Container'a geç (daha ağır ama kesin çözüm).
 
-**Sıradaki adımlar (açık, kullanıcıya bırakıldı):**
-1. 39 uyumsuz ayın `fact_tuketim`'deki kök nedenini araştırmak (ayrı bir
-   görev — bu turun kapsamı dışı).
-2. Kök neden düzeltilip/doğrulanıp bu 39 ay için mutabakat + aktivasyon
-   yeniden denenebilir (`running` durumdaki batch'ler hâlâ orada duruyor,
-   kaybolmadı).
+**Sıradaki adımlar (o anda açık bırakılmıştı — 2026-09-08'de kapandı,
+aşağıdaki kayda bkz.):**
+1. ~~39 uyumsuz ayın `fact_tuketim`'deki kök nedenini araştırmak.~~
+2. ~~Kök neden düzeltilip/doğrulanıp bu 39 ay için mutabakat + aktivasyon
+   yeniden denenmesi.~~
 3. KPI-25/27 formülünün bu yeni tabloyu kullanıp kullanmayacağı — HALA
    ayrı bir karar, bu turda değiştirilmedi.
+
+## 2026-09-08 — fact_tuketim_ulke_geneli: 39 ay mutabakat sapmasının kök
+nedeni bulundu, DÜZELTİLDİ, 120/120 ay aktif
+
+**Kök neden (kanıtlı, tahmin değil):** 39 ayın hiçbiri parser_version
+farkı, duplike satır, yanlış grup eşlemesi veya iletim/dağıtım kayması
+DEĞİLDİ — her yılın kendi `word-YYYY-v1` parser'ı hem uyumlu hem uyumsuz
+aylarda birebir aynı şekilde kullanılmış. **Gerçek neden:**
+`kpi.dogrula_tuketim()`'in negatif değer reddi kuralı İKİ FARKLI
+GRANÜLERLİKTE BAĞIMSIZ uygulanıyor:
+- **İl seviyesi** (`fact_tuketim`): bir ilin Tarımsal/Aydınlatma değeri
+  negatifse o SATIR reddedilip `fact_tuketim`'e hiç yazılmıyor
+  (`worker/ingest.py:fact_tuketim_yukle()`, red satırları `audit_log`'un
+  `red_satirlari`'nda kayıtlı).
+- **Ülke seviyesi** (`fact_tuketim_ulke_geneli`): T11'in Genel Toplam
+  satırı, EPDK'nın KENDİ NETLEŞTİRDİĞİ (bu negatif düzeltmeleri ZATEN
+  içeren) toplamdır.
+
+Sonuç: `fact_tuketim`'in aktif il toplamı, reddedilen (negatif) illerin
+payı kadar SİSTEMATİK OLARAK YÜKSEK çıkıyor. **Kanıt (2020-02 Tarımsal,
+en kötü vaka, %459 fark):** `audit_log`'da 7 il için reddedilen değerler
+toplamı = −88.166,69 MWh; il_toplamı (107.375,11) − |red| = 19.208,42 ≈
+`fact_tuketim_ulke_geneli` (19.208,40, fark 0,02 MWh). **Tüm 39 ay için
+doğrulandı** (78 (ay,grup) çiftinin 77'si — 2016-12 Tarımsal zaten hiç
+yüklenmedi, ayrı durum) — reddedilen satırlar dahil edilince TAMAMI
+≤0,07 MWh fark içinde uyumlu çıktı.
+
+**Bu bir veri hatası DEĞİL** — ne `fact_tuketim` ne `fact_tuketim_ulke_
+geneli` yanlıştı, ikisi de kendi seviyesinde doğruydu. Sorun yalnızca
+mutabakat SORGUSUNUN karşılaştırma mantığındaydı (apples-to-apples
+değildi). **Düzeltme: migration YOK, veri temizliği YOK** — yalnızca
+`worker/scripts/mutabakat_ulke_geneli.py` (YENİ, kalıcı script) eklendi:
+`audit_log`'daki bilinen reddedilen satırları il toplamına geri ekleyip
+(`il_toplami + red_toplam`, red_toplam zaten negatif) öyle karşılaştırır.
+
+**KALICI KURAL (gelecekteki her ay için geçerli, tekrar "bulunmasına"
+gerek YOK):** Bir ilde/grupta negatif bir düzeltme değeri olduğunda,
+`fact_tuketim`'in aktif toplamı `fact_tuketim_ulke_geneli`'nden HER ZAMAN
+biraz yüksek çıkacaktır — bu BEKLENEN bir davranıştır, `worker/scripts/
+mutabakat_ulke_geneli.py`'nin standart mantığı bunu otomatik hesaba
+katar. 2016-12 Tarımsal gibi (ÜLKE seviyesinde negatif çıkan, dolayısıyla
+`fact_tuketim_ulke_geneli`'ne o ay/grup için hiç satır yazılmayan) nadir
+durumlar hâlâ elle karar gerektirir (aşağıya bkz.).
+
+**Sonuç — canlıda uygulandı ve doğrulandı:**
+```
+AKTİF satır/ay/grup: 599, 120, 120        (120/120 AY, TAM)
+PASİF satır: 0
+5 grup TAM olmayan tek ay: 201612 (4/5 grup — Tarımsal o ay ülke
+  seviyesinde de negatif çıktığı için hiç yüklenmedi)
+```
+**2016-12 kararı (kullanıcı onayı):** 4/5 grupla aktive edildi — Tarımsal
+o ay için dashboard'da "veri yok" görünecek (mevcut KPI-05 NULL-değer
+prensibiyle tutarlı), tahmin edilmedi.
+
+**RLS doğrulaması (aktivasyon sonrası, canlı):**
+```
+SET ROLE viewer, JWT role=viewer -> SELECT count: 599   (tüm aktif satırlar)
+SET ROLE admin,  JWT role=admin  -> SELECT count: 599   (aynı — artık hiç pasif satır yok)
+```
+
+**Testler + CI:** `worker/scripts/mutabakat_ulke_geneli.py` ruff/mypy
+temiz. pytest tam suite + CI durumu bu kaydın hemen altındaki commit
+mesajında.
+
+**Kod/şema değişikliği:** Yalnız YENİ bir dosya eklendi
+(`worker/scripts/mutabakat_ulke_geneli.py`) — mevcut hiçbir tablo/
+migration/parser DEĞİŞMEDİ (kök neden bir veri hatası olmadığı için
+gerekmedi).
