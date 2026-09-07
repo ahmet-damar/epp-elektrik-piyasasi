@@ -64,12 +64,26 @@ yansıtıldı.**
   grupların ülke geneli değerini veriyor (yukarıdaki madde) — `07_word_
   parser_kapsam.md`'deki "ileride araştırılabilir" notu artık geçerli
   değil, kapatıldı.
-- **Aşama 1 (operasyonel güvenlik, 2026-09-07) — devam ediyor:** prod DB'ye
-  karşı test guard'ı kod seviyesinde eklendi (C2), CI/deploy migration
-  asimetrisi kapatıldı (B2), yedekleme runbook'u GERÇEK bir restore
-  drill'iyle doğrulandı (C1 — Supabase Free plan'de otomatik yedek YOK,
-  bkz. `11_yedekleme_runbook.md`). Detay: `10_TEKNIK_MASTER_DOKUMAN.md`
-  §8.5/§9.1/§9.4, Sürüm Geçmişi v1.3-v1.5.
+- **Aşama 1 (operasyonel güvenlik, 2026-09-07) — TAMAMLANDI (C2/B2/C1/
+  C3/C4).** Prod DB'ye karşı test guard'ı kod seviyesinde eklendi (C2),
+  CI/deploy migration asimetrisi kapatıldı (B2, gerçek CI koşusuyla
+  doğrulandı), yedekleme runbook'u GERÇEK bir restore drill'iyle
+  doğrulandı (C1 — Supabase Free plan'de otomatik yedek YOK, bkz.
+  `11_yedekleme_runbook.md`), scheduled-refresh sessiz başarısızlığa
+  karşı iki katman savunma kazandı (C3), **8 tabloda RLS geri açıldı ve
+  canlıya uygulandı** (C4 — `dim_*`×5 + `sistem_parametre`/`kpi_esik`/
+  `job_status`; `02_srs_ozet.md`'nin "TÜM tablolarda RLS zorunlu" kuralı
+  artık belgelenmemiş istisnasız gerçeğe uyuyor; istisnasız bir tamlık
+  kontrolü — `worker/validate_role_access.py` — hem gerçek CI'da hem
+  canlıda doğrulandı: 19/19 tablo RLS+policy). C4 uygulaması sırasında
+  3+ saattir açık kalmış terk edilmiş bir Streamlit bağlantısı
+  `pg_terminate_backend()` ile temizlendi (veri kaybı riski yoktu, salt-
+  okunurdu) — detay `06_canli_veri_operasyon_gunlugu.md` 2026-09-07
+  kaydı. Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §8.2/§8.5/§9.1/§9.3/§9.4,
+  Sürüm Geçmişi v1.3-v1.7.
+- **Kapsam dışı bırakılan (ayrı karar):** C5 (KPI-25/27'nin
+  `fact_tuketim_ulke_geneli`'yi kullanıp kullanmayacağı) ve C6'daki diğer
+  öneriler — Aşama 2'ye bırakıldı.
 
 ## Tablo — Yıl × Tablo Aktivasyon Durumu
 

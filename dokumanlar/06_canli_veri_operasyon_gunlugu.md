@@ -1048,3 +1048,35 @@ mesajında.
 (`worker/scripts/mutabakat_ulke_geneli.py`) — mevcut hiçbir tablo/
 migration/parser DEĞİŞMEDİ (kök neden bir veri hatası olmadığı için
 gerekmedi).
+
+## 2026-09-07 — C4: 8 tabloda RLS geri açıldı, bir engel çıktı ve çözüldü
+
+`20260907_0001_dim_config_job_rls_restore.sql` canlıya uygulanmadan
+önce `worker/scripts/backup.py` ile taze bir yedek alındı (bkz.
+`11_yedekleme_runbook.md`).
+
+**Engel:** İlk uygulama denemesi `psycopg.errors.QueryCanceled:
+canceling statement due to statement timeout` ile durdu. Kök neden:
+`pg_stat_activity` sorgusu, `app_dashboard_service` rolüyle (Supavisor
+üzerinden) 3+ saattir **"idle in transaction"** durumda kalmış bir
+bağlantı gösterdi — son çalıştırdığı sorgu `SELECT ... FROM job_status`
+(muhtemelen kapatılmamış/terk edilmiş eski bir Streamlit oturumu). Bu
+bağlantının `job_status` üzerinde tuttuğu kilit, `ALTER TABLE job_status
+ENABLE ROW LEVEL SECURITY`'nin ihtiyaç duyduğu kilidi engelliyordu.
+
+**Çözüm:** Bağlantı yalnız salt-okunur bir SELECT çalıştırmış olduğu
+için (veri kaybı riski YOK) `pg_terminate_backend()` ile sonlandırıldı —
+Streamlit basitçe yeniden bağlanır. Migration ikinci denemede sorunsuz
+uygulandı.
+
+**Doğrulama (canlı, migration sonrası):**
+```
+pg_class/pg_policies: 19/19 public tablo RLS açık + ≥1 policy (0 sorun)
+rol_baglantisi_ac() (gerçek dashboard yolu, app_dashboard_service):
+  viewer/data_operator/admin -> dim_il: 81 satır, job_status: 8 satır (üçü de)
+  admin  -> dim_il UPDATE: rowcount=1 (rollback ile temiz)
+  viewer -> dim_il UPDATE: InsufficientPrivilege (beklenen)
+postgres rolü (worker'ın DATABASE_URL'i): rolbypassrls = true (doğrulandı, varsayılmadı)
+```
+
+Detay/gerekçe: `10_TEKNIK_MASTER_DOKUMAN.md` §8.2, Sürüm Geçmişi v1.7.

@@ -29,6 +29,7 @@ kaynak kodu, canlı Supabase sorgusu) karşı yeniden doğrulandı. Bir
 | v1.4 | 2026-09-07 | B2: `ci.yml`'in `integration` job'ı artık `deploy.yml` ile AYNI glob mantığını kullanıyor + uygulanan/toplam migration sayısı karşılaştırması eklendi (§9.1/§9.3) | Gerçek CI koşusu (run 34157349173): sahte bir migration dosyası hiçbir listeye eklenmeden glob'a yakalandı, kendi `RAISE NOTICE`'ı loga düştü, `Uygulanan: 26 / Toplam dosya: 26` doğrulaması geçti; test dosyası sonraki commit'te geri alındı |
 | v1.5 | 2026-09-07 | C1: `worker/scripts/backup.py` + `dokumanlar/11_yedekleme_runbook.md` eklendi (§8.5) — Supabase Free plan'de otomatik yedek YOK | Gerçek disaster-recovery drill'i (disposable postgres:17, WSL/Docker): migration'lardan şema + `pg_restore --data-only` ile veri geri yüklendi, 19/19 tablo canlı Supabase'in `COUNT(*)` değerleriyle birebir eşleşti, 0 hata (ikinci denemede — ilk denemedeki 6 seed-tablosu hatası `--exclude-table` ile düzeltildi) |
 | v1.6 | 2026-09-07 | C3: `worker/jobs/fetch_weather.py:main()` 0 satır yazılırsa FAIL ediyor + `scheduled-refresh.yml`'e `if: failure()` özet adımı eklendi (§9.3) | `yaml.safe_load` ile sözdizimi doğrulandı, ruff/mypy temiz; GitHub'ın scheduled-workflow bildirim davranışı resmi dokümantasyondan doğrulandı (cron'u oluşturan kullanıcıya gider — `git log` ile bu proje için repo sahibi olduğu teyit edildi), kişisel bildirim AÇIK mı kod seviyesinde doğrulanamadığı için elle teyit gerektiği not edildi |
+| v1.7 | 2026-09-07 | C4: 8 tabloda (`dim_*`×5 + `sistem_parametre`/`kpi_esik`/`job_status`) RLS geri açıldı (§8.2), istisnasız tamlık kontrolü eklendi, **canlıya uygulandı** | Disposable postgres:16 + GERÇEK CI (run 34159706854 pozitif, 34159900787 negatif/fake-tablo-fail, 34160105007 revert-sonrası yeşil) + canlı Supabase'in tümünde doğrulandı: 19/19 tablo RLS+policy, dashboard yolu (viewer/data_operator/admin) gerçek JWT ile test edildi, `postgres` rolünün `rolbypassrls=true` olduğu canlıda teyit edildi (varsayılmadı) |
 
 ---
 
@@ -590,8 +591,35 @@ sırasıyla):**
    viewer aynı UPDATE'i deneyince `InsufficientPrivilege` ile reddedildi
    (beklenen — yalnız admin'e write GRANT'i var).
 4. `worker/jobs/*.py`'nin `job_status`'a kendi yazması ETKİLENMEDİ —
-   `DATABASE_URL` (postgres, service rolü) RLS'ten muaf (BYPASSRLS),
-   ayrıca doğrulanmadı (kod değişmedi, davranış zaten böyleydi).
+   `DATABASE_URL` (postgres, service rolü) RLS'ten muaf: **CANLIDA
+   doğrulandı** (`SELECT rolbypassrls FROM pg_roles` → `true`, varsayılmadı).
+
+**Canlıya uygulandı (2026-09-07):** CI yeşil olduktan sonra migration
+canlı Supabase'e uygulandı. Uygulama sırasında bir engel çıktı ve
+çözüldü — **şeffaflık için kaydediliyor:** `job_status` üzerinde 3+
+saattir "idle in transaction" durumda, `app_dashboard_service` rolüyle
+(muhtemelen kapatılmamış eski bir Streamlit oturumu) açık kalmış salt-
+okunur bir bağlantı, `ALTER TABLE job_status ENABLE ROW LEVEL SECURITY`
+için gereken kilidi engelleyip `statement_timeout` ile migration'ı
+durdurdu. Bağlantı `pg_terminate_backend()` ile sonlandırıldı (yalnız
+`SELECT job_id, ... FROM job_status` çalıştırıyordu, veri kaybı riski
+YOK — Streamlit basitçe yeniden bağlanır) ve migration ikinci denemede
+sorunsuz uygulandı. Detay: `06_canli_veri_operasyon_gunlugu.md`
+2026-09-07 kaydı.
+
+**Canlıda TAM doğrulama (migration sonrası, gerçek `DATABASE_URL_
+DASHBOARD` ile):**
+- `pg_class`/`pg_policies`: **19/19 tablo** RLS açık + ≥1 policy (0 sorun).
+- `rol_baglantisi_ac()` ile viewer/data_operator/admin'in üçü de
+  `dim_il` (81 satır) ve `job_status`'u (8 satır) SELECT edebildi.
+- admin `dim_il`'de gerçek bir UPDATE yapabildi (1 satır, rollback ile
+  temiz); viewer aynı UPDATE'i deneyince `InsufficientPrivilege`.
+- `postgres` rolünün (worker'ın `DATABASE_URL`'i) `rolbypassrls = true`
+  olduğu doğrudan `pg_roles`'tan doğrulandı — job_status'a worker
+  yazması kesinlikle etkilenmiyor.
+
+Öncesinde (canlıya dokunmadan) `worker/scripts/backup.py` ile taze bir
+yedek alındı (`11_yedekleme_runbook.md`'deki prosedür).
 
 ### 8.3 Supabase Auth Entegrasyonu (Faz B, 2026-09-05)
 `worker/auth.py` (framework-agnostik): `giris_yap(email, sifre)`
