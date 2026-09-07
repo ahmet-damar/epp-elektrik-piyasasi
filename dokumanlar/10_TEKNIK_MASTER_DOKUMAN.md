@@ -17,6 +17,7 @@ kaynak kodu, canlı Supabase sorgusu) karşı yeniden doğrulandı. Bir
 | Sürüm | Tarih | Değişiklik | Doğrulama kapsamı |
 |---|---|---|---|
 | v1.0 | 2026-09-08 | İlk yazım | 141 commit (2026-08-18→09-07), 25 migration + 2 ci-only, 11 worker/*.py + 10 yıllık word_20XX.py + 5 diğer script, 25 test dosyası (248 `def test_`, 230 pytest ID non-integration / 276 tüm dosyalar), 4 GitHub Actions workflow, 11 mevcut `dokumanlar/` dosyası, canlı Supabase (RLS/GRANT) doğrudan sorgulandı |
+| v1.1 | 2026-09-08 | §9.4/Ek A test sayısı düzeltmesi | v1.0'ın "230 pytest ID non-integration" rakamı YANLIŞTI — temiz bir kabukta (`env -i`, `.env` erişilemez) doğrudan doğrulandı: 19 unit/regresyon dosyası TEK BAŞINA **227** ID veriyor (`skipif` toplamayı değil çalıştırmayı engelliyor, bu iki kavramın karışması hataya sebep olmuştu). 230, bu oturumun WSL koşusuna ÖZGÜ bir rakam (227 yerel + 3 gerçek `test_auth_integration.py` çağrısı) — genel/ortam-bağımsız bir sabit DEĞİL |
 
 ---
 
@@ -601,18 +602,24 @@ Haftalık cron (`0 6 * * 1`) + her push/PR.
 25 dosya, **248 benzersiz `def test_*`** fonksiyonu (19 unit/regresyon +
 **6** `*_integration.py`, bkz. §9.1 kutucuğu). Bunlar birden fazla
 sayıyla raporlanır, hepsi doğru — ölçüm kapsamı farklı:
-- **230**: pytest'in 19 unit/regresyon dosyasından topladığı test ID
-  sayısı (parametrize genişlemesiyle ~199 def → 230 ID) — DATABASE_URL/
-  DATABASE_URL_DASHBOARD hiç tanımlı DEĞİLKEN (CI'nin `worker` job'ı,
-  ya da yerel offline geliştirme) çalışan, TAMAMEN yerel küme.
-- **230 (bu doküman/turun kendi raporları, DÜZELTİLMİŞ çerçeveleme):**
-  Bu oturumun `fact_tuketim_ulke_geneli` turlarında (WSL/Docker
-  container, GERÇEK `.env`) çalıştırılan "230 passed" rakamı SAYI
-  olarak DOĞRUYDU ama yalnız 5 dosyayı `--ignore` ettiğinden
-  `test_auth_integration.py`'yi (kendi `DATABASE_URL_DASHBOARD` gate'i
-  YÜZÜNDEN atlanmadı) YANLIŞLIKLA içeriyordu — 227'si gerçekten yerel,
-  3'ü gerçek (rollback-izole, zararsız) Supabase Auth çağrısıydı. Bkz.
-  §14 madde 4.
+- **227**: pytest'in 19 unit/regresyon dosyasından TEK BAŞINA topladığı
+  test ID sayısı (parametrize genişlemesiyle 199 def → 227 ID) —
+  **doğrudan doğrulandı (2026-09-08):** temiz bir kabukta, `.env`
+  hiç erişilebilir DEĞİLKEN (`env -i`) ve `DATABASE_URL`/
+  `DATABASE_URL_DASHBOARD` set EDİLMEDEN `pytest worker/tests
+  --collect-only` çalıştırıldı — 6 `*_integration.py` HARİÇ tutulunca
+  **227**, TÜMÜ dahil edilince **276** çıktı (`skipif` yalnız
+  ÇALIŞTIRMAYI engeller, TOPLAMAYI değil — bu iki kavramın
+  karıştırılması önceki bir taslakta yanlışlıkla "230" yazılmasına
+  sebep olmuştu, bkz. §14 madde 4).
+- **230 (bu oturumun WSL koşusundaki gerçek rapor)**: `fact_tuketim_
+  ulke_geneli` turlarında (WSL/Docker container, GERÇEK `.env`)
+  çalıştırılan "230 passed" rakamı = **227 (yukarıdaki, tamamen yerel)
+  + 3 (`test_auth_integration.py`)** — yalnız 5 dosya `--ignore`
+  edilmişti, `test_auth_integration.py`'nin kendi `DATABASE_URL_
+  DASHBOARD` gate'i o ortamda TANIMLI olduğundan bu 3 test YANLIŞLIKLA
+  değil, GERÇEKTEN çalışıp geçmişti (rollback-izole, zararsız — canlı
+  Supabase Auth'a karşı). Bkz. §14 madde 4.
 - **276**: pytest'in TÜM 25 dosyadan (6 `*_integration.py` DAHİL)
   topladığı ID sayısı — hiçbir CI job'ı bunu TEK SEFERDE çalıştırmaz
   (integration job'ı yalnız 5'ini isimle çağırır, `test_auth_
@@ -926,7 +933,7 @@ Bu doküman yazılırken bulunan, önceki notlarla gerçek kod/git arasındaki
 | `worker/scripts/*.py` | 15 | `word_ortak.py` + `word_2016..2025.py` (10) + `backfill.py`, `onayla.py`, `toplu_onayla_word.py`, `mutabakat_ulke_geneli.py` |
 | `app/*.py` | 1 | `dashboard.py` |
 | Test dosyası | 25 | `worker/tests/*.py` (6 `*_integration.py` + 19 unit/regresyon) |
-| Test fonksiyonu | 248 tanım / 230 (non-integration ID) / 276 (tüm ID) | bkz. §9.4 |
+| Test fonksiyonu | 248 tanım / 227 (19 non-integration dosya TEK BAŞINA) / 276 (tüm 25 dosya) | bkz. §9.4 — 230, yalnız bu oturumun bir WSL koşusuna özgü (227+3) bir rakam |
 | GitHub Actions workflow | 4 | `ci.yml`, `security.yml`, `deploy.yml`, `scheduled-refresh.yml` |
 | `dokumanlar/*.md` (bu dosya hariç) | 11 | `00_INDEX` → `09_PROJE_DURUMU` |
 | Fact tablosu | 7 | `fact_tuketim`, `fact_uretim`, `fact_abone`, `fact_serbest_tuketici`, `fact_hava_aylik(+log)`, `fact_tuketim_ulke_geneli` |
