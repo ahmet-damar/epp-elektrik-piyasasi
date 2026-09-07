@@ -94,6 +94,12 @@ tablosunda + `ingestion_batch` + `source_asset` + `dim_tarih`'te kalıcı
 test verisi bırakmıştı — üç turda tespit edilip temizlendi (detay:
 `dokumanlar/06_canli_veri_operasyon_gunlugu.md`, 2026-09-03 girdisi).
 
+**Kod seviyesinde koruma (2026-09-07, C2):** `worker/tests/conftest.py`,
+`DATABASE_URL`/`DATABASE_URL_DASHBOARD` canlı Supabase'e (supabase.co/
+pooler.supabase) işaret ediyorsa `pytest`'i başlamadan durdurur —
+`test_auth_integration.py`'nin BİLEREK canlıya karşı çalıştığı tek
+istisna kaçış kapısı: `ALLOW_DESTRUCTIVE_TESTS=true`.
+
 ## Kalite Kapıları (SRS §13.9)
 G-1 birim+golden · G-2 kapsam≥85% · G-3 entegrasyon · G-4 güvenlik
 G-5 RLS/lisans · G-6 model MAPE · G-7 lint+tip

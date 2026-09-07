@@ -25,6 +25,7 @@ kaynak kodu, canlı Supabase sorgusu) karşı yeniden doğrulandı. Bir
 | v1.0 | 2026-09-07 | İlk yazım | 141 commit (2026-08-18→09-07), 25 migration + 2 ci-only, 11 worker/*.py + 10 yıllık word_20XX.py + 5 diğer script, 25 test dosyası (248 `def test_`, 230 pytest ID non-integration / 276 tüm dosyalar), 4 GitHub Actions workflow, 11 mevcut `dokumanlar/` dosyası, canlı Supabase (RLS/GRANT) doğrudan sorgulandı |
 | v1.1 | 2026-09-07 | §9.4/Ek A test sayısı düzeltmesi | v1.0'ın "230 pytest ID non-integration" rakamı YANLIŞTI — temiz bir kabukta (`env -i`, `.env` erişilemez) doğrudan doğrulandı: 19 unit/regresyon dosyası TEK BAŞINA **227** ID veriyor (`skipif` toplamayı değil çalıştırmayı engelliyor, bu iki kavramın karışması hataya sebep olmuştu). 230, bu oturumun WSL koşusuna ÖZGÜ bir rakam (227 yerel + 3 gerçek `test_auth_integration.py` çağrısı) — genel/ortam-bağımsız bir sabit DEĞİL |
 | v1.2 | 2026-09-07 | 13 dokümanlık dış denetim (ChatGPT/Gemini/Sonnet analizleriyle çapraz) — §4.2/§4.3/§14.1 (T8'in "düzeltmesi" geri alındı, T8 de T12 gibi parse edilmiyor), §7.5 (KPI-28 numara çakışması notu), §12.4 (`prepare_threshold` notu eklendi), tüm "2026-09-08" tarihleri "2026-09-07"ye düzeltildi (git log'a karşı doğrulandı — commit `ecba6b5` dahil hepsi 09-07) | `grep -rn "T8" worker/parser.py worker/pipeline.py`, `grep -rn "KPI-28" worker/`, `git log --format='%cd' --date=iso` (tüm commit'ler 2026-09-07); ayrıca `05_kaynak_dosya_sozlesmesi.md`, `03_veri_modeli.md`, `01_kavramsal_tasarim.md`, `00_INDEX.md`, `.github/copilot-instructions.md`, `09_PROJE_DURUMU.md` bu turda düzeltildi (bu dosyanın kapsamı dışı, kendi commit'lerinde ayrı listelenir) |
+| v1.3 | 2026-09-07 | Aşama 1 (operasyonel güvenlik) başladı — C2: `worker/tests/conftest.py` ile prod DB'ye karşı test guard'ı KOD SEVİYESİNDE eklendi, §9.4'e not düşüldü | Sahte `pooler.supabase.com` URL'i ile pytest exit code 3 ile durduruldu; aynı URL + `ALLOW_DESTRUCTIVE_TESTS=true` ile 276 test normal toplandı; DB env'siz 227 test hatasız koştu (regresyon yok) |
 
 ---
 
@@ -666,6 +667,17 @@ izolasyonunu bypass eder), sentinel `tarih_id=209912` için kalıcı test
 verisi bırakmıştı — 3 turda tespit edilip temizlendi. Bundan sonra
 canlıya karşı yerel doğrulama YALNIZ hedefli `-k <desen>` alt kümesiyle
 yapılıyor.
+
+**Kod seviyesinde koruma (2026-09-07, denetim maddesi C2):** Yukarıdaki
+kural artık yalnız dokümanda değil — `worker/tests/conftest.py`'nin
+`pytest_configure` hook'u, `DATABASE_URL`/`DATABASE_URL_DASHBOARD` canlı
+Supabase işareti (`supabase.co`/`supabase.com`/`pooler.supabase`)
+taşıyorsa `pytest.exit(returncode=3)` ile paketi TOPLAMADAN durdurur.
+`test_auth_integration.py`'nin bilinçli canlı-Auth akışını kırmamak için
+`ALLOW_DESTRUCTIVE_TESTS=true` kaçış kapısı bırakıldı. Doğrulandı: sahte
+bir `pooler.supabase.com` URL'i ile paket exit code 3 ile durdu; aynı URL
++ kaçış kapısıyla 276 test normal toplandı; DB env'siz durumda 227 test
+sorunsuz koştu (regresyon yok).
 
 ---
 
