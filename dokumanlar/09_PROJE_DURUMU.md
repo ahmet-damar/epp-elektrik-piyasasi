@@ -249,18 +249,55 @@ sorgulandı:
 
 ## SONRAKİ OTURUM DEVAM NOKTASI
 
-**Bu bölümü önce oku.** 2026-09-07/08'de tamamlanan iş: 13-dokümanlık dış
-denetim (Aşama 0), operasyonel güvenlik (Aşama 1: C2, B2, C1, C3, C4),
-ve KPI sözleşmesi kapanışı (Aşama 2: C5 + dashboard idle-in-transaction
-kök nedeni + yedekleme restore hedefi düzeltmesi) — **HEPSİ TAMAMLANDI**.
-Dış denetim listesindeki A/B/C bölümlerinden **hiçbir açık madde
-kalmadı**. Sırada denetimin kendisinin işaret ettiği bir sonraki adım
-YOK — proje bir sonraki iş kalemi için (Faz 4/5/6, yeni bir özellik,
-yeni bir denetim turu) açık.
+**Bu bölümü önce oku — bir sonraki oturum yalnız bunu okuyup kaldığı
+yerden devam edebilmeli.**
 
-### C6 — ertelenmiş/değerlendirilmiş küçük maddeler (yalnız referans, aksiyon gerektirmiyor)
-- MFA/merkezi rate-limit: ertelendi (tek admin kullanıcı var).
-- HDD/CDD çok noktalı model: Faz 4 öncesi bir kez ölçülüp karara
-  bağlanacak, şimdi değil.
-- Diğerleri (Strategy Pattern, veri girişi UI'ı vb.) zaten REDDEDİLDİ/
-  KAPANDI — yeniden açılmasın.
+### Bugün (2026-09-07/08) ne kapandı — tek satır özet
+13-dokümanlık dış denetimin **tamamı** kapandı: Aşama 0 (doküman/
+gerçeklik senkronu, A/B/C bölümlerinin hepsi), Aşama 1 (operasyonel
+güvenlik — C2 prod test guard, B2 CI/deploy migration simetrisi, C1
+yedekleme + haftalık otomasyon + GERÇEK restore drill'i, C3 sessiz
+başarısızlık savunması, C4 RLS geri açılması), Aşama 2 (C5 — KPI-25/27
+kaynak kararı, dashboard idle-in-transaction kök nedeni, restore hedefi
+postgres:17 düzeltmesi), ve D kuralına tarih çapası maddesi (commit
+`5214b9d`).
+
+### Açık madde
+**YOK.** Dış denetim listesinin (A/B/C bölümleri) hiçbir maddesi açık
+değil. İstisna yok.
+
+### C6 — ertelenmiş/değerlendirilmiş küçük maddeler (yalnız referans, aksiyon BEKLEMİYOR)
+- **MFA / merkezi rate-limit:** ertelendi (tek admin kullanıcı var).
+- **Veri girişi UI'ı + admin rol-atama UI'ı:** ertelendi (2026-09-05
+  kararı, `data_operator`'ın RLS altyapısı hazır ama UI'ı yok, yeni
+  kullanıcı eklemek hâlâ elle/Supabase Dashboard'dan).
+- **HDD/CDD çok noktalı il temsili:** Faz 4 öncesi bir kez ölçülüp
+  karara bağlanacak, şimdi değil (tek nokta/il varsayımı şu an bilinçli
+  bir metodolojik sınırlama olarak duruyor).
+- **`deploy.yml`'in `build-push` job'ı:** hâlâ `if: false` ile devre
+  dışı (`web/` klasörü ve Dockerfile'lar henüz yok) — `migrate`/
+  `deploy-ssh`/`smoke` job'ları buna `needs` bağlı olduğundan fiilen hiç
+  çalışmıyor.
+- **Yeni bir KPI numarası gerekirse KPI-29'dan başla** — KPI-28 slotu
+  `05_kaynak_dosya_sozlesmesi.md`'de zaten rezerve (tanımlı ama
+  implemente edilmemiş), çakışma olmasın.
+- Diğerleri (Strategy Pattern, `word_20XX.py` refactor'ü vb.) zaten
+  REDDEDİLDİ/KAPANDI — yeniden açılmasın.
+
+### Sıradaki gerçek iş — Faz 4 (Tahminleme), henüz başlamadı
+Kapsam kararı bekliyor. **Öneri (karar verilmedi, yalnız öneri):**
+Eskişehir pilotu + seasonal-naive baseline ile başla — küçük, tek-il
+kapsamlı bir kanıt-of-concept, tam bir tahminleme motoruna atlamadan
+önce. 10 yıl gerçek veri artık var (2016-2025), bu kararı gözden
+geçirmek için önceki turlarda "erken" denen gerekçe artık geçerli değil.
+
+### İlk çalışacak zamanlanmış yedek — bir sonraki oturumun İLK işi
+`scheduled-backup.yml`'in cron'u (`0 3 * * 0`, her Pazar 03:00 UTC) ile
+İLK gerçek otomatik koşusu **2026-09-13 Pazar 03:00 UTC**'de olacak
+(bugüne kadarki koşular hep elle `workflow_dispatch` iledir). Bir sonraki
+oturum önce bunu kontrol etmeli: `gh run list --workflow=scheduled-
+backup.yml` ile o koşunun gerçekten tetiklendiğini ve başarılı olduğunu
+doğrula (artifact oluştu mu, dump boyutu makul mü). GitHub'ın kendi
+başarısızlık e-postası da açık (repo sahibi, "On GitHub + Email + yalnız
+başarısız workflow'lar" — kullanıcı tarafından teyit edildi) — ama bu,
+elle kontrolün YERİNE GEÇMEZ, yalnız bir ek güvenlik ağı.
