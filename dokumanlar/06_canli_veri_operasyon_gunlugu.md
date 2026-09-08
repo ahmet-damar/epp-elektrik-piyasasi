@@ -1359,3 +1359,27 @@ değeri sessizce dönmüyor" AÇIKÇA doğrulandı, bulunamayan bir ay için bo�
 DataFrame (sahte değer YOK) döndüğü de test edildi. pytest 285/286 (tek
 beklenen "hata" — `test_auth_integration.py`). Detay: `10_TEKNIK_MASTER_
 DOKUMAN.md` §5.8, Sürüm Geçmişi v1.21.
+
+## 2026-09-09 (gece çalışması, gözetimsiz, MADDE 3) — Üretim çapraz mutabakat script'i, YALNIZ disposable postgres'te
+
+`worker/scripts/mutabakat_uretim.py` — `fact_uretim_il_geneli` ↔
+`fact_uretim_kaynak_geneli`, her (tarih_id, lisans_id) için ±%0,5
+tolerans, `mutabakat_ulke_geneli.py` deseninde ama `is_active`
+FİLTRELENMEDEN (iki taraf da eşit derecede yeni — bkz. modül notu).
+Uyumsuzluk İKİ tablonun da batch'ini bloklar. Yeni `periyot_aktivasyona_
+uygun_mu()` — `pipeline.otomatik_onaya_uygun()` ile AYNI `(bool, sebep)`
+imzası, ADIM 3 madde 4'ün pipeline kodunun çağıracağı gate.
+
+**Doğrulama (disposable postgres:17, canlıya dokunmadan):**
+- 4 entegrasyon testi: uyumlu veri geçti; KASITLI OLARAK üretilen
+  uyumsuz veri (İl=1000 MWh, Kaynak=850 MWh, %15 fark) hem detayda hem
+  `uyumsuz_batch_idler` kümesinde doğru yakalandı, HER İKİ batch
+  bloklandı; gate fonksiyonu hem uygun hem uygun-değil yönünde test
+  edildi.
+- **Gerçek 6 aya (202601-202606) karşı** (parser çıktıları, henüz DB'ye
+  YÜKLENMEDEN — o ADIM 3 madde 4'te): 12/12 (6 ay × 2 lisans türü —
+  Lisanslı/Lisanssız) toplam ONDALIK BASAMAĞA KADAR birebir eşleşti.
+- Fresh disposable postgres:17'de tam pytest paketi: **289/290** (tek
+  beklenen "hata" — `test_auth_integration.py`).
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.9, Sürüm Geçmişi v1.22.

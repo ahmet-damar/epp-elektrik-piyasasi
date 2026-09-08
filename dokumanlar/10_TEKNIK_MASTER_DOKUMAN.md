@@ -69,6 +69,7 @@ her yeni rakam için geçerlidir.
 | v1.19 | 2026-09-09 | Gece çalışması (gözetimsiz) MADDE 0 — `worker/tests/test_conftest_guard.py` eklendi, `conftest.py`'nin canlı-DB koruması artık kendi pytest regresyon testine sahip (2026-09-02 ve 2026-09-08'de iki kez delinmişti) | Testin anlamlı olduğu (vacuous değil) kanıtlandı: `conftest.py` geçici olarak 2026-09-08 öncesinin buggy sürümüne döndürülüp aynı test suite'i çalıştırıldı — `.env`'den yükleme senaryosu (2026-09-08 bug'ının reprodüksiyonu) beklendiği gibi FAILED verdi, diğer iki senaryo PASSED kaldı; düzeltilmiş sürüm geri yüklenip 3/3 PASSED doğrulandı. Yalnız disposable/subprocess — canlı DB'ye hiç dokunulmadı |
 | v1.20 | 2026-09-09 | Gece çalışması MADDE 1 — `fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli` (migration `20260909_0001`), `fact_tuketim_ulke_geneli` ile AYNI desen, kümülatif DEĞİL — §5.7. **YALNIZ disposable postgres:17'de, CANLIYA UYGULANMADI** | Disposable postgres:17'de migration 29/29, RLS 21/21 tablo, role-access tamamen geçti, pytest 281/282 (tek beklenen "hata" — auth integration). sqlfluff temiz |
 | v1.21 | 2026-09-09 | Gece çalışması MADDE 2 — T2/T3/T5/T6 Excel parser fonksiyonlarında GERÇEK bir hata bulunup düzeltildi: sabit kolon okuyordu (yalnız Ocak dosyasında doğruydu), artık `_ay_kolonu_bul()` ile doğru ay kolonunu buluyor — §5.8 | 6/6 gerçek dosyada (202601-202606) T2↔T3 ve T5↔T6 ONDALIK BASAMAĞA KADAR birebir eşleşti (Lisanslı/Lisanssız ayrı ayrı). Yeni regresyon testleri (her iki başlık stili, "komşu ay değeri sessizce dönmüyor" kontrolü). pytest 285/286 (tek beklenen "hata") |
+| v1.22 | 2026-09-09 | Gece çalışması MADDE 3 — `worker/scripts/mutabakat_uretim.py`: il↔kaynak çapraz mutabakat, ±%0,5 tolerans, aktivasyonu engelleyen `periyot_aktivasyona_uygun_mu()` gate fonksiyonu — §5.9. **YALNIZ disposable postgres:17'de** | 4 yeni entegrasyon testi (kasıtlı uyumsuz veri gerçekten yakalandı, her iki batch bloklandı, gate fonksiyonu her iki yönde test edildi). Gerçek 6 aya karşı (parser çıktıları): 12/12 (6 ay × 2 lisans) birebir eşleşti |
 
 ---
 
@@ -545,6 +546,35 @@ Sabit kolon numarasına bağımlılık tamamen kaldırıldı.
   istenirse boş DataFrame (sahte değer YOK) döndüğü de test edildi.
 - Tam pytest paketi (disposable postgres:17, fresh): **285/286** (tek
   beklenen "hata" — yine `test_auth_integration.py`).
+
+### 5.9 `mutabakat_uretim.py` — Çapraz Mutabakat Script'i (2026-09-09, gece çalışması — Aşama 3/ADIM 3 madde 3)
+**Bu işin asıl güvencesi (kullanıcı talimatı):** `fact_uretim_il_geneli`
+ile `fact_uretim_kaynak_geneli` AYNI üretim toplamının BAĞIMSIZ iki
+kırılımı — her (tarih_id, lisans_id) çifti için toplamları eşleşmelidir.
+`worker/scripts/mutabakat_uretim.py`, `mutabakat_ulke_geneli.py`
+deseninde ama tek farkla: burada iki taraf da EŞİT derecede "yeni" (biri
+uzun süredir aktif değil) — `is_active` FİLTRELENMEZ, her iki tarafın da
+EN SON batch'i karşılaştırılır (§5.6'nın batch-bağımlılığı dersiyle
+tutarlı). ±%0,5 tolerans dışı kalan (tarih_id, lisans_id) çifti, İKİ
+tablonun da batch'ini "uyumsuz" (aktivasyona uygun DEĞİL) işaretler —
+hangi tablonun hatalı olduğu script seviyesinde belli olmadığından.
+
+**Aktivasyon engelleme:** `periyot_aktivasyona_uygun_mu(conn, tarih_id)`
+— `pipeline.otomatik_onaya_uygun()` ile AYNI `(bool, sebep)` imzası. ADIM
+3 madde 4'ün backfill/pipeline kodu, bir periyodu aktive etmeden ÖNCE bunu
+çağırmalı (henüz o pipeline kodu yazılmadı — bu yalnız gate fonksiyonunu
+hazırlıyor).
+
+**Doğrulama:**
+- 4 yeni entegrasyon testi (`worker/tests/test_mutabakat_uretim.py`):
+  uyumlu veri geçer, KASITLI OLARAK üretilen uyumsuz veri (İl=1000,
+  Kaynak=850, %15 fark) hem detayda hem `uyumsuz_batch_idler`'da doğru
+  yakalanır (HER İKİ batch de bloklanır), gate fonksiyonunun her iki yönü
+  (uygun/uygun değil) ayrı ayrı test edildi.
+- **Gerçek 6 aya karşı (parser çıktıları, henüz DB'ye yüklenmeden):**
+  12/12 (6 ay × 2 lisans türü) toplam ONDALIK BASAMAĞA KADAR birebir
+  eşleşti — script'in gerçek veriyle YEŞİL çıkacağının kanıtı (gerçek DB
+  yüklemesi ADIM 3 madde 4'te).
 
 ---
 
