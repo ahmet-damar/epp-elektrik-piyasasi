@@ -1110,3 +1110,40 @@ izni eklemesi istendi, sonucu ayrıca kaydedilecek (bkz.
 `09_PROJE_DURUMU.md` "Sonraki Oturum Devam Noktası").
 
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §8.2/§8.5, Sürüm Geçmişi v1.8.
+
+## 2026-09-08 — scheduled-backup.yml gerçek koşuyla doğrulandı (2 gerçek hata bulundu)
+
+PAT'e (`epp-claude-code`) `workflow` izni eklendikten sonra
+`scheduled-backup.yml` ilk kez gerçekten tetiklendi (`gh workflow run`).
+İlk iki koşu GERÇEKTEN FAIL etti — teorik değil, canlıya karşı çalışırken
+bulunmuş gerçek CI sorunları:
+
+1. **Run 34192536197:** `pg_dump: error: aborting because of server
+   version mismatch` — `ubuntu-latest`'in `pg_dump 16.15`'i canlının
+   `PostgreSQL 17.6`'sından ESKİ. Çözüm: PGDG apt deposundan
+   `postgresql-client-17` kuruldu.
+2. **Run 34192625670:** kurulum "başarılı" ama `pg_dump --version` hâlâ
+   `16.15` bastı (jenerik symlink eskiyi gösteriyordu). Çözüm:
+   `/usr/lib/postgresql/17/bin`, `$GITHUB_PATH` ile PATH'in başına eklendi.
+3. **Run 34192746673: BAŞARILI.** Dump 1.61 MB.
+
+**Artifact GERÇEKTEN indirilip incelendi:**
+```
+gh run download 34192746673 -> epp_data_20260908T055931Z.dump (1.684.116 bayt, log'daki boyutla birebir)
+pg_restore --list -> beklenen TÜM tablolar TABLE DATA olarak mevcut (fact_*×7, dim_tarih,
+  audit_log, ingestion_batch, source_asset, job_status, veri_kapsam_disi); 6 seed tablosu doğru şekilde YOK
+disposable postgres:16'ya restore -> 19/19 tablo canlı Supabase'in COUNT(*) değerleriyle
+  BİREBİR eşleşti (aynı sayılar: audit_log 740, fact_tuketim 44.458, vb. - C1 drilindeki AYNI liste)
+```
+(Restore sırasında `SET transaction_timeout = 0;` için tek bir zararsız
+"unrecognized configuration parameter" uyarısı — bu GUC PG17+'de yeni,
+PG16 hedefte yok; veri restore'unu ETKİLEMEDİ, sayılar birebir eşleşti.)
+
+**100 KB eşiği de test edildi:** geçici olarak 5 MB'a yükseltilip gerçek
+dump (1.68 MB) ile job GERÇEKTEN FAIL ettirildi, `upload-artifact`
+adımının doğru şekilde ATLANDIĞI görüldü, sonra eşik gerçeğine (100000)
+geri alındı — son koşu (run 34193103617) yeniden yeşil.
+
+`09_PROJE_DURUMU.md`'nin "Sonraki Oturum Devam Noktası" bölümündeki açık
+madde bu turla KAPANDI. Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §8.2/§8.5/§9,
+Sürüm Geçmişi v1.9, `11_yedekleme_runbook.md`.

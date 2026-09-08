@@ -96,10 +96,15 @@ yansıtıldı.**
   doğrulandı, normal kullanım etkilenmedi; `app/dashboard.py`'nin bu
   hatayı otomatik yakalamadığı (elle "Çıkış Yap" gerekiyor) bilinen bir
   sınırlama olarak not edildi (kod değişikliği kapsam dışı bırakıldı).
-  **Açık kalan tek madde:** `scheduled-backup.yml`'in gerçek bir koşusu
-  bu oturumda doğrulanamadı (`gh` token'ının `workflow` izni yok) — bkz.
-  aşağıdaki "Sonraki Oturum Devam Noktası". Detay: `10_TEKNIK_MASTER_
-  DOKUMAN.md` §8.2/§8.5, Sürüm Geçmişi v1.8.
+  **`scheduled-backup.yml` artık GERÇEK koşuyla UÇTAN UCA doğrulandı
+  (2026-09-08, PAT'e `workflow` izni eklendikten sonra) — bu madde
+  KAPANDI.** 2 gerçek CI hatası bulunup düzeltildi (pg_dump 16→17 sürüm
+  uyumsuzluğu, PATH sırası); üçüncü koşu başarılı oldu, artifact
+  indirilip `pg_restore --list` ile içeriği incelendi, disposable
+  postgres:16'ya restore edilip **19/19 tablo canlı Supabase'in
+  `COUNT(*)` değerleriyle birebir eşleşti**; 100 KB eşiği de ayrıca
+  test edildi (gerçekten FAIL ettirildi, sonra geri alındı). Detay:
+  `10_TEKNIK_MASTER_DOKUMAN.md` §8.2/§8.5/§9, Sürüm Geçmişi v1.8-v1.9.
 
 ## Tablo — Yıl × Tablo Aktivasyon Durumu
 
@@ -224,19 +229,8 @@ sorgulandı:
 
 **Bu bölümü önce oku.** 2026-09-07/08'de tamamlanan iş: 13-dokümanlık dış
 denetim (Aşama 0, TAMAMLANDI) + operasyonel güvenlik (Aşama 1: C2, B2,
-C1, C3, C4 — TAMAMLANDI). Sırada **Aşama 2** var.
-
-### Açık madde (Aşama 1'den kalan, küçük)
-
-- `.github/workflows/scheduled-backup.yml`'in **gerçek bir koşusu henüz
-  doğrulanmadı** — bu oturumu yürüten `gh` CLI token'ının `workflow`
-  izni yoktu (`workflow_dispatch` 403 verdi). Kullanıcıdan token'a bu
-  izni eklemesi istendi. Bir sonraki oturum: `gh workflow run
-  scheduled-backup.yml` dene; başarılıysa `gh run list --workflow=
-  scheduled-backup.yml` ile son koşuyu kontrol et, dump boyutunu ve
-  artifact'in gerçekten oluştuğunu doğrula, sonucu bu dosyaya ve master
-  dokümana işle. İzin hâlâ yoksa kullanıcıya GitHub UI'dan elle
-  tetiklemesini (Actions → Scheduled Backup → Run workflow) öner.
+C1, C3, C4 — TAMAMLANDI, `scheduled-backup.yml` da gerçek koşuyla
+doğrulandı). Aşama 1'den kalan açık madde YOK. Sırada **Aşama 2** var.
 
 ### Aşama 2 — KPI sözleşmesini kapat (C5 + C6)
 

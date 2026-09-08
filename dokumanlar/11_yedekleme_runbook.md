@@ -87,6 +87,38 @@ tetiklenebilir. **Büyük bir backfill/toplu aktivasyon turundan hemen
 sonra ayrıca elle bir yedek almak** (yukarıdaki komutla) hâlâ önerilir —
 haftalık döngü o anı kaçırabilir.
 
+**Gerçek koşu ile UÇTAN UCA doğrulandı (2026-09-08).** İlk iki koşu
+GERÇEKTEN FAIL etti ve gerçek CI hatalarıyla düzeltildi — bu, teorik bir
+YAML değil, canlıya karşı çalışırken bulunmuş gerçek sorunlardı:
+1. **pg_dump sürüm uyumsuzluğu** (run 34192536197): `ubuntu-latest`
+   `pg_dump 16.15` ile geliyor, canlı Supabase **PostgreSQL 17.6**
+   çalıştırıyor — `pg_dump`, SUNUCUDAN DAHA ESKİYSE dump almayı REDDEDER
+   ("aborting because of server version mismatch"). Çözüm: resmi PGDG
+   apt deposundan `postgresql-client-17` kuruluyor.
+2. **PATH sırası** (run 34192625670): kurulum "başarılı" oldu ama jenerik
+   `pg_dump` symlink'i hâlâ runner'ın önceden kurulu 16.15'ini
+   gösteriyordu (`pg_dump --version` hâlâ 16.15 bastı) — `/usr/lib/
+   postgresql/17/bin`, `$GITHUB_PATH` ile sonraki adımların PATH'inin
+   BAŞINA eklenerek çözüldü.
+3. **Üçüncü koşu (run 34192746673) BAŞARILI**: dump 1.61 MB, `Dump
+   dosyası: yedekler/epp_data_20260908T055931Z.dump (1684116 bayt)`.
+4. **Artifact indirilip GERÇEKTEN incelendi** (`gh run download` +
+   `pg_restore --list`) — dump içinde beklenen TÜM tablolar (`fact_*`
+   7 tablo, `dim_tarih`, `audit_log`, `ingestion_batch`, `source_asset`,
+   `job_status`, `veri_kapsam_disi`) TABLE DATA olarak mevcut; 6 seed
+   tablosu (`dim_il` vb.) doğru şekilde YOK.
+5. **Bu artifact disposable postgres:16'ya GERÇEKTEN restore edildi** —
+   **19/19 tablo, canlı Supabase'in `COUNT(*)` değerleriyle BİREBİR
+   eşleşti** (bkz. aşağıdaki tablo — aynı sayılar). CI artifact'ının
+   yalnız "job yeşil" değil, gerçekten kullanılabilir bir yedek olduğu
+   kanıtlandı.
+6. **100 KB eşiği de test edildi**: geçici olarak 5 MB'a yükseltilip
+   gerçek dump (1.68 MB) ile job GERÇEKTEN FAIL ettirildi (`Dump dosyası
+   beklenenden çok küçük (1684116 bayt)`), `upload-artifact` adımının
+   doğru şekilde ATLANDIĞI (başarısız dump artifact olarak saklanmadı)
+   doğrulandı; sonra eşik gerçek değerine (100000) geri alındı ve son bir
+   koşu (run 34193103617) yeniden yeşil çıktı.
+
 **Erişim ve saklama kararları (2026-09-08, bilinçli — kazara olmasın):**
 - **Bu repo PUBLIC** (`gh repo view --json visibility` ile doğrulandı).
   GitHub'da public repo'ların workflow artifact'ları **repoyu görebilen

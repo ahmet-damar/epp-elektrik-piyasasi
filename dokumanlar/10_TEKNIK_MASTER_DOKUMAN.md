@@ -31,6 +31,7 @@ kaynak kodu, canlı Supabase sorgusu) karşı yeniden doğrulandı. Bir
 | v1.6 | 2026-09-07 | C3: `worker/jobs/fetch_weather.py:main()` 0 satır yazılırsa FAIL ediyor + `scheduled-refresh.yml`'e `if: failure()` özet adımı eklendi (§9.3) | `yaml.safe_load` ile sözdizimi doğrulandı, ruff/mypy temiz; GitHub'ın scheduled-workflow bildirim davranışı resmi dokümantasyondan doğrulandı (cron'u oluşturan kullanıcıya gider — `git log` ile bu proje için repo sahibi olduğu teyit edildi), kişisel bildirim AÇIK mı kod seviyesinde doğrulanamadığı için elle teyit gerektiği not edildi |
 | v1.7 | 2026-09-07 | C4: 8 tabloda (`dim_*`×5 + `sistem_parametre`/`kpi_esik`/`job_status`) RLS geri açıldı (§8.2), istisnasız tamlık kontrolü eklendi, **canlıya uygulandı** | Disposable postgres:16 + GERÇEK CI (run 34159706854 pozitif, 34159900787 negatif/fake-tablo-fail, 34160105007 revert-sonrası yeşil) + canlı Supabase'in tümünde doğrulandı: 19/19 tablo RLS+policy, dashboard yolu (viewer/data_operator/admin) gerçek JWT ile test edildi, `postgres` rolünün `rolbypassrls=true` olduğu canlıda teyit edildi (varsayılmadı) |
 | v1.8 | 2026-09-08 | Aşama 1 kapanışı — `scheduled-backup.yml` (haftalık pg_dump, §8.5), `app_dashboard_service` için `idle_in_transaction_session_timeout=30min` **canlıya uygulandı** (§8.2, C4 olayının tekrarına karşı) | idle timeout: disposable postgres:16'da 27/27 migration + canlıda `pg_roles.rolconfig` doğrulandı, kısa-timeout testiyle (2s) gerçek `IdleInTransactionSessionTimeout` kanıtlandı, normal ardışık kullanım etkilenmedi. `scheduled-backup.yml`: YAML doğrulandı, CI yeşil — **gerçek bir koşu henüz doğrulanamadı** (`gh` token'ının `workflow` izni yok, 403); açık madde olarak sonraki oturuma bırakıldı |
+| v1.9 | 2026-09-08 | `scheduled-backup.yml` gerçek koşuyla UÇTAN UCA doğrulandı (§8.5/§9) — 2 gerçek CI hatası bulunup düzeltildi (pg_dump sürüm uyumsuzluğu + PATH sırası) | Üçüncü koşu (run 34192746673) başarılı: dump 1.61 MB, artifact indirilip `pg_restore --list` ile içeriği incelendi, disposable postgres:16'ya restore edilip **19/19 tablo canlı Supabase'in `COUNT(*)` değerleriyle birebir eşleşti**; 100 KB eşiği ayrı bir koşuda (geçici 5 MB) GERÇEKTEN FAIL ettirilip `upload-artifact`'in atlandığı görüldü, sonra geri alındı (run 34193103617 nihai yeşil) |
 
 ---
 
@@ -714,19 +715,31 @@ yapıldı (varsayılmadı): repo **PUBLIC** (`gh repo view` doğrulandı —
 artifact'lar repoyu görebilen herkese açık, bilinçli kabul edildi) ve
 `audit_log` içeriği elle incelendi (e-posta/connection-string/yerel yol
 YOK, yalnız zaten `git log`'da public olan operatör adı var) — dump
-şifrelenmeden saklanıyor. **Açık kalan madde:** bu workflow'un gerçek bir
-koşusu, oturumu yürüten `gh` CLI token'ının `workflow` iznine sahip
-olmaması yüzünden bu turda DOĞRULANAMADI (`workflow_dispatch` 403
-döndü) — kullanıcıdan token'a izin eklemesi istendi, ilk gerçek koşu
-(Pazar cron'u ya da elle tetikleme) ayrıca kontrol edilmeli, bkz.
-`09_PROJE_DURUMU.md` "Sonraki Oturum Devam Noktası".
+şifrelenmeden saklanıyor.
+
+**Gerçek koşuyla UÇTAN UCA doğrulandı (2026-09-08, PAT'e `workflow`
+izni eklendikten sonra):** İlk iki koşu GERÇEKTEN FAIL etti, gerçek
+hatalarla düzeltildi — (1) `ubuntu-latest`'in `pg_dump 16.15`'i canlının
+**PostgreSQL 17.6**'sından ESKİ olduğu için "server version mismatch"
+ile reddetti → resmi PGDG apt deposundan `postgresql-client-17` kuruldu;
+(2) kurulum sonrası jenerik `pg_dump` symlink'i hâlâ eski 16.15'i
+gösteriyordu → `/usr/lib/postgresql/17/bin`, `$GITHUB_PATH` ile PATH'in
+BAŞINA eklendi. Üçüncü koşu BAŞARILI: dump 1.61 MB. Artifact indirilip
+`pg_restore --list` ile içeriği incelendi (beklenen TÜM tablolar TABLE
+DATA olarak mevcut, 6 seed tablosu doğru şekilde YOK), disposable
+`postgres:16`'ya GERÇEKTEN restore edildi — **19/19 tablo canlı
+Supabase'in `COUNT(*)` değerleriyle BİREBİR eşleşti**. 100 KB eşiği de
+ayrıca test edildi (geçici 5 MB'a yükseltilip job'ın gerçek dump'la
+GERÇEKTEN FAIL ettiği ve `upload-artifact`'in atlandığı görüldü, sonra
+geri alındı). Detay: `11_yedekleme_runbook.md`.
 
 ---
 
 ## 9. CI/CD
 
-Kaynak: `.github/workflows/{ci,security,deploy,scheduled-refresh}.yml`
-(4 workflow dosyası, tam okundu).
+Kaynak: `.github/workflows/{ci,security,deploy,scheduled-refresh,
+scheduled-backup}.yml` (5 workflow dosyası — `scheduled-backup.yml`
+2026-09-08'de eklendi, bkz. §8.5 — tam okundu).
 
 ### 9.1 `ci.yml` — 5 İş (Job)
 | Job | İçerik |
