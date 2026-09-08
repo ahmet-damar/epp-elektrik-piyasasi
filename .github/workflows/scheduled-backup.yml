@@ -33,8 +33,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: pg_dump PATH'te mi kontrol et (varsayma)
-        run: command -v pg_dump || { echo "::error::pg_dump bulunamadı - ubuntu-latest imajı değişmiş olabilir, postgresql-client kurulumu eklenmeli."; exit 1; }
+      - name: postgresql-client-17 kur (ubuntu-latest'in varsayılanı 16 — Supabase 17'de)
+        # Gerçek ilk koşuda (2026-09-08, run 34192536197) bulundu: ubuntu-latest
+        # pg_dump 16.15 ile geliyor, canlı Supabase PostgreSQL 17.6 çalıştırıyor
+        # - pg_dump SUNUCUDAN DAHA ESKİYSE dump almayı REDDEDER ("aborting
+        # because of server version mismatch"). "pg_dump PATH'te mi" kontrolü
+        # bunu YAKALAYAMAZDI (16.15 de "var" sayılırdı) - resmi PGDG apt
+        # deposundan sürüm-eşleşen client kuruluyor.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+      - name: pg_dump doğru sürümde mi doğrula (varsayma)
+        run: |
+          surum=$(pg_dump --version)
+          echo "$surum"
+          echo "$surum" | grep -q " 17\." || { echo "::error::pg_dump 17.x değil - kurulum başarısız olmuş olabilir."; exit 1; }
       - name: pg_dump al (worker/scripts/backup.py ile AYNI --exclude-table listesi)
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
