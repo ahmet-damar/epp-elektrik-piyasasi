@@ -3,8 +3,7 @@
 > **STATUS: LIVE (güncel durum) + MASTER (üst özet)** — bu dosya ve
 > `09_PROJE_DURUMU.md`, değişen sayı/durumun YAŞADIĞI tek iki yerdir;
 > diğer `dokumanlar/` dosyaları yalnız değişmeyen sözleşmeyi tutar
-> (2026-09-07 denetimi, bkz. D bölümü — bu kural henüz bu dokümana ayrı
-> bir bölüm olarak eklenmedi, yalnız etiketlendi).
+> (2026-09-07 denetimi — bkz. "Doküman Yönetim Kuralı" bölümü, aşağıda).
 
 **Bu doküman**, Faz 0'dan bugüne EPP (EPDK Elektrik Piyasası Platformu)
 projesinde yapılan HER ŞEYİN tek bir yerde, gerçek koda/migration'a/git
@@ -17,6 +16,32 @@ DEĞİLDİR — her iddia gerçek kaynağa (git log, migration dosyası, .py
 kaynak kodu, canlı Supabase sorgusu) karşı yeniden doğrulandı. Bir
 çelişki bulunduğunda KOD/GİT esas alındı, çelişki ayrıca not düşüldü
 (bkz. §14 Çelişki Kayıtları).
+
+## Doküman Yönetim Kuralı ("D kuralı", 2026-09-07 denetiminden)
+
+**Değişen durum ve sayılar YALNIZ `09_PROJE_DURUMU.md` ve bu dosyada
+(`10_TEKNIK_MASTER_DOKUMAN.md`) yaşar.** Diğer `dokumanlar/` dosyaları
+ya değişmeyen bir sözleşmeyi tutar (**STATUS: ACTIVE**) ya da geçmişte
+yazılmış bir olay günlüğüdür (**STATUS: HISTORICAL**, append-only —
+güncel durum için asla okunmaz, yalnız o anın kaydı olarak durur).
+
+**Tarih çapası şartı (2026-09-08'de eklendi):** HISTORICAL veya LIVE bir
+dosyaya yazılan HER rakam ve durum ifadesi, yazıldığı anda tarihe
+çapalanmalıdır — "2026-09-03 itibarıyla +%6,9" gibi, yalnız "+%6,9"
+değil. Çapasız yazılan bir rakam, aylar sonra hâlâ güncelmiş gibi
+okunur ve ayrı bir temizlik turu gerektirir. Güncel değer HER ZAMAN
+`09_PROJE_DURUMU.md` veya bu dosyadan okunur, başka hiçbir dosyadan
+değil — HISTORICAL bir dosyadaki tarihli bir rakam yalnız "o tarihte
+neydi" sorusuna cevaptır, "şu an ne" sorusuna değil.
+
+**Gerekçe:** 2026-09-08'deki bir tarama, D kuralının kendisinin (STATUS
+etiketleri) tek başına yetmediğini gösterdi — HISTORICAL dosyalarda
+meşru olarak kalan ama tarihe çapalanmamış 4 rakam/durum ifadesi
+(`07_word_parser_kapsam.md`'deki "+%6,9" dahil), aylar sonra güncel
+sanılıp ayrıca düzeltilmek zorunda kaldı. Bu madde geriye dönük bir
+temizlik ZORUNLULUĞU GETİRMEZ (mevcut çapasız rakamlar olduğu gibi
+kalabilir) — yalnız BUNDAN SONRA HISTORICAL/LIVE dosyalara yazılacak
+her yeni rakam için geçerlidir.
 
 ## Sürüm Geçmişi
 
@@ -35,6 +60,7 @@ kaynak kodu, canlı Supabase sorgusu) karşı yeniden doğrulandı. Bir
 | v1.10 | 2026-09-08 | Aşama 2/C5 — KPI-25 TAMAMEN `fact_tuketim_ulke_geneli`'ye taşındı (tam yıl+5/5 grup şartı), KPI-27 il bazlı `fact_tuketim`'de kaldı — §7.5/§11.2 (artık KAPANDI), `04_kpi_sozlesmeleri.md` güncellendi | Canlı veriyle doğrulandı: KPI-25 artık **+%3,1** (2017→2025, n=8 — önceden sürekli 'hesaplanamaz'dı, GERÇEK fonksiyonel değişiklik), KPI-27 **+%3,8** (2016→2025, n=9, kod değişmedi). 2 pytest testi (`test_yillik_serilerinden_cagr`, `test_kpi_25_eksik_yil_seriye_girmez`) yeni tabloya taşındı, canlıya karşı `-k` ile hedefli çalıştırılıp (rollback-izole) PASSED |
 | v1.11 | 2026-09-08 | Aşama 2 — `app/dashboard.py`'nin idle-in-transaction KÖK NEDENİ düzeltildi (§8.2): bağlantı `autocommit=True`'ya alındı + ölü bağlantıyı sessizce yeniden kuran `_baglanti_saglikli_mi()`/reconnect mantığı eklendi | Canlıda GERÇEK testlerle kanıtlandı: `autocommit=True` ile 2s `idle_in_transaction_session_timeout`'tan 3s sonra ikinci sorgu SORUNSUZ çalıştı (hata hiç fırlamadı — `autocommit=False` ile AYNI test önceki turda hatayı gerçekten üretmişti); kasıtlı kapatılan bir bağlantı `_baglanti_saglikli_mi()` tarafından doğru tespit edilip saklanan JWT claim'iyle sessizce yeniden bağlandı |
 | v1.12 | 2026-09-08 | C1 düzeltmesi — yedekleme runbook'undaki restore hedefi `postgres:16`'dan `postgres:17`'ye (canlı Supabase'in kendi major sürümü) düzeltildi, tatbikat yeniden koşuldu (§8.5) | Disposable postgres:17'ye restore: 19/19 tablo yine BİREBİR eşleşti, PG17'ye özgü `transaction_timeout` GUC uyarısı da (postgres:16 hedefte görülen) bu sefer HİÇ çıkmadı — 0 hata, 0 uyarı |
+| v1.13 | 2026-09-08 | "Doküman Yönetim Kuralı" bölümü yazıldı (D kuralı artık yalnız STATUS etiketi değil, ayrı bir bölüm) + tarih çapası şartı eklendi — `.github/copilot-instructions.md`'ye de tek satır yansıtıldı | Gerekçe: aynı gün yapılan KPI-25/27 taramasında 4 çapasız/eskimiş rakam bulunmuştu (bkz. commit `d141a79`) — bu madde onun tekrarını önlemek için, geriye dönük temizlik ZORUNLULUĞU getirmiyor |
 
 ---
 

@@ -8,7 +8,12 @@ Markdown dokümanlara UYULMALIDIR. Çelişki olursa `dokumanlar/` esastır.
 bugüne mimari, veri modeli, parser, pipeline, KPI, güvenlik, CI/CD ve
 kronolojik geçmişin gerçek koda/git'e karşı doğrulanmış tek dosyası.
 Diğer `dokumanlar/` dosyaları bunun altında, değişmeyen sözleşmeleri tutar
-(bkz. `dokumanlar/00_INDEX.md` tam dizin):
+(bkz. `dokumanlar/00_INDEX.md` tam dizin). `dokumanlar/`'a yazarken: güncel
+sayı/durum YALNIZ `09_PROJE_DURUMU.md`/`10_TEKNIK_MASTER_DOKUMAN.md`'ye
+yazılır; başka bir dosyaya (HISTORICAL/olay günlüğü) bir rakam/durum
+yazılıyorsa MUTLAKA tarihe çapalanmalıdır ("2026-09-03 itibarıyla +%6,9"
+gibi, yalnız "+%6,9" değil) — bkz. master dokümandaki "Doküman Yönetim
+Kuralı" bölümü.
 - `dokumanlar/01_kavramsal_tasarim.md` — proje amacı, mimari, fazlar
 - `dokumanlar/02_srs_ozet.md` — KRİTİK P0 kuralları (asla ihlal etme)
 - `dokumanlar/03_veri_modeli.md` — tablolar, DDL, ilişkiler

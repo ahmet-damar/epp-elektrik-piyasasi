@@ -4,8 +4,8 @@ güncellendi)
 
 > **STATUS: LIVE (güncel durum)** — bu dosya ve `10_TEKNIK_MASTER_
 > DOKUMAN.md`, değişen sayı/durumun YAŞADIĞI tek iki yerdir; diğer
-> `dokumanlar/` dosyaları yalnız değişmeyen sözleşmeyi tutar (2026-09-07
-> denetimi, bkz. D bölümü).
+> `dokumanlar/` dosyaları yalnız değişmeyen sözleşmeyi tutar (bkz.
+> `10_TEKNIK_MASTER_DOKUMAN.md` → "Doküman Yönetim Kuralı" bölümü).
 
 **Bu dosya, canlı Supabase'e karşı salt-okunur sorgularla ve `pytest`
 çalıştırılarak bu turda TAZE DOĞRULANMIŞ bulgulara dayanır — önceki
