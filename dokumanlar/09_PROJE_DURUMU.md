@@ -126,6 +126,17 @@ yansıtıldı.**
   `transaction_timeout` GUC'u) de ortadan kalktı. Detay:
   `10_TEKNIK_MASTER_DOKUMAN.md` §7.5/§8.2/§8.5/§11.2, Sürüm Geçmişi
   v1.10-v1.12.
+- **Aşama 3 (boş KPI'ları açma) — ADIM 1-2 TAMAMLANDI (2026-09-08),
+  ADIM 3-5 AÇIK** (bkz. "Sonraki Oturum Devam Noktası"). ADIM 1:
+  Excel T11'in Genel Toplam satırı KÜMÜLATİF, 6/6 ay (202601-202606)
+  gerçek dosyaya karşı test edildi — de-kümülatif edilince T7 ile 4/6
+  ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11 seçildi** (2016-2025
+  Word ile TEK tanım). ADIM 2: `fact_tuketim_ulke_geneli` 2026-01..06'ya
+  genişletildi (629 aktif satır — 599+30), gerçek bir de-kümülatif
+  bug'ı bulunup düzeltildi (regresyon testiyle). **KPI-13 artık gerçek
+  değer üretiyor:** 2026-06↔2025-06 için **+%7,1** (önceden hep
+  'hesaplanamaz'). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.5, Sürüm
+  Geçmişi v1.15.
 
 ## Tablo — Yıl × Tablo Aktivasyon Durumu
 
@@ -263,8 +274,22 @@ postgres:17 düzeltmesi), ve D kuralına tarih çapası maddesi (commit
 `5214b9d`).
 
 ### Açık madde
-**YOK.** Dış denetim listesinin (A/B/C bölümleri) hiçbir maddesi açık
-değil. İstisna yok.
+Dış denetim listesinin (A/B/C bölümleri) hiçbir maddesi açık değil.
+**Aşama 3 (boş KPI'ları açma) DEVAM EDİYOR** — ADIM 1 (T11 vs T7 tanım
+dikişi kontrolü) ve ADIM 2 (`fact_tuketim_ulke_geneli`'nin 2026+ Excel'e
+genişletilmesi, KPI-13'ün girdisi taşındı) **TAMAMLANDI** (bkz. yukarıdaki
+TL;DR). **ADIM 3, 4, 5 AÇIK** — sırada:
+- **ADIM 3:** `fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli` (tek
+  migration, `fact_tuketim_ulke_geneli` ile AYNI desen) + il/kaynak toplamı
+  mutabakat script'i (`mutabakat_ulke_geneli.py` deseninde).
+- **ADIM 4:** Önce Excel (2026) backfill + doğrulama, SONRA Word (10 yıl,
+  yıl-yıl format sürprizleri beklenir — özellikle Tablo 1.11'in "Brüt
+  Lisanssız Üretim Miktarı" çapa-bazlı kolonu, Tablo 1.12'nin iki-sütunlu
+  sayfa düzeni).
+- **ADIM 5:** KPI-02/03/06/07 → `fact_uretim_kaynak_geneli`; KPI-05 → pay
+  yeni tablodan, payda mevcut `fact_uretim.kurulu_guc_mw`'dan (⚠️
+  `lisans_id` filtresi İKİ tarafta da AYNI olmalı — testle kanıtlanmalı).
+  Her KPI kartına kaynak/kapsam notu.
 
 ### C6 — ertelenmiş/değerlendirilmiş küçük maddeler (yalnız referans, aksiyon BEKLEMİYOR)
 - **MFA / merkezi rate-limit:** ertelendi (tek admin kullanıcı var).
@@ -284,7 +309,7 @@ değil. İstisna yok.
 - Diğerleri (Strategy Pattern, `word_20XX.py` refactor'ü vb.) zaten
   REDDEDİLDİ/KAPANDI — yeniden açılmasın.
 
-### Sıradaki gerçek iş — Faz 4 (Tahminleme), henüz başlamadı
+### Faz 4 (Tahminleme) — Aşama 3'ten SONRA, henüz başlamadı
 Kapsam kararı bekliyor. **Öneri (karar verilmedi, yalnız öneri):**
 Eskişehir pilotu + seasonal-naive baseline ile başla — küçük, tek-il
 kapsamlı bir kanıt-of-concept, tam bir tahminleme motoruna atlamadan

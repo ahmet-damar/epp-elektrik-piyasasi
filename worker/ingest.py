@@ -338,6 +338,49 @@ def yil_ici_onceki_tuketim_toplami(
     return df
 
 
+def yil_ici_onceki_tuketim_ulke_geneli_toplami(
+    conn: Connection, yil: int, tarih_id: int
+) -> dict[str, float]:
+    """`yil_ici_onceki_tuketim_toplami()`'nin `fact_tuketim_ulke_geneli`
+    eşdeğeri (2026-09-08, Aşama 3/ADIM 2) — Excel T11'in Genel Toplam satırı
+    da KÜMÜLATİF (bkz. `worker/parser.py:tablo11_genel_toplam_satiri_oku()`
+    docstring'i); aynı yıl içinde bu aydan ÖNCEKİ ayların grup bazında
+    toplamını döner. Yılın ilk ayı için (öncesinde hiç ay yoksa) boş dict
+    döner (referans toplamı 0 sayılır — kümülatif=aylık).
+
+    **`is_active=true` FİLTRELENMEZ — bilerek** (2026-09-08'de gerçek bir
+    toplu backfill'de bulunan hata): bu batch zinciri elle onaya kadar
+    `is_active=false` kalıyor (bkz. `pipeline.isle_ay_ulke_geneli_excel()`
+    "onayla ÇAĞRILMADI" notu) — birden fazla ayı ARKA ARKAYA, aralarında
+    hiçbiri aktive edilmeden işlemek (tam olarak bu fonksiyonun ilk
+    sürümünün yaptığı hata) `is_active=true` filtresiyle her ay için boş
+    sonuç döndürüp HER ayı yanlışlıkla kendi kümülatif değeriyle
+    yazdırıyordu. Bunun yerine her (tarih_id, grup_id) çifti için EN SON
+    batch'in (aktivasyon durumundan bağımsız, `ingestion_batch_id DESC`)
+    değeri alınır — bu hem geriye dönük backfill'de hem normal aylık akışta
+    doğru sonuç verir, ikinci bir 'aynı ayın iki batch'i' durumunda da en
+    güncel deneme kullanılır (retry senaryosu)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            WITH en_son AS (
+                SELECT DISTINCT ON (ftu.tarih_id, ftu.grup_id)
+                    ftu.tarih_id, ftu.grup_id, ftu.tuketim_mwh
+                FROM fact_tuketim_ulke_geneli ftu
+                WHERE ftu.tarih_id >= %s AND ftu.tarih_id < %s
+                ORDER BY ftu.tarih_id, ftu.grup_id, ftu.ingestion_batch_id DESC
+            )
+            SELECT g.grup_adi, sum(en_son.tuketim_mwh) AS onceki_toplam
+            FROM en_son
+            JOIN dim_tuketici_grubu g ON g.grup_id = en_son.grup_id
+            GROUP BY g.grup_adi
+            """,
+            (yil * 100, tarih_id),
+        )
+        rows = cur.fetchall()
+    return {grup: float(toplam) for grup, toplam in rows}
+
+
 def fact_tuketim_yukle(
     conn: Connection, df: pd.DataFrame, batch_id: int
 ) -> tuple[int, int]:

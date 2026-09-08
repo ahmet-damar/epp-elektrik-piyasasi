@@ -31,13 +31,25 @@ Kaynak: Ek B. Her KPI: formül + grain + kenar durum. Faz 0 production KPI'ları
 | KPI-10 Abone başı tüketim (MWh) | Σ tuketim/Σ abone | abone 0→NULL |
 | KPI-13 YoY (%) | (t − t_12ay_önce)/t_12ay ×100 | geçen yıl yoksa VEYA grup kümesi uyuşmuyorsa 'hesaplanamaz' (aşağıya bkz.) |
 
+**Kaynak (2026-09-08, Aşama 3/ADIM 2'de `fact_tuketim_ulke_geneli`'ye
+taşındı):** `t`/`t_12ay_önce` artık **ülke geneli, il kırılımsız**
+`fact_tuketim_ulke_geneli`'den geliyor (bkz. worker/analytics.py
+`ulke_geneli_tuketim_getir`) — KPI-08/09/10 (yukarıdaki satırlar) hâlâ
+İL BAZLI `fact_tuketim`'i kullanıyor, KPI-13 İLE KARIŞTIRILMASIN.
+
 **KPI-13'ün grup-kümesi kısıtı (2026-09-03, KPI-25/26 ile AYNI kök nedene AYNI disiplin):**
 `t` ve `t_12ay_önce`'nin GRUP KÜMESİ (örn. Sanayi'nin biri içerip diğerinin
 içermemesi) birebir aynı DEĞİLSE YoY hesaplanmaz, None ('hesaplanamaz')
-döner — bkz. worker/kpi.py `kpi_13_yoy`. Kanıt: 2025-06 (Word, Sanayi
-kaynakta yok, Karar 2) ile 2026-06 (Excel, Sanayi var) karşılaştırması
-eskiden %+70,9 gibi sahte bir YoY üretiyordu; Sanayi her iki taraftan da
-çıkarılınca gerçek artış %+2,2 çıkıyor. Bu, KPI-25/26'nın "kapsamı
+döner — bkz. worker/kpi.py `kpi_13_yoy`. Kanıt (o zamanki il bazlı
+kaynakla): 2025-06 (Word, Sanayi kaynakta yok, Karar 2) ile 2026-06
+(Excel, Sanayi var) karşılaştırması eskiden %+70,9 gibi sahte bir YoY
+üretiyordu; Sanayi her iki taraftan da çıkarılınca gerçek artış %+2,2
+çıkıyordu. Kaynak `fact_tuketim_ulke_geneli`'ye taşındıktan SONRA bu
+belirli çift (2025-06/2026-06) artık grup kümesi uyuşuyor (ikisinde de
+Sanayi var) ve gerçek bir değer üretiyor — güncel değer için
+`09_PROJE_DURUMU.md`'ye bakın. Koruma KOD'dan kaldırılmadı — yalnız
+FARKLI bir sınırda (örn. 2016-12 Tarımsal'ın eksik olduğu ay
+karşılaştırmaları) hâlâ devrede kalabilir. Bu, KPI-25/26'nın "kapsamı
 uyuşmayan yılı seriye hiç katma" stratejisinin KPI-13'e (tek bir
 dönem-karşılaştırması, yıllık seri değil) uyarlanmış hâli — aynı
 "sahte değer üretmeme" ilkesi (bkz. worker/kpi.py modül notu).

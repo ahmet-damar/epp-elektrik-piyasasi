@@ -62,6 +62,7 @@ her yeni rakam için geçerlidir.
 | v1.12 | 2026-09-08 | C1 düzeltmesi — yedekleme runbook'undaki restore hedefi `postgres:16`'dan `postgres:17`'ye (canlı Supabase'in kendi major sürümü) düzeltildi, tatbikat yeniden koşuldu (§8.5) | Disposable postgres:17'ye restore: 19/19 tablo yine BİREBİR eşleşti, PG17'ye özgü `transaction_timeout` GUC uyarısı da (postgres:16 hedefte görülen) bu sefer HİÇ çıkmadı — 0 hata, 0 uyarı |
 | v1.13 | 2026-09-08 | "Doküman Yönetim Kuralı" bölümü yazıldı (D kuralı artık yalnız STATUS etiketi değil, ayrı bir bölüm) + tarih çapası şartı eklendi — `.github/copilot-instructions.md`'ye de tek satır yansıtıldı | Gerekçe: aynı gün yapılan KPI-25/27 taramasında 4 çapasız/eskimiş rakam bulunmuştu (bkz. commit `d141a79`) — bu madde onun tekrarını önlemek için, geriye dönük temizlik ZORUNLULUĞU getirmiyor |
 | v1.14 | 2026-09-08 | **Gün sonu kapanışı.** 13-dokümanlık dış denetimin TAMAMI (Aşama 0/1/2 + D kuralı tarih çapası) bu gün içinde kapandı — açık madde YOK. `09_PROJE_DURUMU.md`'nin "Sonraki Oturum Devam Noktası" bölümü yeniden yazıldı: bugünün özeti, C6'nın tam listesi, Faz 4 önerisi (Eskişehir pilotu + seasonal-naive baseline), ve bir sonraki oturumun ilk işi (2026-09-13 Pazar 03:00 UTC — `scheduled-backup.yml`'in İLK gerçek cron koşusunun kontrolü) | Yalnız doküman — kod/migration/canlı DB'ye dokunulmadı. pytest 227/227, CI+Security yeşil, git temiz |
+| v1.15 | 2026-09-08 | Aşama 3 (boş KPI'ları aç) — ADIM 1 (T11-Genel-Toplam vs T7 tanım dikişi kontrolü) + ADIM 2 (`fact_tuketim_ulke_geneli` 2026+ Excel'e genişletildi, KPI-13 girdisi taşındı) — §5.5 | 6/6 ay (202601-202606) gerçek dosyaya karşı test edildi (4/6 birebir, 2/6 <%0,02 fark) — T11 seçildi, T7 değil. Canlıya 30 satır eklendi (629 toplam). Gerçek bir de-kümülatif bug'ı bulunup düzeltildi (regresyon testiyle). KPI-13 2026-06↔2025-06 için artık **+%7,1** (önceden hep 'hesaplanamaz'), eski il-bazlı yol hâlâ None (regresyon yok) — canlıda doğrulandı |
 
 ---
 
@@ -217,7 +218,7 @@ kolon(ları), `ingestion_batch_id FK`, `is_active BOOLEAN`, iki kısıt
 | `fact_serbest_tuketici` | `(il_kodu, tarih_id, tur, grup_id)` | `tuketim_mwh`, `tuketici_sayisi` | migration 0006 grain'i düzeltti (`tur` gerçek T13 değerleri: 'Serbest Tuketici'/'ST Olma Hakki Bulunmayan Aboneler'/'ST Olma Hakkini Kullanmayan Aboneler' — 'Lisansli'/'Lisanssiz' YANLIŞ VARSAYIMDI) |
 | `fact_hava_aylik` | `UNIQUE(il_kodu, tarih_id)` | `t_ort`,`hdd`,`cdd`,`radyasyon`,`ruzgar` | **FARKLI SÜRÜMLEME** — bkz. §3.4 |
 | `fact_hava_aylik_log` | append-only | `old_data`/`new_data JSONB` | fact_hava_aylik'in her UPSERT'i burada JSONB snapshot bırakır |
-| `fact_tuketim_ulke_geneli` | `(tarih_id, grup_id)` | `tuketim_mwh` | **il_kodu/baglanti YOK** — kaynağı T11'in Genel Toplam satırı, zaten il kırılımsız (2026-09-05, migration 20260905_0002) |
+| `fact_tuketim_ulke_geneli` | `(tarih_id, grup_id)` | `tuketim_mwh` | **il_kodu/baglanti YOK** — kaynağı T11'in Genel Toplam satırı, zaten il kırılımsız (2026-09-05, migration 20260905_0002). 2016-2025 (Word) + **2026+ (Excel, 2026-09-08'den beri — bkz. §5.5)** TEK tanımda |
 
 ### 3.3 İşlem/Config Tabloları
 | Tablo | Amaç |
@@ -380,6 +381,50 @@ Mesken/Sanayi/Tarımsal) ülke geneli değerini ZATEN veriyor —
 eşlemesini (`grup_kolonlarini_coz()`, paylaşılan helper) kullanarak okur.
 120 ayın (2016-2025) TAMAMINDA gerçek docx'lere karşı doğrulandı — sıfır
 eksik ay, sıfır format hatası.
+
+### 5.5 `fact_tuketim_ulke_geneli`'nin 2026+ Excel Genişlemesi (2026-09-08, Aşama 3/ADIM 1-2)
+**Tanım dikişi kontrolü (ADIM 1) — GERÇEK dosyaya karşı, 3'ten fazla ay
+(202601-202606, TÜMÜ) test edildi:** Excel T11'in kendi "Genel Toplam"
+satırı da (Word'deki gibi) kullanılabiliyor, ama Excel'de bu satır
+**KÜMÜLATİF** (başlıkta açıkça "Kümülatif Faturalanan..." yazıyor — aynı
+kümülatiflik `fact_tuketim`'in T11'i için zaten biliniyordu, bkz. §6.4/
+`worker/pipeline.py` satır ~358). De-kümülatif edildiğinde (`worker/
+parser.py:tablo11_genel_toplam_satiri_oku()` + `worker/ingest.py:
+yil_ici_onceki_tuketim_ulke_geneli_toplami()`, `fact_tuketim`'in T11
+de-kümülatif etme deseniyle BİREBİR AYNI), **T7 ile karşılaştırıldığında
+6 ayın 4'ü ONDALIK BASAMAĞA KADAR birebir eşleşti** (202601/03/04/05);
+2 ayda (202602, 202606) toplam tüketimin **%0,02'sinin altında** (3.708
+MWh / 208 MWh) küçük bir fark bulundu — EPDK'nın kendi T7/T11 arası doğal
+bir tutarsızlığı olduğu değerlendirildi (Word'de aynı karşılaştırma
+2023-06 için TAM eşleşmişti, bkz. §5.4 civarı araştırma notu), bu ADIM'ın
+de-kümülatif mantığından KAYNAKLANMIYOR. **Karar: T7 DEĞİL, T11'in kendi
+Genel Toplam satırı kullanıldı** — seri 2016-2025 (Word, T11) ile 2026+
+(Excel, T11) arasında TEK bir tanımda kalıyor, 2025→2026 sınırında dikiş
+atlamıyor.
+
+**Gerçek bir bug bulundu ve düzeltildi (ADIM 2 uygulaması sırasında):**
+`yil_ici_onceki_tuketim_ulke_geneli_toplami()`'nin ilk sürümü `is_active
+=true` filtreliyordu — bu tablo elle onaya kadar `is_active=false`
+kaldığından (bkz. `pipeline.isle_ay_ulke_geneli_excel()` "onayla
+ÇAĞRILMADI" notu), art arda 6 ayı hiçbiri aktive edilmeden işleyen bir
+toplu backfill'de HER ay "önceki toplam"ı BOŞ görüp kendi KÜMÜLATİF
+değerini yanlışlıkla "aylık" olarak yazdı (canlıda gerçekten oldu, 6
+batch silinip düzeltmeyle yeniden çalıştırıldı). Düzeltme: filtre
+`is_active`'ten, her (tarih_id, grup_id) için EN SON batch'i alan bir
+`DISTINCT ON (... ORDER BY ingestion_batch_id DESC)` sorgusuna çevrildi
+— aktivasyon durumundan bağımsız çalışır. Regresyon testi eklendi
+(`test_yil_ici_onceki_tuketim_ulke_geneli_toplami_aktivasyonsuz_calisir`).
+
+**Sonuç (canlı, 2026-09-08):** 2026-01..06, 30 yeni satır (629 toplam
+aktif satır — 599 + 30), `worker/scripts/backfill_ulke_geneli_excel.py`
+ile yüklenip `pipeline.batch_onayla()` ile aktive edildi. **KPI-13
+(YoY)** girdisi `fact_tuketim`'den (il bazlı) `fact_tuketim_ulke_geneli`
+(ülke geneli, `worker/analytics.py:ulke_geneli_tuketim_getir()`) taşındı
+— canlıda kanıtlandı: 2026-06 vs 2025-06 (Word/Excel sınırını geçen bir
+çift) artık **+%7,1** gerçek bir değer veriyor (eskiden HER ZAMAN
+'hesaplanamaz' dönüyordu, grup kümesi — Sanayi — uyuşmuyordu; il bazlı
+`fact_tuketim` DEĞİŞMEDİĞİNDEN eski yolla hâlâ None döndüğü de ayrıca
+doğrulandı — regresyon yok, yalnız KPI-13'ün girdisi değişti).
 
 ---
 

@@ -182,6 +182,17 @@ def _sentetik_workbook() -> openpyxl.Workbook:
             "20.000,00",
         ]
     )
+    t11.append(
+        [
+            "GENEL TOPLAM",
+            "5.000,00",
+            "60.000,00",
+            "120.000,00",
+            "90.000,00",
+            "150.000,00",
+            "20.000,00",
+        ]
+    )
 
     # --- T13: serbest tüketici (il × tur × grup, iki paralel değer bloğu) ---
     t13 = wb.create_sheet("Tablo 13")
@@ -381,6 +392,44 @@ def test_tablo11_p0_2_ayri_satir(wb: openpyxl.Workbook) -> None:
     assert iletim == pytest.approx(150000.0)
     assert dagitim == pytest.approx(90000.0)
     assert df["il_kodu"].iloc[0] == 26  # Eskişehir plakası
+
+
+def test_tablo11_genel_toplam_satiri_oku_sanayi_toplanir(
+    wb: openpyxl.Workbook,
+) -> None:
+    """2026-09-08, Aşama 3/ADIM 2: Genel Toplam satırı per-il döngüden
+    BAĞIMSIZ okunmalı, Sanayi-DAĞITIM+Sanayi-İLETİM TEK 'Sanayi' değerinde
+    toplanmalı (fact_tuketim_ulke_geneli grain'inde baglanti YOK)."""
+    degerler = parser.tablo11_genel_toplam_satiri_oku(wb["Tablo 11"], "Tablo 11")
+    assert degerler["Aydınlatma"] == pytest.approx(5000.0)
+    assert degerler["Kamu ve Özel Hizmetler"] == pytest.approx(60000.0)
+    assert degerler["Mesken"] == pytest.approx(120000.0)
+    assert degerler["Tarımsal"] == pytest.approx(20000.0)
+    # Sanayi-DAĞITIM (90.000) + Sanayi-İLETİM (150.000) = 240.000
+    assert degerler["Sanayi"] == pytest.approx(240000.0)
+    assert set(degerler) == {
+        "Aydınlatma",
+        "Kamu ve Özel Hizmetler",
+        "Mesken",
+        "Sanayi",
+        "Tarımsal",
+    }
+
+
+def test_tablo11_genel_toplam_satiri_bulunamazsa_hata(
+    wb: openpyxl.Workbook,
+) -> None:
+    """Genel Toplam satırı yoksa sessizce boş dönmek YERİNE açık bir hata —
+    Word yıllarındaki `genel_toplam_satirini_oku()` ile AYNI ilke."""
+    # Genel Toplam satırı olmayan izole bir workbook
+    bos_wb = openpyxl.Workbook()
+    t11 = bos_wb.active
+    t11.title = "Tablo 11"
+    t11.append(["Tablo 11 - Faturalanan Elektrik Tüketimi (MWh)"])
+    t11.append(["İL", "Aydınlatma"])
+    t11.append(["ESKİŞEHİR", "5.000,00"])
+    with pytest.raises(ValueError, match="Genel Toplam"):
+        parser.tablo11_genel_toplam_satiri_oku(t11, "Tablo 11")
 
 
 def test_kaynak_matrisi_ayni_kanonige_eslenen_sutunlari_toplar(

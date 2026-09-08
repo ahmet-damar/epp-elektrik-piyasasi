@@ -1149,3 +1149,39 @@ geri alındı — son koşu (run 34193103617) yeniden yeşil.
 `09_PROJE_DURUMU.md`'nin "Sonraki Oturum Devam Noktası" bölümündeki açık
 madde bu turla KAPANDI. Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §8.2/§8.5/§9,
 Sürüm Geçmişi v1.9, `11_yedekleme_runbook.md`.
+
+## 2026-09-08 — `fact_tuketim_ulke_geneli` 2026+ Excel'e genişletildi (Aşama 3/ADIM 1-2)
+
+**ADIM 1 (tanım dikişi kontrolü):** 6 ay (202601-202606, TÜMÜ) gerçek
+Excel dosyasına karşı test edildi — T11'in Genel Toplam satırı KÜMÜLATİF
+(başlıkta "Kümülatif" yazıyor), de-kümülatif edilince (bir önceki ayın
+aynı yıl içindeki toplamı çıkarılarak) T7 ile karşılaştırıldı:
+```
+202601: T11_aylık=26.148.333,994  T7=26.148.333,994  fark=0
+202602: T11_aylık=23.344.735,848  T7=23.341.027,929  fark=3.707,920 (%0,0159)
+202603: T11_aylık=23.284.375,477  T7=23.284.375,477  fark=0
+202604: T11_aylık=23.189.725,394  T7=23.189.725,394  fark=0
+202605: T11_aylık=20.909.585,749  T7=20.909.585,749  fark=0
+202606: T11_aylık=24.107.257,184  T7=24.107.048,866  fark=208,318 (%0,0009)
+```
+4/6 ay ONDALIK BASAMAĞA KADAR birebir, 2/6 ay ±%0,5 mutabakat toleransının
+çok altında bir farkla — **karar: T7 DEĞİL, T11'in kendi Genel Toplam
+satırı** kullanıldı (2016-2025 Word ile TEK tanımda kalınsın).
+
+**ADIM 2'de bulunan gerçek bug:** `yil_ici_onceki_tuketim_ulke_geneli_
+toplami()`'nin ilk sürümü `is_active=true` filtreliyordu — bu batch
+zinciri elle onaya kadar `is_active=false` kaldığından, 6 ayı art arda
+(aralarında HİÇBİRİ aktive edilmeden) işleyen ilk backfill denemesinde
+HER ay "önceki toplam"ı BOŞ gördü ve kendi KÜMÜLATİF değerini
+yanlışlıkla "aylık" olarak yazdı (batch_id 585-590). Bu 6 batch + satırları
+silinip, filtre "en son batch'i al" mantığına (aktivasyondan bağımsız)
+çevrilip YENİDEN çalıştırıldı — ikinci deneme doğru aylık değerleri
+üretti, bağımsız Python doğrulama script'imin sonuçlarıyla ondalık
+basamağa kadar eşleşti.
+
+**Sonuç:** 2026-01..06 için 30 satır aktive edildi (batch_id 591-596) —
+`fact_tuketim_ulke_geneli` artık 629 aktif satır (599+30). KPI-13'ün
+girdisi `fact_tuketim` (il bazlı) yerine bu tabloya taşındı — canlıda
+2026-06↔2025-06 için **+%7,1** gerçek bir YoY değeri üretti (eskiden HER
+ZAMAN 'hesaplanamaz'). Detay/gerekçe: `10_TEKNIK_MASTER_DOKUMAN.md` §5.5,
+Sürüm Geçmişi v1.15.

@@ -415,6 +415,55 @@ def tablo11_tuketim_oku(
     )
 
 
+def tablo11_genel_toplam_satiri_oku(
+    ws: Worksheet, tablo_etiketi: str = "Tablo 11"
+) -> dict[str, float]:
+    """T11'in KENDİ 'Genel Toplam' satırından, il kırılımı OLMAYAN, Sanayi
+    DAHİL tüm grupların KÜMÜLATİF (yıl başından bu aya kadar) değerlerini
+    okur — Word yıllarındaki `word_ortak.py:genel_toplam_satirini_oku()` ile
+    AYNI amaç, Excel (2026+) formatı için (2026-09-08, Aşama 3/ADIM 2).
+
+    Sanayi-DAĞITIM + Sanayi-İLETİM burada TOPLANIR (fact_tuketim_ulke_geneli
+    grain'inde baglanti YOK — Word yıllarındaki gibi tek bir 'Sanayi' değeri).
+
+    Satırı, `tablo11_tuketim_oku()`'nun kullandığı per-il döngüden BAĞIMSIZ
+    olarak, tablonun ham hücrelerini TARAYARAK bulur (Word'deki desenle
+    AYNI ilke: 'Genel Toplam' satırı per-il filtrelemede sessizce
+    düşürülmüş olamaz, çünkü ayrı bir tarama yapılıyor).
+
+    ⚠️ KÜMÜLATİF: dönen değerler yıl başından BU AYA KADAR toplamdır — çağıran
+    (bkz. `worker/pipeline.py:isle_ay_ulke_geneli_excel()`) bunu
+    `ingest.yil_ici_onceki_tuketim_ulke_geneli_toplami()` ile aynı yılın
+    önceki aylarının toplamını çıkararak AYLIK değere çevirmeli — `fact_
+    tuketim`'in T11'i (il bazlı) de-kümülatif etme deseniyle BİREBİR AYNI
+    (bkz. `worker/pipeline.py` satır ~358-374)."""
+    konum = _il_matrisi_oku(ws, tablo_etiketi)
+    if konum is None:
+        raise ValueError(f"{tablo_etiketi}: tablo/başlık satırı bulunamadı")
+    baslik_satir, il_sutun = konum
+
+    kolon_indeksleri = [
+        (_satirda_kolon_bul(ws, baslik_satir, arama_etiketi), grup)
+        for arama_etiketi, grup, _baglanti in _T11_GRUP_KOLONLARI
+    ]
+
+    for satir in range(baslik_satir + 1, ws.max_row + 1):
+        il_deger = ws.cell(row=satir, column=il_sutun).value
+        if normalize_label(il_deger) in ("GENEL TOPLAM", "TOPLAM"):
+            degerler: dict[str, float] = {}
+            for kolon, grup in kolon_indeksleri:
+                if kolon is None:
+                    continue
+                deger = parse_sayi(ws.cell(row=satir, column=kolon).value) or 0.0
+                degerler[grup] = degerler.get(grup, 0.0) + deger
+            return degerler
+
+    raise ValueError(
+        f"{tablo_etiketi}: 'Genel Toplam' satırı bulunamadı (satır {baslik_satir + 1}"
+        f"..{ws.max_row} arandı)"
+    )
+
+
 # ---------------------------------------------------------------------------
 # T7/T9 (ülke geneli, mutabakat) + T8/T10 (il bazında) — UZUN format
 # ---------------------------------------------------------------------------

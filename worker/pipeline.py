@@ -514,3 +514,146 @@ def kapsam_disi_isaretle(
             """,
             (tarih_id, fact_tablosu, nitelik, sebep, karar_referansi),
         )
+
+
+def isle_ay_ulke_geneli_excel(
+    conn: Connection,
+    *,
+    wb: openpyxl.Workbook,
+    tarih_id: int,
+    dosya_adi: str,
+    icerik: bytes,
+    source_period: str,
+    actor_name: str,
+    parser_version: str = "excel-ulke-geneli-v1",
+) -> IslemSonucu | None:
+    """`fact_tuketim_ulke_geneli`'yi 2026+ Excel aylarına genişletir
+    (2026-09-08, Aşama 3/ADIM 2) — Word yıllarındaki `word_2025.py:
+    isle_ay_ulke_geneli()` ile AYNI desen: fact_tuketim'in batch zincirine
+    HİÇ DOKUNMAYAN, kendi AYRI batch zinciri.
+
+    **Kaynak kararı (ADIM 1'de gerçek dosyaya karşı doğrulandı, 2026-09-08):**
+    T7 DEĞİL, T11'in kendi Genel Toplam satırı kullanılıyor — 2016-2025
+    (Word, T11-Genel-Toplam) ile 2026+ (Excel) TEK bir tanımda kalsın diye
+    (seri 2025→2026 sınırında "dikiş" atlamıyor). 6 ay (202601-202606)
+    gerçek dosyaya karşı test edildi: T11'in kendi Genel Toplam satırı,
+    fact_tuketim'in de-kümülatif etme yöntemiyle AYNI şekilde (bir önceki
+    ayın aynı yıl içindeki toplamı çıkarılarak) aylık değere çevrildiğinde,
+    4/6 ay T7 ile ONDALIK BASAMAĞA KADAR birebir eşleşti; 2 ayda (202602,
+    202606) %0,02'nin altında (mutabakat toleransının çok altında) küçük
+    bir fark bulundu — muhtemelen EPDK'nın kendi T7/T11 arası doğal bir
+    tutarsızlığı, bu ADIM 2'nin de-kümülatif mantığından KAYNAKLANMIYOR
+    (202601/202603/202604/202605 tam eşleşiyor). Detay: dokumanlar/
+    06_canli_veri_operasyon_gunlugu.md 2026-09-08 kaydı."""
+    print(f"\n=== Ülke Geneli (Excel) {source_period} — {dosya_adi} ===")
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT ib.batch_id, ib.status FROM ingestion_batch ib
+            JOIN source_asset sa ON sa.source_asset_id = ib.source_asset_id
+            WHERE sa.source_type = 'epdk_aylik' AND sa.source_period = %s
+              AND ib.parser_version = %s AND ib.status != 'failed'
+            ORDER BY ib.batch_id
+            """,
+            (source_period, parser_version),
+        )
+        mevcut = cur.fetchall()
+    if mevcut:
+        print(f"  [ATLA] Ülke Geneli (Excel) {source_period} zaten işlenmiş: {mevcut}")
+        return None
+
+    ws11 = _sayfa(wb, 11)
+    kumulatif = parser.tablo11_genel_toplam_satiri_oku(ws11)
+    onceki_toplam = ingest.yil_ici_onceki_tuketim_ulke_geneli_toplami(
+        conn, tarih_id // 100, tarih_id
+    )
+    aylik = {
+        grup: deger - onceki_toplam.get(grup, 0.0) for grup, deger in kumulatif.items()
+    }
+    print(f"  Kümülatif: {kumulatif}")
+    print(f"  Önceki toplam (aynı yıl): {onceki_toplam}")
+    print(f"  Aylık (türetilen): {aylik}")
+
+    ulke_geneli_ham = pd.DataFrame(
+        [
+            {"tarih_id": tarih_id, "grup": grup, "tuketim_mwh": deger}
+            for grup, deger in aylik.items()
+        ],
+        columns=["tarih_id", "grup", "tuketim_mwh"],
+    )
+
+    source_asset_id = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="epdk_aylik",
+        dosya_adi=dosya_adi,
+        icerik=icerik,
+        donem_tipi="aylik",
+        source_period=source_period,
+        uploaded_by=None,
+    )
+    batch_id = ingest.batch_olustur(conn, source_asset_id, parser_version, "1")
+    if not ingest.batch_sahiplen(conn, batch_id):
+        print(f"  [ATLA] batch_id={batch_id} zaten sahiplenilmiş/işlenmiş.")
+        return None
+
+    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+
+    sonuc = IslemSonucu(batch_id=batch_id)
+    dogrulanan = kpi.dogrula_tuketim(ulke_geneli_ham)
+    yuklenen, atlanan = ingest.fact_tuketim_ulke_geneli_yukle(
+        conn, dogrulanan.kabul, batch_id
+    )
+    sonuc.tablolar["fact_tuketim_ulke_geneli"] = TabloSonucu(
+        toplam=len(ulke_geneli_ham),
+        red=len(dogrulanan.red),
+        karantina=len(dogrulanan.karantina),
+        yuklenen=yuklenen,
+        atlanan=atlanan,
+    )
+    audit_tablolar = {
+        "fact_tuketim_ulke_geneli": {
+            "toplam": len(ulke_geneli_ham),
+            "red": len(dogrulanan.red),
+            "karantina": len(dogrulanan.karantina),
+            "yuklenen": yuklenen,
+            "atlanan": atlanan,
+            "red_satirlari": dogrulanan.red.to_dict("records"),
+        }
+    }
+    if dogrulanan.red.shape[0] or dogrulanan.karantina.shape[0]:
+        print(
+            f"  [DİKKAT] fact_tuketim_ulke_geneli: red={len(dogrulanan.red)} "
+            f"karantina={len(dogrulanan.karantina)}"
+        )
+
+    ingest.batch_durumu_guncelle(
+        conn,
+        batch_id,
+        "running",
+        total_row_count=len(ulke_geneli_ham),
+        accepted_row_count=yuklenen,
+        rejected_row_count=len(ulke_geneli_ham) - yuklenen,
+    )
+    ingest.audit_log_yaz(
+        conn,
+        table_name="ingestion_batch",
+        record_id=batch_id,
+        action_type="INSERT",
+        actor_name=actor_name,
+        payload={
+            "olay": "ingest_tamamlandi",
+            "tarih_id": tarih_id,
+            "kaynak": "excel_ulke_geneli",
+            "tablolar": audit_tablolar,
+            "not": "T11'in kendi Genel Toplam satırından (kümülatif, de-"
+            "kümülatif edildi), il kırılımı olmayan ülke geneli değerler "
+            "(Sanayi DAHİL) — bkz. dokumanlar/06_canli_veri_operasyon_"
+            "gunlugu.md 2026-09-08 kaydı.",
+        },
+    )
+
+    uygun, sebep = otomatik_onaya_uygun(sonuc)
+    print(f"  otomatik_onaya_uygun() = {uygun}" + (f" ({sebep})" if sebep else ""))
+    print("  [NOT] onayla ÇAĞRILMADI — batch running/is_active=false kalıyor.")
+    return sonuc

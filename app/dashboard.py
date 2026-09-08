@@ -360,6 +360,11 @@ def _tuketim_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
     return analytics.tuketim_getir(_conn, tarih_id)
 
 
+@st.cache_data(show_spinner="Ülke geneli tüketim (KPI-13) yükleniyor...", ttl=1800)
+def _ulke_geneli_tuketim_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
+    return analytics.ulke_geneli_tuketim_getir(_conn, tarih_id)
+
+
 @st.cache_data(show_spinner="Abone verisi yükleniyor...", ttl=1800)
 def _abone_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
     return analytics.abone_getir(_conn, tarih_id)
@@ -526,11 +531,21 @@ if gercek_veri_var:
     esikler = _kpi_esikleri_getir_cached(db_handle)
 
     # KPI-13 (YoY): bir önceki yılın aynı ayı aktifse kullan, yoksa 'veri yok'.
+    # 2026-09-08 (Aşama 3/ADIM 2): girdi `fact_tuketim_ulke_geneli`'ye taşındı
+    # (analytics.ulke_geneli_tuketim_getir) — il bazlı fact_tuketim Word
+    # yıllarında (2016-2025) Sanayi HİÇ içermediğinden, 2025↔2026 gibi
+    # Word/Excel sınırını geçen karşılaştırmalar grup-kümesi korumasına
+    # takılıp HER ZAMAN 'hesaplanamaz' dönüyordu (bkz. worker/analytics.py
+    # docstring'i). `tuketim`/il bazlı grafikler DEĞİŞMEDİ, yalnız KPI-13'ün
+    # girdisi değişti.
+    ulke_geneli_tuketim_simdi = _ulke_geneli_tuketim_getir_cached(
+        db_handle, secili_tarih_id
+    )
     onceki_tarih_id = secili_tarih_id - 100
     if onceki_tarih_id in donemler["tarih_id"].tolist():
-        onceki_tuketim = _tuketim_getir_cached(db_handle, onceki_tarih_id)
+        onceki_tuketim = _ulke_geneli_tuketim_getir_cached(db_handle, onceki_tarih_id)
     else:
-        onceki_tuketim = pd.DataFrame(columns=tuketim.columns)
+        onceki_tuketim = pd.DataFrame(columns=["grup", "tuketim_mwh"])
 
     il_listesi = _iller_getir_cached(db_handle)
     iller = ["Türkiye Geneli"] + il_listesi["il_adi"].tolist()
@@ -663,12 +678,22 @@ u6.metric(
 # alıyor — iki dönemin grup kümesi uyuşmuyorsa (örn. Sanayi biri içeriyor
 # diğeri içermiyorsa) None döner (bkz. worker/kpi.py modül notu, KPI-25/26
 # ile AYNI "kapsam uyuşmuyorsa hesaplama" disiplini).
-yoy = kpi.kpi_13_yoy(tuketim, onceki_tuketim if not onceki_tuketim.empty else None)
+# 2026-09-08 (Aşama 3/ADIM 2): girdi `fact_tuketim_ulke_geneli`'ye taşındı
+# (ülke geneli, il kırılımsız) — bkz. yukarıdaki `ulke_geneli_tuketim_simdi`
+# tanımı ve worker/analytics.py:ulke_geneli_tuketim_getir() docstring'i.
+yoy = kpi.kpi_13_yoy(
+    ulke_geneli_tuketim_simdi, onceki_tuketim if not onceki_tuketim.empty else None
+)
 u7.metric(
     "Tüketim YoY (KPI-13)",
     f"{_trafik_isigi(yoy, 'KPI-13', esikler)}%{yoy:+.1f}"
     if yoy is not None
     else "hesaplanamaz",
+)
+st.caption(
+    "KPI-13 kaynağı: `fact_tuketim_ulke_geneli` (ülke geneli, Sanayi dahil, "
+    "il kırılımsız) — Word/Excel format sınırını (2025→2026) geçen "
+    "karşılaştırmalarda da gerçek bir grup kümesi tutarlılığı sağlar."
 )
 
 st.divider()

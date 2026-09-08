@@ -98,6 +98,36 @@ def tuketim_getir(
     return df
 
 
+def ulke_geneli_tuketim_getir(conn: Connection, tarih_id: int) -> pd.DataFrame:
+    """`fact_tuketim_ulke_geneli`'den TEK bir dönem için grup bazında tüketim
+    (il kırılımı YOK, Sanayi DAHİL). Kolonlar: grup, tuketim_mwh.
+
+    **KPI-13 (YoY) için eklendi (2026-09-08, Aşama 3/ADIM 2):** `tuketim_
+    getir()` (il bazlı `fact_tuketim`) Word yıllarında (2016-2025) Sanayi
+    HİÇ içermediğinden, 2025↔2026 gibi Word/Excel sınırını geçen YoY
+    karşılaştırmaları `kpi_13_yoy()`'un grup-kümesi korumasına takılıp
+    HER ZAMAN 'hesaplanamaz' dönüyordu. `fact_tuketim_ulke_geneli` artık
+    2016-2025 (Word, T11 Genel Toplam) VE 2026+ (Excel, T11 Genel Toplam
+    de-kümülatif edilerek) için Sanayi DAHİL AYNI 5 grubu veriyor — bu
+    fonksiyon dashboard'un KPI-13 girdisini buraya taşımak için var, `tuketim_
+    getir()`'in YERİNE GEÇMEZ (il bazlı grafikler/KPI-08,09,10 hâlâ onu
+    kullanır)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT dg.grup_adi, ftu.tuketim_mwh
+            FROM fact_tuketim_ulke_geneli ftu
+            JOIN dim_tuketici_grubu dg ON dg.grup_id = ftu.grup_id
+            WHERE ftu.tarih_id = %s AND ftu.is_active
+            """,
+            (tarih_id,),
+        )
+        satirlar = cur.fetchall()
+    df = pd.DataFrame(satirlar, columns=["grup", "tuketim_mwh"])
+    _numerik(df, ["tuketim_mwh"])
+    return df
+
+
 def abone_getir(
     conn: Connection, tarih_id: int, il_kodu: int | None = None
 ) -> pd.DataFrame:
