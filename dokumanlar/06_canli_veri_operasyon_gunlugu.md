@@ -1262,3 +1262,11 @@ niyetle yazılmıştı, ama kendi bağımlılığının (`.env` yükleme zamanla
 DIŞINDA bir varsayıma dayanıyordu — bir güvenlik/koruma kontrolü, kontrol
 ettiği ŞEYİN (burada: nihai ortam değişkeni değeri) aynı anda GEÇERLİ
 olan halini görmeli, kendi izole "önce" anlık görüntüsünü değil.
+
+**Açık kalan boşluk (2026-09-08):** bu koruma artık İKİ KEZ (2026-09-02'de
+hiç yoktu, 2026-09-08'de vardı ama atlandı) sessizce delinmiş oldu — kod
+düzeltildi ve elle canlıda reprodüksiyonla doğrulandı, ama kendisini
+kalıcı olarak kilitleyen bir pytest regresyon testi HÂLÂ YOK. Bkz.
+`09_PROJE_DURUMU.md` "Sonraki Oturum Devam Noktası" — sonraki oturumda
+eklenecek açık madde olarak işaretlendi (bu turda kapsam dışı, yalnız
+doküman kapanışı).

@@ -285,19 +285,24 @@ yedekleme + haftalık otomasyon + GERÇEK restore drill'i, C3 sessiz
 başarısızlık savunması, C4 RLS geri açılması), Aşama 2 (C5 — KPI-25/27
 kaynak kararı, dashboard idle-in-transaction kök nedeni, restore hedefi
 postgres:17 düzeltmesi), ve D kuralına tarih çapası maddesi (commit
-`5214b9d`). Ayrıca 2026-09-08 içinde Aşama 3 ADIM 1-2 (bkz. yukarıdaki
-TL;DR) ve ADIM 3 madde 1 (batch bağımlılığı düzeltmesi) tamamlandı.
+`5214b9d`). Ayrıca 2026-09-08 içinde Aşama 3 ADIM 1-2 (`fact_tuketim_
+ulke_geneli` 2026-01..06'ya genişletildi, 629 aktif satır, KPI-13 artık
++%7,1 gerçek değer — commit `1232cb3`) ve ADIM 3 madde 1 (batch
+bağımlılığı düzeltmesi — `kumulatif_tuketim_mwh` kolonu + `tutarlilik_
+ulke_geneli_kumulatif.py`, canlıda doğrulandı — commit `df616e6`)
+tamamlandı. **Bu kapanış turunda (2026-09-08, gün sonu) yeni kod/tablo/
+migration YAZILMADI** — yalnız bu bölüm + kapanan bir test-izolasyonu
+olayının kaydı güncellendi (aşağıya bkz.).
 
 ### Açık madde
 Dış denetim listesinin (A/B/C bölümleri) hiçbir maddesi açık değil.
 **Aşama 3 (boş KPI'ları açma) DEVAM EDİYOR** — ADIM 1 (T11 vs T7 tanım
-dikişi kontrolü) ve ADIM 2 (`fact_tuketim_ulke_geneli`'nin 2026+ Excel'e
-genişletilmesi, KPI-13'ün girdisi taşındı) **TAMAMLANDI**. **ADIM 3'ün
-madde 1'i (batch bağımlılığı düzeltmesi — `kumulatif_tuketim_mwh` kolonu +
-`tutarlilik_ulke_geneli_kumulatif.py`) de TAMAMLANDI (2026-09-08)** —
-canlıya uygulandı, mevcut 30 satır yeniden doğrulandı (bkz. yukarıdaki
-TL;DR, `10_TEKNIK_MASTER_DOKUMAN.md` §5.6). **ADIM 3'ün madde 2-4'ü ve
-ADIM 4-5 AÇIK** — sırada:
+dikişi kontrolü), ADIM 2 (`fact_tuketim_ulke_geneli`'nin 2026+ Excel'e
+genişletilmesi, KPI-13'ün girdisi taşındı) ve ADIM 3 madde 1 (batch
+bağımlılığı düzeltmesi) **TAMAMLANDI** — canlıya uygulandı, mevcut 30
+satır yeniden doğrulandı (bkz. yukarıdaki TL;DR, `10_TEKNIK_MASTER_
+DOKUMAN.md` §5.5-5.6). **ADIM 3'ün madde 2-4'ü ve ADIM 4-5 AÇIK, HİÇBİRİNE
+BAŞLANMADI** — sırada:
 - **ADIM 3 madde 2:** `fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli`
   (tek migration, `fact_tuketim_ulke_geneli` ile AYNI batch/is_active/RLS/
   GRANT deseni). Excel T2/T3/T5/T6 zaten AYLIK (kümülatif DEĞİL, ADIM 1
@@ -319,6 +324,25 @@ ADIM 4-5 AÇIK** — sırada:
   Her KPI kartına kaynak/kapsam notu. **Bu turda (2026-09-08) ADIM 5'e
   HİÇ dokunulmadı — veri doğru oturmadan KPI'ya bağlanmayacak (kullanıcı
   talimatı).**
+
+### ⚠️ Açık — `conftest.py` canlı-DB koruması için regresyon testi YOK (2026-09-08)
+Aynı koruma (`worker/tests/conftest.py:pytest_configure()`) **iki kez**
+atlandı: 2026-09-02'de ilk kez (koruma o zaman hiç yoktu, 2026-09-07
+denetimi C2 ile eklendi) ve 2026-09-08'de İKİNCİ kez (koruma VARDI ama
+`.env`'in `load_dotenv()` ile kontrolden SONRA yüklenmesi yüzünden
+atlandı — bkz. `06_canli_veri_operasyon_gunlugu.md` 2026-09-08 (devam)
+kaydı, düzeltme commit `df616e6`). Düzeltme canlıda elle reprodüksiyonla
+doğrulandı ama **kod seviyesinde bunu kalıcı olarak kilitleyen bir pytest
+regresyon testi hâlâ YOK** — üçüncü bir atlama (örn. gelecekte `conftest.
+py` yeniden düzenlenirken bu import satırı yanlışlıkla silinirse) yine
+sessizce olabilir. **Sonraki oturumda eklenecek:** subprocess ile pytest'i
+sahte bir `.env`'e (canlı-benzeri bir `DATABASE_URL` içeren) karşı
+tetikleyip `returncode == 3` ve engelleme mesajının çıktığını doğrulayan
+küçük bir test (muhtemelen `worker/tests/test_conftest_guard.py`, ayrı
+bir dosya — asıl pakete `conftest.py` olarak dahil OLMAMALI, yoksa
+kendini test ederken kendini bypass edebilir). Küçük, düşük riskli bir
+madde — ADIM 3 madde 2'den ÖNCE ya da sonra yapılabilir, sıra kullanıcı
+tercihine bağlı.
 
 ### C6 — ertelenmiş/değerlendirilmiş küçük maddeler (yalnız referans, aksiyon BEKLEMİYOR)
 - **MFA / merkezi rate-limit:** ertelendi (tek admin kullanıcı var).
