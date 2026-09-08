@@ -30,6 +30,7 @@ kaynak kodu, canlı Supabase sorgusu) karşı yeniden doğrulandı. Bir
 | v1.5 | 2026-09-07 | C1: `worker/scripts/backup.py` + `dokumanlar/11_yedekleme_runbook.md` eklendi (§8.5) — Supabase Free plan'de otomatik yedek YOK | Gerçek disaster-recovery drill'i (disposable postgres:17, WSL/Docker): migration'lardan şema + `pg_restore --data-only` ile veri geri yüklendi, 19/19 tablo canlı Supabase'in `COUNT(*)` değerleriyle birebir eşleşti, 0 hata (ikinci denemede — ilk denemedeki 6 seed-tablosu hatası `--exclude-table` ile düzeltildi) |
 | v1.6 | 2026-09-07 | C3: `worker/jobs/fetch_weather.py:main()` 0 satır yazılırsa FAIL ediyor + `scheduled-refresh.yml`'e `if: failure()` özet adımı eklendi (§9.3) | `yaml.safe_load` ile sözdizimi doğrulandı, ruff/mypy temiz; GitHub'ın scheduled-workflow bildirim davranışı resmi dokümantasyondan doğrulandı (cron'u oluşturan kullanıcıya gider — `git log` ile bu proje için repo sahibi olduğu teyit edildi), kişisel bildirim AÇIK mı kod seviyesinde doğrulanamadığı için elle teyit gerektiği not edildi |
 | v1.7 | 2026-09-07 | C4: 8 tabloda (`dim_*`×5 + `sistem_parametre`/`kpi_esik`/`job_status`) RLS geri açıldı (§8.2), istisnasız tamlık kontrolü eklendi, **canlıya uygulandı** | Disposable postgres:16 + GERÇEK CI (run 34159706854 pozitif, 34159900787 negatif/fake-tablo-fail, 34160105007 revert-sonrası yeşil) + canlı Supabase'in tümünde doğrulandı: 19/19 tablo RLS+policy, dashboard yolu (viewer/data_operator/admin) gerçek JWT ile test edildi, `postgres` rolünün `rolbypassrls=true` olduğu canlıda teyit edildi (varsayılmadı) |
+| v1.8 | 2026-09-08 | Aşama 1 kapanışı — `scheduled-backup.yml` (haftalık pg_dump, §8.5), `app_dashboard_service` için `idle_in_transaction_session_timeout=30min` (§8.2, C4 olayının tekrarına karşı) | Yeni workflow: kullanıcının PAT'ine `workflow` izni eklenmesi bekleniyordu/durumuna göre gerçek koşu kanıtı burada güncellenir. idle timeout: disposable postgres:16'da 27/27 migration + `pg_roles.rolconfig` doğrulandı; canlıda GERÇEK bir kısa-timeout testiyle (2s) `IdleInTransactionSessionTimeout`'un fırladığı ve `app/dashboard.py`'nin bunu YAKALAMADIĞI (bilinen sınırlama, kod değişikliği kapsam dışı) doğrulandı |
 
 ---
 
@@ -620,6 +621,38 @@ DASHBOARD` ile):**
 
 Öncesinde (canlıya dokunmadan) `worker/scripts/backup.py` ile taze bir
 yedek alındı (`11_yedekleme_runbook.md`'deki prosedür).
+
+**Aynı olayın tekrarına karşı — `idle_in_transaction_session_timeout`
+(2026-09-08, Aşama 1 kapanışı):** `20260908_0001_app_dashboard_service_
+idle_timeout.sql`, `app_dashboard_service`'e `idle_in_transaction_
+session_timeout = '30min'` set eder. **Kök neden SİSTEMATİK, tek
+seferlik değil** — `app/dashboard.py` hiçbir yerde `conn.commit()`/
+`rollback()` ya da `autocommit=True` kullanmıyor (psycopg varsayılanı
+`autocommit=False`), bu yüzden HER dashboard oturumu ilk sorgusundan
+itibaren kapanana kadar TEK bir açık işlem içinde kalıyor — Streamlit
+sekmesi etkileşimsiz bırakıldığında bu otomatik olarak "idle in
+transaction" hâline geliyor (yalnız 2026-09-07'deki tek olay değil, HER
+terk edilmiş sekme için geçerli bir desen). Doğru parametre budur —
+`idle_session_timeout` (PG14+, TAMAMEN boş oturumlar için) DEĞİL, çünkü
+senaryo "açık işlem, sorgu yok" (PG9.6+'nın `idle_in_transaction_
+session_timeout`'u).
+
+**Test edildi, VARSAYILMADI:** kısa bir timeout (2s) ile gerçek bir
+oturumda ikinci sorgu `psycopg.errors.IdleInTransactionSessionTimeout`
+fırlattı. **Bilinen sınırlama:** `app/dashboard.py`'de bu hatayı yakalayıp
+otomatik yeniden bağlanan bir mekanizma YOK — kullanıcı "Çıkış Yap" ile
+elle yeniden giriş yapmalı (kod refactor'ü bu turun kapsamı dışı
+bırakıldı). 30 dakikalık değer, aktif kullanımda (herhangi bir 30 dk
+pencerede en az bir etkileşim, ki her etkileşim yeni bir sorgu çalıştırıp
+sayacı sıfırlar) bu riski pratikte sıfıra indiriyor — yalnız gerçekten
+terk edilmiş sekmeler etkilenir, ki asıl amaç zaten onları temizlemek.
+Doğrulandı (disposable postgres:16, 27/27 migration): `pg_roles.
+rolconfig` → `{idle_in_transaction_session_timeout=30min}`.
+
+**İleride ele alınabilir (bu turun kapsamı dışı):** `app/dashboard.py`'nin
+salt-okunur sorguları için `autocommit=True` ya da periyodik `commit()` —
+bu, oturumun hiç "idle in transaction" hâline GİRMEMESİNİ sağlardı (DB
+seviyesi timeout yerine kök nedeni kapatırdı).
 
 ### 8.3 Supabase Auth Entegrasyonu (Faz B, 2026-09-05)
 `worker/auth.py` (framework-agnostik): `giris_yap(email, sifre)`
