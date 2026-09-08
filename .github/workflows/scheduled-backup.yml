@@ -45,6 +45,13 @@ jobs:
           sudo apt-get install -y postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y postgresql-client-17
+          # apt kurulumu /usr/lib/postgresql/17/bin/pg_dump'ı ekler ama
+          # jenerik `pg_dump` symlink'i (update-alternatives) runner'ın
+          # ÖNCEDEN kurulu 16'sını göstermeye devam ediyor (ilk gerçek
+          # koşuda, run 34192625670'te GERÇEKTEN görüldü - kurulum "başarılı"
+          # ama pg_dump --version hâlâ 16.15 verdi). 17'nin bin dizinini
+          # $GITHUB_PATH ile SONRAKİ adımlar için PATH'in BAŞINA ekliyoruz.
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
       - name: pg_dump doğru sürümde mi doğrula (varsayma)
         run: |
           surum=$(pg_dump --version)
