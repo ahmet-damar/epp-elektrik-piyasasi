@@ -31,7 +31,10 @@ kaynak kodu, canlı Supabase sorgusu) karşı yeniden doğrulandı. Bir
 | v1.6 | 2026-09-07 | C3: `worker/jobs/fetch_weather.py:main()` 0 satır yazılırsa FAIL ediyor + `scheduled-refresh.yml`'e `if: failure()` özet adımı eklendi (§9.3) | `yaml.safe_load` ile sözdizimi doğrulandı, ruff/mypy temiz; GitHub'ın scheduled-workflow bildirim davranışı resmi dokümantasyondan doğrulandı (cron'u oluşturan kullanıcıya gider — `git log` ile bu proje için repo sahibi olduğu teyit edildi), kişisel bildirim AÇIK mı kod seviyesinde doğrulanamadığı için elle teyit gerektiği not edildi |
 | v1.7 | 2026-09-07 | C4: 8 tabloda (`dim_*`×5 + `sistem_parametre`/`kpi_esik`/`job_status`) RLS geri açıldı (§8.2), istisnasız tamlık kontrolü eklendi, **canlıya uygulandı** | Disposable postgres:16 + GERÇEK CI (run 34159706854 pozitif, 34159900787 negatif/fake-tablo-fail, 34160105007 revert-sonrası yeşil) + canlı Supabase'in tümünde doğrulandı: 19/19 tablo RLS+policy, dashboard yolu (viewer/data_operator/admin) gerçek JWT ile test edildi, `postgres` rolünün `rolbypassrls=true` olduğu canlıda teyit edildi (varsayılmadı) |
 | v1.8 | 2026-09-08 | Aşama 1 kapanışı — `scheduled-backup.yml` (haftalık pg_dump, §8.5), `app_dashboard_service` için `idle_in_transaction_session_timeout=30min` **canlıya uygulandı** (§8.2, C4 olayının tekrarına karşı) | idle timeout: disposable postgres:16'da 27/27 migration + canlıda `pg_roles.rolconfig` doğrulandı, kısa-timeout testiyle (2s) gerçek `IdleInTransactionSessionTimeout` kanıtlandı, normal ardışık kullanım etkilenmedi. `scheduled-backup.yml`: YAML doğrulandı, CI yeşil — **gerçek bir koşu henüz doğrulanamadı** (`gh` token'ının `workflow` izni yok, 403); açık madde olarak sonraki oturuma bırakıldı |
-| v1.9 | 2026-09-08 | `scheduled-backup.yml` gerçek koşuyla UÇTAN UCA doğrulandı (§8.5/§9) — 2 gerçek CI hatası bulunup düzeltildi (pg_dump sürüm uyumsuzluğu + PATH sırası) | Üçüncü koşu (run 34192746673) başarılı: dump 1.61 MB, artifact indirilip `pg_restore --list` ile içeriği incelendi, disposable postgres:16'ya restore edilip **19/19 tablo canlı Supabase'in `COUNT(*)` değerleriyle birebir eşleşti**; 100 KB eşiği ayrı bir koşuda (geçici 5 MB) GERÇEKTEN FAIL ettirilip `upload-artifact`'in atlandığı görüldü, sonra geri alındı (run 34193103617 nihai yeşil) |
+| v1.9 | 2026-09-08 | `scheduled-backup.yml` gerçek koşuyla UÇTAN UCA doğrulandı (§8.5/§9) — 2 gerçek CI hatası bulunup düzeltildi (pg_dump sürüm uyumsuzluğu + PATH sırası) | Üçüncü koşu (run 34192746673) başarılı: dump 1.61 MB, artifact indirilip `pg_restore --list` ile içeriği incelendi, disposable postgres:17'ye (canlı Supabase'in kendi major sürümü — bkz. v1.10) restore edilip **19/19 tablo canlı Supabase'in `COUNT(*)` değerleriyle birebir eşleşti**; 100 KB eşiği ayrı bir koşuda (geçici 5 MB) GERÇEKTEN FAIL ettirilip `upload-artifact`'in atlandığı görüldü, sonra geri alındı (run 34193103617 nihai yeşil) |
+| v1.10 | 2026-09-08 | Aşama 2/C5 — KPI-25 TAMAMEN `fact_tuketim_ulke_geneli`'ye taşındı (tam yıl+5/5 grup şartı), KPI-27 il bazlı `fact_tuketim`'de kaldı — §7.5/§11.2 (artık KAPANDI), `04_kpi_sozlesmeleri.md` güncellendi | Canlı veriyle doğrulandı: KPI-25 artık **+%3,1** (2017→2025, n=8 — önceden sürekli 'hesaplanamaz'dı, GERÇEK fonksiyonel değişiklik), KPI-27 **+%3,8** (2016→2025, n=9, kod değişmedi). 2 pytest testi (`test_yillik_serilerinden_cagr`, `test_kpi_25_eksik_yil_seriye_girmez`) yeni tabloya taşındı, canlıya karşı `-k` ile hedefli çalıştırılıp (rollback-izole) PASSED |
+| v1.11 | 2026-09-08 | Aşama 2 — `app/dashboard.py`'nin idle-in-transaction KÖK NEDENİ düzeltildi (§8.2): bağlantı `autocommit=True`'ya alındı + ölü bağlantıyı sessizce yeniden kuran `_baglanti_saglikli_mi()`/reconnect mantığı eklendi | Canlıda GERÇEK testlerle kanıtlandı: `autocommit=True` ile 2s `idle_in_transaction_session_timeout`'tan 3s sonra ikinci sorgu SORUNSUZ çalıştı (hata hiç fırlamadı — `autocommit=False` ile AYNI test önceki turda hatayı gerçekten üretmişti); kasıtlı kapatılan bir bağlantı `_baglanti_saglikli_mi()` tarafından doğru tespit edilip saklanan JWT claim'iyle sessizce yeniden bağlandı |
+| v1.12 | 2026-09-08 | C1 düzeltmesi — yedekleme runbook'undaki restore hedefi `postgres:16`'dan `postgres:17`'ye (canlı Supabase'in kendi major sürümü) düzeltildi, tatbikat yeniden koşuldu (§8.5) | Disposable postgres:17'ye restore: 19/19 tablo yine BİREBİR eşleşti, PG17'ye özgü `transaction_timeout` GUC uyarısı da (postgres:16 hedefte görülen) bu sefer HİÇ çıkmadı — 0 hata, 0 uyarı |
 
 ---
 
@@ -482,20 +485,31 @@ sahte vs %+2,2 gerçek, Sanayi'nin ikisinden de çıkarılmasıyla).
 
 ### 7.5 CAGR (Yıllık, n = son_yıl − ilk_yıl)
 Jenerik formül: `(son/ilk)^(1/n) − 1` (`kpi_cagr`).
-- **KPI-25** CAGR — toplam tüketim (%): yalnız Sanayi'yi İÇEREN yıllar
-  seriye girer (Word 2023-2025 hariç, Karar 2) — filtre olmasaydı sahte
-  bir CAGR üretilirdi (gerçek örnek: -%2,2 sahte). Bugün yalnız 2026 tek
-  Sanayi'li yıl → NULL ("hesaplanamaz"), ikinci Sanayi'li tam yıl
-  (2027+) gelince otomatik seriye girecek.
-- **KPI-27** CAGR — Sanayi-HARİÇ tüketim (%): Sanayi TÜM yıllardan
-  açıkça çıkarılarak hesaplanır (KPI-25'in TERSİ strateji — sorunlu
-  grubu sil, sorunlu yılı değil). KPI-25'İN YERİNE GEÇMEZ (resmi "toplam
-  tüketim" tanımını karşılamaz). 2023→2025 (3 tam yıl) için canlıda
-  +%6,9 hesaplanıyor (2026-09-03 doğrulaması).
+- **KPI-25** CAGR — toplam tüketim (%), RESMİ tanım: **2026-09-08'de
+  (Aşama 2/C5) `fact_tuketim_ulke_geneli`'ye TAŞINDI** — önceki (2026-09-03)
+  "yalnız Sanayi'yi İÇEREN yıllar" filtresi il bazlı `fact_tuketim`
+  içindi ve pratikte yalnız 2026'yı bırakıyordu (sürekli 'hesaplanamaz').
+  Yeni kaynak Sanayi DAHİL tüm grupları 2016-2025'in TAMAMI için
+  içerdiğinden filtre GEREKSİZLEŞTİ, kaldırıldı. Yeni şart: bir yıl
+  yalnız TAM 12 ay VE 5/5 grup mevcutsa (60/60 satır) seriye girer — bu
+  **2016'yı KASITLI olarak dışarıda bırakır** (2016-12 Tarımsal kaynakta
+  hiç yüklenmedi, bkz. §11.3). İl bazlı `fact_tuketim` ile ASLA
+  karıştırılmaz (grain karışımı riski, bkz. §11.2 — artık KAPANMIŞ
+  karar). Canlıda 2017→2025 (9 nokta, n=8) için **+%3,1** hesaplanıyor
+  (2026-09-08 doğrulaması — eskiden hep 'hesaplanamaz'dı, bu GERÇEK bir
+  fonksiyonel değişiklik, yalnız kozmetik değil).
+- **KPI-27** CAGR — Sanayi-HARİÇ tüketim (%): kaynağı **İL BAZLI
+  `fact_tuketim`, DEĞİŞMEDİ** (KPI-25'in taşınmasından etkilenmedi).
+  Sanayi TÜM yıllardan açıkça çıkarılarak hesaplanır. KPI-25'İN YERİNE
+  GEÇMEZ (resmi "toplam tüketim" tanımını karşılamaz). 2016→2025 (10
+  tam yıl) için canlıda **+%3,8** hesaplanıyor (2026-09-08 doğrulaması —
+  önceki turlarda daha kısa bir seri üzerinden farklı bir sayı
+  raporlanmıştı, bu KOD DEĞİŞİKLİĞİNDEN değil, aradan geçen sürede daha
+  fazla yılın "tam yıl" şartını karşılamaya başlamasından kaynaklanıyor).
 - **KPI-26** CAGR — yenilenebilir kurulu güç (%): STOK metriği (aylar
   TOPLANMAZ, yılın son ayı alınır). Yalnız Lisanslı verisi (T1) OLAN
   yıllar seriye girer — Word 2023-2025'te T1 yok (Karar 3), filtre
-  olmasaydı sahte CAGR üretilirdi (AYNI kök neden KPI-25 ile).
+  olmasaydı sahte CAGR üretilirdi (AYNI kök neden eski KPI-25 ile).
 
 **KPI-28 numara notu (2026-09-07, denetimde bulundu):** `05_kaynak_
 dosya_sozlesmesi.md` ("Yıllık Rapor" bölümü), yıllık-aylık toplam sapması
@@ -655,10 +669,29 @@ hiçbir "idle in transaction" bağlantı OLMADIĞI teyit edilerek. Canlıda
 art arda 2 sorgu) sorunsuz çalıştı — 30 dakikalık timeout aktif kullanımı
 etkilemiyor.
 
-**İleride ele alınabilir (bu turun kapsamı dışı):** `app/dashboard.py`'nin
-salt-okunur sorguları için `autocommit=True` ya da periyodik `commit()` —
-bu, oturumun hiç "idle in transaction" hâline GİRMEMESİNİ sağlardı (DB
-seviyesi timeout yerine kök nedeni kapatırdı).
+**Kök neden KOD SEVİYESİNDE de kapatıldı (2026-09-08, Aşama 2):**
+`app/dashboard.py`'de `rol_baglantisi_ac()`'ın döndürdüğü bağlantı artık
+`autocommit=True`'ya alınıyor — HER sorgu kendi başına commit edilir,
+bağlantı HİÇBİR ZAMAN açık bir işlemde kalmıyor (yukarıdaki DB seviyesi
+`idle_in_transaction_session_timeout` artık yalnız bir GÜVENLİK AĞI,
+birincil savunma DEĞİL). **Canlıda GERÇEK bir testle kanıtlandı**
+(varsayılmadı): `autocommit=True` ile bir sorgu çalıştırılıp 2 saniyelik
+kısa bir `idle_in_transaction_session_timeout` konup 3 saniye
+beklendiğinde İKİNCİ sorgu SORUNSUZ çalıştı (`IdleInTransactionSessionTimeout`
+HİÇ fırlamadı) — `autocommit=False` ile AYNI test önceki turda hatayı
+GERÇEKTEN üretmişti (bkz. yukarıdaki paragraf), fark BİREBİR bu
+değişiklikten geliyor.
+
+Ayrıca bağlantı yine de (ağ kopması, Supabase yeniden başlatma gibi BAŞKA
+bir sebeple) ölürse artık kullanıcıya ham bir hata YANSIMAZ —
+`_baglanti_saglikli_mi()` her `_baglanti_al()` çağrısında ucuz bir
+`SELECT 1` ile sağlık kontrolü yapar; sağlıksızsa, giriş sırasında
+saklanan JWT claim'iyle (`st.session_state["_jwt_claims_json"]`/`
+["_rol"]`, Supabase Auth'a TEKRAR gidilmeden) sessizce yeni bir bağlantı
+açılır. **Canlıda GERÇEK bir testle kanıtlandı:** bir bağlantı kasıtlı
+kapatılıp `_baglanti_saglikli_mi()` doğru şekilde `False` döndü, saklanan
+claim'le açılan yeni bağlantı sağlıklı çıktı ve gerçek bir sorgu
+çalıştırdı.
 
 ### 8.3 Supabase Auth Entegrasyonu (Faz B, 2026-09-05)
 `worker/auth.py` (framework-agnostik): `giris_yap(email, sifre)`
@@ -727,11 +760,15 @@ gösteriyordu → `/usr/lib/postgresql/17/bin`, `$GITHUB_PATH` ile PATH'in
 BAŞINA eklendi. Üçüncü koşu BAŞARILI: dump 1.61 MB. Artifact indirilip
 `pg_restore --list` ile içeriği incelendi (beklenen TÜM tablolar TABLE
 DATA olarak mevcut, 6 seed tablosu doğru şekilde YOK), disposable
-`postgres:16`'ya GERÇEKTEN restore edildi — **19/19 tablo canlı
-Supabase'in `COUNT(*)` değerleriyle BİREBİR eşleşti**. 100 KB eşiği de
-ayrıca test edildi (geçici 5 MB'a yükseltilip job'ın gerçek dump'la
-GERÇEKTEN FAIL ettiği ve `upload-artifact`'in atlandığı görüldü, sonra
-geri alındı). Detay: `11_yedekleme_runbook.md`.
+`postgres:17`'ye GERÇEKTEN restore edildi (**canlı Supabase'in kendi
+major sürümüyle BİREBİR aynı** — ilk denemede `postgres:16` hedef
+kullanılmıştı, restore yine başarılıydı ama PG17'ye özgü `SET
+transaction_timeout = 0;` için zararsız bir uyarı vermişti; hedef 17'ye
+düzeltilip tekrar koşulunca o uyarı da ortadan kalktı) — **19/19 tablo
+canlı Supabase'in `COUNT(*)` değerleriyle BİREBİR eşleşti**. 100 KB
+eşiği de ayrıca test edildi (geçici 5 MB'a yükseltilip job'ın gerçek
+dump'la GERÇEKTEN FAIL ettiği ve `upload-artifact`'in atlandığı
+görüldü, sonra geri alındı). Detay: `11_yedekleme_runbook.md`.
 
 ---
 
@@ -988,20 +1025,23 @@ açık madde: 2026-07'den itibaren HENÜZ hiçbir ay yüklenmedi (EPDK'nın
 raporu henüz yayınlamamış olması muhtemel — parser'ın kendisiyle ilgisi
 yok).
 
-### 11.2 KPI-25/27'nin `fact_tuketim_ulke_geneli`'yi Kullanıp Kullanmayacağı
-Açık karar — `fact_tuketim_ulke_geneli` yalnız VERİ hazırlığı olarak
-eklendi (2026-09-05/08), KPI formülü (`worker/analytics.py:
-yillik_tuketim_serisi_getir`/`yillik_tuketim_sanayi_haric_serisi_getir`)
-BU TURDA değiştirilmedi. Karar verilirse KPI-25'in bugünkü "yalnız
-Sanayi'yi içeren yıl" filtresi muhtemelen gevşetilebilir (artık 2016-2025
-için de ülke geneli Sanayi verisi var) — ama bu doğrudan `fact_tuketim`
-(il bazlı) ile `fact_tuketim_ulke_geneli` (ülke bazlı) arasında bir
-KARIŞIK KAYNAK KPI'sı tasarımı gerektirir, dikkatli ele alınmalı.
+### 11.2 KPI-25/27'nin `fact_tuketim_ulke_geneli`'yi Kullanıp Kullanmayacağı — KAPANDI (2026-09-08)
+**Karar verildi ve uygulandı (Aşama 2/C5):** KPI-25 TAMAMEN
+`fact_tuketim_ulke_geneli`'ye taşındı (tam yıl + 5/5 grup şartıyla),
+KPI-27 il bazlı `fact_tuketim`'de KALDI (değişmedi) — KARIŞIK KAYNAK
+tasarımından (aynı KPI içinde iki farklı grain'i toplama/birleştirme)
+BİLİNÇLİ OLARAK kaçınıldı, her KPI TEK bir kaynağa bağlı. Detay: §7.5,
+`worker/analytics.py:yillik_tuketim_serisi_getir()` docstring'i,
+`dokumanlar/04_kpi_sozlesmeleri.md`.
 
 ### 11.3 2016-12 Tarımsal — Kalıcı Eksik
 `fact_tuketim_ulke_geneli`'de 2016-12 yalnız 4/5 grupla aktif (Tarımsal
 o ay ülke seviyesinde de negatif çıktığı için hiç yüklenmedi, kasıtlı —
 bkz. §6.4). Dashboard'da bu ay/grup için "veri yok" görünmesi beklenir.
+**2026-09-08'den beri AYRICA KPI-25'i de etkiliyor** (bu satır bu yüzden
+oraya, tek başına yeterli olmadığı için, cross-reference edildi): 2016
+"tam yıl + 5/5 grup" şartını karşılamadığından (59/60 satır) KPI-25'in
+CAGR serisine hiç girmiyor — bu KASITLI, bir hata DEĞİL (bkz. §7.5).
 
 ### 11.4 Admin Rol-Atama UI'ı ve Veri Girişi UI'ı — Ertelendi
 `data_operator` rolünün RLS izin altyapısı TAM kurulu (INSERT/UPDATE)

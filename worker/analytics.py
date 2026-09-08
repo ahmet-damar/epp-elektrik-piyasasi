@@ -300,39 +300,47 @@ def kpi_11_12_hesapla(
 
 
 def yillik_tuketim_serisi_getir(conn: Connection) -> pd.DataFrame:
-    """KPI-25 (tüketim CAGR) girdisi: yıl başına toplam tuketim_mwh (tüm il,
-    tüm grup/baglanti — akış/flow metriği, aylar toplanır). Kolonlar: yil, tuketim_mwh.
+    """KPI-25 (tüketim CAGR, RESMİ "toplam tüketim" tanımı) girdisi: yıl
+    başına toplam tuketim_mwh, **YALNIZ `fact_tuketim_ulke_geneli`**'den
+    (akış/flow metriği, aylar toplanır). Kolonlar: yil, tuketim_mwh.
 
-    **Yalnız Sanayi grubunu İÇEREN yıllar dahil edilir** (alt sorgu) —
-    `yillik_yenilenebilir_kurulu_guc_serisi_getir()`'e (KPI-26, 2026-09-02)
-    uygulanan AYNI disiplin, aynı kök neden. Word (.docx) kaynaklı 2023-2025
-    dönemlerinde Sanayi grubu `fact_tuketim`'e HİÇ girmedi (Karar 2 —
-    `baglanti`/iletim-dağıtım ayrımı kaynakta yok, dokumanlar/
-    07_word_parser_kapsam.md). 2026 (Excel) Sanayi'yi İÇERİYOR. Bu filtre
-    OLMASAYDI, 2023-2025 (Sanayi'siz — genelde tüketimin en büyük kalemi)
-    2026 (Sanayi'li + üstüne kısmi-yıl) ile AYNI CAGR serisine karışır,
-    sahte bir sayı üretir (2026-09-02'de bulundu: naif hesap -%2,2
-    veriyordu, gerçek değil). Bugün İTİBARİYLE bu filtre yalnız 2026'yı
-    (Sanayi'li TEK yıl) bırakır — `cagr_seriden_hesapla()` ≥2 yıl
-    gerektirdiğinden KPI-25 doğal olarak None ('hesaplanamaz') döner,
-    sahte bir sayı YERİNE. 2027+'de ikinci bir Sanayi'li yıl gelince
-    otomatik olarak seriye girecek, kod değişikliği gerekmeyecek.
+    **Kaynak kararı (2026-09-08, Aşama 2/C5):** Önceden (2026-09-02'den bu
+    yana) bu fonksiyon il bazlı `fact_tuketim`'i, "yalnız Sanayi grubunu
+    İÇEREN yıllar" filtresiyle okuyordu — Sanayi Word (.docx) kaynaklı
+    2016-2025 dönemlerinde `fact_tuketim`'e HİÇ girmediğinden (Karar 2,
+    `baglanti` ayrımı kaynakta yok) bu filtre pratikte yalnız 2026'yı
+    bırakıyor, KPI-25 sürekli 'hesaplanamaz' dönüyordu. `fact_tuketim_
+    ulke_geneli` (2026-09-05/08'de eklendi) artık 2016-2025'in TAMAMI için
+    Sanayi DAHİL ülke geneli veri sağladığından KPI-25 TAMAMEN bu tabloya
+    taşındı — il bazlı `fact_tuketim` ile ASLA KARIŞTIRILMAZ (grain
+    karışımı riski, bkz. dokumanlar/10_TEKNIK_MASTER_DOKUMAN.md §11.2).
 
-    **Bu KPI-25'in RESMİ tanımı** ("toplam tüketim" — tüm gruplar). Sanayi
-    hariç, ayrı bir CAGR için bkz. `yillik_tuketim_sanayi_haric_serisi_getir()`
-    (KPI-27, ayrı bir metrik, KPI-25'in YERİNE GEÇMEZ)."""
+    **Dahil edilme şartı — tam yıl VE 5/5 grup** (alt sorgu `HAVING`):
+    bir yıl yalnız TÜM 12 ayı VE her ayda TÜM 5 tüketici grubu (`COUNT(*) =
+    12*5 = 60`) mevcutsa seriye girer. Bu, 2016'yı OTOMATİK ve KASITLI
+    olarak dışarıda bırakır — 2016-12 Tarımsal, ülke seviyesinde de negatif
+    çıktığı için hiç yüklenmedi (59/60 satır, bkz. §11.3), bu KPI-25 için
+    de "veri yok" (None/'hesaplanamaz' katkısı, sahte bir sayı DEĞİL)
+    anlamına gelir — altı ay sonra "2016 neden CAGR'da yok" diye yeniden
+    araştırılmasın diye burada AÇIKÇA not düşülüyor.
+
+    Sanayi hariç, ayrı bir CAGR için bkz. `yillik_tuketim_sanayi_haric_
+    serisi_getir()` (KPI-27, ayrı bir metrik, İL BAZLI `fact_tuketim`'den,
+    KPI-25'in YERİNE GEÇMEZ, kaynak DEĞİŞMEDİ)."""
     sorgu = """
-        SELECT dt.yil, SUM(ft.tuketim_mwh) AS tuketim_mwh
-        FROM fact_tuketim ft
-        JOIN dim_tarih dt ON dt.tarih_id = ft.tarih_id
-        WHERE ft.is_active
+        SELECT dt.yil, SUM(ftu.tuketim_mwh) AS tuketim_mwh
+        FROM fact_tuketim_ulke_geneli ftu
+        JOIN dim_tarih dt ON dt.tarih_id = ftu.tarih_id
+        WHERE ftu.is_active
           AND dt.yil IN (
               SELECT dt2.yil
-              FROM fact_tuketim ft2
-              JOIN dim_tarih dt2 ON dt2.tarih_id = ft2.tarih_id
-              JOIN dim_tuketici_grubu g2 ON g2.grup_id = ft2.grup_id
-              WHERE ft2.is_active AND g2.grup_adi = 'Sanayi'
+              FROM fact_tuketim_ulke_geneli ftu2
+              JOIN dim_tarih dt2 ON dt2.tarih_id = ftu2.tarih_id
+              WHERE ftu2.is_active AND dt2.donem_tipi = 'aylik'
               GROUP BY dt2.yil
+              HAVING count(DISTINCT dt2.ay) = 12
+                 AND count(DISTINCT ftu2.grup_id) = 5
+                 AND count(*) = 60
           )
         GROUP BY dt.yil
         ORDER BY dt.yil
@@ -347,12 +355,12 @@ def yillik_tuketim_serisi_getir(conn: Connection) -> pd.DataFrame:
 
 def yillik_tuketim_sanayi_haric_serisi_getir(conn: Connection) -> pd.DataFrame:
     """KPI-27 (Sanayi-hariç tüketim CAGR) girdisi — KPI-25'İN YERİNE GEÇMEZ,
-    ayrı bir metrik (bkz. dokumanlar/04_kpi_sozlesmeleri.md). Yıl başına
-    toplam tuketim_mwh, Sanayi grubu HER YILDAN (2023-2026 dahil) açıkça
-    ÇIKARILARAK — bu, KPI-25'in "kaynakta olan yılları filtrele" stratejisinin
-    TERSİ: burada tutarlılık, sorunlu grubu (Sanayi) TÜM yıllardan silerek
-    sağlanıyor, o grubun bulunduğu yılları dışlayarak değil. Sonuç: resmi
-    "toplam tüketim" (KPI-25) DEĞİL, yalnız ek bağlam için bir alt-küme.
+    ayrı bir metrik, kaynağı İL BAZLI `fact_tuketim` (KPI-25 2026-09-08'de
+    `fact_tuketim_ulke_geneli`'ye taşındı, bkz. `yillik_tuketim_serisi_
+    getir()` — bu fonksiyon DEĞİŞMEDİ, kasıtlı olarak il bazlı kalıyor).
+    Yıl başına toplam tuketim_mwh, Sanayi grubu HER YILDAN açıkça
+    ÇIKARILARAK hesaplanır. Sonuç: resmi "toplam tüketim" (KPI-25) DEĞİL,
+    yalnız ek bağlam için bir alt-küme.
 
     **Yalnız TAM yıllar** (12 farklı ay) dahil edilir — 2026 şu an yalnız
     6 aylık kısmi veri içeriyor (dokumanlar/06_canli_veri_operasyon_gunlugu.md,

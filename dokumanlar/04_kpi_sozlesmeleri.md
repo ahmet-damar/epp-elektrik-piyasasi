@@ -68,36 +68,39 @@ tanımlı değildi — Downloads/1/ altındaki kaynak .docx dosyaları taranarak
 2026-08-30'da doğrulandı, bkz. ADR notu worker/kpi.py `kpi_cagr` docstring'i).
 Jenerik formül: (son/ilk)^(1/n) − 1 ; **n = yıl farkı** (2021→2025 ⇒ n=4,
 "gözlem−1" ile aynı YALNIZCA yıllar ardışıksa).
-- **KPI-25** CAGR — tüketim (%): ilk/son = yıl bazında toplam tuketim_mwh
+- **KPI-25** CAGR — tüketim (%), RESMİ "toplam tüketim" tanımı: ilk/son =
+  yıl bazında toplam tuketim_mwh, **YALNIZ `fact_tuketim_ulke_geneli`**'nden
   (aylar TOPLANIR, akış/flow metriği; bkz. worker/analytics.py
-  `yillik_tuketim_serisi_getir`).
-  **2026-09-03'te eklenen kısıt:** yalnız Sanayi grubunu İÇEREN yıllar
-  seriye girer — Word (.docx) kaynaklı 2023-2025 dönemlerinde Sanayi grubu
-  `fact_tuketim`'e hiç girmedi (kaynakta yok, `baglanti`/iletim-dağıtım
-  ayrımı eksik, dokumanlar/07_word_parser_kapsam.md Karar 2), yalnız 2026
-  (Excel) Sanayi'yi içeriyor — filtre olmasaydı bu yıllar (Sanayi'siz,
-  genelde tüketimin en büyük kalemi) 2026 (Sanayi'li + kısmi yıl) ile
-  karışıp sahte bir CAGR üretirdi (2026-09-02'de bulundu: naif hesap
-  -%2,2 veriyordu, gerçek değil — KPI-26'nın Lisanslı sorunuyla AYNI kök
-  neden). Bugün itibarıyla bu filtre yalnız 2026'yı (Sanayi'li TEK yıl)
-  bırakıyor, ikinci bir Sanayi'li yıl olmadan CAGR None ('hesaplanamaz')
-  döner, sahte bir sayı ÜRETİLMEZ. 2027+'de ikinci bir Sanayi'li tam yıl
-  gelince otomatik olarak seriye girecek. Sanayi'yi TAMAMEN dışlayan,
-  KPI-25'in YERİNE GEÇMEYEN ayrı bir metrik için bkz. **KPI-27**.
+  `yillik_tuketim_serisi_getir`) — il bazlı `fact_tuketim` ile ASLA
+  KARIŞTIRILMAZ (grain karışımı riski).
+  **Kaynak kararı (2026-09-08, Aşama 2/C5):** Önceden (2026-09-03'ten bu
+  yana) bu KPI il bazlı `fact_tuketim`'i, "yalnız Sanayi grubunu İÇEREN
+  yıllar" filtresiyle okuyordu — Sanayi Word (.docx) kaynaklı 2016-2025
+  dönemlerinde `fact_tuketim`'e hiç girmediğinden (Karar 2) bu filtre
+  pratikte yalnız 2026'yı bırakıyor, KPI-25 sürekli 'hesaplanamaz'
+  dönüyordu. `fact_tuketim_ulke_geneli` (2026-09-05/08'de eklendi) artık
+  2016-2025'in TAMAMI için Sanayi DAHİL ülke geneli veri sağladığından
+  KPI-25 TAMAMEN bu tabloya taşındı, eski "Sanayi'yi içeren yıllar"
+  filtresi KALDIRILDI (artık gereksiz — Sanayi zaten her yılda var).
+  **Yeni şart — tam yıl VE 5/5 grup:** bir yıl yalnız TÜM 12 ayı VE her
+  ayda TÜM 5 tüketici grubu mevcutsa (60/60 satır) seriye girer. Bu,
+  **2016'yı otomatik ve KASITLI olarak dışarıda bırakır** — 2016-12
+  Tarımsal, ülke seviyesinde de negatif çıktığı için hiç yüklenmedi
+  (59/60 satır, bkz. §11.3 master doküman), bu KASITLI bir kapsam
+  sınırlaması, bir hata DEĞİL (altı ay sonra "2016 neden yok" diye
+  yeniden araştırılmasın diye burada açıkça not düşülüyor). Güncel
+  hesaplanan değer için `09_PROJE_DURUMU.md`'ye bakın (sayılar burada
+  tutulmuyor, her turda eskir). Sanayi'yi TAMAMEN dışlayan, KPI-25'in
+  YERİNE GEÇMEYEN ayrı bir metrik için bkz. **KPI-27**.
 - **KPI-27** CAGR — Sanayi-hariç tüketim (%): ilk/son = yıl bazında toplam
-  tuketim_mwh, Sanayi grubu **TÜM yıllardan** (2023-2026 dahil) açıkça
+  tuketim_mwh, **İL BAZLI `fact_tuketim`**'den (KPI-25'in taşınmasından
+  ETKİLENMEDİ, kaynağı DEĞİŞMEDİ), Sanayi grubu **TÜM yıllardan** açıkça
   ÇIKARILARAK hesaplanır (bkz. worker/analytics.py
-  `yillik_tuketim_sanayi_haric_serisi_getir`) — KPI-25'in "kaynakta olan
-  yılları filtrele" stratejisinin TERSİ: burada tutarlılık, sorunlu grubu
-  (Sanayi) tüm yıllardan silerek sağlanır, o grubun bulunduğu yılları
-  dışlayarak değil. Yalnız **TAM yıllar** (12 farklı ay) dahil edilir —
-  2026 halen 6 aylık kısmi veri içeriyor, kısmi bir yılı tam yıllarla
-  karşılaştırmak aynı tür distorsiyonu yeniden üretirdi; 2026 12 aya
-  tamamlanınca otomatik olarak seriye girecek. **KPI-25'İN YERİNE GEÇMEZ**
-  — resmi "toplam tüketim" tanımını KARŞILAMAZ (Sanayi hariç tutulduğu
-  için), yalnız ek bağlam/gözlem amaçlı ayrı bir metriktir. 2026-09-03
-  itibarıyla canlı veride 2023→2025 (3 nokta, tam yıllar) için +%6,9
-  hesaplanıyor.
+  `yillik_tuketim_sanayi_haric_serisi_getir`). Yalnız **TAM yıllar** (12
+  farklı ay) dahil edilir — kısmi bir yılı tam yıllarla karşılaştırmak
+  distorsiyon üretir. **KPI-25'İN YERİNE GEÇMEZ** — resmi "toplam
+  tüketim" tanımını KARŞILAMAZ (Sanayi hariç tutulduğu için), yalnız ek
+  bağlam/gözlem amaçlı ayrı bir metriktir.
 - **KPI-26** CAGR — yenilenebilir kurulu güç (%): ilk/son = yıl bazında
   Σ kurulu_guc_mw WHERE `dim_kaynak.yenilenebilir_mi=true` — **üretim
   DEĞİL**, yalnız kurulu güç; kurulu güç bir STOK metriğidir, aylar

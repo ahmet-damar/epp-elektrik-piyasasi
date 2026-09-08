@@ -335,107 +335,90 @@ def test_kpi_11_12_hesapla_yetersiz_gecmis_hesaplanamaz(conn) -> None:  # type: 
     }
 
 
-def test_yillik_serilerinden_cagr(conn) -> None:  # type: ignore[no-untyped-def]
-    """yillik_tuketim_serisi_getir() TÜM il'i toplar (bilinçli, KPI-25 ulusal
-    bir gösterge) - bu yüzden yıllar bilinçli olarak uzak-gelecek sentinel
-    (2096/2100), başka hiçbir testle/gerçek veriyle çakışmaz.
+_TUM_GRUPLAR = ("Mesken", "Sanayi", "Tarımsal", "Aydınlatma", "Kamu ve Özel Hizmetler")
 
-    2026-09-03: KPI-25 artık yalnız Sanayi grubunu İÇEREN yılları seriye
-    alıyor (bkz. analytics.yillik_tuketim_serisi_getir() docstring'i) - bu
-    yüzden her iki sentinel yıla da (yalnız Mesken değil) bir Sanayi satırı
-    eklendi, aksi halde ikisi de filtreden düşer, seri boş kalır.
 
-    Seri, canlı (test-dışı) yıllarla karışmaması için kendi sentinel
-    yıllarına (2096/2100) izole edilir - `yillik_tuketim_serisi_getir()`
-    TÜM aktif yılları döndürür (bilinçli, KPI-25 ulusal bir gösterge), bu
-    yüzden CI'nin boş konteynerinde sorun çıkarmasa da CANLI DB'ye karşı
-    çalıştırıldığında gerçek yılların (örn. 2026, Sanayi İÇERDİĞİ için artık
-    bu filtreyi de geçiyor) seriye karışıp ilk/son yıl seçimini bozmasını
-    engeller - `test_kpi_25_tek_sanayili_yil_hesaplanamaz` ve
-    `test_yillik_tuketim_sanayi_haric_serisi_ve_kpi_27_hesaplanir`'daki
-    AYNI izolasyon deseni."""
-    il_kodu = 26
-    batch_id = _bos_batch(conn, "test-cagr")
-    for yil, tuketim_carpan in ((2096, 1.0), (2100, 1.4641)):  # %10/yıl, n=4
-        tarih_id = yil * 100 + 1
+def _ulke_geneli_tam_yil_ekle(
+    conn, batch_id: int, yil: int, yillik_toplam: float
+) -> None:  # type: ignore[no-untyped-def]
+    """Test yardımcısı (2026-09-08, Asama 2/C5): fact_tuketim_ulke_geneli'ye
+    TAM bir yıl (12 ay × 5 grup = 60 satır) ekler — `yillik_toplam`, 60
+    satıra eşit bölünür (yalnız yıl toplamı önemli, aylık/grup kırılımı
+    testler için önemsiz)."""
+    pay = yillik_toplam / 60
+    for ay in range(1, 13):
+        tarih_id = yil * 100 + ay
         ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO fact_tuketim
-                    (il_kodu, tarih_id, grup_id, baglanti, tuketim_mwh, ingestion_batch_id, is_active)
-                VALUES (%s, %s, (SELECT grup_id FROM dim_tuketici_grubu WHERE grup_adi = 'Mesken'),
-                        'dagitim', %s, %s, true)
-                """,
-                (il_kodu, tarih_id, 1000.0 * tuketim_carpan, batch_id),
-            )
-            cur.execute(
-                """
-                INSERT INTO fact_tuketim
-                    (il_kodu, tarih_id, grup_id, baglanti, tuketim_mwh, ingestion_batch_id, is_active)
-                VALUES (%s, %s, (SELECT grup_id FROM dim_tuketici_grubu WHERE grup_adi = 'Sanayi'),
-                        'dagitim', 1.0, %s, true)
-                """,
-                (il_kodu, tarih_id, batch_id),
-            )
+            for grup in _TUM_GRUPLAR:
+                cur.execute(
+                    """
+                    INSERT INTO fact_tuketim_ulke_geneli
+                        (tarih_id, grup_id, tuketim_mwh, ingestion_batch_id, is_active)
+                    VALUES (%s, (SELECT grup_id FROM dim_tuketici_grubu WHERE grup_adi = %s),
+                            %s, %s, true)
+                    """,
+                    (tarih_id, grup, pay, batch_id),
+                )
+
+
+def test_yillik_serilerinden_cagr(conn) -> None:  # type: ignore[no-untyped-def]
+    """yillik_tuketim_serisi_getir() (KPI-25, 2026-09-08'den beri
+    `fact_tuketim_ulke_geneli`'nden okur — bkz. Asama 2/C5 kararı, docstring
+    detayı analytics.py'de) TÜM ülke geneli tüketimi toplar. Yıllar
+    bilinçli olarak uzak-gelecek sentinel'e (2196/2200) izole edilir, canlı
+    veriyle karışmaz."""
+    batch_id = _bos_batch(conn, "test-cagr-ulke-geneli")
+    for yil, tuketim_carpan in ((2196, 1.0), (2200, 1.4641)):  # %10/yıl, n=4
+        _ulke_geneli_tam_yil_ekle(conn, batch_id, yil, 1000.0 * tuketim_carpan)
 
     seri = analytics.yillik_tuketim_serisi_getir(conn)
-    izole_seri = seri[seri["yil"].isin([2096, 2100])]
+    izole_seri = seri[seri["yil"].isin([2196, 2200])]
     cagr = analytics.cagr_seriden_hesapla(izole_seri, "tuketim_mwh")
     assert cagr is not None
     assert cagr == pytest.approx(10.0, abs=0.1)
 
 
-def test_kpi_25_tek_sanayili_yil_hesaplanamaz(conn) -> None:  # type: ignore[no-untyped-def]
-    """KPI-25 (2026-09-03 düzeltmesi): Sanayi grubu OLMAYAN bir yıl seriye
-    HİÇ girmez. Bugünkü canlı durumu izole şekilde simüle eder - yalnız 2026
-    Sanayi içeriyor (2023-2025 Word/Karar 2 gereği içermiyor), bu yüzden
-    KPI-25 None ('hesaplanamaz') dönmeli - KPI-26'nın 2026-09-02'de
-    kurduğu AYNI davranış deseni (yalnız ELİNDEKİ tek yıl farklı sentinel)."""
-    il_kodu = 26
-    batch_id = _bos_batch(conn, "test-kpi25-tek-yil")
-    # 2097: Sanayi VAR - seriye girmeli
-    tarih_id_2097 = 209701
-    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id_2097)
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO fact_tuketim
-                (il_kodu, tarih_id, grup_id, baglanti, tuketim_mwh, ingestion_batch_id, is_active)
-            VALUES
-                (%(il)s, %(t)s, (SELECT grup_id FROM dim_tuketici_grubu WHERE grup_adi = 'Sanayi'), 'dagitim', 5000.0, %(b)s, true),
-                (%(il)s, %(t)s, (SELECT grup_id FROM dim_tuketici_grubu WHERE grup_adi = 'Mesken'), 'dagitim', 2000.0, %(b)s, true)
-            """,
-            {"il": il_kodu, "t": tarih_id_2097, "b": batch_id},
-        )
-    # 2093: Sanayi YOK (Mesken'in aynısı 2023-2025/Word döneminin taklidi) -
-    # seriye GİRMEMELİ. dim_tarih_getir_veya_olustur() ile 209301 zaten
-    # test_kpi_11_12_hesapla_yeterli_gecmisle_hesaplanir tarafından
-    # oluşturulmuş olabilir (aynı dosyada, 2090-2093 aralığı kullanılıyor) -
-    # ON CONFLICT DO UPDATE ile güvenli, çakışma yaratmaz.
-    tarih_id_2093 = 209302  # ...01 test_kpi_11_12'nin hedef ayı, 02 boş
-    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id_2093)
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO fact_tuketim
-                (il_kodu, tarih_id, grup_id, baglanti, tuketim_mwh, ingestion_batch_id, is_active)
-            VALUES (%s, %s, (SELECT grup_id FROM dim_tuketici_grubu WHERE grup_adi = 'Mesken'),
-                    'dagitim', 9999.0, %s, true)
-            """,
-            (il_kodu, tarih_id_2093, batch_id),
-        )
+def test_kpi_25_eksik_yil_seriye_girmez(conn) -> None:  # type: ignore[no-untyped-def]
+    """KPI-25 (2026-09-08 düzeltmesi, Asama 2/C5): tam yıl (12 ay) VE 5/5
+    grup şartını KARŞILAMAYAN bir yıl seriye HİÇ girmez — 2016-12
+    Tarımsal'ın kaynakta hiç yüklenmemesiyle (bkz. master §11.3) AYNI
+    davranış deseni, burada bilerek yeniden üretiliyor: sentinel yılın bir
+    ayında (Aralık) bir grup (Tarımsal) EKSİK bırakılıyor (59/60 satır)."""
+    batch_id = _bos_batch(conn, "test-kpi25-eksik-yil")
+    yil_tam, yil_eksik = 2191, 2187
+
+    # Tam yıl - seriye girmeli
+    _ulke_geneli_tam_yil_ekle(conn, batch_id, yil_tam, 5000.0)
+
+    # Eksik yıl - Aralık ayında Tarımsal YOK (2016-12'nin taklidi) - 59/60 satır
+    for ay in range(1, 13):
+        tarih_id = yil_eksik * 100 + ay
+        ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+        with conn.cursor() as cur:
+            for grup in _TUM_GRUPLAR:
+                if ay == 12 and grup == "Tarımsal":
+                    continue  # bilerek atlanan satır
+                cur.execute(
+                    """
+                    INSERT INTO fact_tuketim_ulke_geneli
+                        (tarih_id, grup_id, tuketim_mwh, ingestion_batch_id, is_active)
+                    VALUES (%s, (SELECT grup_id FROM dim_tuketici_grubu WHERE grup_adi = %s),
+                            9999.0, %s, true)
+                    """,
+                    (tarih_id, grup, batch_id),
+                )
 
     seri = analytics.yillik_tuketim_serisi_getir(conn)
     yillar = set(seri["yil"])
-    assert 2097 in yillar, "Sanayi içeren yıl seriye girmeli"
-    assert 2093 not in yillar, "Sanayi içermeyen yıl seriye HİÇ girmemeli"
+    assert yil_tam in yillar, "Tam yıl (12 ay × 5 grup) seriye girmeli"
+    assert yil_eksik not in yillar, "Eksik yıl (59/60 satır) seriye HİÇ girmemeli"
 
     # Yalnız bu iki sentinel yılın görüldüğü alt-kümeyle CAGR'ı izole test et
-    # (canlı DB'de başka Sanayi'li yıllar da olabilir - o zaman None
-    # beklemek yanlış olur, bu yüzden filtrelenmiş alt-kümeyi kullanıyoruz).
-    izole_seri = seri[seri["yil"].isin([2097, 2093])]
-    assert len(izole_seri) == 1  # yalnız 2097 kaldı
+    # (canlı DB'de başka tam yıllar da olabilir - o zaman None beklemek
+    # yanlış olur, bu yüzden filtrelenmiş alt-kümeyi kullanıyoruz).
+    izole_seri = seri[seri["yil"].isin([yil_tam, yil_eksik])]
+    assert len(izole_seri) == 1  # yalnız yil_tam kaldı
     assert analytics.cagr_seriden_hesapla(izole_seri, "tuketim_mwh") is None
 
 

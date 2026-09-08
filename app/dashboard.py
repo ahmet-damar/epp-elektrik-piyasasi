@@ -73,6 +73,22 @@ claim'lerini (`app_metadata.role`) taşıyan, `SET ROLE` yapılmış YENİ bir
 bağlantı açar ve `session_state`'e koyar — eski, girişsiz `DATABASE_URL`
 yolu (paylaşılabilir/salt-okunur) YALNIZ `DATABASE_URL_DASHBOARD` hiç
 yapılandırılmamışsa (yerel/offline geliştirme) devrede kalır.
+
+**2026-09-08, Aşama 2 — İşlem yönetimi (idle-in-transaction kök nedeni
+düzeltmesi):** Gerçek bir olay (2026-09-07, C4 migration'ı uygularken)
+`app_dashboard_service`'e `idle_in_transaction_session_timeout` DB
+seviyesinde eklenmişti (semptomu tedavi eder) — asıl kök neden bu
+dosyanın hiçbir yerde `commit()`/`rollback()` ÇAĞIRMAMASIYDI: psycopg'nin
+varsayılan `autocommit=False`'unda HER sorgu bir işlem açar ve kapanana
+kadar açık kalır, Streamlit sekmesi etkileşimsiz bırakıldığında bu
+otomatik olarak "idle in transaction" hâline gelirdi. Çözüm: `rol_
+baglantisi_ac()`'ın döndürdüğü bağlantı `autocommit=True`'ya alınır (her
+sorgu KENDİ başına commit edilir, HİÇBİR ZAMAN açık işlemde kalınmaz) —
+`_baglanti_saglikli_mi()` + `_baglanti_al()`'daki yeniden bağlanma
+mantığı bunu TAMAMLAR: bağlantı yine de (ağ kopması, Supabase yeniden
+başlatma vb. başka bir sebeple) ölürse, kullanıcıya ham bir hata
+YANSITILMADAN, saklanan JWT claim'iyle (Supabase Auth'a TEKRAR
+gidilmeden) sessizce yeni bir bağlantı açılır.
 """
 
 from __future__ import annotations
@@ -129,9 +145,26 @@ def _cikis_yap(mesaj: str | None = None) -> None:
         "kullanici_email",
         "kullanici_rolu",
         "giris_zamani",
+        "_jwt_claims_json",
+        "_rol",
     ):
         st.session_state.pop(anahtar, None)
     st.rerun()
+
+
+def _baglanti_saglikli_mi(baglanti: Any) -> bool:
+    """Bağlantının hâlâ canlı olup olmadığını ucuz bir sorguyla kontrol eder
+    (2026-09-08, Aşama 2 — dashboard'un idle-in-transaction kök nedeni
+    düzeltmesinin bir parçası). Sunucu tarafından kapatılmış bir bağlantı
+    (`idle_in_transaction_session_timeout`, ağ kopması, Supabase yeniden
+    başlatma vb.) burada YAKALANIR — kullanıcıya ham bir hata YANSITILMADAN
+    önce, `_baglanti_al()` sessizce yeniden bağlanır."""
+    try:
+        with baglanti.cursor() as cur:
+            cur.execute("SELECT 1")
+        return True
+    except Exception:  # noqa: BLE001 - herhangi bir bağlantı hatası "sağlıksız" demektir
+        return False
 
 
 def _giris_ekrani_goster() -> None:
@@ -176,11 +209,20 @@ def _giris_ekrani_goster() -> None:
                 except Exception as e:  # noqa: BLE001 - kullanıcıya net bir hata göstermek için
                     st.error(f"Giriş başarılı ama bağlantı açılamadı: {e}")
                 else:
+                    # 2026-09-08 (Aşama 2): autocommit=True — bkz. modül
+                    # notu "İşlem yönetimi" ve _baglanti_saglikli_mi().
+                    baglanti.autocommit = True
                     st.session_state.db_handle = baglanti
                     st.session_state.db_source = "PostgreSQL via DATABASE_URL_DASHBOARD"
                     st.session_state.kullanici_email = sonuc.kullanici_email
                     st.session_state.kullanici_rolu = sonuc.rol
                     st.session_state.giris_zamani = time.time()
+                    # Sessiz yeniden bağlanma için saklanır (bkz.
+                    # _baglanti_saglikli_mi/_baglanti_al) - Supabase Auth'a
+                    # TEKRAR gitmeden aynı JWT claim'iyle yeni bir Postgres
+                    # bağlantısı açmaya yeter, şifre YENİDEN istenmez.
+                    st.session_state["_jwt_claims_json"] = sonuc.jwt_claims_json
+                    st.session_state["_rol"] = sonuc.rol
                     st.rerun()
     st.stop()
 
@@ -219,6 +261,27 @@ def _baglanti_al() -> tuple[Any | None, str]:
                 )
         if "db_handle" not in st.session_state:
             _giris_ekrani_goster()  # gönderilmediyse/başarısızsa st.stop() ile burada durur
+        elif not _baglanti_saglikli_mi(st.session_state.db_handle):
+            # 2026-09-08 (Aşama 2): bağlantı sunucu tarafından kapatılmış
+            # (örn. idle_in_transaction_session_timeout, ağ kopması) -
+            # kullanıcıya ham bir hata göstermek/elle "Çıkış Yap"
+            # yaptırmak YERİNE, SAKLANAN JWT claim'iyle (Supabase Auth'a
+            # TEKRAR gitmeden) sessizce yeni bir bağlantı açılır.
+            try:
+                st.session_state.db_handle.close()
+            except Exception:  # noqa: BLE001, S110 - zaten ölü bağlantıyı kapatma hatası önemsiz
+                pass
+            try:
+                yeni_baglanti = rol_baglantisi_ac(
+                    st.session_state["_jwt_claims_json"], st.session_state["_rol"]
+                )
+            except Exception:  # noqa: BLE001 - yeniden bağlanma da başarısızsa normal girişe düş
+                _cikis_yap(
+                    mesaj="Bağlantı kesildi ve yeniden kurulamadı — lütfen tekrar giriş yapın."
+                )
+            else:
+                yeni_baglanti.autocommit = True
+                st.session_state.db_handle = yeni_baglanti
         return st.session_state.db_handle, st.session_state.db_source
 
     if "db_handle" not in st.session_state:
@@ -759,9 +822,30 @@ if gercek_veri_var and (kpi_25 is None or kpi_26 is None or kpi_27 is None):
         "CAGR için en az iki farklı yıla ait aktif veri gerekir — henüz "
         "yeterli geçmiş (backfill) yüklenmemiş olabilir."
     )
+if gercek_veri_var:
+    # KPI-25 kaynak/kapsam bilgisi (2026-09-08, Asama 2/C5): "hesaplanamaz"
+    # çıktığında kullanıcı NEDENİNİ görebilsin - tuketim_serisi zaten yalnız
+    # şartı (tam yıl + 5/5 grup) karşılayan yılları içeriyor (bkz. worker/
+    # analytics.py:yillik_tuketim_serisi_getir()).
+    yillar_kapsam = sorted(tuketim_serisi["yil"].astype(int).tolist())
+    if len(yillar_kapsam) >= 2:
+        kpi_25_kapsam = (
+            f"{yillar_kapsam[0]}–{yillar_kapsam[-1]} ({len(yillar_kapsam)} yıl)"
+        )
+    elif len(yillar_kapsam) == 1:
+        kpi_25_kapsam = f"yalnız {yillar_kapsam[0]} (CAGR için en az 2 yıl gerekir)"
+    else:
+        kpi_25_kapsam = "şartı karşılayan yıl yok"
+    st.caption(
+        f"KPI-25 kaynağı: `fact_tuketim_ulke_geneli` (Sanayi dahil, il "
+        "kırılımsız). Bir yıl yalnız TAM 12 ay VE 5/5 tüketici grubu "
+        "mevcutsa kapsama girer — 2016 bu yüzden otomatik hariç (2016-12 "
+        f"Tarımsal kaynakta hiç yüklenmedi, kasıtlı). Kapsam: {kpi_25_kapsam}."
+    )
 st.caption(
-    "KPI-27, Sanayi grubunu TÜM yıllardan çıkararak hesaplanır — KPI-25'in "
-    "(resmi toplam tüketim) YERİNE GEÇMEZ, yalnız ek bağlam sağlar "
+    "KPI-27, Sanayi grubunu TÜM yıllardan çıkararak hesaplanır (kaynağı "
+    "il bazlı `fact_tuketim`, DEĞİŞMEDİ) — KPI-25'in (resmi toplam "
+    "tüketim) YERİNE GEÇMEZ, yalnız ek bağlam sağlar "
     "(dokumanlar/04_kpi_sozlesmeleri.md)."
 )
 

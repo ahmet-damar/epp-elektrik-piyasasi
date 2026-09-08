@@ -41,10 +41,15 @@ yansıtıldı.**
 - **`veri_kapsam_disi` dashboard'a bağlandı** — seçili dönem için
   "kaynakta yok" işaretli veri varsa panel artık sessiz boşluk yerine
   açıklayıcı bir bilgi kutusu gösteriyor.
-- **KPI-25/KPI-27 zaten uygulanmış durumda** — KPI-25 (resmi "toplam
-  tüketim" CAGR) yalnız Sanayi'yi içeren tam yılları sayıyor (bugün
-  itibarıyla tek yıl olduğu için 'hesaplanamaz'); KPI-27 (Sanayi-hariç,
-  ayrı bir metrik) tüm yıllarda tutarlı grain ile çalışıyor.
+- **KPI-25/KPI-27 — TAMAMLANDI, kaynak kararı uygulandı (2026-09-08,
+  Aşama 2/C5).** KPI-25 (resmi "toplam tüketim" CAGR) TAMAMEN
+  `fact_tuketim_ulke_geneli`'ye taşındı (tam yıl + 5/5 grup şartı, il
+  bazlı `fact_tuketim` ile ASLA karıştırılmıyor) — artık canlıda GERÇEK
+  bir değer üretiyor: **+%3,1** (2017→2025, n=8; 2016 kasıtlı hariç —
+  2016-12 Tarımsal kaynakta hiç yüklenmedi). Önceden sürekli
+  'hesaplanamaz' dönüyordu, bu GERÇEK bir fonksiyonel iyileştirme. KPI-27
+  (Sanayi-hariç, il bazlı `fact_tuketim`, DEĞİŞMEDİ) canlıda **+%3,8**
+  (2016→2025, n=9). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §7.5/§11.2.
 - **pytest** (`worker/tests`, 6 `*_integration.py` hariç): temiz bir
   ortamda (`env -i`, DB env değişkeni yok) **227/227 geçti**, 0 hata —
   bkz. "Test durumu" bölümü ve `10_TEKNIK_MASTER_DOKUMAN.md` §9.4
@@ -93,18 +98,34 @@ yansıtıldı.**
   verildi. `app_dashboard_service`'e `idle_in_transaction_session_
   timeout=30min` **canlıya uygulandı** (2026-09-07'deki 3+ saatlik kilit
   olayının TEKRARINA karşı) — gerçek bir kısa-timeout testiyle
-  doğrulandı, normal kullanım etkilenmedi; `app/dashboard.py`'nin bu
-  hatayı otomatik yakalamadığı (elle "Çıkış Yap" gerekiyor) bilinen bir
-  sınırlama olarak not edildi (kod değişikliği kapsam dışı bırakıldı).
-  **`scheduled-backup.yml` artık GERÇEK koşuyla UÇTAN UCA doğrulandı
-  (2026-09-08, PAT'e `workflow` izni eklendikten sonra) — bu madde
-  KAPANDI.** 2 gerçek CI hatası bulunup düzeltildi (pg_dump 16→17 sürüm
-  uyumsuzluğu, PATH sırası); üçüncü koşu başarılı oldu, artifact
+  doğrulandı, normal kullanım etkilenmedi. (`app/dashboard.py`'nin bu
+  hatayı otomatik yakalamadığı o turda bilinen bir sınırlama olarak not
+  edilmişti — **2026-09-08'de Aşama 2'de KÖKÜNDEN düzeltildi, aşağıya
+  bkz.**) **`scheduled-backup.yml` artık GERÇEK koşuyla UÇTAN UCA
+  doğrulandı (2026-09-08, PAT'e `workflow` izni eklendikten sonra) — bu
+  madde KAPANDI.** 2 gerçek CI hatası bulunup düzeltildi (pg_dump 16→17
+  sürüm uyumsuzluğu, PATH sırası); üçüncü koşu başarılı oldu, artifact
   indirilip `pg_restore --list` ile içeriği incelendi, disposable
-  postgres:16'ya restore edilip **19/19 tablo canlı Supabase'in
-  `COUNT(*)` değerleriyle birebir eşleşti**; 100 KB eşiği de ayrıca
-  test edildi (gerçekten FAIL ettirildi, sonra geri alındı). Detay:
-  `10_TEKNIK_MASTER_DOKUMAN.md` §8.2/§8.5/§9, Sürüm Geçmişi v1.8-v1.9.
+  postgres:17'ye (canlı Supabase'in kendi major sürümü) restore edilip
+  **19/19 tablo canlı Supabase'in `COUNT(*)` değerleriyle birebir
+  eşleşti**; 100 KB eşiği de ayrıca test edildi (gerçekten FAIL
+  ettirildi, sonra geri alındı). Detay: `10_TEKNIK_MASTER_DOKUMAN.md`
+  §8.2/§8.5/§9, Sürüm Geçmişi v1.8-v1.9.
+- **Aşama 2 (2026-09-08) — TAMAMLANDI (C5).** KPI-25 TAMAMEN
+  `fact_tuketim_ulke_geneli`'ye taşındı, KPI-27 il bazlı `fact_tuketim`'de
+  kaldı (yukarıya bkz.) — karışık kaynak KPI'sı tasarımından bilinçli
+  olarak kaçınıldı. `app/dashboard.py`'nin idle-in-transaction KÖK
+  NEDENİ düzeltildi (`autocommit=True` + ölü bağlantıyı sessizce
+  yeniden kuran `_baglanti_saglikli_mi()` mantığı) — canlıda GERÇEK
+  testlerle kanıtlandı (2s timeout + 3s bekleme sonrası ikinci sorgu
+  artık hata VERMİYOR; kasıtlı kapatılan bağlantı doğru tespit edilip
+  saklanan JWT claim'iyle sessizce yeniden bağlandı). Yedekleme
+  runbook'undaki restore hedefi `postgres:16`'dan canlı Supabase'in
+  kendi sürümü `postgres:17`'ye düzeltildi, tatbikat yeniden koşuldu:
+  19/19 tablo yine eşleşti, önceki turdaki tek zararsız uyarı (PG17
+  `transaction_timeout` GUC'u) de ortadan kalktı. Detay:
+  `10_TEKNIK_MASTER_DOKUMAN.md` §7.5/§8.2/§8.5/§11.2, Sürüm Geçmişi
+  v1.10-v1.12.
 
 ## Tablo — Yıl × Tablo Aktivasyon Durumu
 
@@ -228,40 +249,17 @@ sorgulandı:
 ## SONRAKİ OTURUM DEVAM NOKTASI
 
 **Bu bölümü önce oku.** 2026-09-07/08'de tamamlanan iş: 13-dokümanlık dış
-denetim (Aşama 0, TAMAMLANDI) + operasyonel güvenlik (Aşama 1: C2, B2,
-C1, C3, C4 — TAMAMLANDI, `scheduled-backup.yml` da gerçek koşuyla
-doğrulandı). Aşama 1'den kalan açık madde YOK. Sırada **Aşama 2** var.
+denetim (Aşama 0), operasyonel güvenlik (Aşama 1: C2, B2, C1, C3, C4),
+ve KPI sözleşmesi kapanışı (Aşama 2: C5 + dashboard idle-in-transaction
+kök nedeni + yedekleme restore hedefi düzeltmesi) — **HEPSİ TAMAMLANDI**.
+Dış denetim listesindeki A/B/C bölümlerinden **hiçbir açık madde
+kalmadı**. Sırada denetimin kendisinin işaret ettiği bir sonraki adım
+YOK — proje bir sonraki iş kalemi için (Faz 4/5/6, yeni bir özellik,
+yeni bir denetim turu) açık.
 
-### Aşama 2 — KPI sözleşmesini kapat (C5 + C6)
-
-**C5 — KPI-25/27 veri kaynağı kararı (asıl iş):**
-- **KPI-25** (resmî "toplam tüketim" CAGR): kaynağı **yalnız
-  `fact_tuketim_ulke_geneli`** olacak şekilde değiştir — şart: tam yıl
-  (12 ay) VE 5/5 grup (bu şart 2016'yı otomatik dışarıda bırakır, çünkü
-  2016-12 Tarımsal hiç yüklenmedi — bu KASITLI, ayrıca dokümante
-  edilmeli ki 6 ay sonra "2016 neden yok" diye tekrar araştırılmasın).
-  KPI-25 il bazlı `fact_tuketim` ile KARIŞTIRILMAMALI (grain karışımı,
-  bkz. master §11.2).
-- **KPI-27** (Sanayi-hariç tüketim CAGR): **il bazlı `fact_tuketim`**
-  kalır, mevcut hâli DEĞİŞMEZ.
-- KPI-25 kaynak değiştirdiği anda `dokumanlar/04_kpi_sozlesmeleri.md`'deki
-  ESKİYEN "yalnız Sanayi'yi içeren yıllar" filtre paragrafı **silinmeli**
-  — yoksa bir sonraki denetimde yeniden "çelişki" olarak işaretlenir.
-- Uygulama sırası (önceki oturumlardaki pattern'e uy): önce `worker/
-  kpi.py`/`worker/analytics.py`'deki KPI-25 fonksiyonunu değiştir, test
-  yaz/güncelle, CI yeşil olduğunu doğrula, SONRA dokümanları (04, 09, 10)
-  güncelle — kod/doküman aynı commit'te.
-
-**C6 — ertelenmiş/değerlendirilmiş küçük maddeler (yalnız referans,
-aksiyon gerektirmeyebilir):**
+### C6 — ertelenmiş/değerlendirilmiş küçük maddeler (yalnız referans, aksiyon gerektirmiyor)
 - MFA/merkezi rate-limit: ertelendi (tek admin kullanıcı var).
 - HDD/CDD çok noktalı model: Faz 4 öncesi bir kez ölçülüp karara
   bağlanacak, şimdi değil.
 - Diğerleri (Strategy Pattern, veri girişi UI'ı vb.) zaten REDDEDİLDİ/
   KAPANDI — yeniden açılmasın.
-
-**C4'ün kendi açık kalan tasarım notu:** `app/dashboard.py`'nin salt-okunur
-sorgularında `autocommit=True`/periyodik `commit()` kullanılmaması —
-DB'deki `idle_in_transaction_session_timeout` bunu yalnız SINIRLIYOR,
-KÖKÜNDEN çözmüyor. Bir kod refactor'ü fırsatı (bu oturumun kapsamı
-dışıydı, aksiyon gerektirmiyor ama gündemde tutulmalı).

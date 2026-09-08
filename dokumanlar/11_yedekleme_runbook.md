@@ -107,11 +107,18 @@ YAML değil, canlıya karşı çalışırken bulunmuş gerçek sorunlardı:
    7 tablo, `dim_tarih`, `audit_log`, `ingestion_batch`, `source_asset`,
    `job_status`, `veri_kapsam_disi`) TABLE DATA olarak mevcut; 6 seed
    tablosu (`dim_il` vb.) doğru şekilde YOK.
-5. **Bu artifact disposable postgres:16'ya GERÇEKTEN restore edildi** —
-   **19/19 tablo, canlı Supabase'in `COUNT(*)` değerleriyle BİREBİR
-   eşleşti** (bkz. aşağıdaki tablo — aynı sayılar). CI artifact'ının
-   yalnız "job yeşil" değil, gerçekten kullanılabilir bir yedek olduğu
-   kanıtlandı.
+5. **Bu artifact disposable `postgres:17`'ye GERÇEKTEN restore edildi**
+   (2026-09-08'de `postgres:16`'ya karşı bir kez denenmişti — restore
+   BAŞARILI oldu ve 19/19 tablo o zaman da eşleşti, ama PG17'ye özgü
+   `SET transaction_timeout = 0;` dump-preamble komutu için tek bir
+   zararsız "unrecognized configuration parameter" uyarısı vermişti;
+   canlı Supabase **PostgreSQL 17.6** çalıştırdığından hedef `postgres:16`
+   yerine `postgres:17`'ye düzeltildi — tatbikat artık gerçek felaket
+   senaryosuyla BİREBİR aynı major sürümde, o uyarı da tamamen ortadan
+   kalktı, 0 hata) — **19/19 tablo, canlı Supabase'in `COUNT(*)`
+   değerleriyle BİREBİR eşleşti** (bkz. aşağıdaki tablo — aynı sayılar).
+   CI artifact'ının yalnız "job yeşil" değil, gerçekten kullanılabilir
+   bir yedek olduğu kanıtlandı.
 6. **100 KB eşiği de test edildi**: geçici olarak 5 MB'a yükseltilip
    gerçek dump (1.68 MB) ile job GERÇEKTEN FAIL ettirildi (`Dump dosyası
    beklenenden çok küçük (1684116 bayt)`), `upload-artifact` adımının
