@@ -1422,3 +1422,33 @@ uyumsuzsa aktivasyon ENGELLENİR).
 **Sabah onayı bekleniyor:** bu iş canlıya UYGULANMADI (ne migration ne
 backfill). Bkz. `09_PROJE_DURUMU.md` "Sonraki Oturum Devam Noktası" ve
 `10_TEKNIK_MASTER_DOKUMAN.md` §5.10, Sürüm Geçmişi v1.23.
+
+## 2026-09-09 (gece çalışması, gözetimsiz, MADDE 5) — Word üretim tabloları envanteri (araştırma-only, KOD YOK)
+
+`dokumanlar/12_word_uretim_envanteri.md` yazıldı — ADIM 4'ün (Word yılları
+üretim backfill'i) hazırlığı. Yöntem: `word_ortak.py`'nin MEVCUT
+`basliklari_topla()` yardımcısıyla 10 yılın Haziran'ı + 2018/2021/2023
+için ayrıca Ocak/Aralık spot-check'i, gerçek `.docx` dosyalarına karşı.
+KOD YAZILMADI (`07_word_parser_kapsam.md` Bulgu 5'in AYNI disiplini).
+
+**7 bulgu (özet, tam detay dokümanda):**
+- **A:** tablo numaralandırması yıl yıl VE bazı yıl İÇİNDE (2021/2023
+  Ocak) kayıyor — field-code boş render, T11/T10 için zaten bilinen
+  fenomenin üretim tablolarında da doğrulanması.
+- **B:** kaynak-bazında (Lisanslı) tablolar 2017'den itibaren dönemler-
+  arası-karşılaştırma formatında — `hedef_donem_kolonu_bul()` gerekiyor.
+- **C (KARAR BEKLİYOR):** Lisanssız için Word'de GERÇEK bir il×kaynak
+  JOINT matris VAR (2016-2023 doğrulandı) — Excel'de YOK. Kullanılsın mı,
+  yoksa Excel ile simetri için marjinal-only mi tutulsun?
+- **D (KARAR BEKLİYOR):** 2016-2017'de "Brüt Lisanssız Üretim Miktarı"
+  kolonu YOK — yalnız "İhtiyaç fazlası satın alınan enerji miktarı" (dar
+  bir alt-küme, aynı tanım DEĞİL). 2016-2017 kapsam dışı mı sayılsın?
+- **E (AÇIK SORU):** 2023-Aralık ve 2024/2025-Haziran'da il-bazında/
+  il×kaynak Lisanssız tabloları bulunamadı — neden belirsiz (gerçekten
+  yok mu, yeniden adlandırıldı mı, birleştirildi mi) — ADIM 4'ün İLK işi.
+- **F:** il-bazında tablolar HER YIL iki-sütunlu sayfa düzeninde
+  (kullanıcının önceden işaretlediği risk doğrulandı, genelleştirildi).
+- **G (AÇIK SORU):** hiçbir tablonun Genel Toplam/Toplam satırının
+  varlığı/konumu bu turda teyit edilmedi.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` Sürüm Geçmişi v1.24.

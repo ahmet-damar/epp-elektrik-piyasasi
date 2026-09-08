@@ -126,9 +126,13 @@ yansıtıldı.**
   `transaction_timeout` GUC'u) de ortadan kalktı. Detay:
   `10_TEKNIK_MASTER_DOKUMAN.md` §7.5/§8.2/§8.5/§11.2, Sürüm Geçmişi
   v1.10-v1.12.
-- **Aşama 3 (boş KPI'ları açma) — ADIM 1-2 ve ADIM 3 madde 1 TAMAMLANDI
-  (2026-09-08), ADIM 3 madde 2-4 + ADIM 4-5 AÇIK** (bkz. "Sonraki Oturum
-  Devam Noktası"). ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
+- **Aşama 3 (boş KPI'ları açma) — ADIM 1-2 ve ADIM 3 madde 1 canlıda
+  TAMAMLANDI (2026-09-08); ADIM 3 madde 2-4 kod/disposable seviyesinde
+  TAMAMLANDI ama sabah onayı bekliyor, ADIM 5 araştırma hazırlığı bitti,
+  ADIM 5'in kendisi HENÜZ BAŞLAMADI** (bkz. "Sonraki Oturum Devam
+  Noktası" — 2026-09-09 gece çalışması bölümü, canlıya UYGULANMAYAN
+  işlerin tam listesi orada). ADIM 1: Excel T11'in Genel Toplam satırı
+  KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
   edilince T7 ile 4/6 ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11
   seçildi** (2016-2025 Word ile TEK tanım). ADIM 2: `fact_tuketim_
@@ -277,53 +281,64 @@ sorgulandı:
 **Bu bölümü önce oku — bir sonraki oturum yalnız bunu okuyup kaldığı
 yerden devam edebilmeli.**
 
-### Bugün (2026-09-07/08) ne kapandı — tek satır özet
-13-dokümanlık dış denetimin **tamamı** kapandı: Aşama 0 (doküman/
-gerçeklik senkronu, A/B/C bölümlerinin hepsi), Aşama 1 (operasyonel
-güvenlik — C2 prod test guard, B2 CI/deploy migration simetrisi, C1
-yedekleme + haftalık otomasyon + GERÇEK restore drill'i, C3 sessiz
-başarısızlık savunması, C4 RLS geri açılması), Aşama 2 (C5 — KPI-25/27
-kaynak kararı, dashboard idle-in-transaction kök nedeni, restore hedefi
-postgres:17 düzeltmesi), ve D kuralına tarih çapası maddesi (commit
-`5214b9d`). Ayrıca 2026-09-08 içinde Aşama 3 ADIM 1-2 (`fact_tuketim_
-ulke_geneli` 2026-01..06'ya genişletildi, 629 aktif satır, KPI-13 artık
-+%7,1 gerçek değer — commit `1232cb3`) ve ADIM 3 madde 1 (batch
-bağımlılığı düzeltmesi — `kumulatif_tuketim_mwh` kolonu + `tutarlilik_
-ulke_geneli_kumulatif.py`, canlıda doğrulandı — commit `df616e6`)
-tamamlandı. **Bu kapanış turunda (2026-09-08, gün sonu) yeni kod/tablo/
-migration YAZILMADI** — yalnız bu bölüm + kapanan bir test-izolasyonu
-olayının kaydı güncellendi (aşağıya bkz.).
+### Bugün/bu gece (2026-09-07/08/09) ne kapandı — tek satır özet
+13-dokümanlık dış denetimin **tamamı** kapandı (2026-09-07/08, Aşama 0/1/2
++ D kuralı). 2026-09-08 içinde Aşama 3 ADIM 1-2 + ADIM 3 madde 1 kapandı
+(commit `1232cb3`, `df616e6`). **2026-09-09 gecesi (gözetimsiz çalışma)
+ADIM 3'ün TAMAMI (madde 0-4) + ADIM 5'in araştırma hazırlığı kapandı** —
+detay aşağıda, commit'ler `a230614`→`cf5c9a1`.
+
+### ⚠️ SABAH ONAYI BEKLEYEN — canlıya UYGULANMADI (gece çalışmasının mutlak sınırı gereği)
+Gece çalışması talimatı **canlı Supabase'e hiçbir migration/backfill/
+aktivasyon YAPMAMAYI** zorunlu kılıyordu — aşağıdakiler yalnız disposable
+postgres:17'de doğrulandı, hepsi hazır ve test edilmiş durumda, **sabah
+onayla canlıya uygulanmayı bekliyor:**
+1. Migration `20260909_0001_fact_uretim_kaynak_il_geneli.sql` (iki yeni
+   tablo — RLS/policy/GRANT dahil).
+2. `python -m worker.scripts.backfill_uretim_excel` (6 ay, 2026-01..06,
+   gerçek dosyalardan) — disposable'da 6/6 yüklendi, mutabakat 6/6
+   UYGUN, 6/6 aktive edildi (101+942 satır). Canlıda AYNI komut
+   çalıştırılabilir (kod değişmedi, yalnız `DATABASE_URL` canlıyı
+   gösterecek).
+Onay verilirse: migration'ı uygula → `backfill_uretim_excel`'i çalıştır →
+`mutabakat_uretim.py`'yi çalıştırıp YEŞİL olduğunu doğrula →
+`validate_rls_static.py`/`validate_role_access.py`'yi tekrar koş.
 
 ### Açık madde
 Dış denetim listesinin (A/B/C bölümleri) hiçbir maddesi açık değil.
-**Aşama 3 (boş KPI'ları açma) DEVAM EDİYOR** — ADIM 1 (T11 vs T7 tanım
-dikişi kontrolü), ADIM 2 (`fact_tuketim_ulke_geneli`'nin 2026+ Excel'e
-genişletilmesi, KPI-13'ün girdisi taşındı) ve ADIM 3 madde 1 (batch
-bağımlılığı düzeltmesi) **TAMAMLANDI** — canlıya uygulandı, mevcut 30
-satır yeniden doğrulandı (bkz. yukarıdaki TL;DR, `10_TEKNIK_MASTER_
-DOKUMAN.md` §5.5-5.6). **ADIM 3'ün madde 2-4'ü ve ADIM 4-5 AÇIK, HİÇBİRİNE
-BAŞLANMADI** — sırada:
-- **ADIM 3 madde 2:** `fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli`
-  (tek migration, `fact_tuketim_ulke_geneli` ile AYNI batch/is_active/RLS/
-  GRANT deseni). Excel T2/T3/T5/T6 zaten AYLIK (kümülatif DEĞİL, ADIM 1
-  araştırmasında doğrulandı) — de-kümülatif mantığı buraya KOPYALANMAYACAK.
-- **ADIM 3 madde 3:** il toplamı ile kaynak toplamının her (dönem,
-  lisans_id) çifti için eşleştiğini doğrulayan kalıcı mutabakat script'i
-  (`mutabakat_ulke_geneli.py` deseninde), ±%0,5 tolerans — uyumsuzluk
-  aktivasyonu BLOKLAMALI (yalnız uyarı değil).
-- **ADIM 3 madde 4:** Yalnız Excel (2026-01..06) backfill + doğrulama —
-  Word yılları BU maddede YOK.
-- **ADIM 4 (orijinal numaralandırma — Word yılları):** ADIM 3 madde 2-4
-  Excel için oturduktan SONRA, üretim verisi için Word (10 yıl) backfill'i
-  — yıl-yıl format sürprizleri beklenir (özellikle Tablo 1.11'in "Brüt
-  Lisanssız Üretim Miktarı" çapa-bazlı kolonu, Tablo 1.12'nin iki-sütunlu
-  sayfa düzeni).
-- **ADIM 5:** KPI-02/03/06/07 → `fact_uretim_kaynak_geneli`; KPI-05 → pay
-  yeni tablodan, payda mevcut `fact_uretim.kurulu_guc_mw`'dan (⚠️
-  `lisans_id` filtresi İKİ tarafta da AYNI olmalı — testle kanıtlanmalı).
-  Her KPI kartına kaynak/kapsam notu. **Bu turda (2026-09-08) ADIM 5'e
-  HİÇ dokunulmadı — veri doğru oturmadan KPI'ya bağlanmayacak (kullanıcı
-  talimatı).**
+**Aşama 3 (boş KPI'ları açma) — ADIM 1-4'ün TAMAMI kod/test seviyesinde
+TAMAMLANDI, ADIM 3 madde 2-4 sabah onayı bekliyor (yukarı bkz.), ADIM 5
+(KPI bağlama) HENÜZ BAŞLAMADI:**
+- **ADIM 3 madde 1** (batch bağımlılığı düzeltmesi) — TAMAMLANDI, canlıda
+  (2026-09-08, commit `df616e6`).
+- **ADIM 3 madde 2** (`fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli`
+  migration'ı) — kod TAMAMLANDI (commit `cf5c9a1`), **canlıya UYGULANMADI**
+  (yukarıdaki onay kutusuna bkz.).
+- **ADIM 3 madde 3** (`mutabakat_uretim.py`, aktivasyonu engelleyen
+  `periyot_aktivasyona_uygun_mu()`) — TAMAMLANDI (commit `9c3c236`,
+  güvenlik düzeltmesi `dbe610e`), disposable'da kanıtlandı, **canlıda
+  henüz veri yok** (yukarıdaki onay kutusuna bkz.).
+- **ADIM 3 madde 4** (Excel backfill) — kod + disposable doğrulama
+  TAMAMLANDI (commit `cf5c9a1`), **canlıya UYGULANMADI** (yukarıdaki onay
+  kutusuna bkz.).
+- **ADIM 5 hazırlığı (araştırma-only, kod YOK):** Word (2016-2025) üretim
+  tabloları envanteri yazıldı (`dokumanlar/12_word_uretim_envanteri.md`,
+  commit — bu turun son commit'i) — ADIM 4'ün (orijinal numaralandırma,
+  Word yılları backfill'i) hazırlığı. **2 karar bekleyen bulgu var:**
+  - **Bulgu C:** Word'de Lisanssız üretim için GERÇEK bir il×kaynak JOINT
+    matris VAR (Excel'de yok) — kullanılsın mı, yoksa Excel ile simetri
+    için marjinal-only mu tutulsun?
+  - **Bulgu D:** 2016-2017'de "Brüt Lisanssız Üretim Miktarı" tanımı
+    kaynakta YOK (yalnız dar bir "İhtiyaç fazlası..." metriği var) — bu
+    iki yıl kapsam dışı mı sayılsın?
+  Ayrıca 2 açık teknik soru (Bulgu E: bazı ay/yıllarda il-bazında/
+  il×kaynak Lisanssız tablosu bulunamadı, neden belirsiz — ADIM 4'ün İLK
+  işi olmalı; Bulgu G: Genel Toplam satırı konumu teyit edilmedi).
+- **ADIM 5 (asıl KPI bağlama, KPI-02/03/06/07/05):** HİÇ BAŞLAMADI —
+  ADIM 3 madde 2-4 canlıya uygulanıp veri doğru oturmadan başlanmayacak
+  (kullanıcı talimatı, hem 2026-09-08 hem gece çalışması turlarında
+  tekrarlandı). KPI-05'in `lisans_id` filtre tutarlılığı uyarısı hâlâ
+  geçerli (pay/payda İKİ tarafta da AYNI filtrelenmeli).
 
 ### ✅ Kapandı — `conftest.py` canlı-DB koruması artık kendi regresyon testine sahip (2026-09-09, gece çalışması MADDE 0)
 Aynı koruma (`worker/tests/conftest.py:pytest_configure()`) daha önce
