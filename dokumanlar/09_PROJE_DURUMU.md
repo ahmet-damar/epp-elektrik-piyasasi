@@ -1,5 +1,6 @@
 # 09 — Proje Durumu (GÜNCEL, DB'den doğrulandı — 2026-09-04, 2026-09-07'de
-fact_tuketim_ulke_geneli eklemesiyle güncellendi)
+fact_tuketim_ulke_geneli eklemesiyle, 2026-09-08'de Aşama 1 kapanışıyla
+güncellendi)
 
 > **STATUS: LIVE (güncel durum)** — bu dosya ve `10_TEKNIK_MASTER_
 > DOKUMAN.md`, değişen sayı/durumun YAŞADIĞI tek iki yerdir; diğer
@@ -84,6 +85,21 @@ yansıtıldı.**
 - **Kapsam dışı bırakılan (ayrı karar):** C5 (KPI-25/27'nin
   `fact_tuketim_ulke_geneli`'yi kullanıp kullanmayacağı) ve C6'daki diğer
   öneriler — Aşama 2'ye bırakıldı.
+- **Aşama 1 kapanışı (2026-09-08) — C1'in eksik yarısı + C4'ün yan
+  etkisi giderildi.** `.github/workflows/scheduled-backup.yml` eklendi
+  (haftalık `pg_dump`, artifact `retention-days: 90`) — repo PUBLIC
+  olduğu ve `audit_log`'da hassas veri OLMADIĞI doğrulanarak (bkz.
+  `11_yedekleme_runbook.md`) şifrelemeden saklanmasına bilinçli karar
+  verildi. `app_dashboard_service`'e `idle_in_transaction_session_
+  timeout=30min` **canlıya uygulandı** (2026-09-07'deki 3+ saatlik kilit
+  olayının TEKRARINA karşı) — gerçek bir kısa-timeout testiyle
+  doğrulandı, normal kullanım etkilenmedi; `app/dashboard.py`'nin bu
+  hatayı otomatik yakalamadığı (elle "Çıkış Yap" gerekiyor) bilinen bir
+  sınırlama olarak not edildi (kod değişikliği kapsam dışı bırakıldı).
+  **Açık kalan tek madde:** `scheduled-backup.yml`'in gerçek bir koşusu
+  bu oturumda doğrulanamadı (`gh` token'ının `workflow` izni yok) — bkz.
+  aşağıdaki "Sonraki Oturum Devam Noktası". Detay: `10_TEKNIK_MASTER_
+  DOKUMAN.md` §8.2/§8.5, Sürüm Geçmişi v1.8.
 
 ## Tablo — Yıl × Tablo Aktivasyon Durumu
 
@@ -189,11 +205,69 @@ sorgulandı:
   81/120 ay aktive edilebildi, 39 ay `running` bırakılıp kullanıcıya
   rapor edildi (bkz. `06_canli_veri_operasyon_gunlugu.md` 2026-09-05/07
   kaydı) — bu, **geçici bir ara durumdu**, kalıcı sonuç değil.
-- **2026-09-07 turu (son, GÜNCEL durum):** 39 aylık uyumsuzluğun kök
-  nedeni bulundu (veri hatası değil — `dogrula_tuketim()`'in negatif
-  değer reddinin il vs ülke seviyesinde bağımsız uygulanmasının beklenen
-  sonucu), mutabakat sorgusu kalıcı olarak düzeltildi
-  (`worker/scripts/mutabakat_ulke_geneli.py`), kalan 39 ay (2016-12 hariç
-  4/5 grupla) aktive edildi → **120/120 ay aktif, 599 satır** — TL;DR'deki
-  sayı budur ve güncel/nihai olandır. RLS admin+viewer JWT ile yeniden
-  doğrulandı.
+- **2026-09-07 turu:** 39 aylık uyumsuzluğun kök nedeni bulundu (veri
+  hatası değil — `dogrula_tuketim()`'in negatif değer reddinin il vs
+  ülke seviyesinde bağımsız uygulanmasının beklenen sonucu), mutabakat
+  sorgusu kalıcı olarak düzeltildi (`worker/scripts/mutabakat_ulke_
+  geneli.py`), kalan 39 ay (2016-12 hariç 4/5 grupla) aktive edildi →
+  **120/120 ay aktif, 599 satır**. RLS admin+viewer JWT ile yeniden
+  doğrulandı. Ayrıca 13-dokümanlık dış denetim (Aşama 0) ve Aşama 1'in
+  büyük kısmı (C2/B2/C1/C3/C4) bu günde tamamlandı.
+- **2026-09-08 turu (son, GÜNCEL durum):** Aşama 1 kapatıldı — zamanlanmış
+  yedek workflow'u + `app_dashboard_service` idle timeout canlıya
+  uygulandı (yukarıya bkz.). Bu turda hiçbir fact/dim tablosu
+  değişmedi, yalnız CI/CD + rol config'i.
+
+---
+
+## SONRAKİ OTURUM DEVAM NOKTASI
+
+**Bu bölümü önce oku.** 2026-09-07/08'de tamamlanan iş: 13-dokümanlık dış
+denetim (Aşama 0, TAMAMLANDI) + operasyonel güvenlik (Aşama 1: C2, B2,
+C1, C3, C4 — TAMAMLANDI). Sırada **Aşama 2** var.
+
+### Açık madde (Aşama 1'den kalan, küçük)
+
+- `.github/workflows/scheduled-backup.yml`'in **gerçek bir koşusu henüz
+  doğrulanmadı** — bu oturumu yürüten `gh` CLI token'ının `workflow`
+  izni yoktu (`workflow_dispatch` 403 verdi). Kullanıcıdan token'a bu
+  izni eklemesi istendi. Bir sonraki oturum: `gh workflow run
+  scheduled-backup.yml` dene; başarılıysa `gh run list --workflow=
+  scheduled-backup.yml` ile son koşuyu kontrol et, dump boyutunu ve
+  artifact'in gerçekten oluştuğunu doğrula, sonucu bu dosyaya ve master
+  dokümana işle. İzin hâlâ yoksa kullanıcıya GitHub UI'dan elle
+  tetiklemesini (Actions → Scheduled Backup → Run workflow) öner.
+
+### Aşama 2 — KPI sözleşmesini kapat (C5 + C6)
+
+**C5 — KPI-25/27 veri kaynağı kararı (asıl iş):**
+- **KPI-25** (resmî "toplam tüketim" CAGR): kaynağı **yalnız
+  `fact_tuketim_ulke_geneli`** olacak şekilde değiştir — şart: tam yıl
+  (12 ay) VE 5/5 grup (bu şart 2016'yı otomatik dışarıda bırakır, çünkü
+  2016-12 Tarımsal hiç yüklenmedi — bu KASITLI, ayrıca dokümante
+  edilmeli ki 6 ay sonra "2016 neden yok" diye tekrar araştırılmasın).
+  KPI-25 il bazlı `fact_tuketim` ile KARIŞTIRILMAMALI (grain karışımı,
+  bkz. master §11.2).
+- **KPI-27** (Sanayi-hariç tüketim CAGR): **il bazlı `fact_tuketim`**
+  kalır, mevcut hâli DEĞİŞMEZ.
+- KPI-25 kaynak değiştirdiği anda `dokumanlar/04_kpi_sozlesmeleri.md`'deki
+  ESKİYEN "yalnız Sanayi'yi içeren yıllar" filtre paragrafı **silinmeli**
+  — yoksa bir sonraki denetimde yeniden "çelişki" olarak işaretlenir.
+- Uygulama sırası (önceki oturumlardaki pattern'e uy): önce `worker/
+  kpi.py`/`worker/analytics.py`'deki KPI-25 fonksiyonunu değiştir, test
+  yaz/güncelle, CI yeşil olduğunu doğrula, SONRA dokümanları (04, 09, 10)
+  güncelle — kod/doküman aynı commit'te.
+
+**C6 — ertelenmiş/değerlendirilmiş küçük maddeler (yalnız referans,
+aksiyon gerektirmeyebilir):**
+- MFA/merkezi rate-limit: ertelendi (tek admin kullanıcı var).
+- HDD/CDD çok noktalı model: Faz 4 öncesi bir kez ölçülüp karara
+  bağlanacak, şimdi değil.
+- Diğerleri (Strategy Pattern, veri girişi UI'ı vb.) zaten REDDEDİLDİ/
+  KAPANDI — yeniden açılmasın.
+
+**C4'ün kendi açık kalan tasarım notu:** `app/dashboard.py`'nin salt-okunur
+sorgularında `autocommit=True`/periyodik `commit()` kullanılmaması —
+DB'deki `idle_in_transaction_session_timeout` bunu yalnız SINIRLIYOR,
+KÖKÜNDEN çözmüyor. Bir kod refactor'ü fırsatı (bu oturumun kapsamı
+dışıydı, aksiyon gerektirmiyor ama gündemde tutulmalı).

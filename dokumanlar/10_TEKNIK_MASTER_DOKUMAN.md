@@ -30,7 +30,7 @@ kaynak kodu, canlı Supabase sorgusu) karşı yeniden doğrulandı. Bir
 | v1.5 | 2026-09-07 | C1: `worker/scripts/backup.py` + `dokumanlar/11_yedekleme_runbook.md` eklendi (§8.5) — Supabase Free plan'de otomatik yedek YOK | Gerçek disaster-recovery drill'i (disposable postgres:17, WSL/Docker): migration'lardan şema + `pg_restore --data-only` ile veri geri yüklendi, 19/19 tablo canlı Supabase'in `COUNT(*)` değerleriyle birebir eşleşti, 0 hata (ikinci denemede — ilk denemedeki 6 seed-tablosu hatası `--exclude-table` ile düzeltildi) |
 | v1.6 | 2026-09-07 | C3: `worker/jobs/fetch_weather.py:main()` 0 satır yazılırsa FAIL ediyor + `scheduled-refresh.yml`'e `if: failure()` özet adımı eklendi (§9.3) | `yaml.safe_load` ile sözdizimi doğrulandı, ruff/mypy temiz; GitHub'ın scheduled-workflow bildirim davranışı resmi dokümantasyondan doğrulandı (cron'u oluşturan kullanıcıya gider — `git log` ile bu proje için repo sahibi olduğu teyit edildi), kişisel bildirim AÇIK mı kod seviyesinde doğrulanamadığı için elle teyit gerektiği not edildi |
 | v1.7 | 2026-09-07 | C4: 8 tabloda (`dim_*`×5 + `sistem_parametre`/`kpi_esik`/`job_status`) RLS geri açıldı (§8.2), istisnasız tamlık kontrolü eklendi, **canlıya uygulandı** | Disposable postgres:16 + GERÇEK CI (run 34159706854 pozitif, 34159900787 negatif/fake-tablo-fail, 34160105007 revert-sonrası yeşil) + canlı Supabase'in tümünde doğrulandı: 19/19 tablo RLS+policy, dashboard yolu (viewer/data_operator/admin) gerçek JWT ile test edildi, `postgres` rolünün `rolbypassrls=true` olduğu canlıda teyit edildi (varsayılmadı) |
-| v1.8 | 2026-09-08 | Aşama 1 kapanışı — `scheduled-backup.yml` (haftalık pg_dump, §8.5), `app_dashboard_service` için `idle_in_transaction_session_timeout=30min` (§8.2, C4 olayının tekrarına karşı) | Yeni workflow: kullanıcının PAT'ine `workflow` izni eklenmesi bekleniyordu/durumuna göre gerçek koşu kanıtı burada güncellenir. idle timeout: disposable postgres:16'da 27/27 migration + `pg_roles.rolconfig` doğrulandı; canlıda GERÇEK bir kısa-timeout testiyle (2s) `IdleInTransactionSessionTimeout`'un fırladığı ve `app/dashboard.py`'nin bunu YAKALAMADIĞI (bilinen sınırlama, kod değişikliği kapsam dışı) doğrulandı |
+| v1.8 | 2026-09-08 | Aşama 1 kapanışı — `scheduled-backup.yml` (haftalık pg_dump, §8.5), `app_dashboard_service` için `idle_in_transaction_session_timeout=30min` **canlıya uygulandı** (§8.2, C4 olayının tekrarına karşı) | idle timeout: disposable postgres:16'da 27/27 migration + canlıda `pg_roles.rolconfig` doğrulandı, kısa-timeout testiyle (2s) gerçek `IdleInTransactionSessionTimeout` kanıtlandı, normal ardışık kullanım etkilenmedi. `scheduled-backup.yml`: YAML doğrulandı, CI yeşil — **gerçek bir koşu henüz doğrulanamadı** (`gh` token'ının `workflow` izni yok, 403); açık madde olarak sonraki oturuma bırakıldı |
 
 ---
 
@@ -647,7 +647,12 @@ pencerede en az bir etkileşim, ki her etkileşim yeni bir sorgu çalıştırıp
 sayacı sıfırlar) bu riski pratikte sıfıra indiriyor — yalnız gerçekten
 terk edilmiş sekmeler etkilenir, ki asıl amaç zaten onları temizlemek.
 Doğrulandı (disposable postgres:16, 27/27 migration): `pg_roles.
-rolconfig` → `{idle_in_transaction_session_timeout=30min}`.
+rolconfig` → `{idle_in_transaction_session_timeout=30min}`. **Canlıya
+uygulandı (2026-09-08)** — CI yeşil olduktan sonra, `pg_stat_activity`'de
+hiçbir "idle in transaction" bağlantı OLMADIĞI teyit edilerek. Canlıda
+`rolconfig` doğrulandı; normal ardışık kullanım (aynı bağlantıda hemen
+art arda 2 sorgu) sorunsuz çalıştı — 30 dakikalık timeout aktif kullanımı
+etkilemiyor.
 
 **İleride ele alınabilir (bu turun kapsamı dışı):** `app/dashboard.py`'nin
 salt-okunur sorguları için `autocommit=True` ya da periyodik `commit()` —
@@ -701,9 +706,20 @@ zararsız "duplicate key" hataları verdi — bu, `--exclude-table` eklenip
 düzeltildi, ikinci deneme temizdi). Detaylı tablo + adım adım komutlar:
 `11_yedekleme_runbook.md`.
 
-**Bilinen sınırlama:** otomatik/zamanlı yedekleme (cron/Actions ile
-günlük) henüz KURULMADI — bu tur yalnız elle çalıştırılabilir, gerçekten
-doğrulanmış bir prosedür sağladı, otomasyon kapsam dışı bırakıldı.
+**Otomatik hâle getirildi (2026-09-08, Aşama 1 kapanışı):**
+`.github/workflows/scheduled-backup.yml` — her Pazar 03:00 UTC (+ elle
+`workflow_dispatch`) `backup.py`'yi çalıştırıp dump'ı artifact olarak
+saklar (`retention-days: 90`, açıkça belirtildi). İki kontrol ÖNCEDEN
+yapıldı (varsayılmadı): repo **PUBLIC** (`gh repo view` doğrulandı —
+artifact'lar repoyu görebilen herkese açık, bilinçli kabul edildi) ve
+`audit_log` içeriği elle incelendi (e-posta/connection-string/yerel yol
+YOK, yalnız zaten `git log`'da public olan operatör adı var) — dump
+şifrelenmeden saklanıyor. **Açık kalan madde:** bu workflow'un gerçek bir
+koşusu, oturumu yürüten `gh` CLI token'ının `workflow` iznine sahip
+olmaması yüzünden bu turda DOĞRULANAMADI (`workflow_dispatch` 403
+döndü) — kullanıcıdan token'a izin eklemesi istendi, ilk gerçek koşu
+(Pazar cron'u ya da elle tetikleme) ayrıca kontrol edilmeli, bkz.
+`09_PROJE_DURUMU.md` "Sonraki Oturum Devam Noktası".
 
 ---
 

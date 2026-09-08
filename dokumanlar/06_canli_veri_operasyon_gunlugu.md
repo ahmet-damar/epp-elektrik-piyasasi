@@ -1080,3 +1080,33 @@ postgres rolü (worker'ın DATABASE_URL'i): rolbypassrls = true (doğrulandı, v
 ```
 
 Detay/gerekçe: `10_TEKNIK_MASTER_DOKUMAN.md` §8.2, Sürüm Geçmişi v1.7.
+
+## 2026-09-08 — Aşama 1 kapanışı: idle timeout + zamanlanmış yedek
+
+`20260908_0001_app_dashboard_service_idle_timeout.sql` canlıya
+uygulandı — `app_dashboard_service` için `idle_in_transaction_
+session_timeout = '30min'` (2026-09-07'deki "idle in transaction"
+kilidinin TEKRARINA karşı, bkz. yukarıdaki kayıt). Uygulamadan önce
+`pg_stat_activity`'de engel oluşturacak bir bağlantı olmadığı teyit
+edildi. Doğrulama:
+```
+disposable postgres:16, 27/27 migration: pg_roles.rolconfig -> {idle_in_transaction_session_timeout=30min}
+canlı: aynı sonuç + normal ardışık kullanım (aynı bağlantı, art arda 2 sorgu) sorunsuz
+kısa-timeout testi (2s, gerçek bağlantı): ikinci sorgu psycopg.errors.IdleInTransactionSessionTimeout fırlattı (beklenen)
+```
+**Bilinen sınırlama:** `app/dashboard.py` bu hatayı yakalayıp otomatik
+yeniden bağlanmıyor — terk edilmiş bir sekmeye geri dönen kullanıcı
+"Çıkış Yap" ile elle yeniden giriş yapmalı. Kod değişikliği bilinçli
+olarak bu turun kapsamı dışında bırakıldı.
+
+Ayrıca `.github/workflows/scheduled-backup.yml` eklendi (haftalık
+pg_dump artifact) — `worker/scripts/backup.py` yazılmıştı ama onu
+çalıştıran zamanlanmış bir iş yoktu. Repo PUBLIC olduğu ve `audit_log`
+içeriğinde hassas veri olmadığı doğrulanarak (bkz. `11_yedekleme_
+runbook.md`) şifrelemeden artifact olarak saklanmasına karar verildi.
+Bu workflow'un gerçek bir koşusu, `gh` CLI token'ının `workflow` iznine
+sahip olmaması yüzünden bu oturumda DOĞRULANAMADI — kullanıcıdan token
+izni eklemesi istendi, sonucu ayrıca kaydedilecek (bkz.
+`09_PROJE_DURUMU.md` "Sonraki Oturum Devam Noktası").
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §8.2/§8.5, Sürüm Geçmişi v1.8.
