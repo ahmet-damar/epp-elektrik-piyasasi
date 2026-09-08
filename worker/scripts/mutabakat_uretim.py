@@ -49,6 +49,9 @@ def _en_son_batch_toplamlari(
     if tablo not in _TABLO_ADLARI:
         raise ValueError(f"Beklenmeyen tablo adı: {tablo!r}")
     with conn.cursor() as cur:
+        # bandit B608 burada bastırıldı: `tablo` kullanıcı girdisi değil,
+        # yukarıda _TABLO_ADLARI'ya (sabit 2 değerlik whitelist) karşı
+        # doğrulandı — worker/ingest.py:aktivasyon_yap()'ın AYNI deseni.
         cur.execute(
             f"""
             WITH en_son_batch AS (
@@ -64,7 +67,7 @@ def _en_son_batch_toplamlari(
              AND esb.lisans_id = f.lisans_id
              AND esb.ingestion_batch_id = f.ingestion_batch_id
             GROUP BY f.tarih_id, f.lisans_id, esb.ingestion_batch_id
-            """
+            """  # nosec B608
         )
         rows = cur.fetchall()
     return {
