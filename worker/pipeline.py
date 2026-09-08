@@ -667,3 +667,155 @@ def isle_ay_ulke_geneli_excel(
     print(f"  otomatik_onaya_uygun() = {uygun}" + (f" ({sebep})" if sebep else ""))
     print("  [NOT] onayla ÇAĞRILMADI — batch running/is_active=false kalıyor.")
     return sonuc
+
+
+def isle_ay_uretim_excel(
+    conn: Connection,
+    *,
+    wb: openpyxl.Workbook,
+    tarih_id: int,
+    dosya_adi: str,
+    icerik: bytes,
+    source_period: str,
+    actor_name: str,
+    parser_version: str = "excel-uretim-geneli-v1",
+) -> IslemSonucu | None:
+    """`fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli`'ni Excel
+    (2026+) aylarına doldurur (2026-09-09, gece çalışması — Aşama 3/ADIM 3
+    madde 4) — `isle_ay_ulke_geneli_excel()` ile AYNI desen: `fact_uretim`
+    (T1/T4, kurulu güç) batch zincirine HİÇ DOKUNMAYAN, kendi AYRI batch
+    zinciri; İKİ tabloyu da AYNI batch_id altında yazar (grain'leri farklı
+    ama aynı kaynak dosyadan, aynı anda geliyorlar — bkz. migration
+    20260909_0001 modül notu).
+
+    ⚠️ KÜMÜLATİF DEĞİL: T2/T3/T5/T6 zaten AY BAZINDA değer veriyor (§5.8
+    araştırmasında doğrulandı) — `isle_ay_ulke_geneli_excel()`'in T11
+    de-kümülatif mantığı buraya KASITLI OLARAK kopyalanmadı.
+
+    ⚠️ Bu fonksiyon `pipeline.otomatik_onaya_uygun()`'u ÇAĞIRMAZ/kullanmaz
+    — o fonksiyon TEK bir batch'in kendi red/karantina durumuna bakar,
+    burada asıl güvence İKİ AYRI tablo arasındaki çapraz mutabakattır
+    (`worker/scripts/mutabakat_uretim.py:periyot_aktivasyona_uygun_mu()`)
+    — çağıran (backfill script) bu batch'leri aktive etmeden ÖNCE O
+    fonksiyonu çağırmalı (bkz. `worker/scripts/backfill_uretim_excel.py`)."""
+    print(f"\n=== Üretim Geneli (Excel) {source_period} — {dosya_adi} ===")
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT ib.batch_id, ib.status FROM ingestion_batch ib
+            JOIN source_asset sa ON sa.source_asset_id = ib.source_asset_id
+            WHERE sa.source_type = 'epdk_aylik' AND sa.source_period = %s
+              AND ib.parser_version = %s AND ib.status != 'failed'
+            ORDER BY ib.batch_id
+            """,
+            (source_period, parser_version),
+        )
+        mevcut = cur.fetchall()
+    if mevcut:
+        print(
+            f"  [ATLA] Üretim Geneli (Excel) {source_period} zaten işlenmiş: {mevcut}"
+        )
+        return None
+
+    # Her tablo AYRI _sayfa() çağrısıyla bulunur (T2/T3'ü veya T5/T6'yı AYNI
+    # sayfa nesnesi varsayıp paylaştırmak YERİNE) — gerçek dosyada "Tablo
+    # 2-3"/"Tablo 5-6" birleşik sayfalar olsa da (parser.sayfa_bul ikisini
+    # de AYNI sayfaya çözer, gereksiz maliyet YOK), sentetik test
+    # workbook'unda (worker/tests/test_parser.py) T2/T3/T5/T6 AYRI
+    # sayfalardır — bu desen HER İKİ durumda da doğru çalışır.
+    kaynak_ham = pd.concat(
+        [
+            parser.tablo2_uretim_kaynak_oku(_sayfa(wb, 2), tarih_id),
+            parser.tablo5_lisanssiz_uretim_kaynak_oku(_sayfa(wb, 5), tarih_id),
+        ],
+        ignore_index=True,
+    )
+    il_ham = pd.concat(
+        [
+            parser.tablo3_uretim_il_oku(_sayfa(wb, 3), tarih_id),
+            parser.tablo6_lisanssiz_uretim_il_oku(_sayfa(wb, 6), tarih_id),
+        ],
+        ignore_index=True,
+    )
+    print(f"  Kaynak (T2+T5) satır: {len(kaynak_ham)}, İl (T3+T6) satır: {len(il_ham)}")
+
+    source_asset_id = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="epdk_aylik",
+        dosya_adi=dosya_adi,
+        icerik=icerik,
+        donem_tipi="aylik",
+        source_period=source_period,
+        uploaded_by=None,
+    )
+    batch_id = ingest.batch_olustur(conn, source_asset_id, parser_version, "1")
+    if not ingest.batch_sahiplen(conn, batch_id):
+        print(f"  [ATLA] batch_id={batch_id} zaten sahiplenilmiş/işlenmiş.")
+        return None
+
+    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+
+    sonuc = IslemSonucu(batch_id=batch_id)
+    audit_tablolar: dict[str, dict] = {}
+    toplam_yuklenen = 0
+
+    for tablo_adi, ham_df, yukle_fn in (
+        (
+            "fact_uretim_kaynak_geneli",
+            kaynak_ham,
+            ingest.fact_uretim_kaynak_geneli_yukle,
+        ),
+        ("fact_uretim_il_geneli", il_ham, ingest.fact_uretim_il_geneli_yukle),
+    ):
+        dogrulanan = kpi.dogrula_uretim_geneli(ham_df)
+        yuklenen, atlanan = yukle_fn(conn, dogrulanan.kabul, batch_id)
+        toplam_yuklenen += yuklenen
+        sonuc.tablolar[tablo_adi] = TabloSonucu(
+            toplam=len(ham_df),
+            red=len(dogrulanan.red),
+            karantina=len(dogrulanan.karantina),
+            yuklenen=yuklenen,
+            atlanan=atlanan,
+        )
+        audit_tablolar[tablo_adi] = {
+            "toplam": len(ham_df),
+            "red": len(dogrulanan.red),
+            "karantina": len(dogrulanan.karantina),
+            "yuklenen": yuklenen,
+            "atlanan": atlanan,
+            "red_satirlari": dogrulanan.red.to_dict("records"),
+        }
+        if dogrulanan.red.shape[0]:
+            print(f"  [DİKKAT] {tablo_adi}: red={len(dogrulanan.red)}")
+
+    ingest.batch_durumu_guncelle(
+        conn,
+        batch_id,
+        "running",
+        total_row_count=len(kaynak_ham) + len(il_ham),
+        accepted_row_count=toplam_yuklenen,
+        rejected_row_count=len(kaynak_ham) + len(il_ham) - toplam_yuklenen,
+    )
+    ingest.audit_log_yaz(
+        conn,
+        table_name="ingestion_batch",
+        record_id=batch_id,
+        action_type="INSERT",
+        actor_name=actor_name,
+        payload={
+            "olay": "ingest_tamamlandi",
+            "tarih_id": tarih_id,
+            "kaynak": "excel_uretim_geneli",
+            "tablolar": audit_tablolar,
+            "not": "T2/T5 (kaynak-bazında) + T3/T6 (il-bazında) ülke geneli "
+            "üretim, AYLIK (kümülatif DEĞİL) — bkz. dokumanlar/06_canli_"
+            "veri_operasyon_gunlugu.md 2026-09-09 kaydı.",
+        },
+    )
+
+    print(
+        "  [NOT] onayla ÇAĞRILMADI — aktivasyondan ÖNCE mutabakat_uretim."
+        "periyot_aktivasyona_uygun_mu() kontrol edilmeli."
+    )
+    return sonuc

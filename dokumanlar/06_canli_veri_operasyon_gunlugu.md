@@ -1383,3 +1383,42 @@ imzası, ADIM 3 madde 4'ün pipeline kodunun çağıracağı gate.
   beklenen "hata" — `test_auth_integration.py`).
 
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.9, Sürüm Geçmişi v1.22.
+
+## 2026-09-09 (gece çalışması, gözetimsiz, MADDE 4) — Üretim Excel backfill'i, mutabakat-gated aktivasyon, YALNIZ disposable postgres
+
+Eksik yükleme altyapısı tamamlandı: `ingest.fact_uretim_kaynak_geneli_
+yukle()`/`fact_uretim_il_geneli_yukle()`, `kpi.dogrula_uretim_geneli()`,
+`pipeline.isle_ay_uretim_excel()` (T2+T5→kaynak, T3+T6→il, AYNI batch_id
+altında, `fact_uretim`'in T1/T4 zincirine dokunmadan), `_DOGAL_ANAHTAR`'a
+iki yeni tablo eklendi (P0-4 aktivasyonu tanısın diye).
+
+**Kod incelemesi sırasında bulunan tasarım hatası (canlıya dokunmadan
+düzeltildi):** `isle_ay_uretim_excel()` T2/T3'ün (ve T5/T6'nın) AYNI sayfa
+nesnesini paylaştığını varsayıyordu — gerçek dosyada doğru ("Tablo 2-3"
+birleşik), ama sentetik test workbook'unda T2/T3/T5/T6 AYRI sayfalar.
+Pipeline entegrasyon testi yazılırken bulundu, her tablo artık AYRI
+`_sayfa()` çağrısıyla bulunacak şekilde düzeltildi (gerçek dosyada
+maliyetsiz, sentetik/test'te doğru).
+
+`worker/scripts/backfill_uretim_excel.py` — 6 gerçek dosyayı yükler,
+SONRA her ay için `mutabakat_uretim.periyot_aktivasyona_uygun_mu()`'yu
+çağırıp yalnız UYGUN çıkan ayları aktive eder (kullanıcı talimatı:
+uyumsuzsa aktivasyon ENGELLENİR).
+
+**Doğrulama — disposable postgres:17, fresh, canlıya HİÇ dokunmadan:**
+- `--dry-run`: 6/6 ayda kaynak toplamı = il toplamı (fark 0).
+- Gerçek yükleme: 6/6 ay başarıyla yüklendi.
+- Mutabakat: **6/6 ay UYGUN**, hiçbiri bloklanmadı.
+- Aktivasyon: **6/6 ay aktive edildi.**
+- Satır sayıları: `fact_uretim_kaynak_geneli` 101 (hepsi aktif),
+  `fact_uretim_il_geneli` 942 (hepsi aktif).
+- `mutabakat_uretim.py` CLI'ı: **12/12 (tarih_id, lisans_id) uyumlu, 0
+  uyumsuz.**
+- `validate_rls_static.py`/`validate_role_access.py`: veri yüklendikten
+  SONRA da 21/21 tablo YEŞİL.
+- Fresh disposable postgres:17'de tam pytest paketi: **291/292** (tek
+  beklenen "hata" — `test_auth_integration.py`).
+
+**Sabah onayı bekleniyor:** bu iş canlıya UYGULANMADI (ne migration ne
+backfill). Bkz. `09_PROJE_DURUMU.md` "Sonraki Oturum Devam Noktası" ve
+`10_TEKNIK_MASTER_DOKUMAN.md` §5.10, Sürüm Geçmişi v1.23.

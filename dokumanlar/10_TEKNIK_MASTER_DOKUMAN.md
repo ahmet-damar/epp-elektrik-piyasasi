@@ -70,6 +70,7 @@ her yeni rakam için geçerlidir.
 | v1.20 | 2026-09-09 | Gece çalışması MADDE 1 — `fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli` (migration `20260909_0001`), `fact_tuketim_ulke_geneli` ile AYNI desen, kümülatif DEĞİL — §5.7. **YALNIZ disposable postgres:17'de, CANLIYA UYGULANMADI** | Disposable postgres:17'de migration 29/29, RLS 21/21 tablo, role-access tamamen geçti, pytest 281/282 (tek beklenen "hata" — auth integration). sqlfluff temiz |
 | v1.21 | 2026-09-09 | Gece çalışması MADDE 2 — T2/T3/T5/T6 Excel parser fonksiyonlarında GERÇEK bir hata bulunup düzeltildi: sabit kolon okuyordu (yalnız Ocak dosyasında doğruydu), artık `_ay_kolonu_bul()` ile doğru ay kolonunu buluyor — §5.8 | 6/6 gerçek dosyada (202601-202606) T2↔T3 ve T5↔T6 ONDALIK BASAMAĞA KADAR birebir eşleşti (Lisanslı/Lisanssız ayrı ayrı). Yeni regresyon testleri (her iki başlık stili, "komşu ay değeri sessizce dönmüyor" kontrolü). pytest 285/286 (tek beklenen "hata") |
 | v1.22 | 2026-09-09 | Gece çalışması MADDE 3 — `worker/scripts/mutabakat_uretim.py`: il↔kaynak çapraz mutabakat, ±%0,5 tolerans, aktivasyonu engelleyen `periyot_aktivasyona_uygun_mu()` gate fonksiyonu — §5.9. **YALNIZ disposable postgres:17'de** | 4 yeni entegrasyon testi (kasıtlı uyumsuz veri gerçekten yakalandı, her iki batch bloklandı, gate fonksiyonu her iki yönde test edildi). Gerçek 6 aya karşı (parser çıktıları): 12/12 (6 ay × 2 lisans) birebir eşleşti |
+| v1.23 | 2026-09-09 | Gece çalışması MADDE 4 — `fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli` için tam yükleme altyapısı (`ingest`/`kpi`/`pipeline` fonksiyonları) + `backfill_uretim_excel.py` (mutabakat-gated aktivasyon) — §5.10. **YALNIZ disposable postgres:17'de, CANLIYA UYGULANMADI** | 6/6 ay gerçek dosyadan yüklendi, mutabakat 6/6 UYGUN, 6/6 aktive edildi (101+942 satır, hepsi aktif). mutabakat_uretim.py CLI'ı 12/12 uyumlu doğruladı. RLS/role-access veri sonrası da 21/21 YEŞİL. pytest 291/292 (tek beklenen "hata") |
 
 ---
 
@@ -575,6 +576,54 @@ hazırlıyor).
   12/12 (6 ay × 2 lisans türü) toplam ONDALIK BASAMAĞA KADAR birebir
   eşleşti — script'in gerçek veriyle YEŞİL çıkacağının kanıtı (gerçek DB
   yüklemesi ADIM 3 madde 4'te).
+
+### 5.10 Excel Üretim Backfill'i + Mutabakat-Gated Aktivasyon (2026-09-09, gece çalışması — Aşama 3/ADIM 3 madde 4)
+**⚠️ Bu turda YALNIZ disposable postgres:17'de doğrulandı — CANLIYA
+UYGULANMADI, sabah onayla uygulanacak.**
+
+Eksik altyapı tamamlandı: `ingest.fact_uretim_kaynak_geneli_yukle()` +
+`ingest.fact_uretim_il_geneli_yukle()` (`fact_tuketim_ulke_geneli_yukle()`
+ile AYNI desen, KÜMÜLATİF DEĞİL), `kpi.dogrula_uretim_geneli()` (yalnız
+negatif `uretim_mwh` reddi — `dogrula_uretim()`'den farklı, `kurulu_
+guc_mw` burada YOK), `pipeline.isle_ay_uretim_excel()` (T2+T5→kaynak
+tablosu, T3+T6→il tablosu, AYNI batch_id altında — `isle_ay_ulke_geneli_
+excel()` ile AYNI desen: `fact_uretim`'in T1/T4 batch zincirine
+DOKUNMAZ), ve `_DOGAL_ANAHTAR`'a iki yeni tablo eklendi (P0-4 aktivasyon
+mekanizmasının bu tabloları tanıması için).
+
+**Önemli tasarım notu (kod incelemesi sırasında bulundu, canlıya
+dokunmadan düzeltildi):** `isle_ay_uretim_excel()` başlangıçta T2/T3'ü
+(ve T5/T6'yı) AYNI sayfa nesnesini paylaştığı varsayımıyla yazılmıştı —
+gerçek dosyada doğru (ikisi de "Tablo 2-3"/"Tablo 5-6" birleşik sayfa),
+ama sentetik test workbook'unda (`worker/tests/test_parser.py`) T2/T3/T5/
+T6 AYRI sayfalar. Her tablo artık AYRI `_sayfa()` çağrısıyla bulunuyor —
+gerçek dosyada maliyetsiz (aynı sayfaya çözülüyor), sentetik/test
+senaryosunda DOĞRU çalışıyor. Bu, pipeline entegrasyon testi yazılırken
+bulundu ve GERÇEK backfill'e dokunmadan (henüz çalıştırılmamıştı)
+düzeltildi.
+
+`worker/scripts/backfill_uretim_excel.py` — `backfill_ulke_geneli_
+excel.py`'nin `MANIFEST`'ini yeniden kullanır, yükler, SONRA her ay için
+`mutabakat_uretim.periyot_aktivasyona_uygun_mu()`'yu çağırır — yalnız
+UYGUN çıkan aylar aktive edilir (kullanıcı talimatı: "tutmuyorsa
+aktivasyonu ENGELLE").
+
+**Doğrulama (disposable postgres:17, fresh, canlıya dokunmadan):**
+- `--dry-run`: 6/6 ayda kaynak toplamı = il toplamı (fark 0).
+- Gerçek yükleme + aktivasyon: 6/6 ay başarıyla yüklendi, **mutabakat
+  6/6 ayda UYGUN çıktı, 6/6 ay aktive edildi** (hiçbiri bloklanmadı).
+- `fact_uretim_kaynak_geneli`: 101 satır (hepsi aktif); `fact_uretim_
+  il_geneli`: 942 satır (hepsi aktif).
+- `mutabakat_uretim.py` CLI'ı canlı veriyle (disposable) çalıştırıldı:
+  **12/12 (tarih_id, lisans_id) çifti uyumlu, 0 uyumsuz**.
+- `validate_rls_static.py`/`validate_role_access.py`: veri yüklendikten
+  SONRA da 21/21 tablo YEŞİL.
+- 2 yeni pipeline entegrasyon testi (`worker/tests/
+  test_pipeline_integration.py`): uçtan uca yükleme (idempotency dahil —
+  ikinci çağrı ATLANIR) + mutabakat-uygunluk + gerçek aktivasyon
+  (`batch_onayla()` sonrası `is_active=true`).
+- Fresh disposable postgres:17'de tam pytest paketi: **291/292** (tek
+  beklenen "hata" — `test_auth_integration.py`).
 
 ---
 

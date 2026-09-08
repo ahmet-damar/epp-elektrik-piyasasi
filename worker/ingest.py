@@ -497,6 +497,71 @@ def fact_uretim_yukle(
     return yuklenen, atlanan
 
 
+def fact_uretim_kaynak_geneli_yukle(
+    conn: Connection, df: pd.DataFrame, batch_id: int
+) -> tuple[int, int]:
+    """`fact_uretim_kaynak_geneli` (2026-09-09, gece çalışması — Aşama 3/
+    ADIM 3 madde 4, migration 20260909_0001) — T2 (Lisanslı) + T5
+    (Lisanssız) parser çıktılarının BİRLEŞİMİ beklenir (`df`'te `kaynak`,
+    `lisans`, `tarih_id`, `uretim_mwh` kolonları — `worker/parser.py:
+    tablo2_uretim_kaynak_oku()`/`tablo5_lisanssiz_uretim_kaynak_oku()` ile
+    AYNI şekil). `fact_tuketim_ulke_geneli_yukle()` ile AYNI desen ama
+    KÜMÜLATİF DEĞİL — `kumulatif_tuketim_mwh` benzeri bir kolon YOK (T2/T5
+    zaten aylık, bkz. worker/parser.py §5.8 modül notu)."""
+    yuklenen = 0
+    atlanan = 0
+    with conn.cursor() as cur:
+        for satir in df.itertuples(index=False):
+            deger = _sayisal_temiz(satir.uretim_mwh)
+            if deger is None:  # fact_uretim_kaynak_geneli.uretim_mwh NOT NULL
+                atlanan += 1
+                continue
+            kaynak_id = dim_kaynak_id_bul(conn, satir.kaynak)
+            lisans_id = dim_lisans_id_bul(conn, satir.lisans)
+            cur.execute(
+                """
+                INSERT INTO fact_uretim_kaynak_geneli
+                    (tarih_id, kaynak_id, lisans_id, uretim_mwh, ingestion_batch_id, is_active)
+                VALUES (%s, %s, %s, %s, %s, false)
+                ON CONFLICT ON CONSTRAINT uq_fact_uretim_kaynak_geneli_batch DO NOTHING
+                """,
+                (satir.tarih_id, kaynak_id, lisans_id, deger, batch_id),
+            )
+            yuklenen += 1
+    return yuklenen, atlanan
+
+
+def fact_uretim_il_geneli_yukle(
+    conn: Connection, df: pd.DataFrame, batch_id: int
+) -> tuple[int, int]:
+    """`fact_uretim_il_geneli` — `fact_uretim_kaynak_geneli_yukle()` ile
+    AYNI desen, T3 (Lisanslı) + T6 (Lisanssız) parser çıktılarının
+    BİRLEŞİMİ (`df`'te `il`, `il_kodu`, `lisans`, `tarih_id`, `uretim_mwh`
+    kolonları). `il_kodu` `None` olabilir (parser'da eşleşmeyen bir il
+    adı) — bu durumda satır ATLANIR (sahte bir il_kodu ÜRETİLMEZ)."""
+    yuklenen = 0
+    atlanan = 0
+    with conn.cursor() as cur:
+        for satir in df.itertuples(index=False):
+            deger = _sayisal_temiz(satir.uretim_mwh)
+            il_kodu = _sayisal_temiz(satir.il_kodu)
+            if deger is None or il_kodu is None:
+                atlanan += 1
+                continue
+            lisans_id = dim_lisans_id_bul(conn, satir.lisans)
+            cur.execute(
+                """
+                INSERT INTO fact_uretim_il_geneli
+                    (tarih_id, il_kodu, lisans_id, uretim_mwh, ingestion_batch_id, is_active)
+                VALUES (%s, %s, %s, %s, %s, false)
+                ON CONFLICT ON CONSTRAINT uq_fact_uretim_il_geneli_batch DO NOTHING
+                """,
+                (satir.tarih_id, int(il_kodu), lisans_id, deger, batch_id),
+            )
+            yuklenen += 1
+    return yuklenen, atlanan
+
+
 def fact_abone_yukle(
     conn: Connection, df: pd.DataFrame, batch_id: int
 ) -> tuple[int, int]:
@@ -633,6 +698,9 @@ _DOGAL_ANAHTAR = {
     "fact_abone": ["il_kodu", "tarih_id", "grup_id"],
     "fact_serbest_tuketici": ["il_kodu", "tarih_id", "tur", "grup_id"],
     "fact_tuketim_ulke_geneli": ["tarih_id", "grup_id"],
+    # 2026-09-09 (gece çalışması, Aşama 3/ADIM 3 madde 4, migration 20260909_0001):
+    "fact_uretim_kaynak_geneli": ["tarih_id", "kaynak_id", "lisans_id"],
+    "fact_uretim_il_geneli": ["tarih_id", "il_kodu", "lisans_id"],
 }
 
 

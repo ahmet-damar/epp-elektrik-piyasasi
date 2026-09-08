@@ -18,6 +18,7 @@ import psycopg
 import pytest
 
 from worker import pipeline
+from worker.scripts import mutabakat_uretim
 from worker.tests.test_parser import _sentetik_workbook
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -317,3 +318,103 @@ def test_kapsam_disi_isaretle_ayni_anahtar_ikinci_cagri_upsert_yapar(  # type: i
         satir_sayisi, sebep = cur.fetchone()
     assert satir_sayisi == 1  # ikinci çağrı YENİ bir satır AÇMADI
     assert sebep == "güncellenmiş gerekçe metni"  # UPSERT ile güncellendi
+
+
+# ---------------------------------------------------------------------------
+# 2026-09-09 (gece çalışması MADDE 4) — isle_ay_uretim_excel() (Aşama 3/
+# ADIM 3 madde 4): fact_uretim_kaynak_geneli + fact_uretim_il_geneli.
+# ---------------------------------------------------------------------------
+
+
+def test_isle_ay_uretim_excel_uctan_uca(conn) -> None:  # type: ignore[no-untyped-def]
+    """`_sentetik_workbook()`'un T2/T3/T5/T6 sayfaları — sentetik veride
+    HALA AYRI sayfalar (gerçek dosyadaki 'Tablo 2-3'/'Tablo 5-6' birleşik
+    yerleşim DEĞİL) — `isle_ay_uretim_excel()`'in her tabloyu AYRI `_sayfa()`
+    çağrısıyla bulduğu (paylaşılan tek sayfa VARSAYMADIĞI) burada dolaylı
+    olarak da doğrulanmış olur (bkz. worker/pipeline.py'deki modül notu)."""
+    icerik = _wb_bytes(_sentetik_workbook())
+    wb = openpyxl.load_workbook(BytesIO(icerik), data_only=True)
+
+    sonuc = pipeline.isle_ay_uretim_excel(
+        conn,
+        wb=wb,
+        tarih_id=202601,
+        dosya_adi="test_uretim_geneli.xlsx",
+        icerik=icerik,
+        source_period="2026-01",
+        actor_name="test-suite",
+    )
+
+    assert sonuc is not None
+    assert set(sonuc.tablolar) == {
+        "fact_uretim_kaynak_geneli",
+        "fact_uretim_il_geneli",
+    }
+    for tablo_sonucu in sonuc.tablolar.values():
+        assert tablo_sonucu.yuklenen > 0
+        assert tablo_sonucu.red == 0
+
+    with conn.cursor() as cur:
+        for tablo in ("fact_uretim_kaynak_geneli", "fact_uretim_il_geneli"):
+            cur.execute(
+                f"SELECT count(*) FROM {tablo} WHERE ingestion_batch_id = %s",  # nosec B608
+                (sonuc.batch_id,),
+            )
+            assert cur.fetchone()[0] == sonuc.tablolar[tablo].yuklenen
+            # Aktivasyon BURADA yapılmadı (batch_onayla çağrılmadı) — hâlâ
+            # is_active=false olmalı (bkz. fonksiyonun kendi "[NOT]" çıktısı).
+            cur.execute(
+                f"SELECT count(*) FROM {tablo} WHERE ingestion_batch_id = %s AND is_active",  # nosec B608
+                (sonuc.batch_id,),
+            )
+            assert cur.fetchone()[0] == 0
+
+    # Aynı (source_period, parser_version) ikinci kez çağrılırsa ATLANMALI
+    # (P0-5 tekillik — idempotent backfill deseni).
+    tekrar = pipeline.isle_ay_uretim_excel(
+        conn,
+        wb=wb,
+        tarih_id=202601,
+        dosya_adi="test_uretim_geneli.xlsx",
+        icerik=icerik,
+        source_period="2026-01",
+        actor_name="test-suite",
+    )
+    assert tekrar is None
+
+
+def test_isle_ay_uretim_excel_mutabakat_uretim_ile_uyumlu(conn) -> None:  # type: ignore[no-untyped-def]
+    """Yüklenen veri, `mutabakat_uretim.periyot_aktivasyona_uygun_mu()`
+    tarafından UYGUN kabul edilmeli — sentetik veri (T2/T3/T5/T6) zaten
+    tutarlı kurgulanmış (bkz. worker/tests/test_parser.py fixture'ı)."""
+    icerik = _wb_bytes(_sentetik_workbook())
+    wb = openpyxl.load_workbook(BytesIO(icerik), data_only=True)
+
+    # 202601 (Ocak) kullanılıyor — sentetik fixture'ın T2/T3/T5/T6'sı yalnız
+    # tek bir ay kolonu taşıyor ("OCAK"/"2026 OCAK", bkz. worker/tests/
+    # test_parser.py) — başka bir ay istenirse `_ay_kolonu_bul()` (§5.8
+    # düzeltmesi) BİLEREK boş DataFrame döner, bu testin amacı DEĞİL.
+    sonuc = pipeline.isle_ay_uretim_excel(
+        conn,
+        wb=wb,
+        tarih_id=202601,
+        dosya_adi="test_uretim_geneli_mutabakat.xlsx",
+        icerik=icerik,
+        source_period="2026-01",
+        actor_name="test-suite",
+    )
+    assert sonuc is not None
+
+    uygun, sebep = mutabakat_uretim.periyot_aktivasyona_uygun_mu(conn, 202601)
+    assert uygun is True, sebep
+
+    # Aktivasyon şimdi elle yapılabilir (backfill script'in kendi akışı) —
+    # BURADA da kanıtlanır: batch_onayla() sonrası is_active=true olmalı.
+    pipeline.batch_onayla(conn, sonuc.batch_id, actor_name="test-suite")
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT count(*) FROM fact_uretim_kaynak_geneli "
+            "WHERE ingestion_batch_id = %s AND is_active",
+            (sonuc.batch_id,),
+        )
+        assert cur.fetchone()[0] > 0

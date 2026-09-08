@@ -75,6 +75,24 @@ def dogrula_uretim(df: pd.DataFrame) -> DogrulamaSonucu:
     )
 
 
+def dogrula_uretim_geneli(df: pd.DataFrame) -> DogrulamaSonucu:
+    """`fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli` (T2/T3/T5/T6,
+    2026-09-09 gece çalışması — Aşama 3/ADIM 3 madde 4) — `dogrula_uretim()`
+    ile AYNI ilke ama FARKLI şekil: bu tablolarda `kurulu_guc_mw` YOK
+    (yalnız `uretim_mwh`, kurulu güç kavramı burada anlamsız — bkz.
+    migration 20260909_0001), `dogrula_tuketim()`'in `grup` bazlı karantina
+    kavramı da YOK (kaynak/il isimleri parser'da zaten kanonikleştirildi —
+    `kaynak_esle()`/`il_kodu_bul()` — eşleşmeyenler parser seviyesinde
+    zaten satıra hiç dönüşmüyor)."""
+    red_mask = df["uretim_mwh"] < 0
+    kabul_mask = ~red_mask
+    return DogrulamaSonucu(
+        kabul=df[kabul_mask].reset_index(drop=True),
+        red=df[red_mask].reset_index(drop=True),
+        karantina=df.iloc[0:0],
+    )
+
+
 def dogrula_abone(df: pd.DataFrame) -> DogrulamaSonucu:
     red_mask = df["abone_sayisi"] < 0
     karantina_mask = ~df["grup"].isin(GECERLI_GRUPLAR) & ~red_mask
