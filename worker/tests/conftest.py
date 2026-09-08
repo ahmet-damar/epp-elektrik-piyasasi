@@ -18,6 +18,20 @@ gerçek e-posta/şifre girişini/rol bağlantısını egzersiz eder — bkz. o
 dosyanın docstring'i ve `dokumanlar/10_TEKNIK_MASTER_DOKUMAN.md` §9.4).
 Bu bilinçli akışı kırmamak için `ALLOW_DESTRUCTIVE_TESTS=true` kaçış
 kapısı bırakıldı — yalnız elle, açıkça set edildiğinde devre dışı kalır.
+
+**2026-09-08'de bulunan boşluk (bu koruma varken bile canlıya sızma
+yaşandı, tarih_id=209912'ye AYNI 2026-09-02 deseninde 85 satır + 3 batch +
+3 source_asset + 1 dim_tarih — temizlendi, bkz. dokumanlar/06_canli_veri_
+operasyon_gunlugu.md 2026-09-08 kaydı):** bu dosya `worker.db`'yi hiç
+IMPORT ETMEDEN yalnız `os.environ`'a bakıyordu — eğer kabuk ortamında
+`DATABASE_URL` set değilse (örn. elle `Remove-Item Env:DATABASE_URL`),
+`pytest_configure` boş görüp GEÇİYORDU; sonra test toplama sırasında ilk
+`worker.db` import'u kendi `load_dotenv()`'ini çalıştırıp `.env`'den canlı
+`DATABASE_URL`'i SESSİZCE process ortamına yüklüyordu — koruma artık
+etkisizdi. Düzeltme: bu dosya da `worker.db`'yi import ediyor (bu onun
+`load_dotenv()`'ini TETİKLER, `override=False` olduğundan zaten set bir
+kabuk değişkenini BOZMAZ) — kontrol artık test toplamasının göreceğiyle
+AYNI, nihai `DATABASE_URL` değerine bakıyor.
 """
 
 from __future__ import annotations
@@ -25,6 +39,13 @@ from __future__ import annotations
 import os
 
 import pytest
+
+# .env'i BURADA, kontrolden ÖNCE yükle (worker.db'nin kendi load_dotenv()
+# çağrısını tetikler) — aksi halde bu dosya boş os.environ görüp geçer,
+# sonra bir test modülünün İLK worker.db import'u .env'deki canlı
+# DATABASE_URL'i sessizce process'e yükler ve koruma atlanmış olur
+# (2026-09-08'de gerçekten yaşandı, yukarıdaki modül notuna bkz.).
+import worker.db  # noqa: F401
 
 # Canlı Supabase projelerinin connection string'lerinde her zaman geçen
 # host parçaları. CI'nin kendi disposable postgres:16 container'ı

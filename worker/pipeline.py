@@ -565,22 +565,32 @@ def isle_ay_ulke_geneli_excel(
 
     ws11 = _sayfa(wb, 11)
     kumulatif = parser.tablo11_genel_toplam_satiri_oku(ws11)
-    onceki_toplam = ingest.yil_ici_onceki_tuketim_ulke_geneli_toplami(
-        conn, tarih_id // 100, tarih_id
-    )
+    # 2026-09-08 (Aşama 3, batch bağımlılığı düzeltmesi, migration
+    # 20260908_0002): artık bir önceki AYLARIN TOPLAMI yeniden hesaplanmıyor
+    # — yalnız bir önceki ayın KAYITLI kümülatifi okunuyor (tek satır), ham
+    # kümülatif AYRICA saklanıyor (aşağıda) ki N-1 sonradan değişirse
+    # `worker/scripts/tutarlilik_ulke_geneli_kumulatif.py` bunu AÇIKÇA
+    # yakalasın — bkz. ingest.onceki_ay_kumulatif_ulke_geneli_getir() docstring'i.
+    onceki_kumulatif = ingest.onceki_ay_kumulatif_ulke_geneli_getir(conn, tarih_id)
     aylik = {
-        grup: deger - onceki_toplam.get(grup, 0.0) for grup, deger in kumulatif.items()
+        grup: deger - onceki_kumulatif.get(grup, 0.0)
+        for grup, deger in kumulatif.items()
     }
     print(f"  Kümülatif: {kumulatif}")
-    print(f"  Önceki toplam (aynı yıl): {onceki_toplam}")
+    print(f"  Önceki ayın kayıtlı kümülatifi: {onceki_kumulatif}")
     print(f"  Aylık (türetilen): {aylik}")
 
     ulke_geneli_ham = pd.DataFrame(
         [
-            {"tarih_id": tarih_id, "grup": grup, "tuketim_mwh": deger}
+            {
+                "tarih_id": tarih_id,
+                "grup": grup,
+                "tuketim_mwh": deger,
+                "kumulatif_tuketim_mwh": kumulatif[grup],
+            }
             for grup, deger in aylik.items()
         ],
-        columns=["tarih_id", "grup", "tuketim_mwh"],
+        columns=["tarih_id", "grup", "tuketim_mwh", "kumulatif_tuketim_mwh"],
     )
 
     source_asset_id = ingest.kaynak_asset_olustur(

@@ -433,10 +433,12 @@ def tablo11_genel_toplam_satiri_oku(
 
     ⚠️ KÜMÜLATİF: dönen değerler yıl başından BU AYA KADAR toplamdır — çağıran
     (bkz. `worker/pipeline.py:isle_ay_ulke_geneli_excel()`) bunu
-    `ingest.yil_ici_onceki_tuketim_ulke_geneli_toplami()` ile aynı yılın
-    önceki aylarının toplamını çıkararak AYLIK değere çevirmeli — `fact_
-    tuketim`'in T11'i (il bazlı) de-kümülatif etme deseniyle BİREBİR AYNI
-    (bkz. `worker/pipeline.py` satır ~358-374)."""
+    `ingest.onceki_ay_kumulatif_ulke_geneli_getir()`'in döndürdüğü, bir
+    önceki ayın KAYITLI kümülatifini çıkararak AYLIK değere çevirmeli
+    (2026-09-08, Aşama 3 — batch bağımlılığı düzeltmesi: artık önceki
+    ayların toplamı yeniden hesaplanmıyor, tek satır okunuyor; ham
+    kümülatif değer de `fact_tuketim_ulke_geneli.kumulatif_tuketim_mwh`
+    kolonunda AYRICA saklanıyor, migration 20260908_0002)."""
     konum = _il_matrisi_oku(ws, tablo_etiketi)
     if konum is None:
         raise ValueError(f"{tablo_etiketi}: tablo/başlık satırı bulunamadı")

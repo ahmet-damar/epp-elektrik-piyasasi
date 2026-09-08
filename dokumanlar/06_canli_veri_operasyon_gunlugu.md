@@ -1185,3 +1185,80 @@ girdisi `fact_tuketim` (il bazlı) yerine bu tabloya taşındı — canlıda
 2026-06↔2025-06 için **+%7,1** gerçek bir YoY değeri üretti (eskiden HER
 ZAMAN 'hesaplanamaz'). Detay/gerekçe: `10_TEKNIK_MASTER_DOKUMAN.md` §5.5,
 Sürüm Geçmişi v1.15.
+
+## 2026-09-08 — `fact_tuketim_ulke_geneli` batch bağımlılığı düzeltmesi (Aşama 3/ADIM 3 madde 1)
+
+Yukarıdaki ADIM 2 düzeltmesi ("en son batch'i al") bile bir sorunu açık
+bıraktığı fark edildi: ay N'nin aylık değeri, ay N-1'in İŞLENDİĞİ ANDAKİ
+en son batch'ine bağımlı kalıyordu — N-1 SONRADAN başka bir batch'le
+(düzeltilmiş bir değerle) aktive edilirse N'nin kayıtlı değeri artık hiçbir
+aktif veriden türetilmemiş oluyordu ve bunu yakalayacak hiçbir mekanizma
+yoktu (sessiz bağımlılık, batch izolasyonu ilkesine aykırı).
+
+**Düzeltme:** migration `20260908_0002` — `fact_tuketim_ulke_geneli`'ye
+nullable `kumulatif_tuketim_mwh` kolonu eklendi (yalnız Excel ayları için).
+`ingest.yil_ici_onceki_tuketim_ulke_geneli_toplami()` kaldırıldı, yerine
+`ingest.onceki_ay_kumulatif_ulke_geneli_getir()` geldi — artık toplama
+YOK, yalnız bir önceki ayın KAYITLI kümülatifini tek satır okuyor. Yeni
+kalıcı script `worker/scripts/tutarlilik_ulke_geneli_kumulatif.py`: N-1
+sonradan değişirse bunu AÇIKÇA yakalar (exit code 1 + rapor).
+
+**Doğrulama (disposable postgres:17, canlıya dokunmadan):** migration +
+279/279 pytest yeşil; mevcut 6 ay (30 satır) sıfırdan bu YENİ yolla
+yeniden işlendi — canlıdaki `tuketim_mwh` değerleriyle ONDALIK BASAMAĞA
+KADAR birebir eşleşti (regresyon yok). Script'in gerçekten yakaladığı
+KANITLANDI: 2026-02'ye kasıtlı 500.000 MWh farklı kümülatifle superseding
+bir batch aktive edilip script çalıştırıldı — yalnız beklenen
+`(202603, Sanayi)` satırı tutarsız işaretlendi, başka yanlış pozitif yok.
+
+**Canlıya uygulama:** migration + `worker/scripts/
+backfill_ulke_geneli_kumulatif_kolon.py` (aynı 6 kaynak dosyadan T11
+kümülatif değerini okuyup yalnız yeni kolonu dolduran, `tuketim_mwh`'ye
+DOKUNMAYAN tek seferlik script) canlıda çalıştırıldı — 30/30 satır
+güncellendi (`tuketim_mwh` DEĞİŞMEDİ). `mutabakat_ulke_geneli.py` (479
+çift, 0 uyumsuz) ve yeni `tutarlilik_ulke_geneli_kumulatif.py` (30 çift,
+0 tutarsız) canlıda YEŞİL. Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.6,
+Sürüm Geçmişi v1.16.
+
+## 2026-09-08 (devam) — 2026-09-02 sızıntısının AYNISI tekrar yaşandı: `conftest.py` koruması atlandı, temizlendi, kalıcı düzeltildi
+
+Yukarıdaki doğrulama işi sırasında yerel pytest paketi, `DATABASE_URL`
+kabuk ortamından elle kaldırılıp (`Remove-Item Env:DATABASE_URL`) çalıştı
+— amaç disposable postgres'e karşı test etmekti, ama `worker/tests/
+conftest.py`'nin canlı-DB koruması (2026-09-07 denetimi C2'de eklenmişti)
+yalnız `os.environ`'a bakıyordu ve o an boş gördüğü için GEÇTİ. Test
+toplama sırasında `worker.db`'nin kendi `load_dotenv()`'i (`override=
+False`) `.env`'den canlı `DATABASE_URL`'i SESSİZCE process'e yükledi —
+koruma artık etkisizdi, paket canlı Supabase'e karşı çalıştı.
+
+**Sonuç — 2026-09-02'deki İLE BİREBİR AYNI sızıntı deseni:**
+`test_job_worker_integration.py`'nin kendi commit yapan async polling
+yolu, `tarih_id=209912` (yıl 2099) için 4 fact tablosunda (fact_tuketim:
+12, fact_uretim: 14, fact_abone: 12, fact_serbest_tuketici: 47 satır) +
+3 `ingestion_batch` (616-618) + 3 `source_asset` (610-612) + 1 `job_status`
+üçlüsü + 1 `dim_tarih` kaydını canlı production DB'de kalıcı bıraktı.
+
+**Temizlik (tek turda, 2026-09-02'nin 3 turluk deneyiminden ders alınarak
+önce TAM envanter çıkarılıp sonra silindi):** 4 fact tablosu (85 satır) +
+3 `job_status` + 3 `ingestion_batch` + 3 `source_asset` + 1 `dim_tarih`
+silindi, geniş son taramayla 2099/209912 civarında hiç iz kalmadığı
+doğrulandı. `audit_log` (2026-09-02'deki kararla TUTARLI) yine
+SİLİNMEDİ — sızıntı batch'lerine referans veren birkaç kayıt zararsız,
+kalıcı iz olarak bırakıldı. Temizlik sonrası `mutabakat_ulke_geneli.py`
+(479/0) ve `tutarlilik_ulke_geneli_kumulatif.py` (30/0) tekrar YEŞİL
+doğrulandı — bu tablolara sızıntı hiç bulaşmamıştı.
+
+**Kalıcı düzeltme:** `worker/tests/conftest.py` artık `worker.db`'yi
+KENDİSİ import ediyor (kontrolden ÖNCE) — bu onun `load_dotenv()`'ini
+tetikliyor (`override=False` olduğundan zaten set bir kabuk değişkenini
+BOZMUYOR), böylece koruma artık test toplamasının göreceğiyle AYNI nihai
+`DATABASE_URL`/`DATABASE_URL_DASHBOARD` değerine bakıyor. Düzeltme
+canlıda REPRODUCE edilerek doğrulandı: aynı `Remove-Item Env:DATABASE_URL`
+senaryosu düzeltme ÖNCESİ sessizce geçiyordu, düzeltme SONRASI doğru
+şekilde `exit code 3` ile durdu.
+
+**Ders (2026-09-02'nin dersine ek):** bu koruma dosyası VARDI ve doğru
+niyetle yazılmıştı, ama kendi bağımlılığının (`.env` yükleme zamanlaması)
+DIŞINDA bir varsayıma dayanıyordu — bir güvenlik/koruma kontrolü, kontrol
+ettiği ŞEYİN (burada: nihai ortam değişkeni değeri) aynı anda GEÇERLİ
+olan halini görmeli, kendi izole "önce" anlık görüntüsünü değil.

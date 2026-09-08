@@ -63,6 +63,8 @@ her yeni rakam için geçerlidir.
 | v1.13 | 2026-09-08 | "Doküman Yönetim Kuralı" bölümü yazıldı (D kuralı artık yalnız STATUS etiketi değil, ayrı bir bölüm) + tarih çapası şartı eklendi — `.github/copilot-instructions.md`'ye de tek satır yansıtıldı | Gerekçe: aynı gün yapılan KPI-25/27 taramasında 4 çapasız/eskimiş rakam bulunmuştu (bkz. commit `d141a79`) — bu madde onun tekrarını önlemek için, geriye dönük temizlik ZORUNLULUĞU getirmiyor |
 | v1.14 | 2026-09-08 | **Gün sonu kapanışı.** 13-dokümanlık dış denetimin TAMAMI (Aşama 0/1/2 + D kuralı tarih çapası) bu gün içinde kapandı — açık madde YOK. `09_PROJE_DURUMU.md`'nin "Sonraki Oturum Devam Noktası" bölümü yeniden yazıldı: bugünün özeti, C6'nın tam listesi, Faz 4 önerisi (Eskişehir pilotu + seasonal-naive baseline), ve bir sonraki oturumun ilk işi (2026-09-13 Pazar 03:00 UTC — `scheduled-backup.yml`'in İLK gerçek cron koşusunun kontrolü) | Yalnız doküman — kod/migration/canlı DB'ye dokunulmadı. pytest 227/227, CI+Security yeşil, git temiz |
 | v1.15 | 2026-09-08 | Aşama 3 (boş KPI'ları aç) — ADIM 1 (T11-Genel-Toplam vs T7 tanım dikişi kontrolü) + ADIM 2 (`fact_tuketim_ulke_geneli` 2026+ Excel'e genişletildi, KPI-13 girdisi taşındı) — §5.5 | 6/6 ay (202601-202606) gerçek dosyaya karşı test edildi (4/6 birebir, 2/6 <%0,02 fark) — T11 seçildi, T7 değil. Canlıya 30 satır eklendi (629 toplam). Gerçek bir de-kümülatif bug'ı bulunup düzeltildi (regresyon testiyle). KPI-13 2026-06↔2025-06 için artık **+%7,1** (önceden hep 'hesaplanamaz'), eski il-bazlı yol hâlâ None (regresyon yok) — canlıda doğrulandı |
+| v1.16 | 2026-09-08 | Aşama 3/ADIM 3 madde 1 — `fact_tuketim_ulke_geneli` batch bağımlılığı düzeltmesi (migration `20260908_0002`, `kumulatif_tuketim_mwh` kolonu + `tutarlilik_ulke_geneli_kumulatif.py`) — §5.6 | Disposable postgres:17'de 279/279 pytest + mevcut 30 satır sıfırdan yeniden işlenip canlıyla ondalık basamağa kadar eşleşti; simüle edilmiş bir "N-1 sonradan değişti" senaryosunda yeni script beklenen TEK satırı doğru yakaladı, başka yanlış pozitif yok. Canlıya migration + kolon backfill uygulandı (30/30), mutabakat (479/0 uyumsuz) ve yeni tutarlılık script'i (30/0 tutarsız) canlıda YEŞİL |
+| v1.17 | 2026-09-08 | `worker/tests/conftest.py`'nin canlı-DB koruması, 2026-09-02'deki İLE BİREBİR AYNI sızıntı desenini (test kirliliği canlı Supabase'de) TEKRAR üretti (`.env`'in `load_dotenv()`'le kontrolden SONRA yüklenmesi yüzünden atlandı) — bulundu, canlı kirlilik temizlendi (85 fact + 3 batch + 3 source_asset + 1 dim_tarih), koruma kalıcı düzeltildi — bkz. `06_canli_veri_operasyon_gunlugu.md` 2026-09-08 (devam) kaydı | Düzeltme öncesi/sonrası CANLI olarak reprodüklendi: aynı senaryo düzeltme öncesi sessizce geçiyordu, sonrası `exit code 3` ile doğru durdu. Temizlik sonrası mutabakat (479/0) + tutarlılık (30/0) script'leri tekrar YEŞİL, 278/279 pytest (tek "hata" — canlı Auth'a bilerek bağımlı `test_auth_integration.py`'nin bu turda disposable DB'ye yönlendirilmiş olması, beklenen) |
 
 ---
 
@@ -425,6 +427,44 @@ ile yüklenip `pipeline.batch_onayla()` ile aktive edildi. **KPI-13
 'hesaplanamaz' dönüyordu, grup kümesi — Sanayi — uyuşmuyordu; il bazlı
 `fact_tuketim` DEĞİŞMEDİĞİNDEN eski yolla hâlâ None döndüğü de ayrıca
 doğrulandı — regresyon yok, yalnız KPI-13'ün girdisi değişti).
+
+### 5.6 `fact_tuketim_ulke_geneli` Batch Bağımlılığı Düzeltmesi (2026-09-08, Aşama 3/ADIM 3 madde 1)
+**Kalan sorun (§5.5'teki "en son batch" düzeltmesinden SONRA bile):** ay
+N'nin aylık değeri, ay N-1'in İŞLENDİĞİ ANDAKİ en son batch'inden
+türetiliyordu — ama N-1 SONRADAN başka (düzeltilmiş) bir batch'le
+aktive edilirse, N'nin zaten kayıtlı değeri artık hiçbir aktif veriden
+türetilmemiş oluyordu ve bunu YAKALAYACAK hiçbir mekanizma yoktu (projenin
+batch izolasyonu ilkesine aykırı, sessiz bir bağımlılık).
+
+**Düzeltme (migration `20260908_0002`):** `fact_tuketim_ulke_geneli`'ye
+nullable `kumulatif_tuketim_mwh` kolonu eklendi (yalnız Excel ayları için
+dolu — Word ayları NULL kalıyor, kaynakta zaten kümülatif kavramı yok).
+`ingest.yil_ici_onceki_tuketim_ulke_geneli_toplami()` KALDIRILDI, yerine
+`ingest.onceki_ay_kumulatif_ulke_geneli_getir()` geldi — artık önceki
+ayların toplamını YENİDEN HESAPLAMIYOR, yalnız bir önceki ayın KAYITLI
+kümülatifini tek satır okuyor. Yeni formül: aylık = bu batch'in kendi
+kümülatifi − önceki ayın KAYITLI kümülatifi.
+
+**Yeni kalıcı script — `worker/scripts/tutarlilik_ulke_geneli_kumulatif.py`:**
+her aktif Excel ayı için, kayıtlı aylık değerin "kendi kümülatifi − önceki
+ayın GÜNCEL aktif kümülatifi" ile hâlâ eşleştiğini doğrular; N-1 sonradan
+değişirse bunu AÇIKÇA (exit code 1 + rapor) yakalar — sessiz kalmaz.
+
+**Doğrulama (disposable postgres:17, 2026-09-08):** migration + 279/279
+pytest yeşil; mevcut 6 ay (202601-202606, 30 satır) sıfırdan bu YENİ yolla
+yeniden işlendi — canlıdaki `tuketim_mwh` değerleriyle ONDALIK BASAMAĞA
+KADAR birebir eşleşti (regresyon yok, yalnız eksik denetim eklendi).
+Script'in gerçekten yakaladığı KANITLANDI: 2026-02'ye kasıtlı 500.000 MWh
+farklı bir kümülatifle superseding bir batch aktive edilip script
+çalıştırıldı — yalnız beklenen (202603, Sanayi) satırı tutarsız
+işaretlendi, başka hiçbir satır yanlış pozitif vermedi.
+
+**Canlıya uygulama (2026-09-08):** migration + `worker/scripts/
+backfill_ulke_geneli_kumulatif_kolon.py` (aynı 6 kaynak dosyadan T11
+kümülatif değerini okuyup yalnız yeni kolonu dolduran, `tuketim_mwh`'ye
+DOKUNMAYAN tek seferlik script) canlıda çalıştırıldı — 30/30 satır
+güncellendi. `mutabakat_ulke_geneli.py` (479 çift, 0 uyumsuz) ve
+`tutarlilik_ulke_geneli_kumulatif.py` (30 çift, 0 tutarsız) canlıda YEŞİL.
 
 ---
 

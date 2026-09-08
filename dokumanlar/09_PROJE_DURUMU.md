@@ -126,17 +126,31 @@ yansıtıldı.**
   `transaction_timeout` GUC'u) de ortadan kalktı. Detay:
   `10_TEKNIK_MASTER_DOKUMAN.md` §7.5/§8.2/§8.5/§11.2, Sürüm Geçmişi
   v1.10-v1.12.
-- **Aşama 3 (boş KPI'ları açma) — ADIM 1-2 TAMAMLANDI (2026-09-08),
-  ADIM 3-5 AÇIK** (bkz. "Sonraki Oturum Devam Noktası"). ADIM 1:
-  Excel T11'in Genel Toplam satırı KÜMÜLATİF, 6/6 ay (202601-202606)
-  gerçek dosyaya karşı test edildi — de-kümülatif edilince T7 ile 4/6
-  ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11 seçildi** (2016-2025
-  Word ile TEK tanım). ADIM 2: `fact_tuketim_ulke_geneli` 2026-01..06'ya
-  genişletildi (629 aktif satır — 599+30), gerçek bir de-kümülatif
-  bug'ı bulunup düzeltildi (regresyon testiyle). **KPI-13 artık gerçek
-  değer üretiyor:** 2026-06↔2025-06 için **+%7,1** (önceden hep
-  'hesaplanamaz'). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.5, Sürüm
-  Geçmişi v1.15.
+- **Aşama 3 (boş KPI'ları açma) — ADIM 1-2 ve ADIM 3 madde 1 TAMAMLANDI
+  (2026-09-08), ADIM 3 madde 2-4 + ADIM 4-5 AÇIK** (bkz. "Sonraki Oturum
+  Devam Noktası"). ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
+  6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
+  edilince T7 ile 4/6 ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11
+  seçildi** (2016-2025 Word ile TEK tanım). ADIM 2: `fact_tuketim_
+  ulke_geneli` 2026-01..06'ya genişletildi (629 aktif satır — 599+30),
+  gerçek bir de-kümülatif bug'ı bulunup düzeltildi (regresyon testiyle).
+  **KPI-13 artık gerçek değer üretiyor:** 2026-06↔2025-06 için **+%7,1**
+  (önceden hep 'hesaplanamaz'). ADIM 3 madde 1: ADIM 2'nin "en son
+  batch'i al" düzeltmesi bile N-1'in SONRADAN değişmesine karşı sessiz
+  kalıyordu — migration `20260908_0002` ile `kumulatif_tuketim_mwh`
+  kolonu eklendi, yeni kalıcı script `tutarlilik_ulke_geneli_kumulatif.py`
+  bu durumu AÇIKÇA yakalıyor (gerçek bir superseding senaryosuyla
+  kanıtlandı). Canlıya uygulandı, mevcut 30 satır yeniden doğrulandı
+  (`tuketim_mwh` değişmedi), mutabakat+tutarlılık canlıda YEŞİL. Detay:
+  `10_TEKNIK_MASTER_DOKUMAN.md` §5.5-5.6, Sürüm Geçmişi v1.15-v1.16.
+- **Yan olay (2026-09-08):** yukarıdaki doğrulama sırasında `worker/tests/
+  conftest.py`'nin canlı-DB koruması 2026-09-02'deki İLE AYNI şekilde
+  atlandı (`.env`'in kontrolden SONRA yüklenmesi) ve pytest paketi yine
+  canlıya karşı çalışıp `tarih_id=209912` test kirliliği bıraktı — TESPİT
+  EDİLDİ, TEMİZLENDİ (85 fact + 3 batch + 3 source_asset + 1 dim_tarih,
+  audit_log korundu), koruma kalıcı düzeltilip canlıda reprodüksiyonla
+  doğrulandı. Detay: `06_canli_veri_operasyon_gunlugu.md` 2026-09-08
+  (devam) kaydı, Sürüm Geçmişi v1.17.
 
 ## Tablo — Yıl × Tablo Aktivasyon Durumu
 
@@ -271,25 +285,40 @@ yedekleme + haftalık otomasyon + GERÇEK restore drill'i, C3 sessiz
 başarısızlık savunması, C4 RLS geri açılması), Aşama 2 (C5 — KPI-25/27
 kaynak kararı, dashboard idle-in-transaction kök nedeni, restore hedefi
 postgres:17 düzeltmesi), ve D kuralına tarih çapası maddesi (commit
-`5214b9d`).
+`5214b9d`). Ayrıca 2026-09-08 içinde Aşama 3 ADIM 1-2 (bkz. yukarıdaki
+TL;DR) ve ADIM 3 madde 1 (batch bağımlılığı düzeltmesi) tamamlandı.
 
 ### Açık madde
 Dış denetim listesinin (A/B/C bölümleri) hiçbir maddesi açık değil.
 **Aşama 3 (boş KPI'ları açma) DEVAM EDİYOR** — ADIM 1 (T11 vs T7 tanım
 dikişi kontrolü) ve ADIM 2 (`fact_tuketim_ulke_geneli`'nin 2026+ Excel'e
-genişletilmesi, KPI-13'ün girdisi taşındı) **TAMAMLANDI** (bkz. yukarıdaki
-TL;DR). **ADIM 3, 4, 5 AÇIK** — sırada:
-- **ADIM 3:** `fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli` (tek
-  migration, `fact_tuketim_ulke_geneli` ile AYNI desen) + il/kaynak toplamı
-  mutabakat script'i (`mutabakat_ulke_geneli.py` deseninde).
-- **ADIM 4:** Önce Excel (2026) backfill + doğrulama, SONRA Word (10 yıl,
-  yıl-yıl format sürprizleri beklenir — özellikle Tablo 1.11'in "Brüt
+genişletilmesi, KPI-13'ün girdisi taşındı) **TAMAMLANDI**. **ADIM 3'ün
+madde 1'i (batch bağımlılığı düzeltmesi — `kumulatif_tuketim_mwh` kolonu +
+`tutarlilik_ulke_geneli_kumulatif.py`) de TAMAMLANDI (2026-09-08)** —
+canlıya uygulandı, mevcut 30 satır yeniden doğrulandı (bkz. yukarıdaki
+TL;DR, `10_TEKNIK_MASTER_DOKUMAN.md` §5.6). **ADIM 3'ün madde 2-4'ü ve
+ADIM 4-5 AÇIK** — sırada:
+- **ADIM 3 madde 2:** `fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli`
+  (tek migration, `fact_tuketim_ulke_geneli` ile AYNI batch/is_active/RLS/
+  GRANT deseni). Excel T2/T3/T5/T6 zaten AYLIK (kümülatif DEĞİL, ADIM 1
+  araştırmasında doğrulandı) — de-kümülatif mantığı buraya KOPYALANMAYACAK.
+- **ADIM 3 madde 3:** il toplamı ile kaynak toplamının her (dönem,
+  lisans_id) çifti için eşleştiğini doğrulayan kalıcı mutabakat script'i
+  (`mutabakat_ulke_geneli.py` deseninde), ±%0,5 tolerans — uyumsuzluk
+  aktivasyonu BLOKLAMALI (yalnız uyarı değil).
+- **ADIM 3 madde 4:** Yalnız Excel (2026-01..06) backfill + doğrulama —
+  Word yılları BU maddede YOK.
+- **ADIM 4 (orijinal numaralandırma — Word yılları):** ADIM 3 madde 2-4
+  Excel için oturduktan SONRA, üretim verisi için Word (10 yıl) backfill'i
+  — yıl-yıl format sürprizleri beklenir (özellikle Tablo 1.11'in "Brüt
   Lisanssız Üretim Miktarı" çapa-bazlı kolonu, Tablo 1.12'nin iki-sütunlu
   sayfa düzeni).
 - **ADIM 5:** KPI-02/03/06/07 → `fact_uretim_kaynak_geneli`; KPI-05 → pay
   yeni tablodan, payda mevcut `fact_uretim.kurulu_guc_mw`'dan (⚠️
   `lisans_id` filtresi İKİ tarafta da AYNI olmalı — testle kanıtlanmalı).
-  Her KPI kartına kaynak/kapsam notu.
+  Her KPI kartına kaynak/kapsam notu. **Bu turda (2026-09-08) ADIM 5'e
+  HİÇ dokunulmadı — veri doğru oturmadan KPI'ya bağlanmayacak (kullanıcı
+  talimatı).**
 
 ### C6 — ertelenmiş/değerlendirilmiş küçük maddeler (yalnız referans, aksiyon BEKLEMİYOR)
 - **MFA / merkezi rate-limit:** ertelendi (tek admin kullanıcı var).

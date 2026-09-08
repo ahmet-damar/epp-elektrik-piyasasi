@@ -338,47 +338,49 @@ def yil_ici_onceki_tuketim_toplami(
     return df
 
 
-def yil_ici_onceki_tuketim_ulke_geneli_toplami(
-    conn: Connection, yil: int, tarih_id: int
+def onceki_ay_kumulatif_ulke_geneli_getir(
+    conn: Connection, tarih_id: int
 ) -> dict[str, float]:
-    """`yil_ici_onceki_tuketim_toplami()`'nin `fact_tuketim_ulke_geneli`
-    eşdeğeri (2026-09-08, Aşama 3/ADIM 2) — Excel T11'in Genel Toplam satırı
-    da KÜMÜLATİF (bkz. `worker/parser.py:tablo11_genel_toplam_satiri_oku()`
-    docstring'i); aynı yıl içinde bu aydan ÖNCEKİ ayların grup bazında
-    toplamını döner. Yılın ilk ayı için (öncesinde hiç ay yoksa) boş dict
-    döner (referans toplamı 0 sayılır — kümülatif=aylık).
+    """`yil_ici_onceki_tuketim_ulke_geneli_toplami()`'nin YERİNE (2026-09-08,
+    Aşama 3 — batch bağımlılığı düzeltmesi): artık bir ÖNCEKİ AYLARIN
+    TOPLAMINI yeniden hesaplamıyor, yalnız bir önceki ayın (aynı yıl
+    içinde, `tarih_id - 1`) KAYITLI `kumulatif_tuketim_mwh` değerini
+    OKUYOR — tek satır sorgusu, toplama YOK.
 
-    **`is_active=true` FİLTRELENMEZ — bilerek** (2026-09-08'de gerçek bir
-    toplu backfill'de bulunan hata): bu batch zinciri elle onaya kadar
-    `is_active=false` kalıyor (bkz. `pipeline.isle_ay_ulke_geneli_excel()`
-    "onayla ÇAĞRILMADI" notu) — birden fazla ayı ARKA ARKAYA, aralarında
-    hiçbiri aktive edilmeden işlemek (tam olarak bu fonksiyonun ilk
-    sürümünün yaptığı hata) `is_active=true` filtresiyle her ay için boş
-    sonuç döndürüp HER ayı yanlışlıkla kendi kümülatif değeriyle
-    yazdırıyordu. Bunun yerine her (tarih_id, grup_id) çifti için EN SON
-    batch'in (aktivasyon durumundan bağımsız, `ingestion_batch_id DESC`)
-    değeri alınır — bu hem geriye dönük backfill'de hem normal aylık akışta
-    doğru sonuç verir, ikinci bir 'aynı ayın iki batch'i' durumunda da en
-    güncel deneme kullanılır (retry senaryosu)."""
+    **Neden bu değişti:** eski yaklaşım (aylık değerleri toplayarak
+    "önceki toplam" türetmek) N. ayın sonucunu N-1. ayın O ANKİ (belki
+    henüz onaylanmamış) değerine SESSİZCE bağımlı bırakıyordu — N-1
+    sonradan farklı bir batch'le değişirse N'in kayıtlı değeri artık
+    hiçbir aktif veriden türetilmemiş hâle geliyordu ve bunu YAKALAYACAK
+    hiçbir mekanizma yoktu. Artık ham kümülatif değer AYRI saklandığından
+    (migration 20260908_0002) bu bağımlılık `worker/scripts/
+    tutarlilik_ulke_geneli_kumulatif.py` ile AÇIKÇA doğrulanabiliyor —
+    "sessiz kalmasın" ilkesi.
+
+    Yılın ilk ayı için (ay=1, aynı yıl içinde önceki ay yok) boş dict
+    döner (referans kümülatif 0 sayılır). `is_active` FİLTRELENMEZ —
+    aynı gerekçe (2026-09-08'de bulunan gerçek bug): bu batch zinciri elle
+    onaya kadar `is_active=false` kalıyor, birden fazla ayı ARKA ARKAYA
+    (aralarında hiçbiri aktive edilmeden) işlemek `is_active=true`
+    filtresiyle boş sonuç döndürürdü — bunun yerine EN SON batch
+    (`ingestion_batch_id DESC`) alınır."""
+    if tarih_id % 100 == 1:  # yılın ilk ayı — önceki ay YOK
+        return {}
+    onceki_tarih_id = tarih_id - 1
     with conn.cursor() as cur:
         cur.execute(
             """
-            WITH en_son AS (
-                SELECT DISTINCT ON (ftu.tarih_id, ftu.grup_id)
-                    ftu.tarih_id, ftu.grup_id, ftu.tuketim_mwh
-                FROM fact_tuketim_ulke_geneli ftu
-                WHERE ftu.tarih_id >= %s AND ftu.tarih_id < %s
-                ORDER BY ftu.tarih_id, ftu.grup_id, ftu.ingestion_batch_id DESC
-            )
-            SELECT g.grup_adi, sum(en_son.tuketim_mwh) AS onceki_toplam
-            FROM en_son
-            JOIN dim_tuketici_grubu g ON g.grup_id = en_son.grup_id
-            GROUP BY g.grup_adi
+            SELECT DISTINCT ON (ftu.grup_id)
+                g.grup_adi, ftu.kumulatif_tuketim_mwh
+            FROM fact_tuketim_ulke_geneli ftu
+            JOIN dim_tuketici_grubu g ON g.grup_id = ftu.grup_id
+            WHERE ftu.tarih_id = %s AND ftu.kumulatif_tuketim_mwh IS NOT NULL
+            ORDER BY ftu.grup_id, ftu.ingestion_batch_id DESC
             """,
-            (yil * 100, tarih_id),
+            (onceki_tarih_id,),
         )
         rows = cur.fetchall()
-    return {grup: float(toplam) for grup, toplam in rows}
+    return {grup: float(deger) for grup, deger in rows}
 
 
 def fact_tuketim_yukle(
@@ -421,7 +423,14 @@ def fact_tuketim_ulke_geneli_yukle(
     YOK (grain: tarih_id × grup_id yalnız), çünkü kaynak (T11 tablosunun
     kendi Genel Toplam satırı, bkz. worker/scripts/word_ortak.py:
     genel_toplam_satirini_oku()) zaten il kırılımsız. is_active=false
-    yazar (aktivasyon adımı P0-4/P0-5 ile AYNI, bkz. aktivasyon_yap())."""
+    yazar (aktivasyon adımı P0-4/P0-5 ile AYNI, bkz. aktivasyon_yap()).
+
+    **`kumulatif_tuketim_mwh` (2026-09-08, Aşama 3, migration
+    20260908_0002):** `df`'de opsiyonel bir `kumulatif_tuketim_mwh` kolonu
+    varsa (yalnız Excel yılları — `pipeline.isle_ay_ulke_geneli_excel()`)
+    o da yazılır; yoksa (Word yılları — kaynakta zaten kümülatif kavramı
+    yok) NULL kalır."""
+    kumulatif_var = "kumulatif_tuketim_mwh" in df.columns
     yuklenen = 0
     atlanan = 0
     with conn.cursor() as cur:
@@ -431,14 +440,18 @@ def fact_tuketim_ulke_geneli_yukle(
                 atlanan += 1
                 continue
             grup_id = dim_grup_id_bul(conn, satir.grup)
+            kumulatif_deger = (
+                _sayisal_temiz(satir.kumulatif_tuketim_mwh) if kumulatif_var else None
+            )
             cur.execute(
                 """
                 INSERT INTO fact_tuketim_ulke_geneli
-                    (tarih_id, grup_id, tuketim_mwh, ingestion_batch_id, is_active)
-                VALUES (%s, %s, %s, %s, false)
+                    (tarih_id, grup_id, tuketim_mwh, kumulatif_tuketim_mwh,
+                     ingestion_batch_id, is_active)
+                VALUES (%s, %s, %s, %s, %s, false)
                 ON CONFLICT ON CONSTRAINT uq_fact_tuketim_ulke_geneli_batch DO NOTHING
                 """,
-                (satir.tarih_id, grup_id, deger, batch_id),
+                (satir.tarih_id, grup_id, deger, kumulatif_deger, batch_id),
             )
             yuklenen += 1
     return yuklenen, atlanan

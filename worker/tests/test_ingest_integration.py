@@ -191,21 +191,44 @@ def test_yil_ici_onceki_tuketim_toplami(conn) -> None:  # type: ignore[no-untype
     assert iki_ay.iloc[0]["onceki_toplam"] == pytest.approx(250.0)
 
 
-def test_yil_ici_onceki_tuketim_ulke_geneli_toplami_aktivasyonsuz_calisir(
+def test_onceki_ay_kumulatif_ulke_geneli_getir_aktivasyonsuz_calisir(
     conn,
 ) -> None:  # type: ignore[no-untyped-def]
     """2026-09-08, Aşama 3/ADIM 2 — GERÇEK bir toplu backfill'de bulunan
-    hatanın regresyon testi: bu fonksiyonun ilk sürümü `is_active=true`
-    filtreliyordu, bu yüzden ard arda (aralarında HİÇBİRİ aktive edilmeden)
-    işlenen aylar hep BOŞ 'önceki toplam' görüp kendi kümülatif değerlerini
-    yanlışlıkla 'aylık' sanıyordu (canlıda 2026-02..06 için gerçekten
-    yaşandı, worker/scripts/backfill_ulke_geneli_excel.py ile bulunup
-    düzeltildi). Burada da BİLEREK hiçbir batch aktive EDİLMİYOR."""
+    hatanın regresyon testi: bu fonksiyonun (o zamanki) öncülü `is_active=
+    true` filtreliyordu, bu yüzden ard arda (aralarında HİÇBİRİ aktive
+    edilmeden) işlenen aylar hep BOŞ 'önceki toplam' görüp kendi kümülatif
+    değerlerini yanlışlıkla 'aylık' sanıyordu (canlıda 2026-02..06 için
+    gerçekten yaşandı, worker/scripts/backfill_ulke_geneli_excel.py ile
+    bulunup düzeltildi). Burada da BİLEREK hiçbir batch aktive EDİLMİYOR.
+
+    Aşama 3 (batch bağımlılığı düzeltmesi, migration 20260908_0002) sonrası:
+    fonksiyon artık önceki ayların toplamını yeniden HESAPLAMIYOR, yalnız
+    bir önceki ayın KAYITLI `kumulatif_tuketim_mwh` değerini tek satır
+    olarak OKUYOR."""
     for tarih_id in (209801, 209802, 209803):
         ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
 
-    df1 = pd.DataFrame([{"tarih_id": 209801, "grup": "Mesken", "tuketim_mwh": 100.0}])
-    df2 = pd.DataFrame([{"tarih_id": 209802, "grup": "Mesken", "tuketim_mwh": 250.0}])
+    df1 = pd.DataFrame(
+        [
+            {
+                "tarih_id": 209801,
+                "grup": "Mesken",
+                "tuketim_mwh": 100.0,
+                "kumulatif_tuketim_mwh": 100.0,
+            }
+        ]
+    )
+    df2 = pd.DataFrame(
+        [
+            {
+                "tarih_id": 209802,
+                "grup": "Mesken",
+                "tuketim_mwh": 150.0,
+                "kumulatif_tuketim_mwh": 250.0,
+            }
+        ]
+    )
     b1 = _yeni_batch(conn, "test-ulke-geneli-yil-ici-v1")
     ingest.fact_tuketim_ulke_geneli_yukle(conn, df1, b1)
     b2 = _yeni_batch(conn, "test-ulke-geneli-yil-ici-v2")
@@ -214,17 +237,17 @@ def test_yil_ici_onceki_tuketim_ulke_geneli_toplami_aktivasyonsuz_calisir(
     # is_active=false olarak kaldılar, tıpkı canlıda batch_onayla() çağrılana
     # kadar olduğu gibi.
 
-    # Yılın ilk ayı: öncesinde hiç ay yok -> boş.
-    bos = ingest.yil_ici_onceki_tuketim_ulke_geneli_toplami(conn, 2098, 209801)
+    # Yılın ilk ayı: aynı yıl içinde önceki ay yok -> boş.
+    bos = ingest.onceki_ay_kumulatif_ulke_geneli_getir(conn, 209801)
     assert bos == {}
 
-    # 209802'den ÖNCEKİ aylar: yalnız 209801 (aktivasyon GEREKMİYOR) -> 100.0
-    tek_ay = ingest.yil_ici_onceki_tuketim_ulke_geneli_toplami(conn, 2098, 209802)
-    assert tek_ay == pytest.approx({"Mesken": 100.0})
+    # 209802'nin öncesi: 209801'in KAYITLI kümülatifi (aktivasyon GEREKMİYOR) -> 100.0
+    onceki_2 = ingest.onceki_ay_kumulatif_ulke_geneli_getir(conn, 209802)
+    assert onceki_2 == pytest.approx({"Mesken": 100.0})
 
-    # 209803'ten ÖNCEKİ aylar: 209801 (100) + 209802 (250) = 350.0
-    iki_ay = ingest.yil_ici_onceki_tuketim_ulke_geneli_toplami(conn, 2098, 209803)
-    assert iki_ay == pytest.approx({"Mesken": 350.0})
+    # 209803'ün öncesi: 209802'nin KAYITLI kümülatifi (toplama YOK) -> 250.0
+    onceki_3 = ingest.onceki_ay_kumulatif_ulke_geneli_getir(conn, 209803)
+    assert onceki_3 == pytest.approx({"Mesken": 250.0})
 
 
 def test_uretim_ve_abone_yukle(conn) -> None:  # type: ignore[no-untyped-def]
