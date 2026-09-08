@@ -1323,3 +1323,39 @@ postgres:17'de:
 **Sabah onayı bekleniyor:** bu migration canlıya UYGULANMADI. Bkz.
 `09_PROJE_DURUMU.md` "Sonraki Oturum Devam Noktası" ve `10_TEKNIK_
 MASTER_DOKUMAN.md` §5.7, Sürüm Geçmişi v1.20.
+
+## 2026-09-09 (gece çalışması, gözetimsiz, MADDE 2) — T2/T3/T5/T6 Excel parser'ında GERÇEK bir hata bulundu ve düzeltildi
+
+`tablo_kaynak_toplam_oku()` (T2/T5) ve `tablo_il_toplam_oku()` (T3/T6)
+fonksiyonları önceki bir turdan beri VARDI ama HER ZAMAN sabit bir kolon
+(`column=2` / `il_sutun+1`) okuyorlardı — bu yalnız 2026 Ocak dosyasında
+(raporun kendi ayı = sayfadaki TEK ay kolonu) doğru sonuç verirdi.
+6 gerçek dosyaya (202601-202606) karşı doğrulama sırasında bulundu:
+sayfa AYNI ANDA Ocak'tan raporun kendi ayına kadar TÜM ay kolonlarını
+taşıyor (kümülatif DEĞİL) — sabit kolon, Haziran gibi sonraki bir ayda
+SESSİZCE Ocak'ın değerini dönerdi. Hiç yakalanmamıştı çünkü paylaşılan
+sentetik test fixture'ı da yalnız 202601 kullanıyordu.
+
+Ek bulgu: T2/T3'ün ay başlıkları yalnız ay adı ("OCAK"), T5/T6'nınki
+yıl+ay birleşik ("2026 OCAK") — iki farklı biçim, tek `_ay_kolonu_bul()`
+fonksiyonu ikisini de kapsıyor.
+
+**Doğrulama — 6/6 gerçek dosyada, ONDALIK BASAMAĞA KADAR:**
+```
+202601: T2=31.259.275,117  T3=31.259.275,117  (fark 0) | T5=1.140.576,248  T6=1.140.576,248  (fark 0)
+202602: T2=26.480.919,807  T3=26.480.919,807  (fark 0) | T5=1.531.983,455  T6=1.531.983,455  (fark 0)
+202603: T2=27.206.787,117  T3=27.206.787,117  (fark 0) | T5=2.430.037,000  T6=2.430.037,000  (fark 0)
+202604: T2=25.016.411,474  T3=25.016.411,474  (fark 0) | T5=2.780.985,695  T6=2.780.985,695  (fark 0)
+202605: T2=23.939.964,707  T3=23.939.964,707  (fark 0) | T5=2.632.924,460  T6=2.632.924,460  (fark 0)
+202606: T2=26.260.669,569  T3=26.260.669,569  (fark 0) | T5=3.714.728,746  T6=3.714.728,746  (fark 0)
+```
+Bu, ADIM 3 madde 3'ün (çapraz mutabakat script'i) ülke-geneli seviyede
+zaten tutarlı olacağının güçlü, bağımsız bir kanıtı — parser hatası
+olsaydı bu 6 ayın hiçbirinde T2/T3 (veya T5/T6) birebir eşleşmezdi.
+
+Yeni regresyon testleri eklendi (`worker/tests/test_parser.py`): her iki
+başlık stili çok-kolonlu sentetik sayfalarla test edildi, "komşu ayın
+değeri sessizce dönmüyor" AÇIKÇA doğrulandı, bulunamayan bir ay için boş
+DataFrame (sahte değer YOK) döndüğü de test edildi. pytest 285/286 (tek
+beklenen "hata" — `test_auth_integration.py`). Detay: `10_TEKNIK_MASTER_
+DOKUMAN.md` §5.8, Sürüm Geçmişi v1.21.

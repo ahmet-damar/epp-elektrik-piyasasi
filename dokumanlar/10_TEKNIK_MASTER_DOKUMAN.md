@@ -68,6 +68,7 @@ her yeni rakam için geçerlidir.
 | v1.18 | 2026-09-08 | **Gün sonu kapanışı (2).** Aşama 3 ADIM 1-2 (`1232cb3`) + ADIM 3 madde 1 (`df616e6`) bu gün içinde kapandı — ADIM 3 madde 2-4 + ADIM 4-5 AÇIK, HİÇBİRİNE başlanmadı. `09_PROJE_DURUMU.md`'nin "Sonraki Oturum Devam Noktası" bölümü güncellendi: sıradaki iş (ADIM 3 madde 2 — üretim tabloları) netleştirildi, `conftest.py` korumasının HÂLÂ kendi regresyon testi olmadığı (2026-09-02 ve 2026-09-08'de iki kez delinmiş bir koruma) açık madde olarak eklendi | Yalnız doküman — kod/migration/canlı DB'ye dokunulmadı. CI+Security yeşil, git temiz |
 | v1.19 | 2026-09-09 | Gece çalışması (gözetimsiz) MADDE 0 — `worker/tests/test_conftest_guard.py` eklendi, `conftest.py`'nin canlı-DB koruması artık kendi pytest regresyon testine sahip (2026-09-02 ve 2026-09-08'de iki kez delinmişti) | Testin anlamlı olduğu (vacuous değil) kanıtlandı: `conftest.py` geçici olarak 2026-09-08 öncesinin buggy sürümüne döndürülüp aynı test suite'i çalıştırıldı — `.env`'den yükleme senaryosu (2026-09-08 bug'ının reprodüksiyonu) beklendiği gibi FAILED verdi, diğer iki senaryo PASSED kaldı; düzeltilmiş sürüm geri yüklenip 3/3 PASSED doğrulandı. Yalnız disposable/subprocess — canlı DB'ye hiç dokunulmadı |
 | v1.20 | 2026-09-09 | Gece çalışması MADDE 1 — `fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli` (migration `20260909_0001`), `fact_tuketim_ulke_geneli` ile AYNI desen, kümülatif DEĞİL — §5.7. **YALNIZ disposable postgres:17'de, CANLIYA UYGULANMADI** | Disposable postgres:17'de migration 29/29, RLS 21/21 tablo, role-access tamamen geçti, pytest 281/282 (tek beklenen "hata" — auth integration). sqlfluff temiz |
+| v1.21 | 2026-09-09 | Gece çalışması MADDE 2 — T2/T3/T5/T6 Excel parser fonksiyonlarında GERÇEK bir hata bulunup düzeltildi: sabit kolon okuyordu (yalnız Ocak dosyasında doğruydu), artık `_ay_kolonu_bul()` ile doğru ay kolonunu buluyor — §5.8 | 6/6 gerçek dosyada (202601-202606) T2↔T3 ve T5↔T6 ONDALIK BASAMAĞA KADAR birebir eşleşti (Lisanslı/Lisanssız ayrı ayrı). Yeni regresyon testleri (her iki başlık stili, "komşu ay değeri sessizce dönmüyor" kontrolü). pytest 285/286 (tek beklenen "hata") |
 
 ---
 
@@ -506,6 +507,44 @@ RLS+policy (önceki 19 + bu 2 yeni), `validate_role_access.py` → TAMAMEN
 geçti, tam pytest paketi → 281/282 (tek "hata" — canlı Auth'a bilerek
 bağımlı `test_auth_integration.py`'nin disposable DB'ye yönlendirilmiş
 olması, beklenen, regresyon DEĞİL). `sqlfluff lint` temiz.
+
+### 5.8 T2/T3/T5/T6 Excel Parser Fonksiyonları — GERÇEK Bir Hata Bulundu ve Düzeltildi (2026-09-09, gece çalışması — Aşama 3/ADIM 3 madde 2)
+**Bulgu:** `tablo_kaynak_toplam_oku()` (T2/T5) ve `tablo_il_toplam_oku()`
+(T3/T6) fonksiyonları ZATEN VARDI (önceki bir turda, muhtemelen T1/T4 ile
+birlikte, yalnız 2026 Ocak dosyasına karşı doğrulanmıştı — bkz. §5.1
+modül notu) ama HER ZAMAN sabit bir kolon (`column=2` / `il_sutun+1`)
+okuyorlardı. Gerçek dosyaya (202606) karşı doğrulama sırasında bulundu:
+bu tablolar TEK bir ay değil, **Ocak'tan raporun kendi ayına kadar TÜM ay
+kolonlarını AYNI SAYFADA** taşıyor (kümülatif DEĞİL — her kolon kendi
+ayının marjinal değeri). Sabit kolon yalnız Ocak dosyasında (tek kolon)
+doğru sonuç veriyordu — Haziran gibi sonraki bir ayda **SESSİZCE Ocak'ın
+değerini dönerdi** (asla test edilmemişti, çünkü paylaşılan sentetik
+fixture da yalnız 202601 kullanıyordu).
+
+**Ek bulgu:** T2/T3'ün ay başlıkları yalnız ay adı ("OCAK", "ŞUBAT", ...),
+T5/T6'nınki yıl+ay birleşik ("2026 OCAK", "2026 ŞUBAT", ...) — dosyaya
+karşı doğrulandı, kullanıcının MADDE 2 talimatında da önceden
+işaretlenmişti.
+
+**Düzeltme:** yeni `_ay_kolonu_bul()` — `tarih_id`in ayına karşılık gelen
+kolonu, normalize edilmiş başlığın SON kelimesini ay adıyla karşılaştırıp
+bulur (hem "HAZIRAN" hem "2026 HAZIRAN" için çalışır, tek fonksiyon).
+Sabit kolon numarasına bağımlılık tamamen kaldırıldı.
+
+**Doğrulama:**
+- 6 gerçek dosyanın (202601-202606) TAMAMINA karşı: her ay için T2
+  (kaynak-bazında ülke toplamı) ile T3 (il-bazında ülke toplamı)
+  **ONDALIK BASAMAĞA KADAR BİREBİR eşleşti** (Lisanslı), aynı şekilde T5
+  ile T6 (Lisanssız) de birebir eşleşti — bu, ADIM 3 madde 3'ün çapraz
+  mutabakat script'inin ülke-geneli seviyede zaten tutarlı olacağının
+  güçlü bir kanıtı.
+- Yeni birim testleri (`worker/tests/test_parser.py`): hem T2/T3 stili
+  ("OCAK") hem T5/T6 stili ("2026 OCAK") çok-kolonlu sentetik sayfalarla,
+  komşu ayın değerinin SESSİZCE dönmediği AÇIKÇA doğrulandı (regresyon
+  testi — eski koda karşı çalıştırılsa FAIL verirdi); bulunamayan bir ay
+  istenirse boş DataFrame (sahte değer YOK) döndüğü de test edildi.
+- Tam pytest paketi (disposable postgres:17, fresh): **285/286** (tek
+  beklenen "hata" — yine `test_auth_integration.py`).
 
 ---
 

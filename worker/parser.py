@@ -20,6 +20,14 @@ farklı olan şu noktaları ortaya çıkardı:
   AYRI, tek-boyutlu tablodur. İl × kaynak/kategori kesişimi (fact_uretim'in
   beklediği grain) aylık raporda mevcut değildir — yalnız kurulu_guc_mw bu
   detayda var (T1/T4), uretim_mwh değil.
+- **T2/T3/T5/T6 — 2026-09-09 gece çalışması MADDE 2 düzeltmesi:** bu
+  tablolar TEK bir ay değeri değil, Ocak'tan raporun kendi ayına kadar
+  TÜM ay kolonlarını AYNI SAYFADA taşıyor (kümülatif DEĞİL — her kolon o
+  ayın kendi marjinal değeri, 202606 dosyasına karşı doğrulandı). Ayrıca
+  T2/T3'ün başlıkları yalnız ay adı ("OCAK"), T5/T6'nınki yıl+ay birleşik
+  ("2026 OCAK") — bkz. `_ay_kolonu_bul()`. `tablo_kaynak_toplam_oku()`/
+  `tablo_il_toplam_oku()` eskiden sabit bir kolona (yalnız Ocak dosyasında
+  doğru) güveniyordu, bu turda düzeltildi.
 - T8, T11 ile birebir aynı il×tüketici-grubu verisini tekrarlıyor (T11 ayrıca
   Sanayi'yi iletim/dağıtım olarak ayırıyor) → T8 ayrıca implemente edilmedi,
   T11 tek başına yeterli. T7/T9 yalnız ülke geneli mutabakat satırları
@@ -319,6 +327,57 @@ def _satirda_kolon_bul(
         return None
     for col in range(min_col, max_col + 1):
         if hedef in normalize_label(ws.cell(row=satir, column=col).value):
+            return col
+    return None
+
+
+# Ay adları (normalize_label'dan SONRAKİ, Türkçe-sadeleştirilmiş büyük harf
+# hâli — "HAZİRAN" -> "HAZIRAN") — T2/T3/T5/T6'nin ay-kolonu bulunmasında
+# kullanılır (2026-09-09, gece çalışması MADDE 2, bkz. _ay_kolonu_bul).
+_AY_ADLARI = (
+    "OCAK",
+    "SUBAT",
+    "MART",
+    "NISAN",
+    "MAYIS",
+    "HAZIRAN",
+    "TEMMUZ",
+    "AGUSTOS",
+    "EYLUL",
+    "EKIM",
+    "KASIM",
+    "ARALIK",
+)
+
+
+def _ay_kolonu_bul(
+    ws: Worksheet, baslik_satir: int, baslangic_kolon: int, tarih_id: int
+) -> int | None:
+    """T2/T3/T5/T6'nin ay başlıkları — GERÇEK dosyada iki FARKLI biçimde:
+    T2/T3'te yalnız ay adı ("OCAK", "ŞUBAT", ...), T5/T6'da yıl+ay birleşik
+    ("2026 OCAK", "2026 ŞUBAT", ...) — 2026-09-09'da gerçek dosyaya (202606)
+    karşı doğrulandı. Aynı sayfada AYNI ANDA Ocak'tan raporun kendi ayına
+    kadar TÜM ay kolonları var (kümülatif DEĞİL, her kolon o ayın kendi
+    marjinal değeri — worker/scripts/backfill_ulke_geneli_excel.py'nin T11
+    de-kümülatif deseninden FARKLI, burada de-kümülatif GEREKMİYOR).
+
+    Bu fonksiyon, `tarih_id`in ayına (örn. 202606 -> Haziran) karşılık gelen
+    TEK kolonu bulur — normalize edilmiş başlığın SON kelimesini ay adıyla
+    karşılaştırarak (hem "HAZIRAN" hem "2026 HAZIRAN" son kelimesi
+    "HAZIRAN"). Sabit bir kolon numarasına (ör. her zaman kolon 2)
+    GÜVENİLMEZ — bu, yalnız Ocak dosyasında doğru sonuç verirdi (raporun
+    kendi ayı = tek kolon), Haziran gibi sonraki bir ayda column 2 SESSİZCE
+    yanlış (Ocak'ın) değerini dönerdi (gece çalışması MADDE 2'de bulunan
+    gerçek bir hata — 202606 dosyasına karşı test edilerek doğrulandı)."""
+    ay = tarih_id % 100
+    if not 1 <= ay <= 12:
+        return None
+    hedef_ay_adi = _AY_ADLARI[ay - 1]
+    for col in range(baslangic_kolon, baslangic_kolon + 20):
+        baslik = normalize_label(ws.cell(row=baslik_satir, column=col).value)
+        if not baslik:
+            continue
+        if baslik.split()[-1] == hedef_ay_adi:
             return col
     return None
 
@@ -801,7 +860,15 @@ def tablo4_lisanssiz_kurulu_guc_oku(
 def tablo_kaynak_toplam_oku(
     ws: Worksheet, tablo_etiketi: str, tarih_id: int, deger_kolon_adi: str, lisans: str
 ) -> pd.DataFrame:
-    """T2/T5: Kaynak Türü × tek ay değeri (ülke toplamı, il YOK)."""
+    """T2/T5: Kaynak Türü × AY kolonu (ülke toplamı, il YOK).
+
+    ⚠️ 2026-09-09 (gece çalışması MADDE 2) DÜZELTMESİ: bu fonksiyon eskiden
+    HER ZAMAN sabit `column=2`'yi okuyordu — bu yalnız Ocak dosyasında
+    (raporun kendi ayı = sayfadaki TEK ay kolonu) doğru sonuç verirdi.
+    Gerçek dosyada (202606'ya karşı doğrulandı) sayfa, Ocak'tan raporun
+    kendi ayına kadar TÜM ay kolonlarını AYNI ANDA içeriyor — `column=2`
+    Haziran dosyasında SESSİZCE Ocak'ın değerini dönerdi. Artık `tarih_id`in
+    ayına karşılık gelen kolon `_ay_kolonu_bul()` ile AÇIKÇA bulunuyor."""
     kolonlar = ["kaynak", "yenilenebilir", "lisans", "tarih_id", deger_kolon_adi]
     capa = bul_capa(ws, tablo_etiketi)
     if capa is None:
@@ -816,6 +883,10 @@ def tablo_kaynak_toplam_oku(
     if baslik_satir is None:
         return pd.DataFrame(columns=kolonlar)
 
+    deger_sutun = _ay_kolonu_bul(ws, baslik_satir, 2, tarih_id)
+    if deger_sutun is None:
+        return pd.DataFrame(columns=kolonlar)
+
     satirlar = []
     satir = baslik_satir + 1
     while True:
@@ -827,7 +898,7 @@ def tablo_kaynak_toplam_oku(
         eslesme = kaynak_esle(etiket)
         if eslesme is not None:
             kaynak, yenilenebilir = eslesme
-            deger = parse_sayi(ws.cell(row=satir, column=2).value)
+            deger = parse_sayi(ws.cell(row=satir, column=deger_sutun).value)
             satirlar.append(
                 {
                     "kaynak": kaynak,
@@ -851,7 +922,12 @@ def tablo_kaynak_toplam_oku(
 def tablo_il_toplam_oku(
     ws: Worksheet, tablo_etiketi: str, tarih_id: int, deger_kolon_adi: str, lisans: str
 ) -> pd.DataFrame:
-    """T3/T6: İl × tek ay değeri (toplam üretim, kaynak kırılımı YOK)."""
+    """T3/T6: İl × AY kolonu (toplam üretim, kaynak kırılımı YOK).
+
+    ⚠️ 2026-09-09 (gece çalışması MADDE 2) DÜZELTMESİ: `tablo_kaynak_
+    toplam_oku()` ile AYNI kök neden/düzeltme — eskiden sabit `il_sutun+1`
+    okunuyordu, artık `_ay_kolonu_bul()` ile tarih_id'in ayına karşılık
+    gelen kolon AÇIKÇA bulunuyor."""
     kolonlar = ["il", "il_kodu", "tarih_id", "lisans", deger_kolon_adi]
     capa = bul_capa(ws, tablo_etiketi)
     if capa is None:
@@ -873,7 +949,9 @@ def tablo_il_toplam_oku(
     if konum is None:
         return pd.DataFrame(columns=kolonlar)
     baslik_satir, il_sutun = konum
-    deger_sutun = il_sutun + 1
+    deger_sutun = _ay_kolonu_bul(ws, baslik_satir, il_sutun + 1, tarih_id)
+    if deger_sutun is None:
+        return pd.DataFrame(columns=kolonlar)
 
     satirlar = []
     for satir_no, il_adi in _veri_satirlarini_gez(ws, baslik_satir, il_sutun):

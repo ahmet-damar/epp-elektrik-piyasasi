@@ -477,6 +477,123 @@ def test_tablo5_6_lisanssiz_uretim(wb: openpyxl.Workbook) -> None:
     assert il["uretim_mwh"].iloc[0] == pytest.approx(6000.0)
 
 
+# ---------------------------------------------------------------------------
+# 2026-09-09 (gece çalışması MADDE 2) — T2/T3/T5/T6 ay-kolonu düzeltmesi.
+#
+# GERÇEK dosyada (202606'ya karşı doğrulandı) bu tablolar TEK bir ay değil,
+# Ocak'tan raporun kendi ayına kadar TÜM ay kolonlarını AYNI SAYFADA taşıyor
+# (kümülatif DEĞİL — her kolon kendi ayının marjinal değeri). Yukarıdaki
+# testler (`wb` fixture'ı, yalnız 202601/"tek kolon") bu senaryoyu hiç
+# egzersiz etmiyordu — sabit `column=2` okuyan eski kod bu yüzden hiç
+# yakalanmamıştı. Burada BİLEREK ayrı, minimal (paylaşılan `wb` fixture'ına
+# bağlı OLMAYAN) çok-kolonlu sayfalar kuruluyor — hem T2/T3'ün "OCAK" hem
+# T5/T6'nın "2026 OCAK" başlık biçimini AYRI AYRI test ediyor.
+# ---------------------------------------------------------------------------
+
+
+def _coklu_ay_kaynak_sayfasi(
+    ay_basliklari: list[str], tablo_etiketi: str = "Tablo 2"
+) -> openpyxl.Workbook:
+    """T2/T5 deseninde ('Kaynak Türü' + N ay kolonu) minimal bir sayfa kurar."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = tablo_etiketi
+    ws.append([f"{tablo_etiketi} - Kaynak Bazında Aylık Gelişimi"])
+    ws.append(["Kaynak Türü", *ay_basliklari])
+    for satir_no, (kaynak, degerler) in enumerate(
+        [
+            ("Rüzgar", [100.0 * (i + 1) for i in range(len(ay_basliklari))]),
+            ("Hidrolik", [10.0 * (i + 1) for i in range(len(ay_basliklari))]),
+        ]
+    ):
+        ws.append([kaynak, *degerler])
+    return wb
+
+
+def _coklu_ay_il_sayfasi(ay_basliklari: list[str]) -> openpyxl.Workbook:
+    """T3/T6 deseninde ('İLLER' + N ay kolonu) minimal bir sayfa kurar."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Tablo 3"
+    ws.append(["Tablo 3 - Lisanslı Elektrik Üretiminin İl Bazında Aylık Gelişimi"])
+    ws.append(["İLLER", *ay_basliklari])
+    ws.append(["ESKİŞEHİR", *[1000.0 * (i + 1) for i in range(len(ay_basliklari))]])
+    return wb
+
+
+def test_ay_kolonu_bul_t2_stili_yalniz_ay_adi() -> None:
+    """T2/T3 stili: kolon başlığı yalnız ay adı ('OCAK', 'ŞUBAT', ...) —
+    her ayın KENDİ kolonunu, komşu aylarınkini DEĞİL, doğru bulmalı."""
+    wb = _coklu_ay_kaynak_sayfasi(["OCAK", "ŞUBAT", "MART"])
+    ws = wb["Tablo 2"]
+
+    ocak = parser.tablo2_uretim_kaynak_oku(ws, 202601)
+    subat = parser.tablo2_uretim_kaynak_oku(ws, 202602)
+    mart = parser.tablo2_uretim_kaynak_oku(ws, 202603)
+
+    ruzgar_ocak = ocak.loc[ocak["kaynak"] == "Rüzgar", "uretim_mwh"].iloc[0]
+    ruzgar_subat = subat.loc[subat["kaynak"] == "Rüzgar", "uretim_mwh"].iloc[0]
+    ruzgar_mart = mart.loc[mart["kaynak"] == "Rüzgar", "uretim_mwh"].iloc[0]
+
+    assert ruzgar_ocak == pytest.approx(100.0)
+    assert ruzgar_subat == pytest.approx(200.0)
+    assert ruzgar_mart == pytest.approx(300.0)
+    # ⚠️ ESKİ (buggy) davranışın regresyon kontrolü: Şubat/Mart'ın Ocak'ın
+    # değerini SESSİZCE dönmediğini AÇIKÇA doğrula.
+    assert ruzgar_subat != ruzgar_ocak
+    assert ruzgar_mart != ruzgar_ocak
+
+
+def test_ay_kolonu_bul_t5_stili_yil_ay_birlesik() -> None:
+    """T5/T6 stili: kolon başlığı yıl+ay birleşik ('2026 OCAK', '2026 ŞUBAT',
+    ...) — GERÇEK dosyada T2/T3'ten FARKLI bu biçimde (2026-09-09'da
+    202606 dosyasına karşı doğrulandı, bkz. worker/parser.py modül notu)."""
+    wb = _coklu_ay_kaynak_sayfasi(
+        ["2026 OCAK", "2026 ŞUBAT", "2026 HAZİRAN"], tablo_etiketi="Tablo 5"
+    )
+    ws = wb["Tablo 5"]
+
+    ocak = parser.tablo5_lisanssiz_uretim_kaynak_oku(ws, 202601)
+    subat = parser.tablo5_lisanssiz_uretim_kaynak_oku(ws, 202602)
+    haziran = parser.tablo5_lisanssiz_uretim_kaynak_oku(ws, 202606)
+
+    hidrolik_ocak = ocak.loc[ocak["kaynak"] == "Hidrolik", "uretim_mwh"].iloc[0]
+    hidrolik_subat = subat.loc[subat["kaynak"] == "Hidrolik", "uretim_mwh"].iloc[0]
+    hidrolik_haziran = haziran.loc[haziran["kaynak"] == "Hidrolik", "uretim_mwh"].iloc[
+        0
+    ]
+
+    assert hidrolik_ocak == pytest.approx(10.0)
+    assert hidrolik_subat == pytest.approx(20.0)
+    assert hidrolik_haziran == pytest.approx(30.0)  # 3. kolon = "2026 HAZİRAN"
+    assert hidrolik_haziran != hidrolik_ocak
+
+
+def test_tablo_il_toplam_coklu_ay_dogru_kolon_secer() -> None:
+    """T3/T6: il-toplam okuyucusu da (kaynak-toplam ile AYNI kök neden/
+    düzeltme) doğru ay kolonunu seçmeli — komşu ayın değerini DEĞİL."""
+    wb = _coklu_ay_il_sayfasi(["OCAK", "ŞUBAT", "MART", "NİSAN"])
+    ws = wb["Tablo 3"]
+
+    nisan = parser.tablo3_uretim_il_oku(ws, 202604)
+    ocak = parser.tablo3_uretim_il_oku(ws, 202601)
+
+    assert nisan["uretim_mwh"].iloc[0] == pytest.approx(4000.0)
+    assert ocak["uretim_mwh"].iloc[0] == pytest.approx(1000.0)
+    assert nisan["uretim_mwh"].iloc[0] != ocak["uretim_mwh"].iloc[0]
+
+
+def test_ay_kolonu_bul_bulunamayan_ay_bos_dataframe_doner() -> None:
+    """Sayfada hiç karşılığı olmayan bir ay istenirse (ör. rapor Mart'a
+    kadar geliyor ama Temmuz sorgulanıyor) sessizce YANLIŞ bir kolon
+    DEĞİL, boş DataFrame dönmeli — sahte değer üretilmemeli."""
+    wb = _coklu_ay_kaynak_sayfasi(["OCAK", "ŞUBAT", "MART"])
+    ws = wb["Tablo 2"]
+
+    temmuz = parser.tablo2_uretim_kaynak_oku(ws, 202607)
+    assert temmuz.empty
+
+
 def test_tablo7_ulke_geneli_mutabakat(wb: openpyxl.Workbook) -> None:
     df = parser.tablo7_faturalanan_tur_oku(wb["Tablo 7"], 202601)
     assert len(df) == 5
