@@ -1,0 +1,63 @@
+# ============================================================================
+# EPP Scheduled Backup — canlı Supabase'in public şema VERİSİNİ (DDL değil)
+# haftalık pg_dump'lar, workflow artifact olarak saklar.
+#
+# Neden bu workflow var: Supabase Free plan'de otomatik yedek YOK (bkz.
+# dokumanlar/11_yedekleme_runbook.md) - worker/scripts/backup.py + gerçek
+# bir restore drill'i yazılmıştı ama onu ÇALIŞTIRAN zamanlanmış bir iş
+# yoktu; elle çalıştırılmayı bekleyen bir script birkaç ay sonra hiç
+# çalıştırılmamış bir script olur (2026-09-07 denetimi, C1 kapanışı).
+#
+# BİLİNÇLİ KARARLAR (runbook'ta da yazılı, kazara olmasın diye burada da
+# tekrarlanıyor):
+# - Bu repo PUBLIC (`gh repo view` ile doğrulandı, 2026-09-08) - public
+#   repo'larda workflow artifact'ları repoyu GÖREBİLEN HERKES tarafından
+#   indirilebilir. İçerik (EPDK'nın zaten kamuya açık aylık/yıllık sektör
+#   raporu verisi + iç işlem meta verisi) bunu kabul edilebilir kılıyor -
+#   audit_log içeriği elle incelendi (2026-09-08): e-posta, connection
+#   string, yerel dosya yolu YOK; yalnız actor_name alanında operatör adı
+#   geçiyor - bu zaten `git log`'da (aynı derecede public) mevcut, ekstra
+#   bir sızıntı değil. Şifreleme GEREKMİYOR.
+# - retention-days AÇIKÇA 90 olarak ayarlandı (GitHub'ın varsayılanıyla
+#   AYNI değer ama örtük değil, açık - "yedek var sanıp süresi dolmuş
+#   olmasın" riskine karşı bilinçli bir seçim, ileride sessizce değişmez).
+name: Scheduled Backup
+on:
+  schedule: [ { cron: "0 3 * * 0" } ]   # her Pazar 03:00 UTC (haftalık)
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  backup:
+    name: pg_dump (public şema, yalnız veri) + artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: pg_dump PATH'te mi kontrol et (varsayma)
+        run: command -v pg_dump || { echo "::error::pg_dump bulunamadı - ubuntu-latest imajı değişmiş olabilir, postgresql-client kurulumu eklenmeli."; exit 1; }
+      - name: pg_dump al (worker/scripts/backup.py ile AYNI --exclude-table listesi)
+        env:
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p yedekler
+          python worker/scripts/backup.py --out-dir yedekler
+      - name: Dump dosyasının boş/aşırı küçük OLMADIĞINI doğrula
+        # C3'teki "sessiz başarısızlık" dersiyle aynı ilke: dump 0 bayt ya
+        # da anormal küçükse (ör. DATABASE_URL yanlış/boşsa pg_dump yine de
+        # geçerli ama neredeyse boş bir dosya üretebilir) job FAIL etsin,
+        # "yedek alındı" sanılıp sessizce boş bir artifact saklanmasın.
+        run: |
+          set -euo pipefail
+          dosya=$(ls yedekler/epp_data_*.dump)
+          boyut=$(stat -c%s "$dosya")
+          echo "Dump dosyası: $dosya ($boyut bayt)"
+          if [ "$boyut" -lt 100000 ]; then
+            echo "::error::Dump dosyası beklenenden çok küçük ($boyut bayt) - DATABASE_URL secret'i kontrol edin."
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: epp-backup-${{ github.run_id }}
+          path: yedekler/epp_data_*.dump
+          retention-days: 90

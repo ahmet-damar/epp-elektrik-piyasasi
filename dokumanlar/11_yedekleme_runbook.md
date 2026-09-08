@@ -76,11 +76,40 @@ wsl -d Ubuntu -- bash -c '
 içinden bu script'i çağırın: `wsl -d Ubuntu -- python3 ...` ya da dump
 dosyasını Windows'a `/mnt/c/...` üzerinden kopyalayıp orada saklayın.)
 
-**Önerilen sıklık:** her büyük backfill/toplu aktivasyon turundan sonra
-elle (ör. bu proje 120 ay + 599 satırlık `fact_tuketim_ulke_geneli`
-turunu yeni bitirdi — böyle bir turdan hemen sonra bir yedek alınmalı),
-aksi halde ayda bir. **Dump dosyası Supabase'in KENDİSİNDEN AYRI bir yerde
-saklanmalı** (yerel disk + tercihen ayrıca bulut depolama/harici disk) —
+**Otomatik (2026-09-08 itibarıyla ARTIK VAR):** `.github/workflows/
+scheduled-backup.yml`, her Pazar 03:00 UTC `PROD_DATABASE_URL`'e karşı
+`worker/scripts/backup.py`'yi çalıştırıp dump'ı GitHub Actions artifact
+olarak saklar (`retention-days: 90` — GitHub'ın varsayılanıyla AYNI ama
+AÇIKÇA belirtildi, "yedek var sanıp süresi dolmuş olmasın" riskine karşı).
+Dump 100 KB'dan küçükse (muhtemelen boş/bozuk) job bilerek FAIL eder —
+"sessiz başarısızlık" C3'teki aynı ilke. `workflow_dispatch` ile elle de
+tetiklenebilir. **Büyük bir backfill/toplu aktivasyon turundan hemen
+sonra ayrıca elle bir yedek almak** (yukarıdaki komutla) hâlâ önerilir —
+haftalık döngü o anı kaçırabilir.
+
+**Erişim ve saklama kararları (2026-09-08, bilinçli — kazara olmasın):**
+- **Bu repo PUBLIC** (`gh repo view --json visibility` ile doğrulandı).
+  GitHub'da public repo'ların workflow artifact'ları **repoyu görebilen
+  HERKES tarafından indirilebilir** — bu bir varsayım değil, GitHub'ın
+  belgelenmiş davranışı. Bilinçli kabul edildi: içerik zaten kamuya açık
+  EPDK sektör raporu verisi + iç işlem meta verisi.
+- **`audit_log` içeriği elle incelendi** (canlı DB'ye karşı, 2026-09-08):
+  `payload` (jsonb) alanlarında e-posta, connection string, ya da yerel
+  dosya yolu **YOK** (`ILIKE '%@%'`, `'%postgresql://%'`, `'%C:\%'`,
+  `'%windowslive%'` — hiçbiri sıfır satır döndü). `source_asset.file_name`/
+  `storage_path` de EPDK'nın kendi sunucu-üretimi dosya adları/göreli
+  yolları (`_PortalAdmin_Uploads_...`, `var\uploads\<hash>.xlsx`) — yerel
+  makine yolu yok. Tek bulunan: `audit_log.actor_name` alanı operatör adı
+  içeriyor (ör. "ahmet-manual") — bu **zaten** `git log`'da (aynı derecede
+  public) mevcut olduğundan ekstra bir sızıntı SAYILMADI, dump'tan ayrıca
+  çıkarılmadı/şifrelenmedi.
+- Bu yüzden dump **şifrelenmeden** saklanıyor — yukarıdaki iki madde
+  değişirse (repo private'a alınırsa bile artifact görünürlüğü ayrı
+  değerlendirilmeli; audit_log'a gerçekten hassas bir alan eklenirse bu
+  karar YENİDEN gözden geçirilmeli) bu bölüm güncellenmeli.
+
+**Dump dosyası Supabase'in KENDİSİNDEN AYRI bir yerde saklanmalı** (GitHub
+Actions artifact + tercihen ayrıca elle indirip yerel/bulut bir kopya) —
 yalnız Supabase'in kendi altyapısında tutmak "tek kopya" riskini gerçekte
 azaltmaz.
 
@@ -158,7 +187,7 @@ prosedür değil, bir kez gerçekten işlediği kanıtlanmış bir prosedürdür
 - `auth.users` (Supabase'in kendi Auth tablosu) bu dump'ın KAPSAMI DIŞI —
   kullanıcı hesapları Supabase Auth'un kendi altyapısında; bu runbook
   yalnız `public` şemasındaki iş verisini kapsıyor.
-- Otomatik/zamanlı bir yedekleme (ör. cron/GitHub Actions ile günlük)
-  henüz KURULMADI — bu tur yalnız elle çalıştırılabilir script + denenmiş
-  prosedürü sağladı. Otomasyon C bölümünün ölçek/öncelik kararına bağlı,
-  bu turun kapsamı dışında bırakıldı.
+- Otomatik yedekleme artık VAR (`scheduled-backup.yml`, haftalık) ama
+  restore drill'i (yukarıdaki 19/19 tablo eşleşmesi) **elle, bir kez**
+  yapıldı — otomasyon dump ALMAYI otomatikleştiriyor, RESTORE'u değil.
+  Gerçek bir felaket anında yukarıdaki adımlar yine elle izlenmeli.
