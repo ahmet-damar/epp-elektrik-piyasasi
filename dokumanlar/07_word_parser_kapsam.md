@@ -410,8 +410,11 @@ hesaplanamıyor.
   AYRICA yeni bir metrik eklendi — `yillik_tuketim_sanayi_haric_serisi_
   getir()` (KPI-27, Sanayi'yi TÜM yıllardan çıkarıp yalnız TAM yılları
   karşılaştırır, KPI-25'İN YERİNE GEÇMEZ) — canlı veride 2023→2025 için
-  +%6,9 hesaplanıyor. Gerekçe/kod: aynı fonksiyonların docstring'i +
-  `04_kpi_sozlesmeleri.md`.
+  +%6,9 hesaplanıyordu (bu dosyanın kaydettiği 2026-09-03 anına ÖZGÜ bir
+  rakamdı, seri o zaman yalnız 3 nokta içeriyordu; **güncel değer ve
+  kapsam için `09_PROJE_DURUMU.md`'ye bakın** — bu HISTORICAL dosyada
+  sayı güncellenmez, bkz. dosya başındaki STATUS notu). Gerekçe/kod: aynı
+  fonksiyonların docstring'i + `04_kpi_sozlesmeleri.md`.
 
 **Açık kalanlar (yeniden numaralandı):**
 1. `word_2023.py`/`word_2024.py`/`word_2025.py`'nin regresyon testlerini

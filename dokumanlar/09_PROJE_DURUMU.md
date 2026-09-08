@@ -206,9 +206,10 @@ turlarda eklenen testler — tam kırılım doğrulanmadı, yalnız toplam 227
 2. **Faz 4 (Tahminleme) / Faz 5 (EPİAŞ)** — daha önce ertelenmişti,
    artık 10 yıl gerçek veri var, karar gözden geçirilebilir.
 3. **Sanayi'nin ülke geneli serisi — TAMAMEN TAMAMLANDI** (`fact_tuketim_
-   ulke_geneli`, 120/120 ay aktif, yukarıya bkz.). Kalan tek karar:
-   KPI-25/27'nin bu yeni tabloyu kullanıp kullanmayacağı (formül bu
-   turda DEĞİŞTİRİLMEDİ, ayrı bir karar konusu).
+   ulke_geneli`, 120/120 ay aktif, yukarıya bkz.). KPI-25/27'nin bu
+   tabloyu kullanıp kullanmayacağı kararı da **2026-09-08'de (Aşama
+   2/C5) verildi ve uygulandı** — yukarıdaki TL;DR maddesine bkz., bu
+   madde artık açık değil.
 4. **Gerçek internete açık bir deploy** — Streamlit Cloud denemesi
    yapıldı (GRANT/RLS sorunları bu turda çözüldü), kalıcı/otomatik bir
    deploy akışı (`deploy.yml`'in şu an devre dışı `build-push` job'ı)

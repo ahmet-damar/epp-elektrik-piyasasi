@@ -502,10 +502,14 @@ Jenerik formül: `(son/ilk)^(1/n) − 1` (`kpi_cagr`).
   `fact_tuketim`, DEĞİŞMEDİ** (KPI-25'in taşınmasından etkilenmedi).
   Sanayi TÜM yıllardan açıkça çıkarılarak hesaplanır. KPI-25'İN YERİNE
   GEÇMEZ (resmi "toplam tüketim" tanımını karşılamaz). 2016→2025 (10
-  tam yıl) için canlıda **+%3,8** hesaplanıyor (2026-09-08 doğrulaması —
-  önceki turlarda daha kısa bir seri üzerinden farklı bir sayı
-  raporlanmıştı, bu KOD DEĞİŞİKLİĞİNDEN değil, aradan geçen sürede daha
-  fazla yılın "tam yıl" şartını karşılamaya başlamasından kaynaklanıyor).
+  tam yıl) için canlıda **+%3,8** hesaplanıyor (2026-09-08 doğrulaması).
+  **Bu, önceki bir turda kaydedilen "2023→2025, +%6,9" rakamından FARKLI
+  — kod DEĞİŞMEDİ; pencere genişledi çünkü 2016-2022'nin Word
+  genişlemesi (bkz. §10, 2026-08-31→09-03) tamamlandığından bu 7 yıl da
+  artık "tam yıl" (12/12 ay) şartını karşılıyor, seri 2023'ten değil
+  2016'dan başlıyor.** Eski rakam `06_canli_veri_operasyon_gunlugu.md`'de
+  (2026-09-02 tarihli, HISTORICAL) kendi anına özgü bir kayıt olarak
+  duruyor, güncel değer İÇİN her zaman bu bölüme bakılmalı.
 - **KPI-26** CAGR — yenilenebilir kurulu güç (%): STOK metriği (aylar
   TOPLANMAZ, yılın son ayı alınır). Yalnız Lisanslı verisi (T1) OLAN
   yıllar seriye girer — Word 2023-2025'te T1 yok (Karar 3), filtre

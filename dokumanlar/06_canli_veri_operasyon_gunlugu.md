@@ -977,8 +977,10 @@ aşağıdaki kayda bkz.):**
 1. ~~39 uyumsuz ayın `fact_tuketim`'deki kök nedenini araştırmak.~~
 2. ~~Kök neden düzeltilip/doğrulanıp bu 39 ay için mutabakat + aktivasyon
    yeniden denenmesi.~~
-3. KPI-25/27 formülünün bu yeni tabloyu kullanıp kullanmayacağı — HALA
-   ayrı bir karar, bu turda değiştirilmedi.
+3. ~~KPI-25/27 formülünün bu yeni tabloyu kullanıp kullanmayacağı — HALA
+   ayrı bir karar, bu turda değiştirilmedi.~~ **YAPILDI (2026-09-08,
+   Aşama 2/C5)** — KPI-25 tamamen bu tabloya taşındı, KPI-27 il bazlı
+   kaldı, bkz. `10_TEKNIK_MASTER_DOKUMAN.md` §7.5/§11.2 ve o günün kaydı.
 
 ## 2026-09-07 — fact_tuketim_ulke_geneli: 39 ay mutabakat sapmasının kök
 nedeni bulundu, DÜZELTİLDİ, 120/120 ay aktif

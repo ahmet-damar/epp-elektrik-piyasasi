@@ -127,9 +127,10 @@ kaynakta iletim/dağıtım ayrımı YOK. Bu kısıt il kırılımı istemeyen bi
 ÜLKE GENELİ seri için geçerli değil (Genel Toplam satırı zaten il/baglanti
 ayrımı taşımıyor) — bu yüzden Sanayi DAHİL TÜM gruplar (Aydınlatma/Kamu ve
 Özel Hizmetler/Mesken/Sanayi/Tarımsal) buraya yazılabiliyor. Amaç:
-KPI-25/27'nin "Sanayi dahil" hesapları için veri hazırlamak (KPI formülü
-BU TURDA değiştirilmedi, yalnız veri — bkz. `06_canli_veri_operasyon_
-gunlugu.md` 2026-09-05 kaydı).
+KPI-25'in "Sanayi dahil" (resmî toplam tüketim) hesabı için veri
+hazırlamak — güncel KPI-25/27 kaynak/formül durumu için
+`09_PROJE_DURUMU.md`/`10_TEKNIK_MASTER_DOKUMAN.md`'ye bakın (bu ACTIVE
+dosyada durum bilgisi tutulmuyor, bkz. dosya başındaki STATUS notu).
 
 **Doğrulama (120 ay, 2016-2025, gerçek docx'lere karşı):** her ayın kendi
 T11 tablosunda tam 1 "Genel Toplam" satırı bulundu, 5 kanonik grup (Sanayi
