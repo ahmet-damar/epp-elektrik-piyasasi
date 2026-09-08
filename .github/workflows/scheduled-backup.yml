@@ -74,7 +74,7 @@ jobs:
           dosya=$(ls yedekler/epp_data_*.dump)
           boyut=$(stat -c%s "$dosya")
           echo "Dump dosyası: $dosya ($boyut bayt)"
-          if [ "$boyut" -lt 100000 ]; then
+          if [ "$boyut" -lt 5000000 ]; then
             echo "::error::Dump dosyası beklenenden çok küçük ($boyut bayt) - DATABASE_URL secret'i kontrol edin."
             exit 1
           fi
