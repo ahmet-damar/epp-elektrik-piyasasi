@@ -1270,3 +1270,32 @@ kalıcı olarak kilitleyen bir pytest regresyon testi HÂLÂ YOK. Bkz.
 `09_PROJE_DURUMU.md` "Sonraki Oturum Devam Noktası" — sonraki oturumda
 eklenecek açık madde olarak işaretlendi (bu turda kapsam dışı, yalnız
 doküman kapanışı).
+
+## 2026-09-09 (gece çalışması, gözetimsiz, MADDE 0) — `conftest.py` koruması artık kendi regresyon testine sahip
+
+Yukarıdaki açık madde kapatıldı: `worker/tests/test_conftest_guard.py`
+eklendi (ayrı dosya — `conftest.py`'nin İÇİNE değil, kendini test ederken
+kendini bypass etmesin diye). Gerçek `conftest.py`'nin GÜNCEL kaynağı,
+izole bir sahte proje köküne (kendi `worker/db.py` test-double'ı + kendi
+`.env`'i ile, gerçek proje `.env`'ine HİÇ dokunmadan) kopyalanıp
+subprocess olarak çalıştırılır. 3 senaryo:
+
+1. `DATABASE_URL` doğrudan sahte-canlı bir URL'e (`pooler.supabase.com`
+   içeren) set edilince → `exit code 3`.
+2. **2026-09-08 bug'ının BİREBİR reprodüksiyonu:** `DATABASE_URL` kabuk
+   ortamında YOK, yalnız sahte projenin `.env`'inde var → yine de
+   `exit code 3` bekleniyor (eski/buggy sürüm bunu KAÇIRIRDI).
+3. `ALLOW_DESTRUCTIVE_TESTS=true` kaçış kapısı hâlâ çalışıyor — guard
+   devre dışı kalıp sahte (bilerek başarısız) bir test gerçekten
+   çalışıyor.
+
+**Testin gerçekten anlamlı olduğu kanıtlandı (vacuous değil):**
+`conftest.py` GEÇİCİ olarak 2026-09-08 ÖNCESİNİN buggy sürümüne
+döndürüldü (yalnız `os.environ`'a bakan, `worker.db` import etmeyen
+sürüm), aynı test suite'i tekrar çalıştırıldı — senaryo 2 (`.env`'den
+yükleme) beklendiği gibi FAILED verdi (`.env`'deki değer sessizce
+kaçırıldı, sahte test gerçekten çalışıp assertion'ıyla düştü), diğer iki
+senaryo (doğrudan env değişkeni + kaçış kapısı) hâlâ PASSED kaldı — tam
+olarak beklenen fark deseni. Ardından düzeltilmiş sürüm geri yüklendi,
+3/3 PASSED doğrulandı. Detay: `10_TEKNIK_MASTER_DOKUMAN.md` Sürüm
+Geçmişi v1.19.

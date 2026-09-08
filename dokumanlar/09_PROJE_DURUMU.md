@@ -325,24 +325,24 @@ BAŞLANMADI** — sırada:
   HİÇ dokunulmadı — veri doğru oturmadan KPI'ya bağlanmayacak (kullanıcı
   talimatı).**
 
-### ⚠️ Açık — `conftest.py` canlı-DB koruması için regresyon testi YOK (2026-09-08)
-Aynı koruma (`worker/tests/conftest.py:pytest_configure()`) **iki kez**
-atlandı: 2026-09-02'de ilk kez (koruma o zaman hiç yoktu, 2026-09-07
-denetimi C2 ile eklendi) ve 2026-09-08'de İKİNCİ kez (koruma VARDI ama
-`.env`'in `load_dotenv()` ile kontrolden SONRA yüklenmesi yüzünden
-atlandı — bkz. `06_canli_veri_operasyon_gunlugu.md` 2026-09-08 (devam)
-kaydı, düzeltme commit `df616e6`). Düzeltme canlıda elle reprodüksiyonla
-doğrulandı ama **kod seviyesinde bunu kalıcı olarak kilitleyen bir pytest
-regresyon testi hâlâ YOK** — üçüncü bir atlama (örn. gelecekte `conftest.
-py` yeniden düzenlenirken bu import satırı yanlışlıkla silinirse) yine
-sessizce olabilir. **Sonraki oturumda eklenecek:** subprocess ile pytest'i
-sahte bir `.env`'e (canlı-benzeri bir `DATABASE_URL` içeren) karşı
-tetikleyip `returncode == 3` ve engelleme mesajının çıktığını doğrulayan
-küçük bir test (muhtemelen `worker/tests/test_conftest_guard.py`, ayrı
-bir dosya — asıl pakete `conftest.py` olarak dahil OLMAMALI, yoksa
-kendini test ederken kendini bypass edebilir). Küçük, düşük riskli bir
-madde — ADIM 3 madde 2'den ÖNCE ya da sonra yapılabilir, sıra kullanıcı
-tercihine bağlı.
+### ✅ Kapandı — `conftest.py` canlı-DB koruması artık kendi regresyon testine sahip (2026-09-09, gece çalışması MADDE 0)
+Aynı koruma (`worker/tests/conftest.py:pytest_configure()`) daha önce
+**iki kez** atlanmıştı: 2026-09-02'de ilk kez (koruma o zaman hiç yoktu)
+ve 2026-09-08'de İKİNCİ kez (koruma VARDI ama `.env`'in `load_dotenv()`
+ile kontrolden SONRA yüklenmesi yüzünden atlandı — bkz. `06_canli_veri_
+operasyon_gunlugu.md` 2026-09-08 (devam) kaydı, düzeltme commit
+`df616e6`). **2026-09-09'da `worker/tests/test_conftest_guard.py`
+eklendi** (ayrı dosya, `conftest.py`'nin İÇİNE değil — kendini test
+ederken kendini bypass etmesin diye): gerçek `conftest.py`'nin GÜNCEL
+kaynağını izole bir sahte projeye kopyalayıp subprocess olarak çalıştırır,
+3 senaryo doğrular — (1) `DATABASE_URL` doğrudan sahte-canlı bir URL'e
+set edilince `exit code 3`, (2) 2026-09-08 bug'ının BİREBİR
+reprodüksiyonu: `DATABASE_URL` kabukta YOK, yalnız `.env`'de var, yine de
+`exit code 3` (bu senaryo eski/buggy koda karşı BİLİNÇLİ olarak
+çalıştırılıp GERÇEKTEN yakaladığı kanıtlandı — geçici olarak eski koda
+dönülüp test'in kırıldığı görüldü, sonra düzeltme geri alındı), (3)
+`ALLOW_DESTRUCTIVE_TESTS=true` kaçış kapısı hâlâ çalışıyor. Üçüncü bir
+sessiz atlama artık pytest seviyesinde kilitli.
 
 ### C6 — ertelenmiş/değerlendirilmiş küçük maddeler (yalnız referans, aksiyon BEKLEMİYOR)
 - **MFA / merkezi rate-limit:** ertelendi (tek admin kullanıcı var).
