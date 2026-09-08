@@ -1299,3 +1299,27 @@ senaryo (doğrudan env değişkeni + kaçış kapısı) hâlâ PASSED kaldı —
 olarak beklenen fark deseni. Ardından düzeltilmiş sürüm geri yüklendi,
 3/3 PASSED doğrulandı. Detay: `10_TEKNIK_MASTER_DOKUMAN.md` Sürüm
 Geçmişi v1.19.
+
+## 2026-09-09 (gece çalışması, gözetimsiz, MADDE 1) — İki yeni üretim tablosu, YALNIZ disposable postgres'te doğrulandı
+
+`fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli` (migration
+`20260909_0001_fact_uretim_kaynak_il_geneli.sql`) — `fact_tuketim_
+ulke_geneli` ile BİREBİR AYNI batch/is_active/RLS/policy/GRANT deseni,
+KÜMÜLATİF DEĞİL (T2/T3/T5/T6 zaten aylık). Gece çalışmasının mutlak
+sınırı gereği **canlı Supabase'e HİÇ dokunulmadı** — yalnız disposable
+postgres:17'de:
+
+- Migration temiz uygulandı: 29/29 (önceki 28 + bu 1).
+- `worker/validate_rls_static.py`: 21/21 tablo RLS+policy (önceki 19 + 2
+  yeni tablo).
+- `worker/validate_role_access.py`: tamamen geçti (anon reddedildi,
+  viewer JWT claim'iyle doğru filtrelendi).
+- Tam pytest paketi: 281/282 (tek "hata" — `test_auth_integration.py`'nin
+  canlı Supabase Auth'a bilerek bağımlı olması, bu turda disposable DB'ye
+  yönlendirildiği için beklenen, regresyon DEĞİL — aynı desen 2026-09-08
+  kaydında da görülmüştü).
+- `sqlfluff lint` temiz.
+
+**Sabah onayı bekleniyor:** bu migration canlıya UYGULANMADI. Bkz.
+`09_PROJE_DURUMU.md` "Sonraki Oturum Devam Noktası" ve `10_TEKNIK_
+MASTER_DOKUMAN.md` §5.7, Sürüm Geçmişi v1.20.

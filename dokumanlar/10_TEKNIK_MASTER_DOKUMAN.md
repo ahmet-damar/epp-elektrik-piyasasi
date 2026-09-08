@@ -67,6 +67,7 @@ her yeni rakam için geçerlidir.
 | v1.17 | 2026-09-08 | `worker/tests/conftest.py`'nin canlı-DB koruması, 2026-09-02'deki İLE BİREBİR AYNI sızıntı desenini (test kirliliği canlı Supabase'de) TEKRAR üretti (`.env`'in `load_dotenv()`'le kontrolden SONRA yüklenmesi yüzünden atlandı) — bulundu, canlı kirlilik temizlendi (85 fact + 3 batch + 3 source_asset + 1 dim_tarih), koruma kalıcı düzeltildi — bkz. `06_canli_veri_operasyon_gunlugu.md` 2026-09-08 (devam) kaydı | Düzeltme öncesi/sonrası CANLI olarak reprodüklendi: aynı senaryo düzeltme öncesi sessizce geçiyordu, sonrası `exit code 3` ile doğru durdu. Temizlik sonrası mutabakat (479/0) + tutarlılık (30/0) script'leri tekrar YEŞİL, 278/279 pytest (tek "hata" — canlı Auth'a bilerek bağımlı `test_auth_integration.py`'nin bu turda disposable DB'ye yönlendirilmiş olması, beklenen) |
 | v1.18 | 2026-09-08 | **Gün sonu kapanışı (2).** Aşama 3 ADIM 1-2 (`1232cb3`) + ADIM 3 madde 1 (`df616e6`) bu gün içinde kapandı — ADIM 3 madde 2-4 + ADIM 4-5 AÇIK, HİÇBİRİNE başlanmadı. `09_PROJE_DURUMU.md`'nin "Sonraki Oturum Devam Noktası" bölümü güncellendi: sıradaki iş (ADIM 3 madde 2 — üretim tabloları) netleştirildi, `conftest.py` korumasının HÂLÂ kendi regresyon testi olmadığı (2026-09-02 ve 2026-09-08'de iki kez delinmiş bir koruma) açık madde olarak eklendi | Yalnız doküman — kod/migration/canlı DB'ye dokunulmadı. CI+Security yeşil, git temiz |
 | v1.19 | 2026-09-09 | Gece çalışması (gözetimsiz) MADDE 0 — `worker/tests/test_conftest_guard.py` eklendi, `conftest.py`'nin canlı-DB koruması artık kendi pytest regresyon testine sahip (2026-09-02 ve 2026-09-08'de iki kez delinmişti) | Testin anlamlı olduğu (vacuous değil) kanıtlandı: `conftest.py` geçici olarak 2026-09-08 öncesinin buggy sürümüne döndürülüp aynı test suite'i çalıştırıldı — `.env`'den yükleme senaryosu (2026-09-08 bug'ının reprodüksiyonu) beklendiği gibi FAILED verdi, diğer iki senaryo PASSED kaldı; düzeltilmiş sürüm geri yüklenip 3/3 PASSED doğrulandı. Yalnız disposable/subprocess — canlı DB'ye hiç dokunulmadı |
+| v1.20 | 2026-09-09 | Gece çalışması MADDE 1 — `fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli` (migration `20260909_0001`), `fact_tuketim_ulke_geneli` ile AYNI desen, kümülatif DEĞİL — §5.7. **YALNIZ disposable postgres:17'de, CANLIYA UYGULANMADI** | Disposable postgres:17'de migration 29/29, RLS 21/21 tablo, role-access tamamen geçti, pytest 281/282 (tek beklenen "hata" — auth integration). sqlfluff temiz |
 
 ---
 
@@ -467,6 +468,44 @@ kümülatif değerini okuyup yalnız yeni kolonu dolduran, `tuketim_mwh`'ye
 DOKUNMAYAN tek seferlik script) canlıda çalıştırıldı — 30/30 satır
 güncellendi. `mutabakat_ulke_geneli.py` (479 çift, 0 uyumsuz) ve
 `tutarlilik_ulke_geneli_kumulatif.py` (30 çift, 0 tutarsız) canlıda YEŞİL.
+
+### 5.7 `fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli` (2026-09-09, gece çalışması — Aşama 3/ADIM 3 madde 2)
+**⚠️ Bu turda YALNIZ disposable postgres:17'de doğrulandı — CANLIYA
+UYGULANMADI, kod/tablo/RLS/GRANT sabah onayla uygulanacak (gözetimsiz
+gece çalışması sınırı, bkz. `09_PROJE_DURUMU.md` "Sonraki Oturum Devam
+Noktası").**
+
+Migration `20260909_0001_fact_uretim_kaynak_il_geneli.sql` — KPI-02/03/
+05/06/07 için üretim verisi hazırlığı, `fact_tuketim_ulke_geneli` ile
+BİREBİR AYNI batch/is_active/RLS/policy/GRANT deseni, iki tablo:
+
+- `fact_uretim_kaynak_geneli (tarih_id, kaynak_id, lisans_id, uretim_mwh)`
+  — kaynak-bazında ülke geneli üretim (Excel T2+T5, Word Tablo 1.6+1.11).
+- `fact_uretim_il_geneli (tarih_id, il_kodu, lisans_id, uretim_mwh)` —
+  il-bazında ülke geneli üretim (Excel T3+T6, Word Tablo 1.7+1.12).
+
+**Neden İKİ tablo, tek değil:** ADIM 1 araştırması (bkz. §5.5 öncesi
+Aşama 3 araştırma notları) EPDK'nın ne Excel ne Word formatında il×kaynak
+JOINT bir kırılım vermediğini kanıtlamıştı — yalnız iki AYRI marjinal
+seri var. İkisinin AYRI tutulması, aralarındaki tutarlılığın (`worker/
+scripts/mutabakat_uretim.py`, ADIM 3 madde 3) bağımsız bir çapraz-kontrol
+olarak çalışmasını sağlıyor — parser hatalarını anında yakalar.
+
+**⚠️ KÜMÜLATİF DEĞİL:** §5.6'daki `kumulatif_tuketim_mwh` deseni buraya
+KASITLI OLARAK kopyalanmadı — Excel T2/T3/T5/T6 zaten AY BAZINDA değer
+veriyor (ADIM 1'de gerçek dosyaya karşı doğrulandı, Şubat < Ocak örneği).
+
+**`lisans_id` her iki tabloda da var** (Lisanslı/Lisanssız) — hem
+mutabakat script'inin (tarih_id, lisans_id) bazında karşılaştırma
+yapabilmesi hem de gelecekteki KPI-05'in (ADIM 5, bu turda YOK) pay/payda
+tutarlılığı için gerekli.
+
+**Doğrulama (disposable postgres:17, 2026-09-09):** migration 29/29
+uygulandı (önceki 28 + bu 1), `validate_rls_static.py` → 21/21 tablo
+RLS+policy (önceki 19 + bu 2 yeni), `validate_role_access.py` → TAMAMEN
+geçti, tam pytest paketi → 281/282 (tek "hata" — canlı Auth'a bilerek
+bağımlı `test_auth_integration.py`'nin disposable DB'ye yönlendirilmiş
+olması, beklenen, regresyon DEĞİL). `sqlfluff lint` temiz.
 
 ---
 
