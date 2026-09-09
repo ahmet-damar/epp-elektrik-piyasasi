@@ -51,13 +51,27 @@ def main() -> int:
         try:
             _test_tum_tablolarda_rls_ve_policy_var(conn)
             _hazirla(conn)
-            _test_anon_table_level_denied(conn)
-            _test_viewer_claimsiz_sifir_satir(conn)
-            _test_viewer_dogru_claim_ile_satir_doner(conn)
+            sonuclar = [
+                _test_anon_table_level_denied(conn),
+                _test_viewer_claimsiz_sifir_satir(conn),
+                _test_viewer_dogru_claim_ile_satir_doner(conn),
+            ]
         finally:
             conn.rollback()  # hiçbir kalıcı iz bırakma - test verisi dahil
 
-    print("\nRol bazlı erişim doğrulaması TAMAMEN geçti.")
+    calisan = sum(sonuclar)
+    atlanan = len(sonuclar) - calisan
+    if atlanan:
+        print(
+            f"\nRol bazlı erişim doğrulaması KISMEN geçti: {calisan}/{len(sonuclar)} "
+            f"senaryo bu bağlantıyla test edildi, {atlanan} senaryo [ATLANDI] "
+            "(farklı bir bağlantı türü gerektiriyor — yukarıdaki mesajlara bkz.)."
+        )
+    else:
+        print(
+            f"\nRol bazlı erişim doğrulaması TAMAMEN geçti ({calisan}/{len(sonuclar)} "
+            "senaryo bu bağlantıyla test edildi)."
+        )
     return 0
 
 
@@ -112,7 +126,24 @@ def _test_tum_tablolarda_rls_ve_policy_var(conn: psycopg.Connection) -> None:
 
 
 def _hazirla(conn: psycopg.Connection) -> None:
-    with conn.cursor() as cur:
+    """2026-09-09'da bulundu: bu fonksiyon önceden bağlanan rolün DOĞRUDAN
+    (SET ROLE'süz) taban tablolara INSERT yetkisi olduğunu varsayıyordu —
+    `DATABASE_URL`'in (pooler `postgres` rolü, RLS'i bypass eden bir taban
+    erişimi var) bu yüzden hep çalışıyordu. `DATABASE_URL_DASHBOARD`
+    (`app_dashboard_service`) ile çalıştırıldığında BAŞARISIZ oldu: bu rol
+    BİLİNÇLİ OLARAK taban erişimi OLMAYAN, yalnız `SET ROLE` ile viewer/
+    data_operator/admin'e geçen bir rol (gerçek `worker/auth.py:
+    rol_baglantisi_ac()` deseninin AYNISI). **Ayrıca `postgres`, `admin`
+    rolüne `SET ROLE` YAPAMIYOR** (`pg_auth_members.set_option=false` —
+    dokumanlar/10_TEKNIK_MASTER_DOKUMAN.md §5.11'de belgeli) — yani
+    `SET ROLE admin`'e KOŞULSUZ geçmek `postgres` bağlantısını KIRARDI.
+    Düzeltme: ÖNCE doğrudan dene (postgres için çalışır), yalnız
+    yetkisizlik hatası alınırsa `SET LOCAL ROLE admin` + `SET LOCAL
+    request.jwt.claims`'e (app_dashboard_service için gereken, `_test_
+    viewer_dogru_claim_ile_satir_doner()` ile AYNI desen) düş — böylece
+    HER İKİ bağlantı türüyle de çalışır."""
+
+    def _sentinel_satirlari_yaz(cur: psycopg.Cursor) -> None:
         cur.execute(
             """
             INSERT INTO dim_tarih (tarih_id, yil, ay, ceyrek, ay_adi, yil_ay, donem_tipi)
@@ -130,11 +161,62 @@ def _hazirla(conn: psycopg.Connection) -> None:
             (_SENTINEL_TARIH_ID,),
         )
 
+    with conn.cursor() as cur:
+        cur.execute("SAVEPOINT sp_hazirla_dogrudan")
+        try:
+            _sentinel_satirlari_yaz(cur)
+        except psycopg.errors.InsufficientPrivilege:
+            cur.execute("ROLLBACK TO SAVEPOINT sp_hazirla_dogrudan")
+            cur.execute("SET LOCAL ROLE admin")
+            cur.execute(
+                'SET LOCAL request.jwt.claims = \'{"app_metadata": {"role": "admin"}}\''
+            )
+            _sentinel_satirlari_yaz(cur)
+            cur.execute("RESET ROLE")
 
-def _test_anon_table_level_denied(conn: psycopg.Connection) -> None:
+
+def _set_role_veya_atla(
+    cur: psycopg.Cursor, savepoint: str, rol: str, baglanti_ipucu: str
+) -> bool:
+    """`SET LOCAL ROLE {rol}` dener; bağlı taban rol o role `SET ROLE`
+    yapamıyorsa (canlıda BEKLENEN bir durum — `postgres` yalnız anon/
+    authenticated/service_role'e, `app_dashboard_service` yalnız viewer/
+    data_operator/admin'e geçebilir, bkz. `_hazirla()` modül notu, 2026-
+    09-09) SESSİZCE BAŞARISIZ OLMAZ: [ATLANDI] mesajı basar, `False` döner
+    — çağıran bu senaryoyu başka bir bağlantı türüyle AYRICA doğrulamalı.
+    `True` dönerse `SET LOCAL ROLE` başarılı, test normal akışına devam
+    edebilir."""
+    try:
+        # rol her zaman bu dosyanın KENDİ sabit çağrılarından gelir (anon/
+        # viewer), kullanıcı girdisi değil.
+        cur.execute(f"SET LOCAL ROLE {rol}")
+    except psycopg.errors.InsufficientPrivilege as e:
+        cur.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+        print(
+            f"[ATLANDI] {rol}: bağlı rol '{rol}'a SET ROLE yapamıyor "
+            f"({str(e)[:80]}...) — bu bağlantı türüyle {baglanti_ipucu} "
+            "TEST EDİLEMEZ, farklı bir bağlantı türüyle AYRICA doğrulanmalı."
+        )
+        return False
+    return True
+
+
+def _test_anon_table_level_denied(conn: psycopg.Connection) -> bool:
+    """`anon` — Supabase'in PostgREST/anon-API-key istemcilerinin kullandığı
+    rol, `app_dashboard_service`'in (dashboard'ın KENDİ servis rolü, yalnız
+    viewer/data_operator/admin'e `SET ROLE` YAPABİLİR — bkz. `_hazirla()`
+    modül notu) HİÇ ÜYESİ OLMADIĞI AYRI bir kimlik. `DATABASE_URL_DASHBOARD`
+    ile çalıştırıldığında bu adım GEÇERLİ OLARAK atlanır (test EDİLEMEZ
+    DEĞİL — farklı bir bağlantı türü, `DATABASE_URL`/`postgres`, GEREKİR;
+    2026-09-09'da bulundu, dokumanlar/10_TEKNIK_MASTER_DOKUMAN.md §5.11).
+    Döner: bu senaryo bu bağlantıyla GERÇEKTEN test edildiyse `True`,
+    [ATLANDI] ile geçildiyse `False`."""
     with conn.cursor() as cur:
         cur.execute("SAVEPOINT sp_anon")
-        cur.execute("SET LOCAL ROLE anon")
+        if not _set_role_veya_atla(
+            cur, "sp_anon", "anon", "(muhtemelen app_dashboard_service)"
+        ):
+            return False
         try:
             cur.execute("SELECT * FROM veri_kapsam_disi")
         except psycopg.errors.InsufficientPrivilege as e:
@@ -158,12 +240,16 @@ def _test_anon_table_level_denied(conn: psycopg.Connection) -> None:
             )
         finally:
             cur.execute("ROLLBACK TO SAVEPOINT sp_anon")
+    return True
 
 
-def _test_viewer_claimsiz_sifir_satir(conn: psycopg.Connection) -> None:
+def _test_viewer_claimsiz_sifir_satir(conn: psycopg.Connection) -> bool:
     with conn.cursor() as cur:
         cur.execute("SAVEPOINT sp_viewer_claimsiz")
-        cur.execute("SET LOCAL ROLE viewer")
+        if not _set_role_veya_atla(
+            cur, "sp_viewer_claimsiz", "viewer", "(muhtemelen postgres/pooler)"
+        ):
+            return False
         # request.jwt.claims BİLİNÇLİ OLARAK ayarlanmıyor - current_app_role()
         # NULL dönmeli, RLS hiçbir satırı geçirmemeli.
         cur.execute("SELECT * FROM veri_kapsam_disi")
@@ -177,12 +263,16 @@ def _test_viewer_claimsiz_sifir_satir(conn: psycopg.Connection) -> None:
     print(
         "[OK] viewer (JWT claim'siz): sorgu BAŞARILI çalıştı, 0 satır (RLS doğru filtreliyor)"
     )
+    return True
 
 
-def _test_viewer_dogru_claim_ile_satir_doner(conn: psycopg.Connection) -> None:
+def _test_viewer_dogru_claim_ile_satir_doner(conn: psycopg.Connection) -> bool:
     with conn.cursor() as cur:
         cur.execute("SAVEPOINT sp_viewer_claimli")
-        cur.execute("SET LOCAL ROLE viewer")
+        if not _set_role_veya_atla(
+            cur, "sp_viewer_claimli", "viewer", "(muhtemelen postgres/pooler)"
+        ):
+            return False
         cur.execute(
             'SET LOCAL request.jwt.claims = \'{"app_metadata": {"role": "viewer"}}\''
         )
@@ -201,6 +291,7 @@ def _test_viewer_dogru_claim_ile_satir_doner(conn: psycopg.Connection) -> None:
         f"[OK] viewer (app_metadata.role=viewer JWT claim'i ile): sorgu BAŞARILI, "
         f"{len(satirlar)} satır döndü (RLS + GRANT ikisi de doğru çalışıyor)"
     )
+    return True
 
 
 if __name__ == "__main__":

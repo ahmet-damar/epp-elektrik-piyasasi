@@ -1514,3 +1514,36 @@ kurulumumun bir yan etkisiydi, gerçek CI'da (ki her commit'te YEŞİL
 geçti) bu test hiç çalışmaz/hiç sayılmaz.
 
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.11, Sürüm Geçmişi v1.25.
+
+## 2026-09-09 (devam) — ADIM 5 madde 1: canlı RLS doğrulama boşluğu kapatıldı
+
+Kullanıcı 2026-09-04'ün kendi kararını hatırlattı: `app_dashboard_service`
+rolü tam bu senaryo için (`SET ROLE` gerektiren canlı doğrulama)
+`WITH INHERIT FALSE, SET TRUE` ile kurulmuştu — `postgres`'ten (SET
+FALSE) FARKLI. `validate_role_access.py`'yi `DATABASE_URL_DASHBOARD`
+ile çalıştırınca:
+
+- `_hazirla()` başarısız oldu (`app_dashboard_service`'in taban INSERT
+  yetkisi yok, tasarım gereği) — düzeltildi: önce doğrudan dene (postgres
+  için çalışır), yetkisizlikte `SET ROLE admin` + JWT claim'e düş.
+- `anon` senaryosu başarısız oldu — `app_dashboard_service` `anon`'un
+  hiç üyesi değil (ayrı bir kimlik, PostgREST istemcileri için). Bu bir
+  KOD hatası değil, mimari bir gerçek: anon SADECE `DATABASE_URL`/
+  `postgres` ile test edilebilir, viewer/data_operator/admin SADECE
+  `DATABASE_URL_DASHBOARD` ile. Script artık bunu `[ATLANDI]` ile AÇIKÇA
+  raporluyor, sessizce geçmiyor/çökmüyor.
+
+**Sonuç — canlıda 3/3 senaryo, İKİ bağlantıyla, GERÇEKTEN doğrulandı:**
+```
+DATABASE_URL_DASHBOARD (app_dashboard_service):
+  [OK] viewer (JWT claim'siz): 0 satır
+  [OK] viewer (doğru claim): satır döndü
+  [ATLANDI] anon (bu bağlantı türüyle test edilemez)
+DATABASE_URL (postgres):
+  [OK] anon: TABLE seviyesinde reddedildi
+  [ATLANDI] viewer ×2 (bu bağlantı türüyle test edilemez)
+```
+Disposable postgres:17'de regresyon YOK — `test` rolü tüm SET ROLE'lere
+izinli olduğundan tek bağlantıyla 3/3 geçiyor (eskisi gibi).
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.12, Sürüm Geçmişi v1.26.

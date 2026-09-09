@@ -73,6 +73,7 @@ her yeni rakam için geçerlidir.
 | v1.23 | 2026-09-09 | Gece çalışması MADDE 4 — `fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli` için tam yükleme altyapısı (`ingest`/`kpi`/`pipeline` fonksiyonları) + `backfill_uretim_excel.py` (mutabakat-gated aktivasyon) — §5.10. **YALNIZ disposable postgres:17'de, CANLIYA UYGULANMADI** | 6/6 ay gerçek dosyadan yüklendi, mutabakat 6/6 UYGUN, 6/6 aktive edildi (101+942 satır, hepsi aktif). mutabakat_uretim.py CLI'ı 12/12 uyumlu doğruladı. RLS/role-access veri sonrası da 21/21 YEŞİL. pytest 291/292 (tek beklenen "hata") |
 | v1.24 | 2026-09-09 | Gece çalışması MADDE 5 (araştırma-only, KOD YOK) — `dokumanlar/12_word_uretim_envanteri.md`: Word (2016-2025) üretim tabloları envanteri, ADIM 4'ün (Word backfill) hazırlığı | Gerçek dosyalara karşı (10 yılın Haziran'ı + 2018/2021/2023 için ayrıca Ocak/Aralık spot-check) 7 bulgu (A-G) — 2 karar bekleyen (Bulgu C: Lisanssız için Word'de GERÇEK il×kaynak matris var, kullanılsın mı; Bulgu D: 2016-2017'de "Brüt Lisanssız Üretim" tanımı YOK, farklı bir dar metrik var), 2 açık teknik soru (Bulgu E: bazı ay/yıllarda il-bazında/il×kaynak tablo bulunamadı — neden belirsiz; Bulgu G: Genel Toplam satırı konumu teyit edilmedi) |
 | v1.25 | 2026-09-09 | Kullanıcı onayıyla: ADIM 3 madde 2-4 CANLIYA UYGULANDI (migration `20260909_0001` + `backfill_uretim_excel.py`), Bulgu C/D kararları verilip uygulandı (migration `20260909_0002`, `veri_kapsam_disi`'ye 48 satır, KPI-07 için ileriye dönük şart + regresyon testi) — §5.11 | Canlı sonuç disposable ile birebir eşleşti: 101+942 satır (hepsi aktif), mutabakat 12/12 uyumlu. Yan bulgu: `validate_role_access.py`'nin `SET ROLE` adımı canlıda (öncesinden var olan bir rol-üyelik karakteristiği yüzünden, bu turla ilgisiz) çalışmadı — `validate_rls_static.py` (21/21) ile doğrulandı. pytest 292/293 (tek beklenen "hata") |
+| v1.26 | 2026-09-09 | `validate_role_access.py` canlı RLS doğrulama boşluğu kapatıldı — v1.25'teki "SET ROLE canlıda çalışmıyor" bulgusu YANLIŞ bağlantıya dayanıyordu, doğru bağlantı `DATABASE_URL_DASHBOARD` (`app_dashboard_service`, 2026-09-04'te tam bunun için `SET TRUE` ile kurulmuş) — §5.12 | Canlıda İKİ ayrı bağlantıyla 3/3 senaryo GERÇEKTEN doğrulandı: `DATABASE_URL_DASHBOARD` ile viewer×2 (claim'siz→0 satır, doğru claim→satır döner), `DATABASE_URL` ile anon (TABLE seviyesinde reddedildi). Script artık `[ATLANDI]` ile hangi senaryonun hangi bağlantıyla test edilebildiğini AÇIKÇA raporluyor (sessiz varsayım yok). Disposable postgres:17'de regresyon yok (3/3 tek bağlantıyla) |
 
 ---
 
@@ -666,6 +667,35 @@ test_golden.py:test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz` ile
 `kpi_07_lisanssiz_pay()`'in boş/tüm-NaN girdide `None` döndüğü SABİTLENDİ
 (mevcut korumanın regresyon testi — ADIM 5 henüz wire ETMEDİ, bu test
 yalnız var olan davranışı pinler).
+
+### 5.12 `validate_role_access.py` — Canlı RLS Doğrulama Boşluğu Kapatıldı (2026-09-09)
+§5.11'deki "SET ROLE canlıda çalışmıyor" bulgusu **YANLIŞ bağlantıya**
+dayanıyordu — kullanıcı 2026-09-04'ün kendi kararını hatırlattı:
+`app_dashboard_service` rolü tam olarak BUNUN için `WITH INHERIT FALSE,
+SET TRUE` ile kurulmuştu (`postgres`'ten FARKLI olarak). Doğrulandı:
+`app_dashboard_service`, `viewer`/`data_operator`/`admin`'e `SET ROLE`
+YAPABİLİYOR — `DATABASE_URL_DASHBOARD` ile çalıştırıldığında viewer'ın
+İKİ senaryosu (claim'siz→0 satır, doğru claim'le→satır döner) canlıda
+GERÇEKTEN doğrulandı.
+
+**Kalan asimetri (kod DEĞİL, MİMARİ gerçeklik):** `anon` (Supabase
+PostgREST/anon-key istemcilerinin kimliği) `app_dashboard_service`'in
+HİÇ üyesi olmadığı AYRI bir rol — `DATABASE_URL_DASHBOARD` bunu test
+edemez, yalnız `DATABASE_URL`/`postgres` edebilir (postgres ise
+viewer/data_operator/admin'i test edemez, ters asimetri). **Script artık
+bunu SESSİZCE atlamak yerine `[ATLANDI]` ile AÇIKÇA raporluyor** ve
+`main()` "3/3 mü 2/3 mü test edildi" özetini basıyor — `_hazirla()` de
+aynı ilkeyle düzeltildi (önce doğrudan dene, yetkisizlikte `SET ROLE
+admin` + JWT claim'e düş).
+
+**Sonuç — canlıda 3/3 senaryo, İKİ ayrı bağlantıyla, GERÇEKTEN doğrulandı:**
+- `DATABASE_URL` (postgres): anon → TABLE seviyesinde reddedildi ✅
+- `DATABASE_URL_DASHBOARD` (app_dashboard_service): viewer claim'siz →
+  0 satır ✅, viewer doğru claim'le → satır döner ✅
+
+Disposable postgres:17'de regresyon YOK (3/3 tek bağlantıyla geçiyor —
+disposable'ın `test` rolü tüm SET ROLE'lere izinli). Detay: `worker/
+validate_role_access.py` modül notları.
 
 ---
 
