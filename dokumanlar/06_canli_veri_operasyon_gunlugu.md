@@ -1452,3 +1452,65 @@ KOD YAZILMADI (`07_word_parser_kapsam.md` Bulgu 5'in AYNI disiplini).
   varlığı/konumu bu turda teyit edilmedi.
 
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` Sürüm Geçmişi v1.24.
+
+## 2026-09-09 (devam) — ADIM 3 madde 2-4 canlıya uygulandı + Bulgu C/D kararları
+
+Kullanıcı onayıyla, gece çalışmasının disposable-doğrulanmış işi canlıya
+taşındı:
+
+1. Migration `20260909_0001` canlı Supabase'e uygulandı (kilit
+   kontrolü önce yapıldı — idle-in-transaction/uzun süreli açık bağlantı
+   YOKTU).
+2. `validate_rls_static.py`: 21/21 tablo RLS+policy, canlıda YEŞİL.
+   `validate_role_access.py`'nin `SET ROLE` adımı canlıda "permission
+   denied" verdi — teşhis edildi: `postgres` rolünün `viewer`/`data_
+   operator`/`admin`/`app_dashboard_service`'e üyeliği PG16+'nın `WITH
+   INHERIT FALSE, SET FALSE` seçeneğiyle kurulmuş (Supabase'in native
+   rolleri — anon/authenticated/service_role — `SET TRUE`). Disposable
+   postgres:17'de AYNI script sorunsuz geçti — bu turun migration'larıyla
+   İLGİSİZ, ÖNCEDEN VAR OLAN bir canlı-ortam karakteristiği. Kod/veri
+   DEĞİŞTİRİLMEDİ, ayrı bir araştırma konusu olarak not düşüldü.
+3. `backfill_uretim_excel` canlıda çalıştırıldı: 6/6 ay (202601-202606)
+   yüklendi, `mutabakat_uretim.periyot_aktivasyona_uygun_mu()` 6/6 ay
+   için UYGUN döndü, 6/6 ay `pipeline.batch_onayla()` ile aktive edildi
+   (zorla aktivasyon YOK — script kendi gate'ini kullandı). Sonuç:
+   `fact_uretim_kaynak_geneli` 101 satır (hepsi aktif), `fact_uretim_
+   il_geneli` 942 satır (hepsi aktif) — **disposable'daki sonuçla
+   BİREBİR eşleşti**. `mutabakat_uretim.py` CLI'ı canlıda ayrıca
+   çalıştırıldı: 12/12 (tarih_id, lisans_id) çifti uyumlu, 0 uyumsuz.
+
+**Bulgu C kararı (Ahmet):** Word'ün Lisanssız için sunduğu il×kaynak
+veri KULLANILMAYACAK — yalnız doküman kararı (`05_kaynak_dosya_
+sozlesmesi.md`, `12_word_uretim_envanteri.md`), kod/veri değişikliği yok.
+
+**Bulgu D kararı (Ahmet — Karar 4):** 2016-2017 Lisanssız üretim KAPSAM
+DIŞI. Migration `20260909_0002` önce disposable postgres:17'de test
+edildi (dim_tarih 2016-2017 için seed edilip `veri_kapsam_disi.
+fact_tablosu` CHECK kısıtının genişlemesi + 48 satırlık marking
+doğrulandı), SONRA canlıya uygulandı: CHECK kısıtı `fact_uretim_kaynak_
+geneli`/`fact_uretim_il_geneli`'ni kapsayacak şekilde genişletildi,
+`pipeline.kapsam_disi_isaretle()` ile 48 satır eklendi (2 tablo × 24 ay,
+`nitelik='lisans_durumu=Lisanssız'`, `karar_referansi='Karar 4
+(2026-09-09, Bulgu D)'`) — canlıda 48/48 doğrulandı. `04_kpi_
+sozlesmeleri.md`'ye KPI-07 için ileriye dönük bir şart yazıldı (ADIM 5
+wiring'i bu işareti okumalı, yeniden keşfetmemeli) ve `worker/tests/
+test_golden.py:test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz` ile
+`kpi_07_lisanssiz_pay()`'in boş/tüm-NaN girdide `None` döndüğü
+sabitlendi.
+
+**pytest sayısındaki "281/282" → "292/293" farkının açıklaması (kullanıcı
+sorusu):** hiçbiri "atlanan" test değil — tek "hata" HER ZAMAN
+`test_auth_integration.py::test_rol_baglantisi_ac_admin_claim_ile_tum_
+veriye_erisir` idi, sayı gece boyunca artan test SAYISINI (MADDE 0'da
++3, MADDE 2'de +4, MADDE 3'te +4, MADDE 4'te +2, bugün +1) yansıtıyor.
+Bu test normalde (gerçek CI'da, `DATABASE_URL_DASHBOARD` hiç TANIMLI
+DEĞİLKEN) `pytest.mark.skipif` ile TAMAMEN atlanır (dosyanın kendi modül
+notu: "CI'de bu env değişkeni hiç yok") — disposable-postgres
+doğrulamalarımda bu değişkeni BİLEREK disposable URL'e set ettiğim için
+(canlı-DB guard'ının BAŞKA bir env değişkenine takılmaması için) skipif
+koşulu YANLIŞLIKLA `False` oldu ve test gerçekten ÇALIŞIP disposable'da
+gerçek Supabase Auth verisi olmadığından FAIL verdi — bu benim test
+kurulumumun bir yan etkisiydi, gerçek CI'da (ki her commit'te YEŞİL
+geçti) bu test hiç çalışmaz/hiç sayılmaz.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.11, Sürüm Geçmişi v1.25.

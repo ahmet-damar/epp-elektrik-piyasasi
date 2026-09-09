@@ -123,3 +123,26 @@ def test_kpi_05_uretim_mwh_hic_yoksa_hesaplanamaz(hesaplanan: dict) -> None:
 def test_kpi_07_lisanssiz_pay_lisans_kolonu_yoksa_sifir(hesaplanan: dict) -> None:
     uretim = kpi.yukle_uretim(INPUT / "uretim.csv").kabul
     assert kpi.kpi_07_lisanssiz_pay(uretim) == 0.0
+
+
+def test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz() -> None:
+    """2026-09-09, Bulgu D/Karar 4 (bkz. `04_kpi_sozlesmeleri.md` KPI-07
+    notu) — 2016-2017 Lisanssız üretim `veri_kapsam_disi`'de kapsam dışı
+    işaretli; ADIM 5 bu tabloyu `fact_uretim_kaynak_geneli`'ye wire
+    ettiğinde bu iki yıl için KPI-07'ye BOŞ (ya da tamamen NaN) bir
+    `uretim_mwh` girecek. Bu test, `kpi_07_lisanssiz_pay()`'in o durumda
+    zaten sahte bir %0/%100 DEĞİL, `None` ('hesaplanamaz') döndüğünü
+    SABİTLİYOR — henüz WIRING yapılmadı (ADIM 5 bu turda kapsam dışı),
+    yalnız mevcut korumanın davranışını pinliyor."""
+    bos = pd.DataFrame(columns=["kaynak", "yenilenebilir", "lisans", "uretim_mwh"])
+    assert kpi.kpi_07_lisanssiz_pay(bos) is None
+
+    tum_nan = pd.DataFrame(
+        {
+            "kaynak": ["Rüzgar", "Güneş"],
+            "yenilenebilir": [True, True],
+            "lisans": ["Lisanssız", "Lisanssız"],
+            "uretim_mwh": [None, None],
+        }
+    )
+    assert kpi.kpi_07_lisanssiz_pay(tum_nan) is None

@@ -126,12 +126,10 @@ yansıtıldı.**
   `transaction_timeout` GUC'u) de ortadan kalktı. Detay:
   `10_TEKNIK_MASTER_DOKUMAN.md` §7.5/§8.2/§8.5/§11.2, Sürüm Geçmişi
   v1.10-v1.12.
-- **Aşama 3 (boş KPI'ları açma) — ADIM 1-2 ve ADIM 3 madde 1 canlıda
-  TAMAMLANDI (2026-09-08); ADIM 3 madde 2-4 kod/disposable seviyesinde
-  TAMAMLANDI ama sabah onayı bekliyor, ADIM 5 araştırma hazırlığı bitti,
-  ADIM 5'in kendisi HENÜZ BAŞLAMADI** (bkz. "Sonraki Oturum Devam
-  Noktası" — 2026-09-09 gece çalışması bölümü, canlıya UYGULANMAYAN
-  işlerin tam listesi orada). ADIM 1: Excel T11'in Genel Toplam satırı
+- **Aşama 3 (boş KPI'ları açma) — ADIM 1-4'ün TAMAMI (kod + canlı)
+  TAMAMLANDI (2026-09-08/09), Bulgu C/D kararları verilip uygulandı,
+  ADIM 5 (KPI bağlama) HENÜZ BAŞLAMADI** (bkz. "Sonraki Oturum Devam
+  Noktası" — tam liste orada). ADIM 1: Excel T11'in Genel Toplam satırı
   KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
   edilince T7 ile 4/6 ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11
@@ -284,61 +282,59 @@ yerden devam edebilmeli.**
 ### Bugün/bu gece (2026-09-07/08/09) ne kapandı — tek satır özet
 13-dokümanlık dış denetimin **tamamı** kapandı (2026-09-07/08, Aşama 0/1/2
 + D kuralı). 2026-09-08 içinde Aşama 3 ADIM 1-2 + ADIM 3 madde 1 kapandı
-(commit `1232cb3`, `df616e6`). **2026-09-09 gecesi (gözetimsiz çalışma)
-ADIM 3'ün TAMAMI (madde 0-4) + ADIM 5'in araştırma hazırlığı kapandı** —
-detay aşağıda, commit'ler `a230614`→`cf5c9a1`.
-
-### ⚠️ SABAH ONAYI BEKLEYEN — canlıya UYGULANMADI (gece çalışmasının mutlak sınırı gereği)
-Gece çalışması talimatı **canlı Supabase'e hiçbir migration/backfill/
-aktivasyon YAPMAMAYI** zorunlu kılıyordu — aşağıdakiler yalnız disposable
-postgres:17'de doğrulandı, hepsi hazır ve test edilmiş durumda, **sabah
-onayla canlıya uygulanmayı bekliyor:**
-1. Migration `20260909_0001_fact_uretim_kaynak_il_geneli.sql` (iki yeni
-   tablo — RLS/policy/GRANT dahil).
-2. `python -m worker.scripts.backfill_uretim_excel` (6 ay, 2026-01..06,
-   gerçek dosyalardan) — disposable'da 6/6 yüklendi, mutabakat 6/6
-   UYGUN, 6/6 aktive edildi (101+942 satır). Canlıda AYNI komut
-   çalıştırılabilir (kod değişmedi, yalnız `DATABASE_URL` canlıyı
-   gösterecek).
-Onay verilirse: migration'ı uygula → `backfill_uretim_excel`'i çalıştır →
-`mutabakat_uretim.py`'yi çalıştırıp YEŞİL olduğunu doğrula →
-`validate_rls_static.py`/`validate_role_access.py`'yi tekrar koş.
+(commit `1232cb3`, `df616e6`). 2026-09-09 gecesi (gözetimsiz çalışma)
+ADIM 3'ün TAMAMI (madde 0-4, kod+disposable) + ADIM 5'in araştırma
+hazırlığı kapandı (commit'ler `a230614`→`cf5c9a1`, `7b76e3c`). **Aynı gün
+(2026-09-09) kullanıcı onayıyla ADIM 3 madde 2-4 CANLIYA UYGULANDI**
+(migration `20260909_0001` + `backfill_uretim_excel.py`) ve **Bulgu C/D
+kararları verilip uygulandı** (migration `20260909_0002` + `veri_
+kapsam_disi` 48 satır + KPI-07 regresyon testi) — detay `10_TEKNIK_
+MASTER_DOKUMAN.md` §5.11.
 
 ### Açık madde
 Dış denetim listesinin (A/B/C bölümleri) hiçbir maddesi açık değil.
-**Aşama 3 (boş KPI'ları açma) — ADIM 1-4'ün TAMAMI kod/test seviyesinde
-TAMAMLANDI, ADIM 3 madde 2-4 sabah onayı bekliyor (yukarı bkz.), ADIM 5
-(KPI bağlama) HENÜZ BAŞLAMADI:**
+**Aşama 3 (boş KPI'ları açma) — ADIM 1-4'ün TAMAMI (kod + canlı) TAMAMLANDI,
+ADIM 5 (KPI bağlama) HENÜZ BAŞLAMADI:**
 - **ADIM 3 madde 1** (batch bağımlılığı düzeltmesi) — TAMAMLANDI, canlıda
   (2026-09-08, commit `df616e6`).
 - **ADIM 3 madde 2** (`fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli`
-  migration'ı) — kod TAMAMLANDI (commit `cf5c9a1`), **canlıya UYGULANMADI**
-  (yukarıdaki onay kutusuna bkz.).
+  migration'ı) — TAMAMLANDI, **canlıya UYGULANDI** (2026-09-09).
 - **ADIM 3 madde 3** (`mutabakat_uretim.py`, aktivasyonu engelleyen
   `periyot_aktivasyona_uygun_mu()`) — TAMAMLANDI (commit `9c3c236`,
-  güvenlik düzeltmesi `dbe610e`), disposable'da kanıtlandı, **canlıda
-  henüz veri yok** (yukarıdaki onay kutusuna bkz.).
-- **ADIM 3 madde 4** (Excel backfill) — kod + disposable doğrulama
-  TAMAMLANDI (commit `cf5c9a1`), **canlıya UYGULANMADI** (yukarıdaki onay
-  kutusuna bkz.).
-- **ADIM 5 hazırlığı (araştırma-only, kod YOK):** Word (2016-2025) üretim
-  tabloları envanteri yazıldı (`dokumanlar/12_word_uretim_envanteri.md`,
-  commit — bu turun son commit'i) — ADIM 4'ün (orijinal numaralandırma,
-  Word yılları backfill'i) hazırlığı. **2 karar bekleyen bulgu var:**
-  - **Bulgu C:** Word'de Lisanssız üretim için GERÇEK bir il×kaynak JOINT
-    matris VAR (Excel'de yok) — kullanılsın mı, yoksa Excel ile simetri
-    için marjinal-only mu tutulsun?
-  - **Bulgu D:** 2016-2017'de "Brüt Lisanssız Üretim Miktarı" tanımı
-    kaynakta YOK (yalnız dar bir "İhtiyaç fazlası..." metriği var) — bu
-    iki yıl kapsam dışı mı sayılsın?
-  Ayrıca 2 açık teknik soru (Bulgu E: bazı ay/yıllarda il-bazında/
-  il×kaynak Lisanssız tablosu bulunamadı, neden belirsiz — ADIM 4'ün İLK
-  işi olmalı; Bulgu G: Genel Toplam satırı konumu teyit edilmedi).
+  güvenlik düzeltmesi `dbe610e`), canlıda 12/12 uyumlu doğrulandı.
+- **ADIM 3 madde 4** (Excel backfill) — TAMAMLANDI, **canlıya UYGULANDI**
+  (2026-09-09): 6/6 ay yüklendi, mutabakat 6/6 UYGUN, 6/6 aktive edildi
+  (`fact_uretim_kaynak_geneli` 101 satır, `fact_uretim_il_geneli` 942
+  satır, hepsi aktif — canlı sonuç disposable ile birebir eşleşti).
+- **Bulgu C/D kararları — VERİLDİ VE UYGULANDI (2026-09-09):**
+  - **Bulgu C:** Word'ün Lisanssız için sunduğu zengin il×kaynak veri
+    **KULLANILMAYACAK** (Word-Excel sınırında tanım kırılması riski) —
+    yalnız doküman kararı, kod/veri değişikliği yok.
+  - **Bulgu D (Karar 4):** 2016-2017 Lisanssız üretim **KAPSAM DIŞI** —
+    migration `20260909_0002` (`veri_kapsam_disi.fact_tablosu` CHECK
+    genişletildi) + `pipeline.kapsam_disi_isaretle()` ile 48 satır
+    (canlıda 48/48 doğrulandı). KPI-07 için ileriye dönük şart `04_kpi_
+    sozlesmeleri.md`'ye yazıldı + `kpi_07_lisanssiz_pay()`'in boş/tüm-NaN
+    girdide `None` döndüğü yeni bir regresyon testiyle SABİTLENDİ.
+  Detay: `05_kaynak_dosya_sozlesmesi.md`, `12_word_uretim_envanteri.md`.
+- **Yan bulgu (canlıya özgü, kod DEĞİŞTİRİLMEDİ):** `validate_role_
+  access.py`'nin `SET ROLE` adımı canlıda "permission denied" verdi —
+  `postgres` rolünün `viewer`/`data_operator`/`admin`/`app_dashboard_
+  service`'e üyeliği `WITH INHERIT FALSE, SET FALSE` (PG16+ özelliği,
+  Supabase'in native rolleri — anon/authenticated/service_role — `SET
+  TRUE` ile granted, fark BURADA) — bu turun migration'larıyla İLGİSİZ,
+  ÖNCEDEN VAR OLAN bir canlı-ortam karakteristiği (disposable'da AYNI
+  script sorunsuz geçti). `validate_rls_static.py` (21/21) canlıda
+  YEŞİL — dinamik SET ROLE testi ayrı bir araştırma konusu, kod/veri
+  değişikliği GEREKTİRMEZ, sonraki bir oturumda değerlendirilebilir.
+- **ADIM 4 (orijinal numaralandırma — Word yılları backfill'i):** henüz
+  başlamadı, `dokumanlar/12_word_uretim_envanteri.md`'deki envanterle
+  hazır (Bulgu E/G hâlâ açık teknik sorular — ilk iş bunları çözmek).
 - **ADIM 5 (asıl KPI bağlama, KPI-02/03/06/07/05):** HİÇ BAŞLAMADI —
-  ADIM 3 madde 2-4 canlıya uygulanıp veri doğru oturmadan başlanmayacak
-  (kullanıcı talimatı, hem 2026-09-08 hem gece çalışması turlarında
-  tekrarlandı). KPI-05'in `lisans_id` filtre tutarlılığı uyarısı hâlâ
-  geçerli (pay/payda İKİ tarafta da AYNI filtrelenmeli).
+  veri artık canlıda doğru oturduğu için bu bir sonraki oturumun doğal
+  sıradaki işi olabilir (kullanıcı kararı bekliyor). KPI-05'in
+  `lisans_id` filtre tutarlılığı uyarısı hâlâ geçerli (pay/payda İKİ
+  tarafta da AYNI filtrelenmeli).
 
 ### ✅ Kapandı — `conftest.py` canlı-DB koruması artık kendi regresyon testine sahip (2026-09-09, gece çalışması MADDE 0)
 Aynı koruma (`worker/tests/conftest.py:pytest_configure()`) daha önce

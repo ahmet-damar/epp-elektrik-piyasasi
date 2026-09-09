@@ -72,6 +72,7 @@ her yeni rakam için geçerlidir.
 | v1.22 | 2026-09-09 | Gece çalışması MADDE 3 — `worker/scripts/mutabakat_uretim.py`: il↔kaynak çapraz mutabakat, ±%0,5 tolerans, aktivasyonu engelleyen `periyot_aktivasyona_uygun_mu()` gate fonksiyonu — §5.9. **YALNIZ disposable postgres:17'de** | 4 yeni entegrasyon testi (kasıtlı uyumsuz veri gerçekten yakalandı, her iki batch bloklandı, gate fonksiyonu her iki yönde test edildi). Gerçek 6 aya karşı (parser çıktıları): 12/12 (6 ay × 2 lisans) birebir eşleşti |
 | v1.23 | 2026-09-09 | Gece çalışması MADDE 4 — `fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli` için tam yükleme altyapısı (`ingest`/`kpi`/`pipeline` fonksiyonları) + `backfill_uretim_excel.py` (mutabakat-gated aktivasyon) — §5.10. **YALNIZ disposable postgres:17'de, CANLIYA UYGULANMADI** | 6/6 ay gerçek dosyadan yüklendi, mutabakat 6/6 UYGUN, 6/6 aktive edildi (101+942 satır, hepsi aktif). mutabakat_uretim.py CLI'ı 12/12 uyumlu doğruladı. RLS/role-access veri sonrası da 21/21 YEŞİL. pytest 291/292 (tek beklenen "hata") |
 | v1.24 | 2026-09-09 | Gece çalışması MADDE 5 (araştırma-only, KOD YOK) — `dokumanlar/12_word_uretim_envanteri.md`: Word (2016-2025) üretim tabloları envanteri, ADIM 4'ün (Word backfill) hazırlığı | Gerçek dosyalara karşı (10 yılın Haziran'ı + 2018/2021/2023 için ayrıca Ocak/Aralık spot-check) 7 bulgu (A-G) — 2 karar bekleyen (Bulgu C: Lisanssız için Word'de GERÇEK il×kaynak matris var, kullanılsın mı; Bulgu D: 2016-2017'de "Brüt Lisanssız Üretim" tanımı YOK, farklı bir dar metrik var), 2 açık teknik soru (Bulgu E: bazı ay/yıllarda il-bazında/il×kaynak tablo bulunamadı — neden belirsiz; Bulgu G: Genel Toplam satırı konumu teyit edilmedi) |
+| v1.25 | 2026-09-09 | Kullanıcı onayıyla: ADIM 3 madde 2-4 CANLIYA UYGULANDI (migration `20260909_0001` + `backfill_uretim_excel.py`), Bulgu C/D kararları verilip uygulandı (migration `20260909_0002`, `veri_kapsam_disi`'ye 48 satır, KPI-07 için ileriye dönük şart + regresyon testi) — §5.11 | Canlı sonuç disposable ile birebir eşleşti: 101+942 satır (hepsi aktif), mutabakat 12/12 uyumlu. Yan bulgu: `validate_role_access.py`'nin `SET ROLE` adımı canlıda (öncesinden var olan bir rol-üyelik karakteristiği yüzünden, bu turla ilgisiz) çalışmadı — `validate_rls_static.py` (21/21) ile doğrulandı. pytest 292/293 (tek beklenen "hata") |
 
 ---
 
@@ -625,6 +626,46 @@ aktivasyonu ENGELLE").
   (`batch_onayla()` sonrası `is_active=true`).
 - Fresh disposable postgres:17'de tam pytest paketi: **291/292** (tek
   beklenen "hata" — `test_auth_integration.py`).
+
+### 5.11 ADIM 3 madde 2-4 Canlıya Uygulandı + Bulgu C/D Kararları (2026-09-09, kullanıcı onayıyla)
+**Canlıya uygulama (§5.7/§5.10'daki disposable-doğrulanmış işin canlıya
+taşınması):** migration `20260909_0001` uygulandı, `backfill_uretim_
+excel.py` çalıştırıldı — 6/6 ay yüklendi, mutabakat 6/6 UYGUN, 6/6 aktive
+edildi. Canlı sonuç disposable ile BİREBİR eşleşti: `fact_uretim_kaynak_
+geneli` 101 satır (hepsi aktif), `fact_uretim_il_geneli` 942 satır (hepsi
+aktif), `mutabakat_uretim.py` CLI'ı canlıda 12/12 uyumlu doğruladı.
+
+**Yan bulgu (canlıya özgü, kod DEĞİŞTİRİLMEDİ):** `validate_role_access.py`
+canlıda `SET ROLE viewer` adımında "permission denied" verdi —
+`pg_auth_members`'ın `set_option`/`inherit_option` kolonları (PG16+)
+`postgres` rolünün `viewer`/`data_operator`/`admin`/`app_dashboard_
+service`'e üyeliğinin `WITH INHERIT FALSE, SET FALSE` olduğunu gösterdi
+(Supabase'in kendi native rolleri — `anon`/`authenticated`/`service_role`
+— `SET TRUE` ile granted, fark BURADA). Bu, bu turun migration'larıyla
+İLGİSİZ, ÖNCEDEN VAR OLAN bir canlı-ortam karakteristiği (disposable
+postgres:17'de AYNI script sorunsuz geçti — DB kurulum/rol-bootstrap
+farkı). `validate_rls_static.py` (statik metin taraması, 21/21 tablo
+RLS+policy) canlıda YEŞİL — dinamik SET ROLE testi bu turda canlıda
+ÇALIŞTIRILAMADI, ayrı bir araştırma konusu (bu turun kapsamı dışında,
+kod/veri değişikliği GEREKTİRMEZ).
+
+**Bulgu C kararı (2026-09-09, Ahmet):** Word'ün Lisanssız için sunduğu
+zengin il×kaynak veri **KULLANILMAYACAK** — Word-Excel sınırında tanım
+kırılması riski. Detay: `05_kaynak_dosya_sozlesmesi.md`, `12_word_
+uretim_envanteri.md` Bulgu C.
+
+**Bulgu D kararı (2026-09-09, Ahmet — Karar 4):** 2016-2017 Lisanssız
+üretim **KAPSAM DIŞI**. Migration `20260909_0002` `veri_kapsam_disi.
+fact_tablosu` CHECK kısıtını `fact_uretim_kaynak_geneli`/`fact_uretim_
+il_geneli` için genişletti (disposable'da test edildi, canlıya
+uygulandı); `pipeline.kapsam_disi_isaretle()` ile 48 satır eklendi (2016-
+01..2017-12 × 2 tablo, `nitelik='lisans_durumu=Lisanssız'`) — canlıda
+48/48 doğrulandı. `04_kpi_sozlesmeleri.md`'ye KPI-07 için ileriye dönük
+bir şart yazıldı (ADIM 5 wiring'i bu işareti okumalı) + `worker/tests/
+test_golden.py:test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz` ile
+`kpi_07_lisanssiz_pay()`'in boş/tüm-NaN girdide `None` döndüğü SABİTLENDİ
+(mevcut korumanın regresyon testi — ADIM 5 henüz wire ETMEDİ, bu test
+yalnız var olan davranışı pinler).
 
 ---
 

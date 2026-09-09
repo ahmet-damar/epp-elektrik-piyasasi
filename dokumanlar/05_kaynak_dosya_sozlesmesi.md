@@ -122,6 +122,29 @@ T1'inde (kurulu güç) her ikisi de sütun olarak mevcut. Migration
 - İl adları ≥%99 dim_il'e eşlenmeli; eşleşmeyen karantina
 - Negatif değer → reddet; bilinmeyen grup/kaynak → karantina + uyarı
 
+**Word yılları — üretim (T2/T3/T5/T6 eşdeğeri) kararları (2026-09-09,
+Aşama 3/ADIM 3, `dokumanlar/12_word_uretim_envanteri.md`'deki araştırmaya
+dayanır):**
+- **Karar (Bulgu C):** Word kaynağında Lisanssız üretim için gerçek bir
+  il×kaynak JOINT tablo VAR (2016-2023 doğrulandı, Excel'de YOK) —
+  **BİLİNÇLİ OLARAK KULLANILMIYOR**. Gerekçe: 2016-2023 (zengin, il×kaynak)
+  ile 2024+ (yalnız marjinal) arasında tanım/grain farkı, Word-Excel
+  sınırında davranış değiştiren bir KPI üretir — projenin "tek seride tek
+  tanım" ilkesine (bkz. §5.5 T7/T11 dikişi kararı) aykırı. `fact_uretim.
+  uretim_mwh` da bu yüzden Word yılları için AYRICA doldurulmuyor (aynı
+  sınır sorunu — 2016-2023 dolu/2024+ NULL bir kolon kırılganlık yaratır).
+  **İleride il×kaynak kırılımlı bir üretim KPI'sı tanımlanırsa bu bulgu
+  yeniden değerlendirilebilir** — bkz. envanterdeki tam detay.
+- **Karar (Bulgu D):** 2016-2017 Lisanssız üretim **KAPSAM DIŞI** —
+  Excel'in "Brüt Lisanssız Üretim Miktarı" tanımıyla eşleşen bir kaynak bu
+  iki yılda YOK (yalnız dar bir "İhtiyaç fazlası satın alınan enerji
+  miktarı" alt-kümesi var, 2018'den itibaren Brüt kolonu VAR). `veri_
+  kapsam_disi`'ye migration `20260909_0002` ile genişletilen whitelist
+  üzerinden 48 satır eklendi (`fact_uretim_kaynak_geneli`/`fact_uretim_
+  il_geneli` × 2016-01..2017-12, `nitelik='lisans_durumu=Lisanssız'`,
+  `karar_referansi='Karar 4 (2026-09-09, Bulgu D)'`) — canlıda uygulandı.
+  Lisanslı üretim ETKİLENMEZ.
+
 **Faz 0 orkestrasyon notu (2026-08-30, worker/pipeline.py):** Yukarıdaki kural
 tam 13 tabloyu ima ediyor, ancak fact tablosuna gerçekten YAZAN yalnız 5
 tablo var (T1/T4/T10/T11/T13 — bkz. yukarıdaki Hedef sütunu; T8/T12

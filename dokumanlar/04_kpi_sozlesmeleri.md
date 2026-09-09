@@ -127,3 +127,21 @@ Jenerik formül: (son/ilk)^(1/n) − 1 ; **n = yıl farkı** (2021→2025 ⇒ n=
   CAGR üretirdi (KPI-25'in Sanayi dahil/hariç sorunuyla AYNI kök neden).
   Lisanslı'sı olmayan yıl "veri yok" sayılır (None/"hesaplanamaz"), sahte
   bir sayı ÜRETİLMEZ.
+- **KPI-07 — 2016-2017 için ileriye dönük şart (2026-09-09, Bulgu D/Karar
+  4, henüz WIRING YAPILMADI):** KPI-07 (Lisanssız pay) ve Lisanssız
+  üretimi kullanan HERHANGİ bir CAGR/yıllık seri, `fact_uretim_kaynak_
+  geneli`/`fact_uretim_il_geneli`'ye Word yıllarının (ADIM 4, henüz
+  başlamadı) bağlanmasıyla wire edildiğinde, **2016-2017'yi KPI-25/26/27
+  ile AYNI disiplinle DIŞLAMALIDIR** — bu iki yıl için Excel'in "Brüt
+  Lisanssız Üretim" tanımıyla eşleşen bir kaynak YOK (yalnız dar bir
+  alt-küme metriği var, bkz. `dokumanlar/12_word_uretim_envanteri.md`
+  Bulgu D). `veri_kapsam_disi`'de bu iki yıl için `fact_uretim_kaynak_
+  geneli`/`fact_uretim_il_geneli`, `nitelik='lisans_durumu=Lisanssız'`,
+  `karar_referansi='Karar 4 (2026-09-09, Bulgu D)'` olarak ZATEN
+  işaretli (canlıda 48 satır) — gelecekteki wiring bu işareti OKUMALI,
+  yeniden keşfetmemeli. `kpi.kpi_07_lisanssiz_pay()`'in kendisi zaten boş/
+  tamamen-NULL bir `uretim_mwh` girdisinde `None` döner (mevcut davranış,
+  `worker/tests/test_kpi.py:test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz`
+  ile sabitlendi) — bu, 2016-2017 kaynaktan hariç tutulduğunda (yukarıdaki
+  kapsam-dışı işaretiyle boş bir DataFrame beslendiğinde) KPI-07'nin doğru
+  şekilde 'hesaplanamaz' döneceğinin GÜVENCESİDİR.

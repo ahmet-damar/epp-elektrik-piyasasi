@@ -85,17 +85,21 @@ Hidrolik/Rüzgar, +bazı yıllarda Doğalgaz), son kolon "Toplam". 2017
 (kaynak-only + il-only), Excel'deki (ve Word'ün kurulu-güç tarafındaki
 Bulgu 5) asimetriyle TUTARLI.
 
-**⚠️ Karar gerektiren açık soru (BU TURDA ÇÖZÜLMEDİ):** Word'ün Lisanssız
-için sunduğu bu daha ZENGİN veri kullanılsın mı (gerçek il×kaynak grain'i
-`fact_uretim`'e yazılabilir — yalnız Lisanssız için, yalnız Word
-yıllarında), yoksa serinin TAMAMI (2016-2026) TEK bir basitleştirilmiş
-marjinal-only tanımda mı tutulsun (Excel ile simetri, `fact_uretim_
-kaynak_geneli`/`fact_uretim_il_geneli`'nin şu anki AYRI-marjinal
-tasarımıyla tutarlı)? İkinci seçenek daha basit ve ADIM 3'ün zaten kurulu
-mimarisiyle (2026-09-09 gecesi tamamlanan) doğrudan uyumlu; birincisi
-daha fazla bilgi taşır ama YENİ bir tablo/grain kararı gerektirir (`fact_
-uretim`'in kendi il×kaynak grain'ine mi yazılır, yoksa üçüncü bir tabloya
-mı?). **Ahmet'in kararı bekliyor — bu doküman yalnız bulguyu kaydediyor.**
+**✅ KARAR (2026-09-09, Ahmet):** Word'ün Lisanssız için sunduğu bu daha
+ZENGİN il×kaynak veri **KULLANILMAYACAK**. Gerekçe: 2016-2023 (zengin,
+il×kaynak) ile 2024+ (yalnız marjinal) arasında tanım/grain farkı olurdu
+— Word-Excel sınırında davranış değiştiren bir KPI üretir, projenin
+baştan beri kaçındığı grain karışımıdır (bkz. §5.5 T7/T11 dikişi kararı
+— AYNI ilke). `fact_uretim.uretim_mwh`'yi Word yılları için doldurmak da
+AYNI nedenle YAPILMAYACAK (2016-2023 dolu / 2024+ NULL bir kolon sınırda
+kırılır). Serinin TAMAMI (2016-2026) TEK bir basitleştirilmiş
+marjinal-only tanımda kalıyor — `fact_uretim_kaynak_geneli`/`fact_uretim_
+il_geneli`'nin ADIM 3'te kurulan mimarisiyle DOĞRUDAN uyumlu, YENİ bir
+tablo/grain kararı GEREKMEDİ. **İleride il×kaynak kırılımlı bir üretim
+KPI'sı tanımlanırsa bu bulgu YENİDEN değerlendirilebilir** — Word
+kaynağının bu veriyi taşıdığı GERÇEĞİ (yukarıdaki bulgu) hâlâ geçerli,
+yalnız BİLİNÇLİ OLARAK kullanılmıyor. Detay: `05_kaynak_dosya_
+sozlesmesi.md` "Word yılları — üretim kararları" bölümü.
 
 ## Bulgu D — 2016-2017'de "Brüt Lisanssız Üretim Miktarı" kolonu YOK (tanım kayması riski)
 
@@ -112,14 +116,17 @@ itibaren**:
   Lisanssız...") TANIM OLARAK EŞLEŞEN kolon budur, `"İhtiyaç fazlası..."`
   DEĞİL.
 
-**Sonuç: 2016-2017 için Excel'in T5/T6 tanımıyla (Brüt üretim) BİREBİR
-eşleşen bir Word kaynağı YOK** — yalnız "şebekeye satılan fazla enerji"
-gibi DAHA DAR bir metrik var. Bu iki yıl için ya (a) bu daha dar metrik
-FARKLI bir tanım olarak AÇIKÇA işaretlenip ayrı tutulmalı (Karar 1/3
-mekanzimasındaki gibi `veri_kapsam_disi`'ye not düşülebilir), ya da (b)
-Lisanssız üretim serisi 2018'den başlatılmalı (2016-2017 için "kaynakta
-yok" sayılmalı). **Karar bu turda VERİLMEDİ** — ADIM 4'ün (Word backfill)
-kod turunda çözülecek.
+**✅ KARAR (2026-09-09, Ahmet — Karar 4):** 2016-2017 Lisanssız üretim
+**KAPSAM DIŞI** sayılıyor (seçenek b) — bu iki yıl için "şebekeye satılan
+fazla enerji" gibi dar bir metriği, Excel'in "Brüt Lisanssız Üretim"
+tanımıyla aynı seriye karıştırmak sahte değer üretirdi (T7/T11 dikişinde
+verilen kararla AYNI ilke — bkz. `10_TEKNIK_MASTER_DOKUMAN.md` §5.5).
+Lisanslı üretim ETKİLENMEZ. **Uygulandı (2026-09-09, canlıya):** migration
+`20260909_0002` `veri_kapsam_disi.fact_tablosu` CHECK kısıtını
+`fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli` için genişletti;
+`pipeline.kapsam_disi_isaretle()` ile 48 satır eklendi (2 tablo × 24 ay,
+2016-01..2017-12, `nitelik='lisans_durumu=Lisanssız'`, `karar_referansi=
+'Karar 4 (2026-09-09, Bulgu D)'`) — canlıda doğrulandı (48/48).
 
 ## Bulgu E — Bazı ay/yıllarda İl-bazında (Lisanssız) VE İl×Kaynak tabloları HİÇ bulunamadı
 
@@ -170,10 +177,10 @@ kasıtlı sığ tutuldu) — ADIM 4'ün kod turunda erken bir adım bu olmalı.
    yok mu yoksa yeniden adlandırılmış mı olduğunu netleştir.
    Her tablonun kendi Genel Toplam/Toplam satırının varlığını/konumunu
    doğrula (Bulgu G).
-2. Bulgu D'nin kararını (2016-2017 Lisanssız kapsam dışı mı, yoksa dar
-   tanımla mı işaretlenip dahil edilecek) Ahmet'ten al.
-3. Bulgu C'nin kararını (Lisanssız için zengin il×kaynak verisi
-   kullanılsın mı, yoksa marjinal-only tutarlılık mı tercih edilsin) al.
+2. ~~Bulgu D'nin kararını al~~ **YAPILDI (2026-09-09) — KAPSAM DIŞI,
+   Karar 4, `veri_kapsam_disi`'ye 48 satır eklendi.**
+3. ~~Bulgu C'nin kararını al~~ **YAPILDI (2026-09-09) — KULLANILMAYACAK,
+   marjinal-only tutarlılık tercih edildi.**
 4. İki yeni `word_ortak.py` yardımcısı yaz: (a) iki-sütunlu il tablosu
    okuyucu (Bulgu F), (b) `hedef_donem_kolonu_bul()`'ün kaynak-bazında
    tablolara uygulanması (zaten var olan fonksiyon, yeni bir çağıran
