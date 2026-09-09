@@ -74,6 +74,89 @@ def uretim_getir(
     return df
 
 
+def uretim_kaynak_geneli_getir(conn: Connection, tarih_id: int) -> pd.DataFrame:
+    """`fact_uretim_kaynak_geneli`'den TEK bir dönem için kaynak bazında
+    üretim (il kırılımı YOK, Lisanslı+Lisanssız İKİSİ DE — çağıran gerekirse
+    `lisans` kolonuyla filtreler). Kolonlar: kaynak, yenilenebilir, lisans,
+    uretim_mwh.
+
+    **KPI-02/03/06/07 için eklendi (2026-09-09, Aşama 3/ADIM 5 madde 2):**
+    `uretim_getir()` (il×kaynak `fact_uretim`) bu grain'de `uretim_mwh`'yi
+    HİÇ vermiyordu (bkz. o fonksiyonun/§5.7'nin modül notu — EPDK hiçbir
+    formatta il×kaynak joint üretim kırılımı yayımlamıyor) — bu yüzden
+    KPI-02/03/06/07 hep 'veri yok' gösteriyordu. `fact_uretim_kaynak_
+    geneli` (ülke geneli, il kırılımsız) artık GERÇEK aylık üretim veriyor
+    (2026-01'den itibaren, Excel T2+T5) — bu fonksiyon o KPI'ların girdisini
+    buraya taşır. `uretim_getir()`'in YERİNE GEÇMEZ — KPI-01 (kurulu güç,
+    STOK) ve KPI-05'in PAYDASI (kurulu güç) hâlâ `fact_uretim.kurulu_guc_mw`
+    kullanır (bkz. `dogru_kapasite_faktoru()` modül notu, lisans_id
+    tutarlılığı KRİTİK)."""
+    kolonlar = ["kaynak", "yenilenebilir", "lisans", "uretim_mwh"]
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT dk.kaynak_adi, dk.yenilenebilir_mi, dl.tur, fukg.uretim_mwh
+            FROM fact_uretim_kaynak_geneli fukg
+            JOIN dim_kaynak dk ON dk.kaynak_id = fukg.kaynak_id
+            JOIN dim_lisans dl ON dl.lisans_id = fukg.lisans_id
+            WHERE fukg.tarih_id = %s AND fukg.is_active
+            """,
+            (tarih_id,),
+        )
+        satirlar = cur.fetchall()
+    df = pd.DataFrame(satirlar, columns=kolonlar)
+    if not df.empty:
+        df["lisans"] = df["lisans"].map(_LISANS_GORUNUM).fillna(df["lisans"])
+        df["yenilenebilir"] = df["yenilenebilir"].astype(bool)
+    _numerik(df, ["uretim_mwh"])
+    return df
+
+
+def kapasite_faktoru_girdisi_getir(conn: Connection, tarih_id: int) -> pd.DataFrame:
+    """KPI-05 (Kapasite Faktörü) için pay VE paydayı AYNI lisans filtresiyle
+    (yalnız Lisanslı) getirir — tek satırlık `[kurulu_guc_mw, uretim_mwh]`.
+
+    **KRİTİK (2026-09-09, ADIM 5 madde 3, sessiz hata riski):** Pay
+    `fact_uretim_kaynak_geneli`'den (T2 = yalnız LİSANSLI üretim) — payda
+    ise `fact_uretim.kurulu_guc_mw`'dan geliyor ve O TABLODA hem T1
+    (Lisanslı) hem T4 (Lisanssız) kurulu güç BİRLİKTE var. `lisans_id` her
+    iki tarafta da AYNI şekilde (yalnız Lisanslı) filtrelenmezse payda
+    olduğundan büyük çıkar ve kapasite faktörü SESSİZCE (hatasız) sistematik
+    düşük hesaplanır. Bu yüzden filtre iki ayrı çağıranın tutarlılığına
+    bırakılmadan TEK bir yerde (burada) merkezi olarak uygulanır — bkz.
+    worker/tests/test_analytics_integration.py::
+    test_kapasite_faktoru_girdisi_lisans_filtresi_olmadan_yanilticidir
+    (filtresiz/yanlış yolun GERÇEKTEN farklı ve düşük çıktığını kanıtlar)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT COALESCE(SUM(fu.kurulu_guc_mw), 0)
+            FROM fact_uretim fu
+            JOIN dim_lisans dl ON dl.lisans_id = fu.lisans_id
+            WHERE fu.tarih_id = %s AND fu.is_active AND dl.tur = 'Lisansli'
+            """,
+            (tarih_id,),
+        )
+        satir_kurulu = cur.fetchone()
+        assert satir_kurulu is not None  # COALESCE(SUM,0): agregat, hep 1 satır döner
+        (kurulu,) = satir_kurulu
+        cur.execute(
+            """
+            SELECT COALESCE(SUM(fukg.uretim_mwh), 0)
+            FROM fact_uretim_kaynak_geneli fukg
+            JOIN dim_lisans dl ON dl.lisans_id = fukg.lisans_id
+            WHERE fukg.tarih_id = %s AND fukg.is_active AND dl.tur = 'Lisansli'
+            """,
+            (tarih_id,),
+        )
+        satir_uretim = cur.fetchone()
+        assert satir_uretim is not None
+        (uretim_mwh,) = satir_uretim
+    df = pd.DataFrame([{"kurulu_guc_mw": kurulu, "uretim_mwh": uretim_mwh}])
+    _numerik(df, ["kurulu_guc_mw", "uretim_mwh"])
+    return df
+
+
 def tuketim_getir(
     conn: Connection, tarih_id: int, il_kodu: int | None = None
 ) -> pd.DataFrame:

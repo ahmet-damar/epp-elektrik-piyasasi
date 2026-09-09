@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import pandas as pd
 import psycopg
 import pytest
 
@@ -84,6 +85,164 @@ def test_uretim_getir_sekil_ve_lisans_gorunumu(conn, aktif_batch) -> None:  # ty
     # kpi.py fonksiyonları değişiklik gerektirmeden bu şekli tüketebilmeli
     assert kpi.kpi_02_toplam_uretim(df) == pytest.approx(880000.0)
     assert kpi.kpi_07_lisanssiz_pay(df) == pytest.approx(0.0)  # hepsi lisanslı
+
+
+def _kaynak_geneli_satir_ekle(
+    conn,
+    tarih_id: int,
+    kaynak_adi: str,
+    lisans_etiketi: str,
+    uretim_mwh: float,
+    batch_id: int,
+) -> None:  # type: ignore[no-untyped-def]
+    """Test yardımcısı: `fact_uretim_kaynak_geneli`'ye tek bir aktif satır
+    ekler (ADIM 5 madde 2/3 testleri için ortak)."""
+    kaynak_id = ingest.dim_kaynak_id_bul(conn, kaynak_adi)
+    lisans_id = ingest.dim_lisans_id_bul(conn, lisans_etiketi)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO fact_uretim_kaynak_geneli
+                (tarih_id, kaynak_id, lisans_id, uretim_mwh, ingestion_batch_id, is_active)
+            VALUES (%s, %s, %s, %s, %s, true)
+            """,
+            (tarih_id, kaynak_id, lisans_id, uretim_mwh, batch_id),
+        )
+
+
+def test_uretim_kaynak_geneli_getir_sekil_ve_lisans_gorunumu(conn) -> None:  # type: ignore[no-untyped-def]
+    """ADIM 5 madde 2 (2026-09-09) — KPI-02/03/06/07'nin yeni girdisi.
+    `uretim_getir()` (il×kaynak) ile AYNI lisans görünüm çevrimi (ASCII ->
+    Türkçe) burada da uygulanmalı, ama il/il_kodu/kurulu_guc_mw YOK (bu
+    tablo il kırılımsız ve STOK değil, AKIŞ)."""
+    tarih_id = 218601
+    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+    source_asset_id = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="epdk_aylik",
+        dosya_adi="test_kaynak_geneli.xlsx",
+        icerik=b"test-kaynak-geneli",
+        donem_tipi="aylik",
+        source_period="2186-01",
+    )
+    batch_id = ingest.batch_olustur(conn, source_asset_id, "test-kaynak-geneli", "s1")
+    _kaynak_geneli_satir_ekle(conn, tarih_id, "Rüzgar", "Lisanslı", 100_000.0, batch_id)
+    _kaynak_geneli_satir_ekle(conn, tarih_id, "Güneş", "Lisanssız", 5_000.0, batch_id)
+
+    df = analytics.uretim_kaynak_geneli_getir(conn, tarih_id)
+
+    assert len(df) == 2
+    assert set(df.columns) == {"kaynak", "yenilenebilir", "lisans", "uretim_mwh"}
+    assert set(df["lisans"]) == {"Lisanslı", "Lisanssız"}  # Türkçe görünüm, ASCII değil
+    assert df["uretim_mwh"].sum() == pytest.approx(105_000.0)
+
+    # kpi.py değişiklik gerektirmeden bu şekli tüketebilmeli
+    assert kpi.kpi_02_toplam_uretim(df) == pytest.approx(105_000.0)
+    lisansli = df.loc[df["lisans"] == "Lisanslı"]
+    assert kpi.kpi_02_toplam_uretim(lisansli) == pytest.approx(100_000.0)
+    assert kpi.kpi_07_lisanssiz_pay(df) == pytest.approx(
+        round(5_000.0 / 105_000.0 * 100, 1)
+    )
+
+
+def test_uretim_kaynak_geneli_getir_donem_bos_ise_veri_yok(conn) -> None:  # type: ignore[no-untyped-def]
+    """Hiç yüklenmemiş bir dönem (örn. Word yılları, ADIM 4 öncesi) için
+    boş ama doğru kolon şekilli bir DataFrame döner - dashboard'un 'veri
+    yok' kapısı (`kaynak_geneli_var`) buna dayanır."""
+    tarih_id = 218602
+    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+    df = analytics.uretim_kaynak_geneli_getir(conn, tarih_id)
+    assert df.empty
+    assert list(df.columns) == ["kaynak", "yenilenebilir", "lisans", "uretim_mwh"]
+
+
+def test_kapasite_faktoru_girdisi_lisans_filtresi_olmadan_yanilticidir(conn) -> None:  # type: ignore[no-untyped-def]
+    """ADIM 5 madde 3 (2026-09-09) — SESSİZ HATA testi.
+
+    Kurgu: aynı dönemde 1000 MW Lisanslı + 500 MW Lisanssız kurulu güç var
+    (fact_uretim, T1+T4 karışık) - Lisanslı üretim (fact_uretim_kaynak_
+    geneli, T2) 300.000 MWh, saat=720.
+
+    ÖNCE yanlış (filtresiz) yolu GERÇEKTEN hesaplayıp doğru yoldan
+    FARKLI ve DAHA DÜŞÜK çıktığını kanıtlıyoruz (payda gereğinden büyük
+    olduğu için) - sonra `kapasite_faktoru_girdisi_getir()`'in doğru
+    (Lisanslı-filtreli) sonucu ürettiğini pinliyoruz."""
+    tarih_id = 218603
+    saat = 720.0
+    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+
+    # --- fact_uretim: payda tarafı (Lisanslı 1000 MW + Lisanssız 500 MW) ---
+    uretim_source_asset = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="epdk_aylik",
+        dosya_adi="test_kapasite_kurulu.xlsx",
+        icerik=b"test-kapasite-kurulu",
+        donem_tipi="aylik",
+        source_period="2186-03",
+    )
+    uretim_batch_id = ingest.batch_olustur(
+        conn, uretim_source_asset, "test-kapasite-kurulu", "s1"
+    )
+    kaynak_sorgu = "SELECT kaynak_id FROM dim_kaynak WHERE kaynak_adi = 'Rüzgar'"
+    for lisans_etiketi, kurulu_mw in (("Lisanslı", 1000.0), ("Lisanssız", 500.0)):
+        lisans_id = ingest.dim_lisans_id_bul(conn, lisans_etiketi)
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                INSERT INTO fact_uretim
+                    (il_kodu, tarih_id, kaynak_id, lisans_id, kurulu_guc_mw,
+                     ingestion_batch_id, is_active)
+                VALUES (26, %s, ({kaynak_sorgu}), %s, %s, %s, true)
+                """,  # nosec B608 - kaynak_sorgu sabit metin, kullanıcı girdisi değil
+                (tarih_id, lisans_id, kurulu_mw, uretim_batch_id),
+            )
+
+    # --- fact_uretim_kaynak_geneli: pay tarafı (yalnız Lisanslı, 300.000 MWh) ---
+    kaynak_geneli_source_asset = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="epdk_aylik",
+        dosya_adi="test_kapasite_uretim.xlsx",
+        icerik=b"test-kapasite-uretim",
+        donem_tipi="aylik",
+        source_period="2186-03",
+    )
+    kaynak_geneli_batch_id = ingest.batch_olustur(
+        conn, kaynak_geneli_source_asset, "test-kapasite-uretim", "s1"
+    )
+    _kaynak_geneli_satir_ekle(
+        conn, tarih_id, "Rüzgar", "Lisanslı", 300_000.0, kaynak_geneli_batch_id
+    )
+
+    # --- YANLIŞ (filtresiz) yol: kasıtlı olarak lisans_id'yi payda'da HİÇ
+    # filtrelemeden hesapla - gerçek bir geliştiricinin yapabileceği hata. ---
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT COALESCE(SUM(kurulu_guc_mw), 0) FROM fact_uretim "
+            "WHERE tarih_id = %s AND is_active",
+            (tarih_id,),
+        )
+        (kurulu_filtresiz,) = cur.fetchone()
+    yanlis_df = pd.DataFrame(
+        [{"kurulu_guc_mw": float(kurulu_filtresiz), "uretim_mwh": 300_000.0}]
+    )
+    yanlis_kf = kpi.kpi_05_kapasite_faktoru(yanlis_df, saat)
+
+    # --- DOĞRU (lisans-filtreli) yol: analytics.py'nin merkezi fonksiyonu ---
+    girdi = analytics.kapasite_faktoru_girdisi_getir(conn, tarih_id)
+    assert girdi["kurulu_guc_mw"].iloc[0] == pytest.approx(1000.0)  # yalnız Lisanslı
+    assert girdi["uretim_mwh"].iloc[0] == pytest.approx(300_000.0)
+    dogru_kf = kpi.kpi_05_kapasite_faktoru(girdi, saat)
+
+    beklenen_dogru = 300_000.0 / (1000.0 * saat) * 100  # ≈ %41.7
+    beklenen_yanlis = 300_000.0 / (1500.0 * saat) * 100  # ≈ %27.8
+
+    assert dogru_kf == pytest.approx(round(beklenen_dogru, 1))
+    assert yanlis_kf == pytest.approx(round(beklenen_yanlis, 1))
+    # Yakalanması gereken bulgu: filtresiz yol SESSİZCE (hatasız) daha
+    # düşük bir kapasite faktörü üretiyor - iki sonuç GERÇEKTEN farklı.
+    assert dogru_kf is not None and yanlis_kf is not None
+    assert dogru_kf > yanlis_kf
+    assert dogru_kf != yanlis_kf
 
 
 def test_tuketim_getir_ve_p0_2(conn, aktif_batch) -> None:  # type: ignore[no-untyped-def]

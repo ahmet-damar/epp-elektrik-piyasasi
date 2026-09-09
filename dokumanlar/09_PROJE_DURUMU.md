@@ -327,14 +327,51 @@ ADIM 5 (KPI bağlama) HENÜZ BAŞLAMADI:**
   script sorunsuz geçti). `validate_rls_static.py` (21/21) canlıda
   YEŞİL — dinamik SET ROLE testi ayrı bir araştırma konusu, kod/veri
   değişikliği GEREKTİRMEZ, sonraki bir oturumda değerlendirilebilir.
+- **ADIM 5 (asıl KPI bağlama, KPI-02/03/06/07/05) — TAMAMLANDI (2026-09-09,
+  ADIM 4'ten ÖNCE yapıldı, yalnız 2026 Excel verisiyle):**
+  - `worker/analytics.py:uretim_kaynak_geneli_getir()` → KPI-02 (yalnız
+    Lisanslı, formül gereği)/03/06/07 (kombine).
+  - `worker/analytics.py:kapasite_faktoru_girdisi_getir()` → KPI-05, pay
+    VE payda AYNI lisans (Lisanslı) filtresiyle — sessiz-hata riski
+    testle sabitlendi (filtresiz/doğru yol GERÇEKTEN farklı çıktığı
+    kanıtlandı, sonra doğru yol pinlendi).
+  - Canlı 2026-01..06: KPI-02 23,9-31,3 TWh, KPI-03 %39,7-72,0, KPI-05
+    %32,0-42,3 (makul aralık), HHI 0,175-0,246, KPI-07 %3,5-12,4.
+  - `dashboard.py` kartlarına kaynak/kapsam notu eklendi. KPI-01/04
+    BİLİNÇLİ dokunulmadı (kapsam dışı).
+  - Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.13, Sürüm Geçmişi v1.27;
+    `06_canli_veri_operasyon_gunlugu.md` 2026-09-09 (devam) kaydı.
 - **ADIM 4 (orijinal numaralandırma — Word yılları backfill'i):** henüz
   başlamadı, `dokumanlar/12_word_uretim_envanteri.md`'deki envanterle
   hazır (Bulgu E/G hâlâ açık teknik sorular — ilk iş bunları çözmek).
-- **ADIM 5 (asıl KPI bağlama, KPI-02/03/06/07/05):** HİÇ BAŞLAMADI —
-  veri artık canlıda doğru oturduğu için bu bir sonraki oturumun doğal
-  sıradaki işi olabilir (kullanıcı kararı bekliyor). KPI-05'in
-  `lisans_id` filtre tutarlılığı uyarısı hâlâ geçerli (pay/payda İKİ
-  tarafta da AYNI filtrelenmeli).
+  **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatacak notlar:**
+  - `lisans_id` çözümü: `worker/ingest.py:dim_lisans_id_bul()` GENEL bir
+    yardımcı (Türkçe VEYA ASCII etiket kabul eder, `_LISANS_KODU` ile
+    çevirip `dim_lisans.tur`'a bakar) — Excel T2/T5 parser'ları zaten
+    bunu kullanıyor (`fact_uretim_kaynak_geneli_yukle()`). Kontrol
+    edildi: `worker/scripts/word_ortak.py`'de ŞU AN hiç `lisans` alanı
+    YOK (yalnız tüketim/T11 için yazılmış, üretim Word parser'ı henüz
+    YAZILMADI) — ADIM 4'ün üretim Word parser'ı yazılırken tek gereken,
+    Word Tablo 1.6/1.11 (Lisanslı/Lisanssız ayrı tablolar, bkz. `12_
+    word_uretim_envanteri.md`) satırlarına aynı `dim_lisans_id_bul()`'u
+    çağırmak — YENİ bir lisans-çözümleme mekanizması İCAT ETMEYE gerek
+    yok, mevcut yardımcı doğrudan reuse edilebilir.
+  - 2016-2017 KPI-07 'hesaplanamaz' geçişi: `fact_uretim_kaynak_geneli`
+    o yıllar için (Bulgu D kararı gereği) HİÇ satır almayacak — bu
+    turda `uretim_kaynak_geneli_getir()` zaten BOŞ DataFrame'i doğru
+    şekilde işliyor (`kpi_07_lisanssiz_pay()` boş girdide `None`
+    döner, testle pinli). Tek fark: bu turda boşluk "veri yok" (dönem
+    hiç yüklenmemiş), ADIM 4 sonrası 2016-2017 için "hesaplanamaz"
+    (kasıtlı kapsam-dışı) olması gerekecek — ayrım `veri_kapsam_disi`
+    tablosundan (`analytics.kapsam_disi_getir()`, migration
+    `20260909_0002` zaten bu iki tabloyu kapsıyor) okunarak
+    dashboard'da metne yansıtılmalı; KOD DEĞİŞİKLİĞİ küçük (yalnız
+    caption/etiket seçimi, hesap mantığı DEĞİŞMEZ).
+  - `kapasite_faktoru_girdisi_getir()` Word yılları için de OLDUĞU GİBİ
+    çalışır (SQL sorguları `tarih_id` parametrik, tabloya Word verisi
+    hangi batch'ten gelirse gelsin AYNI filtre mantığı geçerli) — ADIM
+    4'te KPI-05 için ayrı bir wiring GEREKMEZ, yalnız veri dolunca
+    otomatik doğru değer üretir.
 
 ### ✅ Kapandı — `conftest.py` canlı-DB koruması artık kendi regresyon testine sahip (2026-09-09, gece çalışması MADDE 0)
 Aynı koruma (`worker/tests/conftest.py:pytest_configure()`) daha önce

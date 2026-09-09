@@ -1547,3 +1547,56 @@ Disposable postgres:17'de regresyon YOK — `test` rolü tüm SET ROLE'lere
 izinli olduğundan tek bağlantıyla 3/3 geçiyor (eskisi gibi).
 
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.12, Sürüm Geçmişi v1.26.
+
+## 2026-09-09 (devam) — ADIM 5 madde 2/3: KPI-02/03/05/06/07 canlıya bağlandı
+
+`worker/analytics.py`'ye `uretim_kaynak_geneli_getir()` (KPI-02/03/06/07)
+ve `kapasite_faktoru_girdisi_getir()` (KPI-05, lisans-tutarlı pay/payda)
+eklendi, `app/dashboard.py`'nin "Üretim" kart bloğu bunlara bağlandı.
+Detaylı gerekçe/tasarım `10_TEKNIK_MASTER_DOKUMAN.md` §5.13'te — burada
+yalnız CANLI KANIT:
+
+```
+Canlı Supabase, DATABASE_URL, tarih_id 202601-202606:
+202601: satır=17 saat=744.0 KPI-02=31.259 TWh KPI-03=%39.7 HHI=0.175 KPI-07=%3.5 KPI-05=%42.3
+202602: satır=17 saat=672.0 KPI-02=26.481 TWh KPI-03=%57.0 HHI=0.177 KPI-07=%5.5 KPI-05=%39.4
+202603: satır=17 saat=744.0 KPI-02=27.207 TWh KPI-03=%64.9 HHI=0.196 KPI-07=%8.2 KPI-05=%36.4
+202604: satır=17 saat=720.0 KPI-02=25.016 TWh KPI-03=%70.4 HHI=0.229 KPI-07=%10.0 KPI-05=%34.6
+202605: satır=17 saat=744.0 KPI-02=23.940 TWh KPI-03=%72.0 HHI=0.246 KPI-07=%9.9 KPI-05=%32.0
+202606: satır=16 saat=720.0 KPI-02=26.261 TWh KPI-03=%67.9 HHI=0.194 KPI-07=%12.4 KPI-05=%36.2
+```
+
+KPI-05 tüm ayларda %20-60 makul aralığında — gözle kontrol (kullanıcı
+talebi). Lisanslı kurulu güç ~99.267-100.874 MW.
+
+**Sınır (2025-12 → 2026-01) canlıda test edildi:**
+```
+202512: uretim_kaynak_geneli BOŞ (0 satır) | kapasite_girdisi kurulu=0.0 uretim=0.0  → dashboard 'veri yok'
+202601: uretim_kaynak_geneli 17 satır       | kapasite_girdisi kurulu=99267.231 uretim=31259275.117 → dolu
+```
+
+**2026-06 dashboard kart dökümü (ekran görüntüsü yerine — headless ortamda
+tarayıcı yok), `app/dashboard.py`'nin GERÇEK kart mantığı taklit edilerek
+canlıya karşı üretildi:**
+```
+KPI-01 Kurulu Güç: 126,113 MW           (değişmedi, fact_uretim)
+KPI-02 Toplam Üretim (yalnız Lisanslı): 26.26 TWh   (YENİ dolu)
+KPI-03 Yenilenebilir Payı: %67.9                     (YENİ dolu)
+KPI-05 Kapasite Faktörü: %36.2                       (YENİ dolu)
+KPI-06 HHI: 0.194                                    (YENİ dolu)
+KPI-07 Lisanssız Üretim Payı: %12.4                  (YENİ dolu)
+KPI-04 Kaynak Payı: veri yok             (DEĞİŞMEDİ — kapsam dışı, fact_uretim.uretim_mwh hâlâ NULL)
+```
+
+Sessiz-hata testi (`worker/tests/test_analytics_integration.py::
+test_kapasite_faktoru_girdisi_lisans_filtresi_olmadan_yanilticidir`):
+kasıtlı filtresiz payda (1000 MW Lisanslı + 500 MW Lisanssız = 1500 MW)
+ile doğru (yalnız 1000 MW) payda GERÇEKTEN farklı sonuç verdi (≈%27.8 vs
+≈%41.7) — yanlış yol yakalanabilir olduğu kanıtlandıktan sonra doğru yol
+pinlendi.
+
+`worker/tests/test_golden.py::test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz`
+wiring sonrası yeniden çalıştırıldı — hâlâ PASSED (2016-2017 kapsam-dışı
+davranışı bozulmadı, henüz o yıllar bağlanmadı).
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.13, Sürüm Geçmişi v1.27.

@@ -355,6 +355,18 @@ def _uretim_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
     return analytics.uretim_getir(_conn, tarih_id)
 
 
+@st.cache_data(
+    show_spinner="Üretim (ülke geneli, kaynak bazlı) yükleniyor...", ttl=1800
+)
+def _uretim_kaynak_geneli_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
+    return analytics.uretim_kaynak_geneli_getir(_conn, tarih_id)
+
+
+@st.cache_data(show_spinner="Kapasite faktörü girdisi yükleniyor...", ttl=1800)
+def _kapasite_faktoru_girdisi_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
+    return analytics.kapasite_faktoru_girdisi_getir(_conn, tarih_id)
+
+
 @st.cache_data(show_spinner="Tüketim verisi yükleniyor...", ttl=1800)
 def _tuketim_getir_cached(_conn: Any, tarih_id: int) -> pd.DataFrame:
     return analytics.tuketim_getir(_conn, tarih_id)
@@ -523,6 +535,16 @@ if gercek_veri_var:
     )
 
     uretim = _uretim_getir_cached(db_handle, secili_tarih_id)
+    # ADIM 5 madde 2/3 (2026-09-09): KPI-02/03/06/07'nin girdisi + KPI-05'in
+    # pay/payda'sı — bkz. worker/analytics.py:uretim_kaynak_geneli_getir()/
+    # kapasite_faktoru_girdisi_getir() docstring'leri. `uretim` (yukarıdaki,
+    # fact_uretim) DEĞİŞMEDİ — KPI-01 ve KPI-04 hâlâ onu kullanır.
+    uretim_kaynak_geneli = _uretim_kaynak_geneli_getir_cached(
+        db_handle, secili_tarih_id
+    )
+    kapasite_girdisi = _kapasite_faktoru_girdisi_getir_cached(
+        db_handle, secili_tarih_id
+    )
     tuketim = _tuketim_getir_cached(db_handle, secili_tarih_id)
     abone = _abone_getir_cached(db_handle, secili_tarih_id)
     serbest = _serbest_tuketici_getir_cached(db_handle, secili_tarih_id)
@@ -560,6 +582,14 @@ if gercek_veri_var:
     tuketim_norm_yil = int(_sp.get("tuketim_norm_yil", 5))
 else:
     tuketim, uretim, abone, serbest, hava = _statik_veri_hazirla()
+    # fact_uretim_kaynak_geneli / kapasite_faktoru_girdisi statik dosya
+    # modunda YOK (yalnız DB'de var, 2026-01'den itibaren) — boş şekilli
+    # DataFrame'ler KPI-02/03/05/06/07 kartlarının 'veri yok' göstermesini
+    # sağlar (bkz. worker/analytics.py ilgili fonksiyonların kolon şekli).
+    uretim_kaynak_geneli = pd.DataFrame(
+        columns=["kaynak", "yenilenebilir", "lisans", "uretim_mwh"]
+    )
+    kapasite_girdisi = pd.DataFrame(columns=["kurulu_guc_mw", "uretim_mwh"])
     onceki_tuketim = pd.DataFrame(columns=tuketim.columns)
     iller = ["Türkiye Geneli"] + sorted(tuketim["il"].dropna().unique().tolist())
     donem_etiketi = "2026-01 (yerel dosya)"
@@ -636,7 +666,21 @@ if gercek_veri_var and secili_il != "Türkiye Geneli":
 st.subheader("Üretim")
 
 kurulu_var = bool(uretim["kurulu_guc_mw"].notna().any())
-lisans_var = bool(uretim["lisans"].notna().any())
+# ADIM 5 madde 2/3 (2026-09-09): KPI-02/03/06/07 artık `uretim_kaynak_geneli`
+# (fact_uretim_kaynak_geneli, ülke geneli - il kırılımı YOK) kullanıyor;
+# `uretim` (fact_uretim) yalnız KPI-01 (kurulu güç, STOK) ve KPI-04'te kaldı.
+# Veri yalnız 2026-01'den itibaren var (bkz. worker/analytics.py docstring) -
+# önceki dönemler seçilirse df boş döner, kartlar 'veri yok' gösterir.
+kaynak_geneli_var = not uretim_kaynak_geneli.empty
+# KPI-02 formülü AÇIKÇA yalnız lisanslı üretimi sayar (bkz.
+# dokumanlar/04_kpi_sozlesmeleri.md "Σ uretim_mwh (lisanslı)") - KPI-03/06/07
+# ise KOMBİNE (lisanslı+lisanssız) karışımı kullanır (07 zaten kendi içinde
+# lisanssız payını ayırıyor).
+uretim_lisansli = (
+    uretim_kaynak_geneli.loc[uretim_kaynak_geneli["lisans"] == "Lisanslı"]
+    if kaynak_geneli_var
+    else uretim_kaynak_geneli
+)
 
 u1, u2, u3, u4 = st.columns(4)
 u1.metric(
@@ -644,23 +688,33 @@ u1.metric(
     f"{kpi.kpi_01_kurulu_guc(uretim):,.0f} MW" if kurulu_var else "veri yok",
 )
 
-toplam_uretim = kpi.kpi_02_toplam_uretim(uretim)
+toplam_uretim = kpi.kpi_02_toplam_uretim(uretim_lisansli) if kaynak_geneli_var else 0.0
 u2.metric(
     "Toplam Üretim (KPI-02)",
     f"{toplam_uretim / 1e6:,.2f} TWh" if toplam_uretim else "veri yok",
 )
 
-yen_pay = kpi.kpi_03_yenilenebilir_pay(uretim)
+yen_pay = (
+    kpi.kpi_03_yenilenebilir_pay(uretim_kaynak_geneli) if kaynak_geneli_var else None
+)
 u3.metric(
     "Yenilenebilir Payı (KPI-03)",
     f"%{yen_pay:.1f}" if yen_pay is not None else "veri yok",
 )
 
-kf = kpi.kpi_05_kapasite_faktoru(uretim, donem_saat) if kurulu_var else None
+# KPI-05: pay VE payda AYNI lisans filtresiyle (yalnız Lisanslı) geliyor -
+# bkz. worker/analytics.py:kapasite_faktoru_girdisi_getir() docstring'i
+# (lisans_id tutarlılığı, sessiz hata riski). `kurulu_var`'dan AYRI bir
+# kapı: kapasite_girdisi boşsa (statik dosya modu) ya da kurulu_guc_mw 0'sa
+# 'veri yok'.
+kapasite_var = (
+    not kapasite_girdisi.empty and float(kapasite_girdisi["kurulu_guc_mw"].iloc[0]) > 0
+)
+kf = kpi.kpi_05_kapasite_faktoru(kapasite_girdisi, donem_saat) if kapasite_var else None
 u4.metric("Kapasite Faktörü (KPI-05)", f"%{kf:.1f}" if kf is not None else "veri yok")
 
 u5, u6, u7 = st.columns(3)
-hhi = kpi.kpi_06_hhi(uretim)
+hhi = kpi.kpi_06_hhi(uretim_kaynak_geneli) if kaynak_geneli_var else None
 u5.metric(
     "Kaynak Yoğunlaşması (KPI-06 HHI)",
     f"{_trafik_isigi(hhi, 'KPI-06', esikler)}{hhi:.3f}"
@@ -668,10 +722,24 @@ u5.metric(
     else "veri yok",
 )
 
-lisanssiz_pay = kpi.kpi_07_lisanssiz_pay(uretim) if lisans_var else None
+lisanssiz_pay = (
+    kpi.kpi_07_lisanssiz_pay(uretim_kaynak_geneli) if kaynak_geneli_var else None
+)
 u6.metric(
     "Lisanssız Üretim Payı (KPI-07)",
     f"%{lisanssiz_pay:.1f}" if lisanssiz_pay is not None else "veri yok",
+)
+st.caption(
+    "KPI-02/03/06/07 kaynağı: `fact_uretim_kaynak_geneli` (ülke geneli, "
+    "il kırılımı yok) — yalnız 2026-01'den itibaren mevcut (Excel T2/T5). "
+    "KPI-02 yalnız lisanslı üretimi sayar (formül gereği), 03/06/07 "
+    "lisanslı+lisanssız kombine karışımı kullanır. KPI-05'in pay VE "
+    "paydası (kurulu güç) AYNI lisans (yalnız Lisanslı) filtresiyle "
+    "geliyor — bkz. worker/analytics.py:kapasite_faktoru_girdisi_getir(). "
+    "'veri yok' burada dönem kaynakta hiç yok demek (örn. 2026-01 öncesi); "
+    "Word yılları (2016-2025) bağlandığında 2016-2017 için KPI-07 kasıtlı "
+    "kapsam-dışı kararıyla 'hesaplanamaz' gösterecek (veri eksikliğinden "
+    "AYRI bir durum) — bkz. dokumanlar/09_PROJE_DURUMU.md."
 )
 
 # 2026-09-03: kpi_13_yoy() artık ÖZET rakam değil, DataFrame'lerin kendisini

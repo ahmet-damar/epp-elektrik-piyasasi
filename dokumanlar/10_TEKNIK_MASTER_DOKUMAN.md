@@ -74,6 +74,7 @@ her yeni rakam için geçerlidir.
 | v1.24 | 2026-09-09 | Gece çalışması MADDE 5 (araştırma-only, KOD YOK) — `dokumanlar/12_word_uretim_envanteri.md`: Word (2016-2025) üretim tabloları envanteri, ADIM 4'ün (Word backfill) hazırlığı | Gerçek dosyalara karşı (10 yılın Haziran'ı + 2018/2021/2023 için ayrıca Ocak/Aralık spot-check) 7 bulgu (A-G) — 2 karar bekleyen (Bulgu C: Lisanssız için Word'de GERÇEK il×kaynak matris var, kullanılsın mı; Bulgu D: 2016-2017'de "Brüt Lisanssız Üretim" tanımı YOK, farklı bir dar metrik var), 2 açık teknik soru (Bulgu E: bazı ay/yıllarda il-bazında/il×kaynak tablo bulunamadı — neden belirsiz; Bulgu G: Genel Toplam satırı konumu teyit edilmedi) |
 | v1.25 | 2026-09-09 | Kullanıcı onayıyla: ADIM 3 madde 2-4 CANLIYA UYGULANDI (migration `20260909_0001` + `backfill_uretim_excel.py`), Bulgu C/D kararları verilip uygulandı (migration `20260909_0002`, `veri_kapsam_disi`'ye 48 satır, KPI-07 için ileriye dönük şart + regresyon testi) — §5.11 | Canlı sonuç disposable ile birebir eşleşti: 101+942 satır (hepsi aktif), mutabakat 12/12 uyumlu. Yan bulgu: `validate_role_access.py`'nin `SET ROLE` adımı canlıda (öncesinden var olan bir rol-üyelik karakteristiği yüzünden, bu turla ilgisiz) çalışmadı — `validate_rls_static.py` (21/21) ile doğrulandı. pytest 292/293 (tek beklenen "hata") |
 | v1.26 | 2026-09-09 | `validate_role_access.py` canlı RLS doğrulama boşluğu kapatıldı — v1.25'teki "SET ROLE canlıda çalışmıyor" bulgusu YANLIŞ bağlantıya dayanıyordu, doğru bağlantı `DATABASE_URL_DASHBOARD` (`app_dashboard_service`, 2026-09-04'te tam bunun için `SET TRUE` ile kurulmuş) — §5.12 | Canlıda İKİ ayrı bağlantıyla 3/3 senaryo GERÇEKTEN doğrulandı: `DATABASE_URL_DASHBOARD` ile viewer×2 (claim'siz→0 satır, doğru claim→satır döner), `DATABASE_URL` ile anon (TABLE seviyesinde reddedildi). Script artık `[ATLANDI]` ile hangi senaryonun hangi bağlantıyla test edilebildiğini AÇIKÇA raporluyor (sessiz varsayım yok). Disposable postgres:17'de regresyon yok (3/3 tek bağlantıyla) |
+| v1.27 | 2026-09-09 | ADIM 5 — KPI-02/03/06/07 `fact_uretim_kaynak_geneli`'ye, KPI-05 `kapasite_faktoru_girdisi_getir()`'e (lisans-tutarlı pay/payda) bağlandı — §5.13, `04_kpi_sozlesmeleri.md` KPI-02 formülü (yalnız Lisanslı) uygulandı, dashboard kartlarına kaynak/kapsam notu eklendi | Canlı 2026-01..06: KPI-02 23,9-31,3 TWh, KPI-03 %39,7-72,0, KPI-05 %32,0-42,3 (makul aralık), KPI-06 HHI 0,175-0,246, KPI-07 %3,5-12,4 — hepsi gerçek Supabase sorgusuyla üretildi. Sessiz-hata testi (`test_kapasite_faktoru_girdisi_lisans_filtresi_olmadan_yanilticidir`) filtresiz/doğru yolun GERÇEKTEN farklı çıktığını (≈%27,8 vs ≈%41,7) kanıtladı. `test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz` wiring sonrası tekrar PASSED. Disposable postgres:17: 52/52 entegrasyon (ingest+pipeline+job_worker+analytics+fetch_weather) + 237/237 unit (59 skip, DB'siz) |
 
 ---
 
@@ -696,6 +697,81 @@ admin` + JWT claim'e düş).
 Disposable postgres:17'de regresyon YOK (3/3 tek bağlantıyla geçiyor —
 disposable'ın `test` rolü tüm SET ROLE'lere izinli). Detay: `worker/
 validate_role_access.py` modül notları.
+
+### 5.13 KPI-02/03/05/06/07 → `fact_uretim_kaynak_geneli` Bağlandı (2026-09-09, ADIM 5)
+
+**Sıra kararı:** ADIM 5 (KPI bağlama), ADIM 4'ten (Word 10 yıl parser)
+ÖNCE yapıldı — tasarım yalnız 2026-01..06 Excel verisiyle (canlıda zaten
+mevcut) ucuza doğrulandı, pahalı Word işi ertelendi.
+
+**KPI-02/03/06/07 (`worker/analytics.py:uretim_kaynak_geneli_getir()`):**
+Yeni fonksiyon, `fact_uretim_kaynak_geneli`'yi (§5.7, il kırılımsız, ülke
+geneli) `dim_kaynak`/`dim_lisans` ile join'leyip `[kaynak, yenilenebilir,
+lisans, uretim_mwh]` döner — `uretim_getir()`'in (`fact_uretim`, il×kaynak,
+`uretim_mwh` HER ZAMAN NULL) YERİNE DEĞİL, YANINA eklendi. KPI-01 (kurulu
+güç, STOK) ve KPI-04 (kaynak payı, mevcut tasarımda kombine `fact_uretim`
+kullanıyor) BİLİNÇLİ OLARAK dokunulmadı — kullanıcı talimatının kapsamı
+yalnız 02/03/06/07 idi. KPI-02'nin formülü (`04_kpi_sozlesmeleri.md`)
+AÇIKÇA yalnız lisanslı üretimi sayar — dashboard'da `uretim_kaynak_geneli`
+lisans='Lisanslı' filtrelenip KPI-02'ye, FİLTRESİZ (kombine) hâliyle
+03/06/07'ye veriliyor (kpi.py'nin kendisi DEĞİŞMEDİ, hâlâ saf/pure — filtre
+çağıran katmanda).
+
+**KPI-05 (Kapasite Faktörü) — sessiz hata riski, `kapasite_faktoru_
+girdisi_getir()`:** Pay `fact_uretim_kaynak_geneli`'den (T2, Lisanslı),
+payda `fact_uretim.kurulu_guc_mw`'dan — ama O TABLODA hem T1 (Lisanslı)
+hem T4 (Lisanssız) kurulu güç birlikte var. `lisans_id` her iki tarafta da
+AYNI şekilde (yalnız Lisanslı) filtrelenmezse payda olduğundan büyük çıkar
+ve kapasite faktörü SESSİZCE (hatasız) sistematik düşük hesaplanır. Bu
+yüzden filtre TEK bir merkezi fonksiyonda uygulanıyor — iki ayrı çağıranın
+(pay/payda) tutarlılığına bırakılmıyor.
+
+**Testle sabitlendi (`worker/tests/test_analytics_integration.py::
+test_kapasite_faktoru_girdisi_lisans_filtresi_olmadan_yanilticidir`):**
+kasıtlı olarak filtresiz (T1+T4 karışık payda) bir hesap YAPILIP doğru
+(yalnız T1 payda) hesaptan GERÇEKTEN farklı ve daha düşük çıktığı
+kanıtlandı (1000 MW Lisanslı + 500 MW Lisanssız + 300.000 MWh Lisanslı
+üretim, saat=720 → doğru ≈%41.7, yanlış ≈%27.8), SONRA doğru yol pinlendi.
+
+**Canlı 2026-01..06 (gerçek Supabase, tarih_id 202601-202606):**
+
+| Ay | KPI-02 (TWh, yalnız Lisanslı) | KPI-03 (%) | KPI-05 (%) | KPI-06 HHI | KPI-07 (%) |
+|----|----|----|----|----|----|
+| 2026-01 | 31.26 | 39.7 | 42.3 | 0.175 | 3.5 |
+| 2026-02 | 26.48 | 57.0 | 39.4 | 0.177 | 5.5 |
+| 2026-03 | 27.21 | 64.9 | 36.4 | 0.196 | 8.2 |
+| 2026-04 | 25.02 | 70.4 | 34.6 | 0.229 | 10.0 |
+| 2026-05 | 23.94 | 72.0 | 32.0 | 0.246 | 9.9 |
+| 2026-06 | 26.26 | 67.9 | 36.2 | 0.194 | 12.4 |
+
+KPI-05 tüm ayларda %20-60 makul aralığında (gözle kontrol edildi, kullanıcı
+talebi). Lisanslı kurulu güç ~99.267-100.874 MW (fact_uretim, Lisanslı
+filtreli) — Türkiye'nin toplam kurulu gücüyle (KPI-01, tüm lisanslar,
+~123-126 GW) tutarlı büyüklük farkı (lisanssız/çatı GES payı).
+
+**Sınır davranışı canlıda doğrulandı:** 2025-12 (Word dönemi, Excel öncesi)
+için `uretim_kaynak_geneli_getir()` BOŞ döner (0 satır) ve `kapasite_
+faktoru_girdisi_getir()` kurulu=0/uretim=0 döner — dashboard'da her ikisi
+de 'veri yok' gösterir (gerçek bir veri boşluğu, hesaplanabilirlik kısıtı
+DEĞİL). 2026-01'den itibaren dolu.
+
+**KPI-07 2016-2017 kapsam-dışı davranışı korundu:** `worker/tests/
+test_golden.py::test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz` wiring
+SONRASI tekrar çalıştırıldı, hâlâ geçiyor — boş/tüm-NaN girdi için
+`kpi_07_lisanssiz_pay()` hâlâ `None` ('hesaplanamaz') dönüyor, sahte bir
+%0/%100 YOK.
+
+**Dashboard kartları (`app/dashboard.py`):** her yeni bağlanan KPI kartının
+altına veri kaynağı + kapsam notu eklendi ("ülke geneli, il kırılımı yok",
+"yalnız 2026-01'den itibaren mevcut") — 'veri yok' (gerçek boşluk) ile
+'hesaplanamaz' (hesaplanabilirlik kısıtı, örn. gelecekte 2016-2017 KPI-07)
+ayrımı notta açıkça korundu. Statik dosya modu (`_statik_veri_hazirla()`)
+için boş şekilli DataFrame'ler eklendi — DB'siz çalışırken de kartlar
+çökmeden 'veri yok' gösteriyor.
+
+**ADIM 4 hazırlık notu:** `dokumanlar/09_PROJE_DURUMU.md`'ye eklendi (bkz.
+o dosya) — Word yıllarının `lisans_id`'i nasıl çözeceği ve kapsam-dışı
+'hesaplanamaz' geçişinin nereye takılacağı.
 
 ---
 
