@@ -1600,3 +1600,43 @@ wiring sonrası yeniden çalıştırıldı — hâlâ PASSED (2016-2017 kapsam-d
 davranışı bozulmadı, henüz o yıllar bağlanmadı).
 
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.13, Sürüm Geçmişi v1.27.
+
+## 2026-09-09 (devam) — KPI-04 kontrolü: "kapsam dışı" yanlış karakterizasyonu düzeltildi
+
+Bir önceki turun raporunda KPI-04 (Kaynak Karışımı) "hâlâ veri yok,
+önceden beri böyle, kapsam dışı" denmişti. Kullanıcı bunu sorguladı —
+haklı çıktı: KPI-04'ün formülü (`Σ uretim(kaynak)/Σ uretim ×100`) KPI-03/
+06 ile birebir aynı yapıda, lisans şartı yok — "kapsam dışı" gerçek bir
+tasarım kararı değildi, ADIM 5'in ilk turunda talimatın kapsamı yalnız
+KPI-02/03/06/07 olduğu için KPI-04 bilerek atlanmıştı, ama sonraki raporda
+bu atlama yanlış biçimde "kapsam dışı" diye nitelendi.
+
+Düzeltme: `app/dashboard.py`'de KPI-04, `fact_uretim` (hep boş) yerine
+`uretim_kaynak_geneli`'ye (§ADIM 5'in kaynağı) bağlandı. Canlı Supabase,
+2026-01..06:
+```
+202601: KPI-04 toplam pay = %99.9
+202602: KPI-04 toplam pay = %100.0
+202603: KPI-04 toplam pay = %100.2
+202604: KPI-04 toplam pay = %100.1
+202605: KPI-04 toplam pay = %99.9
+202606: KPI-04 toplam pay = %100.0
+```
+6/6 ay ~%100 (yuvarlama payı, hesap hatası değil) — kaynak payları
+gerçek anlamlı, örn. 2026-06: Hidrolik %35.2, Güneş %15.7, İthal Kömür
+%11.0, Rüzgar %11.4, Doğal Gaz %9.6, Linyit %10.0.
+
+`worker/tests/test_analytics_integration.py::
+test_uretim_kaynak_geneli_getir_sekil_ve_lisans_gorunumu` genişletildi
+(kaynak paylarının toplamının ~%100 olduğu artık regresyonla korunuyor).
+Disposable postgres:17'de CI-tam-sırayla 52/52 + unit-only 237/237 yeşil.
+
+**Ortam notu (kod DEĞİL):** bu turda disposable postgres'in Windows↔WSL2
+port-forward köprüsü (`127.0.0.1:15433`) birkaç kez bağlantı zaman aşımı
+verdi (container'ın kendisi `docker stats`/`pg_isready` ile her seferinde
+sağlıklı bulundu — düşük CPU/bellek, "accepting connections") — köprü
+yanıt verdiğinde (hızlı bir `connect_timeout=5` kontrolüyle doğrulanıp)
+tüm test paketi TEK BİR temiz pencerede sorunsuz koştu. Bilinen "WSL VM
+boşlukta duruyor" deseninin bir varyantı, kod regresyonuyla İLGİSİZ.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.14, Sürüm Geçmişi v1.28.

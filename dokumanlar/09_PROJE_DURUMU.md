@@ -126,11 +126,12 @@ yansıtıldı.**
   `transaction_timeout` GUC'u) de ortadan kalktı. Detay:
   `10_TEKNIK_MASTER_DOKUMAN.md` §7.5/§8.2/§8.5/§11.2, Sürüm Geçmişi
   v1.10-v1.12.
-- **Aşama 3 (boş KPI'ları açma) — ADIM 1-4'ün TAMAMI (kod + canlı)
-  TAMAMLANDI (2026-09-08/09), Bulgu C/D kararları verilip uygulandı,
-  ADIM 5 (KPI bağlama) HENÜZ BAŞLAMADI** (bkz. "Sonraki Oturum Devam
-  Noktası" — tam liste orada). ADIM 1: Excel T11'in Genel Toplam satırı
-  KÜMÜLATİF,
+- **Aşama 3 (boş KPI'ları açma) — ADIM 1-3'ün TAMAMI (kod + canlı)
+  TAMAMLANDI (2026-09-08/09), Bulgu C/D kararları verilip uygulandı, ADIM
+  5 (KPI bağlama, KPI-01..07'nin TAMAMI — KPI-04 dahil) TAMAMLANDI
+  (2026-09-09), yalnız ADIM 4 (Word 2016-2025 üretim parser'ı) HENÜZ
+  BAŞLAMADI** (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
+  ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
   edilince T7 ile 4/6 ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11
   seçildi** (2016-2025 Word ile TEK tanım). ADIM 2: `fact_tuketim_
@@ -286,15 +287,21 @@ yerden devam edebilmeli.**
 ADIM 3'ün TAMAMI (madde 0-4, kod+disposable) + ADIM 5'in araştırma
 hazırlığı kapandı (commit'ler `a230614`→`cf5c9a1`, `7b76e3c`). **Aynı gün
 (2026-09-09) kullanıcı onayıyla ADIM 3 madde 2-4 CANLIYA UYGULANDI**
-(migration `20260909_0001` + `backfill_uretim_excel.py`) ve **Bulgu C/D
-kararları verilip uygulandı** (migration `20260909_0002` + `veri_
-kapsam_disi` 48 satır + KPI-07 regresyon testi) — detay `10_TEKNIK_
-MASTER_DOKUMAN.md` §5.11.
+(migration `20260909_0001` + `backfill_uretim_excel.py`, commit `2b3ecac`)
+ve **Bulgu C/D kararları verilip uygulandı** (migration `20260909_0002` +
+`veri_kapsam_disi` 48 satır + KPI-07 regresyon testi) — detay `10_TEKNIK_
+MASTER_DOKUMAN.md` §5.11. **Sonra ADIM 5 (KPI-02/03/05/06/07 bağlama)
+TAMAMLANDI** (commit `8afe19c`, §5.13) ve hemen ardından bir kontrol
+turunda **KPI-04'ün de aynı kaynağa (yeniden) bağlanması gerektiği
+bulunup düzeltildi** (bkz. "Açık madde" altındaki ADIM 5 kaydı ve §5.14) —
+Aşama 3'ün "boş KPI'ları aç" hedefi artık KPI-01..07'nin TAMAMI için
+gerçekleşmiş durumda (yalnız 2026-01'den itibaren; Word yılları ADIM 4'te).
 
 ### Açık madde
 Dış denetim listesinin (A/B/C bölümleri) hiçbir maddesi açık değil.
-**Aşama 3 (boş KPI'ları açma) — ADIM 1-4'ün TAMAMI (kod + canlı) TAMAMLANDI,
-ADIM 5 (KPI bağlama) HENÜZ BAŞLAMADI:**
+**Aşama 3 (boş KPI'ları açma) — ADIM 3'ün madde 1-4'ünün TAMAMI (kod +
+canlı) TAMAMLANDI, ADIM 5 (KPI bağlama, KPI-04 dahil) DE TAMAMLANDI —
+yalnız ADIM 4 (Word yılları) AÇIK:**
 - **ADIM 3 madde 1** (batch bağımlılığı düzeltmesi) — TAMAMLANDI, canlıda
   (2026-09-08, commit `df616e6`).
 - **ADIM 3 madde 2** (`fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli`
@@ -337,14 +344,32 @@ ADIM 5 (KPI bağlama) HENÜZ BAŞLAMADI:**
     kanıtlandı, sonra doğru yol pinlendi).
   - Canlı 2026-01..06: KPI-02 23,9-31,3 TWh, KPI-03 %39,7-72,0, KPI-05
     %32,0-42,3 (makul aralık), HHI 0,175-0,246, KPI-07 %3,5-12,4.
-  - `dashboard.py` kartlarına kaynak/kapsam notu eklendi. KPI-01/04
-    BİLİNÇLİ dokunulmadı (kapsam dışı).
+  - `dashboard.py` kartlarına kaynak/kapsam notu eklendi. KPI-01
+    BİLİNÇLİ dokunulmadı (`fact_uretim`, kurulu güç, STOK).
   - Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.13, Sürüm Geçmişi v1.27;
     `06_canli_veri_operasyon_gunlugu.md` 2026-09-09 (devam) kaydı.
-- **ADIM 4 (orijinal numaralandırma — Word yılları backfill'i):** henüz
-  başlamadı, `dokumanlar/12_word_uretim_envanteri.md`'deki envanterle
-  hazır (Bulgu E/G hâlâ açık teknik sorular — ilk iş bunları çözmek).
-  **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatacak notlar:**
+- **KPI-04 kontrolü — DÜZELTİLDİ (2026-09-09, ADIM 5'in hemen ardından,
+  kullanıcının "bu kapsam dışı denmesi doğru görünmüyor" itirazı üzerine):**
+  ADIM 5'in ilk turunda KPI-04 raporda "hâlâ veri yok, kapsam dışı"
+  olarak bırakılmıştı — bu YANLIŞ bir karakterizasyondu, gerçek bir kapsam
+  kararı değil, o turun talimat kapsamının (yalnız KPI-02/03/06/07) dışında
+  kaldığı için atlanmıştı. Formülü (`Σ uretim(kaynak)/Σ uretim`) KPI-03/06
+  ile YAPISAL OLARAK AYNI — kaynak DEĞİŞTİRİLİP `uretim_kaynak_geneli`'ye
+  bağlandı (`app/dashboard.py`, `kpi.kpi_04_kaynak_payi(uretim_kaynak_
+  geneli)`). Canlı 2026-01..06 kaynak payları toplamı 6/6 ayda ~%100
+  (99,9-100,2 — 1 ondalık yuvarlamadan kaynaklanan beklenen sapma)
+  doğrulandı. Yeni regresyon assertion'ı `test_uretim_kaynak_geneli_
+  getir_sekil_ve_lisans_gorunumu`'a eklendi (payların toplamı %100'e
+  yakın olmalı). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.14.
+- **🔵 SIRADAKİ İŞ — ADIM 4 (orijinal numaralandırma — Word yılları
+  backfill'i, 2016-2025 üretim parser'ı):** henüz başlamadı,
+  `dokumanlar/12_word_uretim_envanteri.md`'deki envanterle hazır (Bulgu
+  E/G hâlâ açık teknik sorular — ilk iş bunları çözmek). Bulgu C kararı
+  gereği Word'ün il×kaynak Lisanssız tablosu **KULLANILMAYACAK**
+  (yukarıdaki Bulgu C/D maddesine bkz.) — yalnız ülke geneli/kaynak
+  bazlı Tablo 1.6/1.11 (Lisanslı/Lisanssız) ve il bazlı Tablo 1.7/1.12
+  parse edilecek. **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü
+  ucuzlatacak notlar:**
   - `lisans_id` çözümü: `worker/ingest.py:dim_lisans_id_bul()` GENEL bir
     yardımcı (Türkçe VEYA ASCII etiket kabul eder, `_LISANS_KODU` ile
     çevirip `dim_lisans.tur`'a bakar) — Excel T2/T5 parser'ları zaten
@@ -372,6 +397,13 @@ ADIM 5 (KPI bağlama) HENÜZ BAŞLAMADI:**
     hangi batch'ten gelirse gelsin AYNI filtre mantığı geçerli) — ADIM
     4'te KPI-05 için ayrı bir wiring GEREKMEZ, yalnız veri dolunca
     otomatik doğru değer üretir.
+- **Sonrası — Faz 4 (Tahminleme):** ADIM 4 bittikten SONRA gündemde,
+  kapsam kararı HÂLÂ bekliyor (aksiyon gerektirmiyor) — detay aşağıda
+  "Faz 4 (Tahminleme)" bölümünde.
+- **Kontrol edildi, açık madde DEĞİL:** `conftest.py` canlı-DB koruması
+  regresyon testi (`worker/tests/test_conftest_guard.py`) 2026-09-09
+  gecesinde zaten eklenmişti — bu turda yeniden doğrulandı, hâlâ mevcut
+  ve ✅ Kapandı olarak aşağıda listeli, tekrar açık madde değil.
 
 ### ✅ Kapandı — `conftest.py` canlı-DB koruması artık kendi regresyon testine sahip (2026-09-09, gece çalışması MADDE 0)
 Aynı koruma (`worker/tests/conftest.py:pytest_configure()`) daha önce

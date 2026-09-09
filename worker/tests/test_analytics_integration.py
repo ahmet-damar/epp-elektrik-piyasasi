@@ -144,6 +144,17 @@ def test_uretim_kaynak_geneli_getir_sekil_ve_lisans_gorunumu(conn) -> None:  # t
         round(5_000.0 / 105_000.0 * 100, 1)
     )
 
+    # 2026-09-09 (ADIM 5 sonrası kontrol) — KPI-04 de AYNI (kombine)
+    # şekli tüketir, dashboard artık `uretim` (fact_uretim) yerine bunu
+    # kullanıyor. Kaynak paylarının toplamı ~%100 olmalı (yuvarlama payı).
+    kaynak_payi = kpi.kpi_04_kaynak_payi(df)
+    assert kaynak_payi is not None
+    assert kaynak_payi == {
+        "Rüzgar": pytest.approx(round(100_000.0 / 105_000.0 * 100, 1)),
+        "Güneş": pytest.approx(round(5_000.0 / 105_000.0 * 100, 1)),
+    }
+    assert sum(kaynak_payi.values()) == pytest.approx(100.0, abs=0.2)
+
 
 def test_uretim_kaynak_geneli_getir_donem_bos_ise_veri_yok(conn) -> None:  # type: ignore[no-untyped-def]
     """Hiç yüklenmemiş bir dönem (örn. Word yılları, ADIM 4 öncesi) için

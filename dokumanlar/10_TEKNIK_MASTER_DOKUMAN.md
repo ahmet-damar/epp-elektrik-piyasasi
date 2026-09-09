@@ -75,6 +75,7 @@ her yeni rakam için geçerlidir.
 | v1.25 | 2026-09-09 | Kullanıcı onayıyla: ADIM 3 madde 2-4 CANLIYA UYGULANDI (migration `20260909_0001` + `backfill_uretim_excel.py`), Bulgu C/D kararları verilip uygulandı (migration `20260909_0002`, `veri_kapsam_disi`'ye 48 satır, KPI-07 için ileriye dönük şart + regresyon testi) — §5.11 | Canlı sonuç disposable ile birebir eşleşti: 101+942 satır (hepsi aktif), mutabakat 12/12 uyumlu. Yan bulgu: `validate_role_access.py`'nin `SET ROLE` adımı canlıda (öncesinden var olan bir rol-üyelik karakteristiği yüzünden, bu turla ilgisiz) çalışmadı — `validate_rls_static.py` (21/21) ile doğrulandı. pytest 292/293 (tek beklenen "hata") |
 | v1.26 | 2026-09-09 | `validate_role_access.py` canlı RLS doğrulama boşluğu kapatıldı — v1.25'teki "SET ROLE canlıda çalışmıyor" bulgusu YANLIŞ bağlantıya dayanıyordu, doğru bağlantı `DATABASE_URL_DASHBOARD` (`app_dashboard_service`, 2026-09-04'te tam bunun için `SET TRUE` ile kurulmuş) — §5.12 | Canlıda İKİ ayrı bağlantıyla 3/3 senaryo GERÇEKTEN doğrulandı: `DATABASE_URL_DASHBOARD` ile viewer×2 (claim'siz→0 satır, doğru claim→satır döner), `DATABASE_URL` ile anon (TABLE seviyesinde reddedildi). Script artık `[ATLANDI]` ile hangi senaryonun hangi bağlantıyla test edilebildiğini AÇIKÇA raporluyor (sessiz varsayım yok). Disposable postgres:17'de regresyon yok (3/3 tek bağlantıyla) |
 | v1.27 | 2026-09-09 | ADIM 5 — KPI-02/03/06/07 `fact_uretim_kaynak_geneli`'ye, KPI-05 `kapasite_faktoru_girdisi_getir()`'e (lisans-tutarlı pay/payda) bağlandı — §5.13, `04_kpi_sozlesmeleri.md` KPI-02 formülü (yalnız Lisanslı) uygulandı, dashboard kartlarına kaynak/kapsam notu eklendi | Canlı 2026-01..06: KPI-02 23,9-31,3 TWh, KPI-03 %39,7-72,0, KPI-05 %32,0-42,3 (makul aralık), KPI-06 HHI 0,175-0,246, KPI-07 %3,5-12,4 — hepsi gerçek Supabase sorgusuyla üretildi. Sessiz-hata testi (`test_kapasite_faktoru_girdisi_lisans_filtresi_olmadan_yanilticidir`) filtresiz/doğru yolun GERÇEKTEN farklı çıktığını (≈%27,8 vs ≈%41,7) kanıtladı. `test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz` wiring sonrası tekrar PASSED. Disposable postgres:17: 52/52 entegrasyon (ingest+pipeline+job_worker+analytics+fetch_weather) + 237/237 unit (59 skip, DB'siz) |
+| v1.28 | 2026-09-09 | **Gün sonu kapanışı (3).** KPI-04 kontrolü — §5.13'teki "kapsam dışı" karakterizasyonu YANLIŞTI (kullanıcı itirazı haklı çıktı), gerçekte KPI-03/06 ile aynı formül/kaynak — `uretim_kaynak_geneli`'ye bağlandı, §5.14. Aşama 3'ün "boş KPI'ları aç" hedefi KPI-01..07'nin TAMAMI için (2026-01'den itibaren) gerçekleşti | Canlı 2026-01..06 kaynak payları toplamı 6/6 ay %99,9-100,2 (yuvarlama payı, hesap hatası değil). Regresyon testi genişletildi (toplam ~%100 kontrolü). Disposable postgres:17: CI-tam-sırayla 52/52 + unit-only 237/237 yeşil (bugün, WSL2 port-forward köprüsü ara sıra bağlantı zaman aşımı verdi — container'ın kendisi sağlıklıydı, temiz bir pencerede tekrar koşulup doğrulandı, kod regresyonu değil). ruff/mypy/bandit temiz, CI+Security canlıda yeşil, git temiz |
 
 ---
 
@@ -772,6 +773,50 @@ için boş şekilli DataFrame'ler eklendi — DB'siz çalışırken de kartlar
 **ADIM 4 hazırlık notu:** `dokumanlar/09_PROJE_DURUMU.md`'ye eklendi (bkz.
 o dosya) — Word yıllarının `lisans_id`'i nasıl çözeceği ve kapsam-dışı
 'hesaplanamaz' geçişinin nereye takılacağı.
+
+### 5.14 KPI-04 Kontrolü — Yanlış "Kapsam Dışı" Karakterizasyonu Düzeltildi (2026-09-09)
+
+§5.13'ün raporunda KPI-04 (Kaynak Karışımı) "hâlâ veri yok, önceden beri
+böyle, kapsam dışı" olarak bırakılmıştı. Kullanıcı bunun doğru
+görünmediğini belirtti — HAKLIYDI: KPI-04'ün formülü (`04_kpi_
+sozlesmeleri.md`, `Σ uretim(kaynak)/Σ uretim ×100`, lisans şartı YOK)
+KPI-03/06 ile **yapısal olarak birebir aynı** — üçü de kaynak-gruplu
+toplam/oran hesabı, hiçbiri lisans filtresi gerektirmiyor. "Kapsam dışı"
+gerçek bir tasarım kararı DEĞİLDİ — ADIM 5'in ilk turunda kullanıcı
+talimatının kapsamı yalnız "KPI-02, 03, 06, 07" olarak verildiği için
+KPI-04 o turda BİLEREK atlanmıştı; sonraki raporda bu atlama yanlış bir
+şekilde "kapsam dışı" diye nitelendi (gerekçesiz, yanıltıcı bir ifade).
+
+**Düzeltme:** `app/dashboard.py`'de `kaynak_payi = kpi.kpi_04_kaynak_
+payi(uretim)` (eski, hep-boş `fact_uretim`) →
+`kpi.kpi_04_kaynak_payi(uretim_kaynak_geneli) if kaynak_geneli_var else
+None` (§5.13'ün `uretim_kaynak_geneli`'si, kombine lisanslı+lisanssız —
+KPI-03/06/07 ile AYNI kaynak, KPI-02'nin aksine lisans filtresi yok).
+Kart altına diğerleriyle aynı desende kaynak/kapsam caption'ı eklendi.
+
+**Canlı 2026-01..06 doğrulaması — kaynak payları toplamı ~%100 olmalı:**
+
+| Ay | Toplam pay (%) |
+|----|----|
+| 2026-01 | 99.9 |
+| 2026-02 | 100.0 |
+| 2026-03 | 100.2 |
+| 2026-04 | 100.1 |
+| 2026-05 | 99.9 |
+| 2026-06 | 100.0 |
+
+6/6 ay 99.9-100.2 aralığında (1 ondalık basamağa yuvarlanan pay
+değerlerinin toplanmasından kaynaklanan beklenen sapma, hesap hatası
+DEĞİL). 2026-06 örnek kırılım: Hidrolik %35.2, Doğal Gaz %9.6, İthal
+Kömür %11.0, Güneş %15.7, Rüzgar %11.4, Linyit %10.0, kalan 5 kaynak
+(Jeotermal/Biyokütle/Taş Kömürü/Asfaltit/Fuel Oil) ~%8.1.
+
+**Test:** `worker/tests/test_analytics_integration.py::
+test_uretim_kaynak_geneli_getir_sekil_ve_lisans_gorunumu` genişletildi —
+`kpi_04_kaynak_payi()`'nin kaynak başına doğru payı ürettiği VE toplamın
+%100'e (±0.2 tolerans) yakın olduğu artık regresyonla korunuyor.
+Disposable postgres:17'de CI-tam-sırayla (ingest→pipeline→job_worker→
+analytics→fetch_weather) 52/52, unit-only (DB'siz) 237/237 yeşil.
 
 ---
 

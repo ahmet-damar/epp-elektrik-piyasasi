@@ -535,10 +535,11 @@ if gercek_veri_var:
     )
 
     uretim = _uretim_getir_cached(db_handle, secili_tarih_id)
-    # ADIM 5 madde 2/3 (2026-09-09): KPI-02/03/06/07'nin girdisi + KPI-05'in
-    # pay/payda'sı — bkz. worker/analytics.py:uretim_kaynak_geneli_getir()/
-    # kapasite_faktoru_girdisi_getir() docstring'leri. `uretim` (yukarıdaki,
-    # fact_uretim) DEĞİŞMEDİ — KPI-01 ve KPI-04 hâlâ onu kullanır.
+    # ADIM 5 madde 2/3 (2026-09-09) + KPI-04 kontrolü (2026-09-09, devam):
+    # KPI-02/03/04/06/07'nin girdisi + KPI-05'in pay/payda'sı — bkz. worker/
+    # analytics.py:uretim_kaynak_geneli_getir()/kapasite_faktoru_girdisi_
+    # getir() docstring'leri. `uretim` (yukarıdaki, fact_uretim) DEĞİŞMEDİ —
+    # yalnız KPI-01 (kurulu güç, STOK) hâlâ onu kullanır.
     uretim_kaynak_geneli = _uretim_kaynak_geneli_getir_cached(
         db_handle, secili_tarih_id
     )
@@ -666,11 +667,12 @@ if gercek_veri_var and secili_il != "Türkiye Geneli":
 st.subheader("Üretim")
 
 kurulu_var = bool(uretim["kurulu_guc_mw"].notna().any())
-# ADIM 5 madde 2/3 (2026-09-09): KPI-02/03/06/07 artık `uretim_kaynak_geneli`
-# (fact_uretim_kaynak_geneli, ülke geneli - il kırılımı YOK) kullanıyor;
-# `uretim` (fact_uretim) yalnız KPI-01 (kurulu güç, STOK) ve KPI-04'te kaldı.
-# Veri yalnız 2026-01'den itibaren var (bkz. worker/analytics.py docstring) -
-# önceki dönemler seçilirse df boş döner, kartlar 'veri yok' gösterir.
+# ADIM 5 madde 2/3 (2026-09-09) + KPI-04 kontrolü (2026-09-09, devam):
+# KPI-02/03/04/06/07 artık `uretim_kaynak_geneli` (fact_uretim_kaynak_
+# geneli, ülke geneli - il kırılımı YOK) kullanıyor; `uretim` (fact_uretim)
+# yalnız KPI-01'de (kurulu güç, STOK) kaldı. Veri yalnız 2026-01'den
+# itibaren var (bkz. worker/analytics.py docstring) - önceki dönemler
+# seçilirse df boş döner, kartlar 'veri yok' gösterir.
 kaynak_geneli_var = not uretim_kaynak_geneli.empty
 # KPI-02 formülü AÇIKÇA yalnız lisanslı üretimi sayar (bkz.
 # dokumanlar/04_kpi_sozlesmeleri.md "Σ uretim_mwh (lisanslı)") - KPI-03/06/07
@@ -961,12 +963,26 @@ with c1:
 
 with c2:
     st.subheader("Üretim Kaynak Karışımı — KPI-04 (%)")
-    kaynak_payi = kpi.kpi_04_kaynak_payi(uretim)
+    # 2026-09-09 (ADIM 5 sonrası kontrol): ÖNCEDEN `uretim` (fact_uretim,
+    # uretim_mwh HER ZAMAN NULL) kullanıyordu, HER ZAMAN 'veri yok'
+    # gösteriyordu — bu "kapsam dışı" bir tasarım kararı DEĞİLDİ, ADIM
+    # 5'in ilk turunda kullanıcı talimatının kapsamı yalnız KPI-02/03/06/07
+    # olduğu için bilerek atlanmıştı. Formülü (04_kpi_sozlesmeleri.md,
+    # lisans şartı YOK) KPI-03/06/07 ile AYNI - kombine `uretim_kaynak_
+    # geneli` üzerinden hesaplanabiliyor, artık ona bağlı.
+    kaynak_payi = (
+        kpi.kpi_04_kaynak_payi(uretim_kaynak_geneli) if kaynak_geneli_var else None
+    )
     if kaynak_payi:
         kk = pd.Series(kaynak_payi).sort_values(ascending=False)
         st.bar_chart(kk, horizontal=True, color="#548235")
+        st.caption(
+            "KPI-04 kaynağı: `fact_uretim_kaynak_geneli` (ülke geneli, il "
+            "kırılımı yok, lisanslı+lisanssız kombine) — yalnız 2026-01'den "
+            "itibaren mevcut."
+        )
     else:
-        st.caption("Üretim verisi yok.")
+        st.caption("Üretim verisi yok (2026-01 öncesi dönemler için).")
 
 c3, c4 = st.columns(2)
 
