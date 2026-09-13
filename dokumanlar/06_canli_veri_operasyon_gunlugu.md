@@ -2127,3 +2127,65 @@ Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.23, Sürüm Geçmişi v1.37,
 Lisanslı) TAMAMLANDI — "Excel'e en yakın 8 yıl" fazı BİTTİ, hepsi
 YALNIZ disposable, canlıya HİÇBİRİ uygulanmadı. Sıradaki adım: 2016-2017
 için GENİŞLETİLMİŞ dry-run (kod YAZILMADAN), sonra bulgulara göre karar.
+
+## 2026-09-13 (devam) — 2016-2017 GENİŞLETİLMİŞ dry-run taraması (KOD YAZILMADI)
+
+24 ayın (2016: 12, 2017: 12) TAMAMI için T2/T3'ün varlığı, tam başlık
+metni, satır/kolon yapısı, il sayısı ve TÜM kaynak etiketleri tek tek
+dökümlendi (`tek_aday_bul()`'a hem standart hem geriye-uyumlu arama
+metinleriyle denendi, ayrıca ham `basliklari_topla()` çıktısı JAN/ŞUB
+2016 ve KAS/ARA 2017 için TAM listelendi).
+
+**Görünüşte "tablo yok" 4 ay araştırıldı, İKİSİ DE gerçek yokluk
+DEĞİL:** 2016 Ocak/Şubat'ın T2/T3'ü (`Tablo-1.4`/`Tablo-1.5`) GERÇEKTEN
+var, yalnız başlıkta "Lisanslı" kelimesi eksik (Mart'tan itibaren
+ekleniyor) — içerik dökümlendi, yapı Mart-Aralık ile AYNI. 2017 Kasım/
+Aralık'ta T2 (`Tablo-1.5`) GERÇEKTEN var, ama EPDK bu iki ayda AYRICA
+bir YILLIK KÜMÜLATİF karşılaştırma tablosu (`Tablo-1.6 Ocak-Kasım/
+Ocak-Aralık ...`) ekliyor — AYNI arama alt-dizisini taşıdığı için
+`tek_aday_bul()` iki aday bulup belirsizlik hatası fırlatıyor (dry-run
+script'i bunu "BULUNAMADI" gibi yutmuştu, gerçek nedeni GÖSTERMEMİŞTİ).
+
+**En önemli yapısal bulgu:** 2016'nın T2'si (TÜM 12 ay) 2017-2025'in
+6-kolonlu dönemler-arası-karşılaştırma formatından TAMAMEN FARKLI — YALNIZ
+3 kolonlu TEK-DÖNEM format (`Kaynak Türü | Üretim Miktarı (MWh) | Oran
+(%)`). `hedef_donem_kolonu_bul()` bu yılda KULLANILAMAZ — 2016'nın
+gelecekteki `t2_oku()`'sü bespoke yazılmalı (kolon seçimi yok, veri
+`tbl.rows[1:]`'den başlıyor). T3'ün iki-sütunlu-blok yapısı (`iki_
+blokta_il_degerlerini_oku()`) ETKİLENMİYOR (pozisyona güveniyor,
+başlık metnine bakmıyor).
+
+**Bulgu N (Hidrolik ikiye bölünmüş) her iki yılda da var:** 2017
+`"BARAJLI HİDROLİK"` (2018/2019 ile AYNI, yeni alias gerekir); 2016
+yalnız `"BARAJLI"` (worker/parser.py'de ZATEN tanınıyor, yeni alias
+GEREKMİYOR) — ama Mart 2016'nın tam dökümünde `AKARSU` + `BARAJLI`
+AYRI satırlar olarak görüldüğünden (ikisi de "Hidrolik"e eşleniyor),
+2016'nın `t2_oku()`'sü de AYNI `dict`-biriktirici TOPLAMA desenini
+kullanmalı (aksi halde UNIQUE kısıt ihlali).
+
+**Bulgu I sınıfı (bölünmüş başlık):** yalnız 2017 Ekim'de görüldü,
+established while-loop çözer. 2016'da hiç yok (zaten tek-satırlık
+başlık).
+
+**Kaynak etiketleri:** 2016+2017'nin TÜM T2 etiketleri (AKARSU,
+ASFALTİT/ASFALTİT KÖMÜR, BARAJLI/BARAJLI HİDROLİK, BİYOKÜTLE, DOĞAL
+GAZ, FUEL OİL, GÜNEŞ, JEOTERMAL, LNG, LİNYİT, MOTORİN, NAFTA [yalnız
+2016], RÜZGAR, TAŞ KÖMÜR/TAŞ KÖMÜRÜ, İTHAL KÖMÜR) ZATEN tanınıyor,
+Bulgu N dışında yeni bir kaynak türü YOK. (Uyarı: bu taramada 2016 için
+`tbl.rows[2:]` kullanıldı, doğrusu `tbl.rows[1:]` olurdu — üretim
+turunda TAM offset'le yeniden taranmalı, bu envanter ÖNGÖRÜCÜ.)
+
+**T3 il sayısı:** 2016: 76-80/ay, 2017: 76-80/ay — established Bulgu G
+deseniyle tutarlı, `t3_oku()` tasarımı zaten sabit sayı varsaymadığından
+kod değişikliği GEREKMİYOR.
+
+**Lisanssız (T5/T6):** Ocak 2016 başlık listesinde `Tablo 1.9`/`Tablo
+1.10` (Lisanssız kaynak/il) MEVCUT olduğu doğrulandı — Bulgu D'nin
+kararı (Karar 4) geçerliliğini koruyor, yeniden ölçüm GEREKMEDİ.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.24, Sürüm Geçmişi v1.38,
+`12_word_uretim_envanteri.md` Bulgu O (tam özet tablosu dahil).
+
+**KOD YAZILMADI** — bu tur yalnız envanter/tarama. 2016-2017'nin
+uygulaması (kod + yükleme + test) bulgulara göre karar verildikten
+sonra, ayrı bir turda yapılacak.

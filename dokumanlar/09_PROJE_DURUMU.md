@@ -133,9 +133,12 @@ yansıtıldı.**
   BAŞLADI — 2025/2024/2023/2022/2021/2020/2019/2018'in "Excel'e en yakın
   8 yıl" fazı TAMAMLANDI (T2+T3 Lisanslı yüklendi, Lisanssız TÜM Word
   yılları için kapsam dışı — Bulgu D/L, iki açık karar 2024-02/2022-T6
-  sayıyla ölçülüp kapatıldı, bkz. Bulgu I/J/K/L/M/N), hepsi YALNIZ
-  disposable, canlıya UYGULANMADI, sıradaki iş 2016-2017 için
-  GENİŞLETİLMİŞ dry-run (kod yazılmadan)** (bkz. "Sonraki Oturum Devam
+  sayıyla ölçülüp kapatıldı, bkz. Bulgu I/J/K/L/M/N). 2016-2017 için
+  GENİŞLETİLMİŞ dry-run taraması da BİTTİ (Bulgu O, KOD YAZILMADI) —
+  2016'nın T2'si diğer TÜM yıllardan yapısal olarak FARKLI (tek-dönem
+  3-kolonlu), 4 "yok görünen" ay aslında yok DEĞİL (başlık/YTD-tablo
+  belirsizliği). Hiçbir yıl canlıya UYGULANMADI, sıradaki iş: 2016-2017
+  bulgularına göre KARAR + uygulama** (bkz. "Sonraki Oturum Devam
   Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
@@ -507,14 +510,32 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     `10_TEKNIK_MASTER_DOKUMAN.md` §5.23, Sürüm Geçmişi v1.37.
   - **🏁 ADIM 4'ün "Excel'e en yakın 8 yıl" fazı TAMAMLANDI (2025+2024+
     2023+2022+2021+2020+2019+2018) — hepsi YALNIZ disposable
-    postgres:17'de, canlıya HİÇBİRİ UYGULANMADI.** Sıradaki adım:
-    2016-2017 için GENİŞLETİLMİŞ dry-run (KOD YAZILMADAN — il satır
-    sayısı, kaynak etiketleri, başlık/dönem kolonu yapısı çıkarılıp
-    `12_word_uretim_envanteri.md`'ye ayrı bölüm olarak yazılacak,
-    sonra DUR VE RAPORLA — 2016-2017'nin uygulaması ayrı bir tur).
-    Canlı backfill kullanıcı onayıyla TÜM yıllar bittikten sonra TEK
-    SEFERDE yapılacak — 2024-02/2022-T6 kararları zaten yukarıda
-    KAPATILDI, canlıya geçmeden önce başka açık karar YOK.
+    postgres:17'de, canlıya HİÇBİRİ UYGULANMADI.**
+  - **✅ 2016-2017 GENİŞLETİLMİŞ dry-run taraması BİTTİ (2026-09-13,
+    KOD YAZILMADI — Bulgu O):** 24 ayın TAMAMI için T2/T3 varlığı,
+    başlık metni, satır/kolon yapısı, il sayısı, kaynak etiketleri
+    dökümlendi.
+    - Görünüşte "tablo yok" olan 4 ay (2016 Oca/Şub, 2017 Kas/Ara)
+      araştırıldı — İKİSİ DE gerçek yokluk DEĞİL: 2016 Oca/Şub
+      başlıkta "Lisanslı" kelimesi eksik; 2017 Kas/Ara'da EPDK ayrıca
+      bir YTD/kümülatif tablo ekleyip arama metnini belirsizleştiriyor.
+    - **En önemli bulgu:** 2016'nın T2'si TÜM 12 ay TEK-DÖNEM 3-kolonlu
+      format — 2017-2025'in 6-kolonlu dönemler-arası formatından
+      TAMAMEN FARKLI, `hedef_donem_kolonu_bul()` KULLANILAMAZ, bespoke
+      bir `t2_oku()` gerekecek.
+    - Bulgu N (Hidrolik ikiye bölünmüş) her iki yılda da var (2017
+      "BARAJLI HİDROLİK" yeni alias gerekir; 2016 yalnız "BARAJLI"
+      zaten tanınıyor ama YİNE DE toplama gerekiyor).
+    - Bulgu I sınıfı yalnız 2017 Ekim'de, yeni/tanınmayan kaynak türü
+      YOK, T3 il sayısı established Bulgu G deseniyle tutarlı,
+      Lisanssız (T5/T6) zaten Bulgu D ile kapsam dışı.
+    - Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.24, Sürüm Geçmişi v1.38,
+      `12_word_uretim_envanteri.md` Bulgu O (özet tablosu dahil).
+  - **Sıradaki adım: 2016-2017'nin uygulaması** (kod + yükleme + test),
+    Bulgu O'nun bulgularına göre karar verilip ayrı bir turda. Canlı
+    backfill kullanıcı onayıyla TÜM yıllar bittikten sonra TEK SEFERDE
+    yapılacak — 2024-02/2022-T6 kararları zaten yukarıda KAPATILDI,
+    canlıya geçmeden önce başka açık karar YOK.
   - **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatan notlar
     (hâlâ geçerli):**
   - `lisans_id` çözümü: **DOĞRULANDI, 2025 için ÇALIŞTI** — `t2_oku()`/

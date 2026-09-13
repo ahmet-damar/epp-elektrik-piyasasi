@@ -441,6 +441,140 @@ Disposable postgres:17'de (fresh, tek başına) 12/12 ay yüklendi,
 (`test_word_2018.py`: alias eşlemesi, `t2_oku`'nun toplama davranışı,
 3-satırlık bölünmüş başlık, Genel-Toplam-uyuşmazlığı).
 
+## Bulgu O — 2016-2017 GENİŞLETİLMİŞ dry-run taraması (2026-09-13, KOD YAZILMADI)
+
+ADIM 4'ün "Excel'e en yakın 8 yıl" (2018-2025) fazı bittikten sonra,
+2016-2017 için — bu iki yıl önceki Word genişletmesinde (T4/T10/T11,
+dokumanlar/08) EN ZORLU olarak işaretlendiği için — kod yazılmadan
+ÖNCE GENİŞLETİLMİŞ bir tarama yapıldı: 24 ayın (2016: 12, 2017: 12)
+TAMAMI için T2/T3'ün varlığı, tam başlık metni, satır/kolon yapısı, il
+sayısı ve TÜM kaynak etiketleri tek tek dökümlendi. **Aşağıdaki
+bulguların HİÇBİRİ için kod yazılmadı — bu bölüm yalnız envanterdir,
+sıradaki turda karar+uygulama yapılacak.**
+
+### 1. Görünüşte "tablo yok" olan 4 ay — İKİSİ DE GERÇEK YOKLUK DEĞİL
+
+İlk taramada basit bir başlık-metni arama (2018-2025'in kullandığı
+`icerir=["Lisanslı Elektrik Üretiminin Kaynak/İl Bazında Dağılımı"]`)
+şu 4 ayda "BULUNAMADI" sonucu verdi: **2016 Ocak/Şubat** (T2 VE T3
+ikisi de) ve **2017 Kasım/Aralık** (yalnız T2). Tam tablo başlığı
+dökümü alınarak İKİSİ de araştırıldı, İKİSİ de GERÇEK YOKLUK
+DEĞİL — arama metni yetersiz kaldığı için "bulunamadı" görünmüş:
+
+- **2016 Ocak/Şubat:** Tablo GERÇEKTEN var (`Tablo-1.4 Ocak 2016
+  Döneminde Elektrik Üretiminin Kaynak Bazında Dağılımı (MWh)`) — ama
+  başlıkta **"Lisanslı" kelimesi YOK** (Mart 2016'dan itibaren "...
+  Döneminde **Lisanslı** Elektrik Üretiminin..." diye değişiyor). Aynı
+  durum T3'ün karşılığı için de geçerli (`Tablo-1.5 ... Elektrik
+  Üretiminin İl Bazında Dağılımı`). İçerik doğrudan dökümlendi: Ocak
+  2016'nın T2'si `['Kaynak Türü', 'Üretim Miktarı (MWh)', 'Oran (%)']`
+  başlıklı, T3'ü `['İL', 'Üretim Miktarı (MWh)', 'Oran (%)', 'İL', ...]`
+  (Şubat'ta "İLLER" — tekil/çoğul da ay ay değişiyor) — yani YAPI Mart-
+  Aralık ile AYNI, yalnız İKİ AYIN başlık metni "Lisanslı"sız.
+- **2017 Kasım/Aralık:** Tablo GERÇEKTEN var (`Tablo-1.5 Kasım 2017
+  Döneminde Lisanslı Elektrik Üretiminin Kaynak Bazında Dağılımı Ve
+  2016 Yılı Kasım Ayı Değeriyle Karşılaştırılması`) — ama bu iki ayda
+  EPDK AYRICA bir **YILLIK KÜMÜLATİF karşılaştırma tablosu** ekliyor
+  (`Tablo-1.6 Ocak-Kasım 2017 Döneminde Lisanslı Elektrik Üretiminin
+  Kaynak Bazında Dağılımı Ve 2016 Yılı Ocak-Kasım Dönemi Değeriyle
+  Karşılaştırılması`) — bu YENİ tablo da AYNI arama alt-dizisini
+  ("Lisanslı Elektrik Üretiminin Kaynak Bazında Dağılımı") taşıdığından
+  `tek_aday_bul()` İKİ ADAY bulup belirsizlik hatası fırlatıyor (kod
+  bunu "BULUNAMADI" gibi YUTMUŞ, gerçek hatayı GÖSTERMEMİŞ — dry-run
+  script'inin kendi kusuru, `word_20XX.py`'nin DEĞİL). T3'ün karşılığı
+  (`Tablo-1.7`) BU İKİ AYDA sorunsuz TEK ADAY olarak bulundu (kümülatif
+  bir il-bazlı tablo EKLENMEMİŞ, yalnız kaynak-bazlı YTD tablosu var).
+
+**Sonuç:** 24 ayın TAMAMINDA T2 VE T3 GERÇEKTEN mevcut — "tamamen yokluk"
+sınıfında (2016'nın T10'u gibi) HİÇBİR ay yok. Gelecek turda: 2016
+Ocak/Şubat için arama metninden "Lisanslı" çıkarılmalı (`icermez=
+["Lisanssız"]` ile T5-eşdeğerine karışması önlenerek); 2017 Kasım/Aralık
+için arama metnine `icermez=["Ocak-"]` (ya da benzeri YTD-dışlayan bir
+filtre) eklenmeli.
+
+### 2. 2016'nın T2'si TÜM DİĞER YILLARDAN YAPISAL OLARAK FARKLI — EN ÖNEMLİ BULGU
+
+**2017-2025'in T2'si HEP dönemler-arası-karşılaştırma formatında** (6
+kolon: önceki yıl ÜRETİM+ORAN, hedef yıl ÜRETİM+ORAN, DEĞİŞİM — bkz.
+Bulgu B), bu yüzden `hedef_donem_kolonu_bul()` ile "doğru dönem
+kolonunu seç" mantığı GEREKİYORDU. **2016'nın T2'si (TÜM 12 ay, Ocak-
+Aralık) YALNIZ 3 KOLONLU TEK-DÖNEM formatında**: `Kaynak Türü | Üretim
+Miktarı (MWh) | Oran (%)` — önceki yılla karşılaştırma YOK, seçilecek
+"hedef dönem kolonu" da YOK, tablonun TAMAMI zaten hedef ayın verisi.
+**Bu, `hedef_donem_kolonu_bul()`'ün 2017-2025'te KULLANILAMAYACAĞI
+anlamına geliyor** — 2016'nın gelecekteki `t2_oku()`'sü BAŞTAN FARKLI
+yazılmalı (kolon seçimi YOK, doğrudan sabit kolon indeksinden okuma;
+veri satırları `tbl.rows[1:]`'den başlıyor, `tbl.rows[2:]` DEĞİL). T3'ün
+YAPISI (iki-sütunlu il bloğu, `iki_blokta_il_degerlerini_oku()`) 2016'da
+da AYNI kalıyor (yalnız başlık hücre metinleri "İL"/"İLLER" arası
+salınıyor — `iki_blokta_il_degerlerini_oku()` zaten başlık metnine
+bakmıyor, POZİSYONA güveniyor, bu yüzden ETKİLENMEZ).
+
+### 3. Bulgu N (Hidrolik ikiye bölünmüş) HER İKİ YILDA DA VAR — farklı etiketle
+
+**2017:** `"AKARSU"` + `"BARAJLI HİDROLİK"` (2018/2019 ile AYNI etiket) —
+`"BARAJLI HİDROLİK"` `TANINMIYOR` (worker/parser.py'nin "Barajlı" alias'ı
+TEK kelime, "Barajlı Hidrolik" birleşik metinle eşleşmiyor) — Bulgu N'in
+AYNI çözümü (alias + `dict` toplama) uygulanabilir.
+
+**2016:** Etiket FARKLI — yalnız `"BARAJLI"` (Hidrolik'siz, "BARAJLI
+HİDROLİK" DEĞİL) — bu zaten `worker/parser.py:KAYNAK_ESLEME`'nin kendi
+`"Barajlı"` girdisiyle **TANINIYOR**, YENİ bir alias GEREKMİYOR. Ama
+**AYNI TOPLAMA sorunu yine de var**: Mart 2016'nın T2 dökümünde
+`AKARSU` (satır 1) VE `BARAJLI` (satır 3) AYRI satırlar olarak
+görünüyor, ikisi de `"Hidrolik"`e eşleniyor — zorla yüklenirse AYNI
+UNIQUE kısıt ihlaliyle karşılaşılır. **Sonuç: 2016'nın `t2_oku()`'sü de
+Bulgu N'in `dict`-biriktirici deseniyle yazılmalı, yalnız YENİ bir
+`_KAYNAK_TAKMA_ADLAR` girdisi gerekmiyor.**
+
+### 4. Bulgu I sınıfı (bölünmüş başlık) — yalnız 2017 Ekim'de görüldü
+
+2017'nin T2'si Ocak-Eylül'de düz 2-satırlık başlık, **Ekim'de** 3-
+satırlık bölünmüş başlık ("ORAN" satır 1'de, "(%)" satır 2'de — 2018/
+2024 ile AYNI desen) kullanıyor. Established dinamik `veri_baslangic`
+while-loop'u ek kod gerekmeden çözer. 2016'da bu desen HİÇ görülmedi
+(zaten tek-satırlık başlık formatı kullanıyor — bkz. madde 2).
+
+### 5. Kaynak etiketleri — YENİ/tanınmayan bir tür YOK (Bulgu N hariç)
+
+2016 ve 2017'nin TÜM T2 kaynak etiketleri (`AKARSU, ASFALTİT/ASFALTİT
+KÖMÜR, BARAJLI/BARAJLI HİDROLİK, BİYOKÜTLE, DOĞAL GAZ, FUEL OİL, GÜNEŞ,
+JEOTERMAL, LNG, LİNYİT, MOTORİN, NAFTA (yalnız 2016), RÜZGAR, TAŞ KÖMÜR/
+TAŞ KÖMÜRÜ, İTHAL KÖMÜR`) `worker/parser.py:KAYNAK_ESLEME`'de ZATEN
+tanınıyor — Bulgu N'in "Barajlı Hidrolik" birleşik-metin istisnası
+DIŞINDA yeni bir `_KAYNAK_TAKMA_ADLAR` girdisi GEREKMEDİ. **Uyarı:** bu
+tarama yalnız `tbl.rows[2:]`'yi topladı (2016 için `tbl.rows[1:]`
+OLMALIYDI, madde 2'deki yapısal farktan dolayı) — üretim turunda TAM
+12 ayın TAM satır listesi yeniden, doğru offset'le taranmalı (bu tarama
+ÖNGÖRÜCÜ, KESİN DEĞİL).
+
+### 6. T3'ün il sayısı — established Bulgu G deseniyle tutarlı, kod değişikliği gerekmiyor
+
+2016: 77-80 il/ay (42→80, 41→78-79, 40→76-77 satır/il oranı korunuyor).
+2017: 76-80 il/ay. İkisi de 2018-2019'un 78-81 aralığıyla AYNI sınıfta
+— `t3_oku()`'nun eksik-il-sıfırlama + Genel-Toplam-doğrulama tasarımı
+zaten HİÇBİR sabit sayı varsaymadığından bu KOD DEĞİŞİKLİĞİ GEREKTİRMEZ.
+
+### 7. Lisanssız (T5/T6) — Bulgu D zaten kapsıyor, yeni inceleme gerekmedi
+
+Ocak 2016'nın başlık listesi doğrulandı: `Tablo 1.9 ... Lisanssız
+Elektrik Üretiminin Kaynaklara Dağılımı` (T5-eşdeğeri) ve `Tablo 1.10
+... Lisanssız Elektrik Üretiminin İllere Göre Dağılımı` (T6-eşdeğeri)
+İKİSİ de MEVCUT — Bulgu D'nin zaten belgelediği "Brüt Lisanssız Üretim
+Miktarı kolonu YOK" kararı (Karar 4) bu iki yıl için GEÇERLİLİĞİNİ
+KORUYOR, yeniden ölçüm gerekmedi (kullanıcının önceden verdiği kural).
+
+### Özet — 2016-2017 uygulaması İÇİN gereken ek işler (karar DEĞİL, yalnız envanter)
+
+| Konu | 2016 | 2017 |
+|---|---|---|
+| T2 formatı | **BAŞKA** (tek-dönem, 3 kolon) — bespoke `t2_oku()` gerekir | Standart (2018-2025 ile AYNI, 6 kolon) |
+| Ocak/Şubat (2016) veya Kasım/Aralık (2017) arama metni | "Lisanslı" çıkarılmalı | `icermez=["Ocak-"]` (YTD tablosu dışlanmalı) |
+| Bulgu N (Hidrolik toplama) | GEREKİYOR, yeni alias GEREKMİYOR | GEREKİYOR, `"BARAJLI HİDROLİK"` alias'ı gerekiyor |
+| Bulgu I sınıfı (bölünmüş başlık) | Görülmedi | Yalnız Ekim'de var, established çözüm yeterli |
+| T3 il sayısı değişimi | Var (77-80), established desen | Var (76-80), established desen |
+| Lisanssız (T5/T6) | Bulgu D ile zaten kapsam dışı | Bulgu D ile zaten kapsam dışı |
+
 ## Özet — ADIM 4 (Word üretim backfill'i) için önerilen sıra (öneri, karar DEĞİL)
 
 1. Bulgu E'yi çöz: 2023-Aralık + 2024/2025'in TAM tablo listesini (filtre

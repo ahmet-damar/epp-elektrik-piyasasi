@@ -85,6 +85,7 @@ her yeni rakam için geçerlidir.
 | v1.35 | 2026-09-13 | ADIM 4 — 2020 (T2+T3 Lisanslı) tamamlandı — §5.21. 12 ayın TAMAMI kod yazmadan ÖNCE dry-run ile tarandı, hiçbir format sürprizi (Bulgu I/M sınıfı) yok — tüm-büyük kaynak etiketleri (DOĞAL GAZ/İTHAL KÖMÜR/HİDROLİK/RÜZGAR/GÜNEŞ/JEOTERMAL/BİYOKÜTLE/LİNYİT/ASFALTİT/TAŞ KÖMÜRÜ/MOTORİN) hiçbiri yeni takma ad gerektirmedi. Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı (2020 zaten Bulgu L'nin ölçüm aralığındaydı) | Disposable postgres:17: 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu. +4 test (`test_word_2020.py`). ADIM 4'ün "Excel'e en yakın 6 yıl" fazı (2025-2020) TAMAMLANDI, hepsi YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı |
 | v1.36 | 2026-09-13 | 2024-02 kararı yeniden CANLI doğrulandı (bekleyen yoktu) + ADIM 4 — 2019 (T2+T3 Lisanslı) tamamlandı, Bulgu N — §5.22. Bulgu N: 2019'un T2'si Ocak-Kasım'da Hidrolik'i "AKARSU"+"BARAJLI HİDROLİK" diye İKİ satıra bölüyor (Aralık tek satır) — kod yazmadan ÖNCE tam T2 dökümüyle tespit edildi, `t2_oku()` artık T4'ün established "TOPLA" ilkesiyle aynı kaynağa eşlenen satırları biriktirip TEK satır üretiyor (UNIQUE kısıt ihlali önlendi). Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı | Disposable postgres:17: 12/12 ay yüklendi (UNIQUE ihlali YOK), `mutabakat_uretim.py` 2024 ile birlikte 24 çift kontrol etti, 23/24 uyumlu (tek uyumsuz beklenen 202402). +3 test (`test_word_2019.py`). Sıradaki adım 2018, sonra 2016-2017 |
 | v1.37 | 2026-09-13 | ADIM 4 — 2018 (T2+T3 Lisanslı) tamamlandı — §5.23. İki desen, ikisi de bilinen sınıflardan: Bulgu I sınıfı (Temmuz-Aralık'ın T2'si 3-satırlık bölünmüş başlık) ve Bulgu N (12 ayın TAMAMINDA — Aralık dahil — Hidrolik "AKARSU"+"BARAJLI HİDROLİK" ikiye bölünmüş). T3'ün il sayısı ay ay değişiyor (78/79/80, established Bulgu G). Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı | Disposable postgres:17 (fresh, tek başına — sequence-drift kontaminasyonunu önlemek için): 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu. +4 test (`test_word_2018.py`). ADIM 4'ün "Excel'e en yakın 8 yıl" fazı (2025-2018) TAMAMLANDI, hepsi YALNIZ disposable. Sıradaki adım: 2016-2017 için GENİŞLETİLMİŞ dry-run (kod YAZILMADAN) |
+| v1.38 | 2026-09-13 | 2016-2017 GENİŞLETİLMİŞ dry-run taraması — §5.24, `12_word_uretim_envanteri.md` Bulgu O. KOD YAZILMADI, yalnız envanter. En önemli bulgu: 2016'nın T2'si TÜM diğer yıllardan (2017-2025) YAPISAL OLARAK FARKLI — tek-dönem 3-kolonlu format, `hedef_donem_kolonu_bul()` kullanılamaz, bespoke `t2_oku()` gerekir. Görünüşte "tablo yok" olan 4 ay (2016 Oca/Şub, 2017 Kas/Ara) araştırıldı, İKİSİ DE gerçek yokluk DEĞİL (başlık metni/YTD-tablo belirsizliği). Bulgu N her iki yılda da var, Bulgu I sınıfı yalnız 2017 Ekim'de | Kod değişikliği YOK, yalnız `12_word_uretim_envanteri.md`/`10_TEKNIK_MASTER_DOKUMAN.md` güncellendi. Karar bekliyor — 2016-2017'nin uygulaması ayrı bir turda |
 
 ---
 
@@ -1155,6 +1156,31 @@ kontaminasyonuna yol açtığı için, temiz sinyal için rebuild edildi):
 BİTTİ, hepsi YALNIZ disposable, canlıya HİÇBİRİ uygulanmadı. Sıradaki
 adım: 2016-2017 için GENİŞLETİLMİŞ dry-run (kod YAZILMADAN) — bkz.
 `12_word_uretim_envanteri.md`'nin ilgili yeni bölümü.
+
+### 5.24 2016-2017 GENİŞLETİLMİŞ dry-run taraması — KOD YAZILMADI (2026-09-13)
+
+24 ayın (2016+2017) TAMAMI için T2/T3 varlığı, başlık metni, satır/kolon
+yapısı, il sayısı ve kaynak etiketleri döküldü — `12_word_uretim_
+envanteri.md` Bulgu O. Özet:
+
+1. Görünüşte "tablo yok" olan 4 ay (2016 Oca/Şub, 2017 Kas/Ara) —
+   İKİSİ DE GERÇEK YOKLUK DEĞİL: 2016 Oca/Şub başlıkta "Lisanslı"
+   kelimesi eksik; 2017 Kas/Ara'da EPDK ayrıca bir YTD/kümülatif tablo
+   ekleyip arama metnini belirsizleştiriyor.
+2. **En önemli bulgu:** 2016'nın T2'si TÜM 12 ay TEK-DÖNEM 3-kolonlu
+   format (2017-2025'in 6-kolonlu dönemler-arası formatından TAMAMEN
+   FARKLI) — `hedef_donem_kolonu_bul()` KULLANILAMAZ, bespoke bir
+   `t2_oku()` gerekir.
+3. Bulgu N (Hidrolik ikiye bölünmüş) HER İKİ yılda da var — 2017
+   "BARAJLI HİDROLİK" (yeni alias gerekir), 2016 yalnız "BARAJLI"
+   (zaten tanınıyor, ama YİNE DE toplama gerekiyor).
+4. Bulgu I sınıfı yalnız 2017 Ekim'de.
+5. Yeni/tanınmayan bir kaynak türü YOK.
+6. T3 il sayısı established Bulgu G deseniyle tutarlı.
+7. Lisanssız (T5/T6) zaten Bulgu D ile kapsam dışı.
+
+**Karar bekliyor, uygulama YAPILMADI** — 2016-2017 ayrı bir turda
+kararlarla birlikte uygulanacak.
 
 ---
 
