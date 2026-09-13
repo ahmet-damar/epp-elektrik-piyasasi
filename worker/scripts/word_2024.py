@@ -100,6 +100,20 @@ _KAYNAK_ATLA_ETIKETLERI = {"Genel Toplam", "Toplam", "İl Toplam"}
 # üzere tam il kümesiyle karşılaştırma gerekiyor.
 TUM_IL_KODLARI = set(range(1, 82))
 
+# Bulgu J (2026-09-13, dokumanlar/12_word_uretim_envanteri.md) — T3'ün
+# (Lisanslı, il bazında) Şubat 2024 içeriği, EPDK'nın kendi belgesinde
+# Ocak 2024'ün BİREBİR AYNI kopyası (81/81 il, ondalık basamağa kadar) —
+# ÖLÇÜLDÜ ve DOĞRULANDI (T2/kaynak tarafı Ocak/Şubat'ta 11/11 kaynakta
+# TAMAMEN FARKLI, yani sağlam). ay(int) -> kapsam_disi_isaretle() sebebi.
+# YENİ bir ay YENİ bir stale-kopya bulunursa buraya eklenir.
+_STALE_IL_AYLAR: dict[int, str] = {
+    2: "T3 (Lisanslı, il bazında) Şubat 2024 içeriği Ocak 2024'ün "
+    "BİREBİR AYNI kopyası (81/81 il) — EPDK'nın kendi belgesinde bir "
+    "hata, parser hatası DEĞİL. T2 (kaynak bazında) ÖLÇÜLDÜ: Ocak/Şubat "
+    "11/11 kaynakta TAMAMEN FARKLI, sağlam — bkz. 12_word_uretim_"
+    "envanteri.md Bulgu J.",
+}
+
 
 def kaynak_esle_zorunlu(metin: str) -> str | None:
     """None → bilinen bir 'atla' etiketi (toplam/özet satırı ya da kolonu,
@@ -952,7 +966,23 @@ def isle_ay_uretim_geneli(
     (12/12 ay) T6 (Lisanssız, il bazında) karşılığı bir tablo HİÇ
     OLMADIĞINI doğruladı — 2025 ile AYNI karar (Karar 4 genişletildi):
     Lisanssız HER İKİ tabloda da simetrik olarak kapsam dışı bırakılıyor,
-    mutabakat kontrolüne istisna EKLENMİYOR."""
+    mutabakat kontrolüne istisna EKLENMİYOR.
+
+    **2026-09-13 (devam) — Bulgu J kararı uygulandı, YALNIZ 202402:**
+    ÖLÇÜLDÜ (gerçek 2024 Ocak/Şubat dosyalarına karşı, disposable
+    postgres:17'de doğrulandı — bkz. `12_word_uretim_envanteri.md` Bulgu
+    J ve `06_canli_veri_operasyon_gunlugu.md` 2026-09-13 kaydı): T2'nin
+    (kaynak) Ocak/Şubat 2024 değerleri 11/11 kaynakta TAMAMEN FARKLI (T2
+    sağlam), T3'ün (il) Ocak/Şubat değerleri 81/81 ilde ONDALIK BASAMAĞA
+    KADAR BİREBİR AYNI (T3 Şubat'ta EPDK'nın kendi belgesinde stale bir
+    kopya). Karar: Şubat için YALNIZ T2 (kaynak, Lisanslı) yüklenir, T3
+    (il, Lisanslı) o ay için AYRICA kapsam dışı işaretlenir
+    (`_STALE_IL_AYLAR`) — `mutabakat_uretim.py`'ye İSTİSNA EKLENMEDİ
+    (kodu değişmedi); bunun beklenen/belgelenen bir sonucu, (202402,
+    Lisanslı) çiftinin artık 'bir_taraf_eksik' görünmesidir (kaynak dolu,
+    il bilerek boş) — bu, ÖNCEKİ %11,45'lik SAYISAL uyumsuzluktan (gerçek
+    bir hata sinyali) FARKLI bir durum (bilinçli/belgelenmiş bir kapsam
+    kararının doğal sonucu)."""
     dosya_adi = MANIFEST_2024[ay]
     yol = klasor / dosya_adi
     yil = 2024
@@ -1007,6 +1037,12 @@ def isle_ay_uretim_geneli(
         f"  T3 (il): {len(il_ham)} satır, toplam={il_ham['uretim_mwh'].sum():,.2f} MWh"
     )
 
+    il_stale_sebep = _STALE_IL_AYLAR.get(ay)
+    if il_stale_sebep:
+        print(
+            f"  [BULGU J] T3 (il) bu ay STALE kabul edildi, YÜKLENMEYECEK: {il_stale_sebep}"
+        )
+
     if dry_run:
         print("  [DRY-RUN] DB'ye yazılmadı.")
         return None
@@ -1031,14 +1067,20 @@ def isle_ay_uretim_geneli(
     audit_tablolar: dict[str, dict[str, object]] = {}
     toplam_yuklenen = 0
 
-    for tablo_adi, ham_df, yukle_fn in (
+    tablolar_islenecek = [
         (
             "fact_uretim_kaynak_geneli",
             kaynak_ham,
             ingest.fact_uretim_kaynak_geneli_yukle,
         ),
-        ("fact_uretim_il_geneli", il_ham, ingest.fact_uretim_il_geneli_yukle),
-    ):
+    ]
+    if not il_stale_sebep:
+        tablolar_islenecek.append(
+            ("fact_uretim_il_geneli", il_ham, ingest.fact_uretim_il_geneli_yukle)
+        )
+    toplam_satir = len(kaynak_ham) + (0 if il_stale_sebep else len(il_ham))
+
+    for tablo_adi, ham_df, yukle_fn in tablolar_islenecek:
         dogrulanan = kpi.dogrula_uretim_geneli(ham_df)
         yuklenen, atlanan = yukle_fn(conn, dogrulanan.kabul, batch_id)
         toplam_yuklenen += yuklenen
@@ -1064,9 +1106,9 @@ def isle_ay_uretim_geneli(
         conn,
         batch_id,
         "running",
-        total_row_count=len(kaynak_ham) + len(il_ham),
+        total_row_count=toplam_satir,
         accepted_row_count=toplam_yuklenen,
-        rejected_row_count=len(kaynak_ham) + len(il_ham) - toplam_yuklenen,
+        rejected_row_count=toplam_satir - toplam_yuklenen,
     )
     ingest.audit_log_yaz(
         conn,
@@ -1079,8 +1121,16 @@ def isle_ay_uretim_geneli(
             "tarih_id": tarih_id,
             "kaynak": "word_2024_uretim_geneli",
             "tablolar": audit_tablolar,
-            "not": "Yalnız Lisanslı (T2+T3) yüklendi - Lisanssız (T5/T6) "
-            "kapsam dışı işaretlendi (Bulgu H, Karar 4'ün 2024'e genişlemesi).",
+            "not": (
+                "Yalnız Lisanslı (T2+T3) yüklendi - Lisanssız (T5/T6) kapsam "
+                "dışı işaretlendi (Bulgu H, Karar 4'ün 2024'e genişlemesi)."
+                + (
+                    f" AYRICA T3 (il, Lisanslı) bu ay STALE kabul edildi ve "
+                    f"YÜKLENMEDİ (Bulgu J): {il_stale_sebep}"
+                    if il_stale_sebep
+                    else ""
+                )
+            ),
         },
     )
 
@@ -1097,6 +1147,20 @@ def isle_ay_uretim_geneli(
             nitelik="lisans_durumu=Lisanssız",
         )
     print("  [KAPSAM DIŞI] Lisanssız (T5/T6) her iki tabloda da işaretlendi.")
+
+    if il_stale_sebep:
+        pipeline.kapsam_disi_isaretle(
+            conn,
+            tarih_id=tarih_id,
+            fact_tablosu="fact_uretim_il_geneli",
+            sebep=il_stale_sebep,
+            karar_referansi="Bulgu J (2026-09-13, EPDK kaynak belge hatası)",
+            nitelik="lisans_durumu=Lisanslı",
+        )
+        print(
+            "  [KAPSAM DIŞI] fact_uretim_il_geneli (Lisanslı) bu ay için de "
+            "işaretlendi (Bulgu J) - yalnız kaynak tarafı (T2) yüklendi."
+        )
 
     uygun, sebep = pipeline.otomatik_onaya_uygun(sonuc)
     print(f"  otomatik_onaya_uygun() = {uygun}" + (f" ({sebep})" if sebep else ""))

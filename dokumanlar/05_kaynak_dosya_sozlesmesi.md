@@ -144,6 +144,22 @@ dayanır):**
   il_geneli` × 2016-01..2017-12, `nitelik='lisans_durumu=Lisanssız'`,
   `karar_referansi='Karar 4 (2026-09-09, Bulgu D)'`) — canlıda uygulandı.
   Lisanslı üretim ETKİLENMEZ.
+- **Karar (Bulgu L, 2026-09-13 — SAYIYLA ÖLÇÜLDÜ, başlığa bakıp
+  varsayılmadı):** T6 (il bazında Lisanssız üretim) **HİÇBİR ZAMAN**
+  Excel'in "Brüt Lisanssız Üretim Miktarı" tanımını taşımamış — VAR
+  OLDUĞU HER YIL (2016'dan 2023 Haziran'a, tablonun kaybolduğu ana
+  kadar) kaynak-tablosunun "İhtiyaç Fazlası Satın Alınan" kolonuyla
+  ondalık basamağa kadar BİREBİR eşleşiyor, "Brüt" kolonuyla DEĞİL
+  (2020 Ocak/Haziran VE 2022 Mart-Ağustos'ta doğrulandı — 2022 Haziran'da
+  başlığın "İhtiyaç Fazlası Satın Alınan..." diye değişmesi bir TANIM
+  DEĞİŞİKLİĞİ değil, başlığın tablonun HER ZAMAN gerçekte ölçtüğü şeye
+  SONRADAN uydurulması). Bulgu D'nin ilkesiyle BİREBİR tutarlı: **T6 (il
+  bazında Lisanssız) var olduğu her yıl KAPSAM DIŞI** — `fact_uretim_
+  il_geneli`'nin Lisanssız kolonu artık TÜM Word yılları (2016-2025) için
+  kapsam dışı, istisnasız. T5 (kaynak, Brüt, 2018'den itibaren sağlam)
+  bu karardan etkilenmez ama karşı tarafı olmadığından (2016-2017/2023-
+  2025 ile AYNI simetri ilkesi) yüklenmiyor. Detay: `12_word_uretim_
+  envanteri.md` Bulgu L.
 
 **Faz 0 orkestrasyon notu (2026-08-30, worker/pipeline.py):** Yukarıdaki kural
 tam 13 tabloyu ima ediyor, ancak fact tablosuna gerçekten YAZAN yalnız 5

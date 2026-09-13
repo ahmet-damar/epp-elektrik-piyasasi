@@ -172,6 +172,12 @@ kasıtlı sığ tutuldu) — ADIM 4'ün kod turunda erken bir adım bu olmalı.
 
 ## Bulgu H — T5/T6 (Lisanssız) 10 yılın TAMAMI için tam taranmış envanteri (2026-09-13)
 
+> **⚠️ GÜNCELLEME (Bulgu L, aynı gün):** Aşağıdaki tablonun "VAR" sütunu
+> T6'nın satır olarak VARLIĞINI doğru raporluyor ama "kullanılabilir"
+> ANLAMINA GELMİYOR — ölçümle kanıtlandı ki T6, var olduğu HER yılda
+> "Brüt Üretim" DEĞİL, "İhtiyaç Fazlası Satın Alınan" ölçüyor (bkz. Bulgu
+> L). Nihai karar: T6 var olduğu her yıl (2016-2023 Haziran) KAPSAM DIŞI.
+
 Bulgu E'nin (2024/2025 için tek-yıl bulgusu) sonucu, TÜM 10 yıl (2016-2025,
 120 ay, filtre olmadan tam tablo listesi) için genelleştirildi — bu tur
 öncesi Bulgu A'nın Haziran-ağırlıklı spot-check'inin (bazı yıllarda yalnız
@@ -286,6 +292,68 @@ bir satır bulundu. İncelendi:
 **Sonuç:** disposable postgres:17'de 12/12 ay yüklendi, `mutabakat_
 uretim.py` **12/12 uyumlu** (2023'te 2024'ün Bulgu J'sine benzer bir
 kaynak-belge hatası GÖRÜLMEDİ).
+
+## Bulgu L — T6 (il bazında Lisanssız) HİÇBİR ZAMAN "Brüt Üretim" değilmiş — Bulgu H'yi düzeltir (2026-09-13)
+
+**Soru (kullanıcı talimatı):** 2022 Haziran'da T6'nın başlığı "Lisanssız
+Elektrik Üretiminin İllere Göre Dağılımı"ndan "İhtiyaç Fazlası Satın
+Alınan Lisanssız Elektrik Üretiminin İllere Göre Dağılımı"na değişiyor —
+bu yalnızca bir yeniden adlandırma mı, yoksa gerçek bir tanım değişikliği
+mi? **Başlığa bakıp varsayılmadı, sayıyla ölçüldü.**
+
+**Yöntem:** Mart-Ağustos 2022 (rename sınırının her iki yanı) için hem
+T6'nın (il) kendi toplamı HEM T5'in (kaynak) İKİ kolonu (İhtiyaç Fazlası
+Satın Alınan / Brüt Lisanssız Üretim) ayrı ayrı hesaplandı, üç seri
+karşılaştırıldı. Ek doğrulama: 2020 Ocak/Haziran (rename'den 2 yıl önce,
+hâlâ eski/generic başlıkla) AYNI karşılaştırma tekrarlandı.
+
+**Sonuç — rename sınırında yapısal bir SIÇRAMA YOK, ama daha büyük bir
+gerçek ortaya çıktı:**
+
+| Ay | T6 (il) toplamı | Kaynak: İhtiyaç Fazlası | Kaynak: Brüt Üretim |
+|---|---|---|---|
+| 2022-03 | 888.156,30 | 888.156,28 | 893.552,01 |
+| 2022-04 | 1.166.160,66 | 1.166.160,68 | 1.200.804,97 |
+| 2022-05 | 1.305.964,33 | 1.305.964,34 | 1.339.669,14 |
+| 2022-06 (yeniden adlandırıldı) | 1.287.641,13 | 1.287.641,12 | 1.308.722,34 |
+| 2022-07 (yeniden adlandırıldı) | 1.545.064,55 | 1.545.064,61 | 1.716.220,82 |
+| 2022-08 (yeniden adlandırıldı) | 1.320.213,74 | 1.320.213,73 | 1.319.705,95 |
+| 2020-01 (eski/generic başlık) | 551.436,09 | 551.436,09 | 563.604,23 |
+| 2020-06 (eski/generic başlık) | 1.165.766,89 | 1.165.766,89 | 1.177.433,44 |
+
+**T6'nın kendi il-toplamı, HER TEK AYDA (rename'den ÖNCE, SONRA, ve
+rename'den 2 yıl önce fark etmeksizin) kaynak tablosunun "İhtiyaç
+Fazlası Satın Alınan" kolonuyla ONDALIK BASAMAĞA KADAR BİREBİR eşleşiyor
+— "Brüt Lisanssız Üretim Miktarı" kolonuyla DEĞİL** (fark her ayda
+%0,04-%13 arası, rastgele/mevsimsel — sistematik bir "aynı tanım, küçük
+yuvarlama" örüntüsü DEĞİL, iki FARKLI metrik).
+
+**Yorum:** 2022 Haziran'daki başlık değişikliği bir TANIM DEĞİŞİKLİĞİ
+DEĞİL — EPDK'nın başlığı, tablonun HER ZAMAN gerçekte ölçtüğü şeyi
+(İhtiyaç Fazlası Satın Alınan) daha doğru yansıtacak şekilde
+GÜNCELLENMESİ. Yani 2020'nin (ve muhtemelen tablo var olduğu HER yılın)
+"generic" başlıklı T6'sı da ZATEN İhtiyaç Fazlası'ydı — yalnız başlığı
+bunu SÖYLEMİYORDU.
+
+**✅ KARAR (2026-09-13, Ahmet — ölçümle, tahmin YOK): Bulgu H'nin "2022
+Haziran'dan itibaren tanım riski" ifadesi YETERSİZ KALDI — risk rename
+ANINDA başlamıyor, T6 VAR OLDUĞU HER YIL boyunca (en azından 2020'den
+2023 Haziran'a kadar ölçülen aralıkta) GEÇERLİ.** Bulgu D'nin ilkesiyle
+BİREBİR tutarlı (2016-2017'nin kaynak tablosunda da "İhtiyaç Fazlası"
+tek kolon olması AYNI şekilde kapsam dışı bırakılmıştı): **T6 (il
+bazında Lisanssız), VAR OLDUĞU HER YIL (2016'dan 2023 Haziran'a kadar)
+KAPSAM DIŞI** — Excel'in/T5'in "Brüt Lisanssız Üretim" tanımıyla HİÇBİR
+ZAMAN eşleşmiyor. Bu, Bulgu H'nin tablosundaki "VAR" sütununu YANLIŞ
+YAPMAZ (tablo GERÇEKTEN var, satır olarak) ama "kullanılabilir" anlamına
+GELMEDİĞİNİ netleştirir — pratik sonuç: **fact_uretim_il_geneli'nin
+Lisanssız kolonu artık TÜM Word yılları (2016-2025) için kapsam dışı**,
+tek bir istisna kalmadan. T5 (kaynak, Brüt Üretim, 2018'den itibaren
+sağlam) bu karardan ETKİLENMEZ — yalnız fact_uretim_il_geneli'nin karşı
+tarafı olmadığından SİMETRİ için (2016-2017/2023-2025 ile AYNI ilke)
+yüklenmeye devam etmiyor.
+
+Detay/güncelleme: `dokumanlar/05_kaynak_dosya_sozlesmesi.md` "Word
+yılları — üretim kararları" bölümüne Karar (Bulgu L) olarak eklendi.
 
 ## Özet — ADIM 4 (Word üretim backfill'i) için önerilen sıra (öneri, karar DEĞİL)
 

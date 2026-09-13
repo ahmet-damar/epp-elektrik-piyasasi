@@ -1859,3 +1859,61 @@ turun TAMAMI bittikten sonra tek seferde yapılacak.
 
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.18, Sürüm Geçmişi v1.32,
 `12_word_uretim_envanteri.md` Bulgu K.
+
+## 2026-09-13 (devam) — İki açık karar SAYIYLA ölçülüp kapatıldı, 2022 tamamlandı
+
+**Karar 1 — 2024-02 (Bulgu J), önce ölç sonra uygula:**
+```
+T2 (kaynak) Ocak vs Şubat 2024: 11/11 kaynak TAMAMEN FARKLI → T2 sağlam
+T3 (il)     Ocak vs Şubat 2024: 81/81 il BİREBİR AYNI → T3 stale
+```
+Karar (önceden verilen kurala göre): Şubat için yalnız T2 (kaynak,
+Lisanslı) yükleniyor, T3 (il, Lisanslı) o ay için AYRICA kapsam dışı
+işaretleniyor (`nitelik='lisans_durumu=Lisanslı'`, `karar_referansi=
+'Bulgu J'`). `mutabakat_uretim.py`'ye istisna EKLENMEDİ — beklenen
+sonuç doğrulandı:
+```
+Önce: {'tarih_id': 202402, 'lisans_id': 1, 'fark_yuzde': 11.45, 'uyumlu': False}
+Sonra: {'tarih_id': 202402, 'lisans_id': 1, 'durum': 'bir_taraf_eksik',
+        'il_toplami': None, 'kaynak_toplami': 25615763.19, 'uyumlu': False}
+```
+Bu, ÖNCEKİ sayısal-uyumsuzluk sinyalinden FARKLI, bilinçli bir kapsam
+kararının BEKLENEN doğal sonucu.
+
+**Karar 2 — 2022 T6 tanım sınırı (Bulgu L), başlığa bakıp varsayılmadı:**
+```
+        T6(il)          Kaynak:İhtiyaçFazlası   Kaynak:Brüt
+2022-03 888.156,30      888.156,28              893.552,01
+2022-04 1.166.160,66    1.166.160,68            1.200.804,97
+2022-05 1.305.964,33    1.305.964,34            1.339.669,14
+2022-06 1.287.641,13    1.287.641,12            1.308.722,34  (başlık değişti)
+2022-07 1.545.064,55    1.545.064,61            1.716.220,82  (başlık değişti)
+2022-08 1.320.213,74    1.320.213,73            1.319.705,95  (başlık değişti)
+2020-01 (kontrol)  551.436,09     551.436,09    563.604,23
+2020-06 (kontrol)  1.165.766,89   1.165.766,89  1.177.433,44
+```
+Rename sınırında (Mayıs→Haziran) SIÇRAMA YOK — ama T6, HER AYDA (rename
+öncesi/sonrası, 2020'de bile) "İhtiyaç Fazlası" kolonuyla ondalık
+basamağa kadar BİREBİR eşleşiyor, "Brüt" ile DEĞİL. Sonuç: 2022
+Haziran'daki başlık değişikliği bir TANIM değişikliği değil, EPDK'nın
+başlığı gerçeğe SONRADAN uydurması — T6 hiçbir zaman Brüt Üretim
+ölçmemiş. Bulgu D'nin ilkesiyle tutarlı: **T6 (il bazında Lisanssız),
+var olduğu HER yıl (2016-2023 Haziran) KAPSAM DIŞI.** Bulgu H'nin "2022
+Haziran'dan itibaren tanım riski" ifadesi bu yüzden YETERSİZ kaldı,
+düzeltildi. Karar `05_kaynak_dosya_sozlesmesi.md`'ye yazıldı.
+
+**2022 (T2+T3 Lisanslı) tamamlandı:** 2023 ile AYNI desen, Lisanssız
+(Bulgu L kararıyla) TÜM yıl kapsam dışı. Disposable postgres:17'de
+12/12 ay yüklendi, `mutabakat_uretim.py` **12/12 uyumlu** — 2024'ün
+Bulgu I/J'sine benzer bir sürpriz YOK. +6 yeni test (2'si Bulgu J'nin
+`_STALE_IL_AYLAR` sabitini pinliyor, 4'ü `test_word_2022.py`). 260/260
+unit test yeşil.
+
+**ADIM 4 durumu:** 2025/2024/2023/2022 (T2+T3 Lisanslı) TAMAMLANDI,
+YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı. Lisanssız stratejisi
+artık NET (tüm Word yılları kapsam dışı, yeniden değerlendirme yok).
+Sıradaki adımlar 2021→2020→2019→2018, sonra 2016-2017.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.19, Sürüm Geçmişi v1.33,
+`12_word_uretim_envanteri.md` Bulgu L, `05_kaynak_dosya_sozlesmesi.md`
+Karar (Bulgu L).

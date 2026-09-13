@@ -80,6 +80,7 @@ her yeni rakam için geçerlidir.
 | v1.30 | 2026-09-13 | T5/T6 (Lisanssız) 10 yılın TAMAMI (120 ay) tarandı — Bulgu H, `12_word_uretim_envanteri.md`. Desen KARIŞIK (2016-2022 çoğunlukla var, 2022 Haziran'dan itibaren tanım riski, 2023 yıl-içi bölünmüş, 2024-2025 tamamen yok) — karar önceden verilmiş kurala göre ONAY BEKLENMEDEN uygulandı: yıl/ay bazında `veri_kapsam_disi`, mutabakata İSTİSNA YOK — §5.16 | `word_2025.py:isle_ay_uretim_geneli()` artık her ay için Lisanssız'ı HER İKİ tabloda da (`nitelik='lisans_durumu=Lisanssız'`, Karar 4 genişletildi) kapsam dışı işaretliyor. Disposable postgres:17: 12/12 ay, 24 satır `veri_kapsam_disi`'ye eklendi, `mutabakat_uretim.py` hâlâ 12/12 uyumlu (Lisanslı etkilenmedi). KPI-07 dışlaması GEREKMEDİ (desen "hiçbir yılda yok" değil, kpi_07 yalnız kaynak tablosuna bağımlı). 244/244 unit test yeşil |
 | v1.31 | 2026-09-13 | ADIM 4 — 2024 (T2+T3 Lisanslı) tamamlandı, Lisanssız kapsam dışı (Bulgu H'nin 2024 satırı) — §5.17. 2 gerçek bulgu: Bulgu I (3 satırlık bölünmüş başlık, Mayıs/Kasım/Aralık — parser hatası, düzeltildi), Bulgu J (2024-02'nin T3'ü GERÇEKTEN hatalı — EPDK'nın kendi belgesinde Ocak'ın stale kopyası, kod hatası DEĞİL, ZORLA GEÇİRİLMEDİ) | Disposable postgres:17: 12/12 ay yüklendi, `mutabakat_uretim.py` 11/12 uyumlu (yalnız 202402 uyumsuz — %11,45 fark, araştırıldı, kaynak belge hatası olarak doğrulandı, aktive edilmedi). +5 test (`test_word_2024.py`, 3 satırlık başlık + normal senaryo dahil). 249/249 unit test yeşil |
 | v1.32 | 2026-09-13 | ADIM 4 — 2023 (T2+T3 Lisanslı) tamamlandı, Lisanssız TÜM yıl kapsam dışı (T6 yıl-içi bölünmüş, güvenli taraf seçildi) — §5.18. Bulgu K: yeni kaynak türü 'LPG' bulundu (12 ayda hep 0,00 MWh — atla sayıldı, Genel Toplam kontrolü güvence), 'Motorin'in gerçek üretimi (Kasım/Aralık) zaten mevcut altyapıyla (2026-08-19'dan beri) sorunsuz çözüldü — YENİ migration gerekmedi (ilk taslak redundant çıkıp silindi) | Disposable postgres:17: 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu (2024'ün Bulgu J'sine benzer bir sorun YOK). +4 test (`test_word_2023.py`, LPG atlama + Motorin tanıma dahil). 255/255 unit test yeşil. ADIM 4'ün "en yakın 3 yıl" (2023-2025) fazı TAMAMLANDI, hepsi YALNIZ disposable — canlıya UYGULANMADI |
+| v1.33 | 2026-09-13 | İki açık karar SAYIYLA ölçülüp kapatıldı + 2022 tamamlandı — §5.19. (1) 2024-02 (Bulgu J): T2 sağlam/T3 stale ölçümüyle doğrulandı, yalnız T2 yüklenip T3 o ay için ayrıca kapsam dışı işaretlendi (mutabakata istisna YOK, `'bir_taraf_eksik'` beklenen sonuç). (2) 2022 T6 rename sınırı (Bulgu L): sıçrama YOK ama T6 VAR OLDUĞU HER YIL (2020 dahil) "Brüt" DEĞİL "İhtiyaç Fazlası" ölçtüğü kanıtlandı — Bulgu H düzeltildi, T6 TÜM Word yılları için kapsam dışı (istisnasız), `05_kaynak_dosya_sozlesmesi.md`'ye yazıldı | Disposable postgres:17: 2022'nin 12/12 ayı yüklendi (T2+T3 Lisanslı, Lisanssız TÜM yıl kapsam dışı), `mutabakat_uretim.py` 12/12 uyumlu — 2024'ün sürprizleri YOK. +6 test (2 Bulgu J pinlemesi + 4 word_2022). 260/260 unit test yeşil. Lisanssız stratejisi artık TÜM Word yılları için NET (kapsam dışı, yeniden değerlendirme yok) |
 
 ---
 
@@ -990,6 +991,53 @@ unit test yeşil. Detay: `12_word_uretim_envanteri.md` Bulgu K.
 disposable postgres:17'de — canlıya HİÇBİRİ uygulanmadı. Sıradaki
 adımlar 2018-2022 (Bulgu H'nin "T6 çoğunlukla var" aralığı) — kullanıcı
 onayıyla canlı backfill bu 3 yılın TAMAMI bittikten sonra tek seferde.
+
+### 5.19 İki açık kararın kapatılması (2024-02, 2022 T6) + 2022 tamamlandı (2026-09-13)
+
+**Karar 1 — 2024-02 (Bulgu J): ÖLÇÜLDÜ, uygulandı.** T2'nin (kaynak)
+Ocak/Şubat 2024 değerleri 11/11 kaynakta TAMAMEN FARKLI (T2 sağlam);
+T3'ün (il) Ocak/Şubat değerleri 81/81 ilde ONDALIK BASAMAĞA KADAR
+BİREBİR AYNI (T3 stale). Karar (önceden verilen kural, türetme/tahmin
+YOK): `word_2024.py:isle_ay_uretim_geneli()` artık `_STALE_IL_AYLAR`
+haritasıyla Şubat için YALNIZ T2'yi (kaynak, Lisanslı) yüklüyor, T3'ü
+(il, Lisanslı) o ay için AYRICA kapsam dışı işaretliyor
+(`nitelik='lisans_durumu=Lisanslı'`, `karar_referansi='Bulgu J'`).
+`mutabakat_uretim.py`'ye istisna EKLENMEDİ — beklenen/belgelenen sonuç:
+(202402, Lisanslı) artık `'durum': 'bir_taraf_eksik'` gösteriyor (önceki
+%11,45'lik SAYISAL uyumsuzluktan FARKLI, bilinçli bir kapsam kararının
+doğal sonucu). Disposable'da doğrulandı: mutabakat çıktısı tam olarak bu
+şekilde değişti (`il_toplami: None, kaynak_toplami: 25615763.19`).
++2 yeni test (`test_word_2024.py`, `_STALE_IL_AYLAR`'ın kendisini
+pinliyor).
+
+**Karar 2 — 2022 T6 tanım sınırı (Bulgu L): ÖLÇÜLDÜ, Bulgu H'yi
+DÜZELTTİ.** 2022 Mart-Ağustos (rename sınırının her iki yanı) + 2020
+Ocak/Haziran (rename'den 2 yıl önce, generic başlıkla) için T6'nın (il)
+kendi toplamı, kaynak tablosunun İKİ kolonuyla (İhtiyaç Fazlası / Brüt)
+ayrı ayrı karşılaştırıldı. **Sonuç: rename sınırında sıçrama YOK ama
+T6, VAR OLDUĞU HER AY (rename öncesi/sonrası, 2020'de bile) "İhtiyaç
+Fazlası Satın Alınan" kolonuyla ondalık basamağa kadar BİREBİR eşleşiyor
+— "Brüt" kolonuyla DEĞİL.** Yani 2022 Haziran'daki başlık değişikliği
+bir tanım değişikliği DEĞİL, EPDK'nın başlığı tablonun HER ZAMAN
+gerçekte ölçtüğü şeye SONRADAN uydurması. Bulgu D'nin ilkesiyle tutarlı:
+**T6 (il bazında Lisanssız), var olduğu HER yıl (2016-2023 Haziran)
+KAPSAM DIŞI** — Bulgu H'nin "2022 Haziran'dan itibaren tanım riski"
+ifadesi YETERSİZ kaldığı için düzeltildi. Karar `05_kaynak_dosya_
+sozlesmesi.md`'ye Karar (Bulgu L) olarak yazıldı.
+
+**2022 (T2+T3 Lisanslı) tamamlandı:** `word_2022.py`'ye `t2_oku()`/
+`t3_oku()`/`isle_ay_uretim_geneli()` eklendi (2023 ile BİREBİR AYNI
+desen) — Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı.
+12 ayın TAMAMI gerçek dosyaya karşı temiz (2024'ün Bulgu I/J'sine
+benzer bir sürpriz YOK). Disposable postgres:17: 12/12 ay yüklendi,
+`mutabakat_uretim.py` **12/12 uyumlu**. +4 yeni test (`test_word_2022.py`).
+260/260 unit test yeşil.
+
+**ADIM 4 durumu (güncellendi):** 2025/2024/2023/2022 (T2+T3 Lisanslı)
+TAMAMLANDI, YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı. Lisanssız
+(T5/T6) stratejisi artık NET: TÜM Word yılları için kapsam dışı (Bulgu
+D/L), yeniden değerlendirme gerekmiyor. Sıradaki adımlar 2021→2020→2019
+→2018, sonra 2016-2017 (zaten Lisanssız kapsam dışı, yalnız Lisanslı).
 
 ---
 

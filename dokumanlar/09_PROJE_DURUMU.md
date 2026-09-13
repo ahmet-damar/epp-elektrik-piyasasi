@@ -130,11 +130,12 @@ yansıtıldı.**
   TAMAMLANDI (2026-09-08/09), Bulgu C/D kararları verilip uygulandı, ADIM
   5 (KPI bağlama, KPI-01..07'nin TAMAMI — KPI-04 dahil) TAMAMLANDI
   (2026-09-09), ADIM 4 (Word 2016-2025 üretim parser'ı) 2026-09-13'te
-  BAŞLADI — 2025/2024/2023'ün "Excel'e en yakın 3 yıl" fazı TAMAMLANDI
-  (T2+T3 Lisanslı yüklendi, Lisanssız kapsam dışı — Bulgu H; 4 gerçek
-  bulgu bulundu, bkz. Bulgu I/J/K), hepsi YALNIZ disposable, canlıya
-  UYGULANMADI, sıradaki iş 2018-2022** (bkz. "Sonraki Oturum Devam
-  Noktası" — tam liste orada).
+  BAŞLADI — 2025/2024/2023/2022'nin "Excel'e en yakın 4 yıl" fazı
+  TAMAMLANDI (T2+T3 Lisanslı yüklendi, Lisanssız TÜM Word yılları için
+  kapsam dışı — Bulgu D/L, iki açık karar 2024-02/2022-T6 sayıyla
+  ölçülüp kapatıldı, bkz. Bulgu I/J/K/L), hepsi YALNIZ disposable,
+  canlıya UYGULANMADI, sıradaki iş 2021→2020→2019→2018** (bkz. "Sonraki
+  Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
   edilince T7 ile 4/6 ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11
@@ -390,11 +391,13 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     Disposable postgres:17: 24 satır (2×12 ay) eklendi, mutabakat hâlâ
     12/12 uyumlu. KPI-07 için Word-genelinde dışlama GEREKMEDİ (desen
     "hiçbir yılda yok" değil, `kpi_07_lisanssiz_pay()` yalnız kaynak
-    tablosuna bağımlı). 2018-2022'nin T6'sı (özellikle rename öncesi)
-    o yıllar işlenirken AYRICA gerçek mutabakatla doğrulanacak — başlığın
-    normal görünmesi tek başına kanıt sayılmıyor. Detay: `dokumanlar/
-    12_word_uretim_envanteri.md` Bulgu H, `10_TEKNIK_MASTER_DOKUMAN.md`
-    §5.16, Sürüm Geçmişi v1.30.
+    tablosuna bağımlı). **GÜNCELLEME (Bulgu L, aynı gün):** 2018-2022'nin
+    T6'sı AYRICA ölçüldü — "rename öncesi normal görünen başlık" tek
+    başına kanıt DEĞİLMİŞ, T6 var olduğu HER yıl "Brüt" değil "İhtiyaç
+    Fazlası" ölçüyor, TÜM Word yılları için kapsam dışı (bkz. aşağıdaki
+    Bulgu L maddesi). Detay: `dokumanlar/12_word_uretim_envanteri.md`
+    Bulgu H/L, `10_TEKNIK_MASTER_DOKUMAN.md` §5.16/§5.19, Sürüm Geçmişi
+    v1.30/v1.33.
   - **✅ 2024 TAMAMLANDI (2026-09-13):** T2+T3 (Lisanslı) yüklendi,
     Lisanssız (Bulgu H'nin 2024 satırı zaten "YOK") kapsam dışı
     işaretlendi. 2 gerçek bulgu: **Bulgu I** (3 satırlık bölünmüş T2
@@ -423,14 +426,36 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     bir sorun YOK). +4 test, 255/255 unit test yeşil. Detay: `12_word_
     uretim_envanteri.md` Bulgu K, `10_TEKNIK_MASTER_DOKUMAN.md` §5.18,
     Sürüm Geçmişi v1.32.
-  - **🏁 ADIM 4'ün "Excel'e en yakın 3 yıl" fazı TAMAMLANDI (2025+2024+
-    2023) — hepsi YALNIZ disposable postgres:17'de, canlıya HİÇBİRİ
-    UYGULANMADI.** Sıradaki adım 2018-2022 (Bulgu H'nin T6'nın çoğunlukla
-    sağlam olduğu aralığı, 2022 Haziran'dan itibaren tanım-riskli kısmı
-    hâlâ ayrıca değerlendirilecek). Canlı backfill kullanıcı onayıyla bu
-    turun TAMAMI bittikten sonra TEK SEFERDE yapılacak — açık maddeler:
-    (1) 2024-02'nin T3 verisi için karar (Bulgu J), (2) 2022/2023 T6'nın
-    Ocak-Haziran kısmının gerçekten "Brüt Üretim" taşıyıp taşımadığı.
+  - **✅ Her iki açık karar SAYIYLA ölçülüp KAPATILDI (2026-09-13):**
+    - **2024-02 (Bulgu J):** ÖLÇÜLDÜ — T2 (kaynak) Ocak/Şubat'ta 11/11
+      kaynakta TAMAMEN FARKLI (sağlam), T3 (il) 81/81 ilde BİREBİR AYNI
+      (stale). Uygulandı: Şubat için yalnız T2 yükleniyor, T3 o ay için
+      AYRICA kapsam dışı işaretlendi — mutabakata istisna YOK, beklenen
+      sonuç doğrulandı (`'bir_taraf_eksik'`, önceki %11,45 sayısal
+      uyumsuzluktan farklı, bilinçli kararın doğal sonucu).
+    - **2022 T6 tanım sınırı (Bulgu L):** ÖLÇÜLDÜ (2022 Mart-Ağustos +
+      2020 Ocak/Haziran kontrolü) — rename sınırında SIÇRAMA YOK ama T6
+      VAR OLDUĞU HER AY (2020 dahil, rename'den 2 yıl önce) "Brüt"
+      DEĞİL "İhtiyaç Fazlası" ölçüyor. **Bulgu H'nin "2022 Haziran'dan
+      itibaren tanım riski" ifadesi YETERSİZ kaldı, düzeltildi: T6 var
+      olduğu HER yıl (2016-2023 Haziran) KAPSAM DIŞI**, istisnasız.
+      `05_kaynak_dosya_sozlesmesi.md`'ye yazıldı. Lisanssız stratejisi
+      artık TÜM Word yılları için NET, yıl yıl yeniden değerlendirme
+      gerekmiyor.
+  - **✅ 2022 TAMAMLANDI (2026-09-13):** T2+T3 (Lisanslı) yüklendi,
+    Lisanssız (Bulgu L kararıyla) TÜM yıl kapsam dışı. 12 ayın TAMAMI
+    temiz (2024'ün Bulgu I/J'sine benzer bir sürpriz YOK). Disposable:
+    12/12 ay yüklendi, mutabakat **12/12 uyumlu**. +6 test (2 Bulgu J
+    pinlemesi + 4 `test_word_2022.py`), 260/260 unit test yeşil. Detay:
+    `10_TEKNIK_MASTER_DOKUMAN.md` §5.19, Sürüm Geçmişi v1.33.
+  - **🏁 ADIM 4'ün "Excel'e en yakın 4 yıl" fazı TAMAMLANDI (2025+2024+
+    2023+2022) — hepsi YALNIZ disposable postgres:17'de, canlıya
+    HİÇBİRİ UYGULANMADI.** Sıradaki adım 2021→2020→2019→2018, sonra
+    2016-2017 (zaten Lisanssız kapsam dışı, ayrı bir turda, yalnız
+    Lisanslı yüklenecek). Canlı backfill kullanıcı onayıyla TÜM yıllar
+    bittikten sonra TEK SEFERDE yapılacak — kalan açık madde: 2024-02'nin
+    T3 verisi için (T3'ü olduğu gibi mi kabul et yoksa EPDK'nın olası bir
+    düzeltmesini mi bekle) canlıya geçmeden önce nihai bir karar.
   - **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatan notlar
     (hâlâ geçerli):**
   - `lisans_id` çözümü: **DOĞRULANDI, 2025 için ÇALIŞTI** — `t2_oku()`/

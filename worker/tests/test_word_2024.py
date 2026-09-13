@@ -18,6 +18,7 @@ from docx import Document
 
 from worker.parser import _IL_ADI_KANONIK
 from worker.scripts.word_2024 import (
+    _STALE_IL_AYLAR,
     _ay_yil_dogrula,
     grup_esle_zorunlu,
     kaynak_esle_zorunlu,
@@ -306,3 +307,18 @@ def test_t3_oku_genel_toplam_uyusmazliginda_hata_verir() -> None:
 
     with pytest.raises(ValueError, match="Genel"):
         t3_oku(tbl, tarih_id=202401)
+
+
+# ---------------------------------------------------------------------------
+# Bulgu J (2026-09-13) — 2024-02'nin T3'ü (il bazında) EPDK'nın kendi
+# belgesinde Ocak'ın stale kopyası. Ölçüm gerçek dosyaya karşı yapıldı
+# (bkz. word_2024.py:isle_ay_uretim_geneli() modül notu, 12_word_uretim_
+# envanteri.md Bulgu J) — burada yalnız kararın KENDİSİNİN (hangi ay,
+# hangi gerekçe) doğru kayıtlı olduğu pinleniyor.
+# ---------------------------------------------------------------------------
+
+
+def test_stale_il_aylar_yalniz_subat_isaretli_gerekcesi_bulgu_j() -> None:
+    assert set(_STALE_IL_AYLAR) == {2}
+    assert "Bulgu J" in _STALE_IL_AYLAR[2]
+    assert "BİREBİR" in _STALE_IL_AYLAR[2]
