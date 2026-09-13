@@ -1725,3 +1725,55 @@ postgres:17'de CI-tam-sırayla + unit-only tüm suite yeşil (244 unit +
 52 entegrasyon).
 
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.15, Sürüm Geçmişi v1.29.
+
+## 2026-09-13 (devam) — T5/T6 (Lisanssız) 10 yılın TAMAMI tarandı, karar uygulandı
+
+2025'e özgü Bulgu E'nin (T6 yok) tek yıla bakılarak karar verilmemesi
+için 2016-2025'in TAMAMI (120 ay, filtre olmadan tam tablo taraması)
+tarandı. Sonuç (`12_word_uretim_envanteri.md` Bulgu H):
+
+```
+Yıl   T5 (kaynak)   T6 (il)
+2016  VAR (12/12)   VAR (12/12)
+2017  VAR (12/12)   VAR (12/12)
+2018  VAR (12/12)   VAR (12/12)
+2019  VAR (12/12)   VAR (12/12)
+2020  VAR (12/12)   VAR (12/12)
+2021  VAR (12/12)   VAR (12/12)
+2022  VAR (12/12)   VAR (12/12) — Haziran'dan itibaren "İhtiyaç Fazlası
+                     Satın Alınan" diye yeniden adlandırıldı (tanım riski)
+2023  VAR (12/12)   VAR yalnız Ocak-Haziran, Temmuz-Aralık YOK (6/12)
+2024  VAR (12/12)   YOK (0/12)
+2025  VAR (12/12)   YOK (0/12)
+```
+
+Desen KARIŞIK — ne "hep var" ne "hiç yok". Kullanıcının önceden verdiği
+kural gereği (KARIŞIKSA yıl/ay bazında `veri_kapsam_disi`, mutabakata
+İSTİSNA EKLEME) karar ONAY BEKLENMEDEN uygulandı:
+
+- 2025 (bu turda zaten yüklenen T2/T3'ün yanına): `word_2025.py:
+  isle_ay_uretim_geneli()`'ye eklenen kod, her ay için Lisanssız'ı HEM
+  `fact_uretim_kaynak_geneli` HEM `fact_uretim_il_geneli`'nde
+  `pipeline.kapsam_disi_isaretle()` ile işaretliyor (`nitelik=
+  'lisans_durumu=Lisanssız'`, `karar_referansi='Karar 4 genişletildi
+  (2026-09-13, Bulgu H)'`) — T5 teknik olarak çalışsa da SİMETRİ için
+  yüklenmiyor (2016-2017 Karar 4 ile aynı ilke).
+- Disposable postgres:17'de doğrulandı: 12/12 ay yeniden yüklendi, 24
+  satır (2 tablo × 12 ay) `veri_kapsam_disi`'ye eklendi,
+  `mutabakat_uretim.py` hâlâ **12/12 uyumlu** (Lisanslı taraf hiç
+  etkilenmedi, mutabakat kontrolüne hiçbir istisna eklenmedi).
+- KPI-07 için Word-yılları-genelinde bir dışlama GEREKMEDİ — desen
+  "T6 hiçbir yılda yok" değil, ve `kpi_07_lisanssiz_pay()` zaten yalnız
+  `fact_uretim_kaynak_geneli`'ye bakıyor (il tablosuna bağımlı değil).
+  2025 için Lisanssız hiç yüklenmediğinden doğal olarak 'hesaplanamaz'
+  dönüyor.
+- 2018-2022'nin T6'sı (özellikle 2022 Haziran öncesi ve 2023 Ocak-
+  Haziran) gelecekte o yıllar işlenirken AYRICA değerlendirilecek —
+  başlığın "normal" görünmesi TEK BAŞINA yeterli kanıt değil, mutabakat
+  o yıllara gelindiğinde gerçek değerleri karşılaştıracak.
+
+244/244 unit test yeşil (yeni test eklenmedi — `isle_ay_*()` orkestrasyon
+fonksiyonları bu projede zaten birim/entegrasyon testiyle değil, disposable
+DB'ye karşı elle çalıştırılıp doğrulanıyor, established pattern).
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.16, Sürüm Geçmişi v1.30.

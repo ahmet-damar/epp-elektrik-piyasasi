@@ -859,17 +859,19 @@ def isle_ay_uretim_geneli(
     (İKİ tabloyu da AYNI batch_id altında yazar), `isle_ay`/`isle_ay_t4`nin
     T11/T10/T4 akışlarına DOKUNMAZ.
 
-    **2026-09-13 (ADIM 4 kod turu) — YALNIZ Lisanslı (T2+T3):** Bulgu E
-    bu turda TAM doğrulandı (12/12 ay) — 2025'te T6 (Lisanssız, il
-    bazında) karşılığı bir tablo HİÇ YOK (yalnız kaynak-bazında T5 var,
-    il×kaynak joint tablo da Bulgu C kararı gereği zaten kullanılmıyor).
-    T5'i buraya eklemek `fact_uretim_kaynak_geneli`'ye Lisanssız satır
-    yazar ama `fact_uretim_il_geneli` tarafında hiç karşılığı olmadığından
-    `mutabakat_uretim.py` bunu HER ZAMAN 'bir_taraf_eksik' (uyumsuz)
-    olarak işaretler ve aktivasyonu SÜRESİZ bloklar — bu, kullanıcı
-    kararını gerektiren açık bir madde (bkz. dokumanlar/
-    09_PROJE_DURUMU.md). Karar verilene kadar yalnız Lisanslı yükleniyor;
-    `t5_oku()` yazıldı ama HİÇBİR YERDEN çağrılmıyor."""
+    **2026-09-13 — Lisanslı (T2+T3) yüklenir, Lisanssız (T5/T6) KAPSAM
+    DIŞI:** Bulgu H (10 yılın TAMAMI tarandı, `12_word_uretim_envanteri.md`)
+    2025'te T6 (Lisanssız, il bazında) karşılığı bir tablo HİÇ YOK (yalnız
+    kaynak-bazında T5 var) — desen KARIŞIK (2016-2022 çoğunlukla var,
+    2023 yıl-içi bölünmüş, 2024-2025 tamamen yok), bu yüzden "hep var"/
+    "hiç yok" basit kuralı uygulanamıyor, yıl/ay bazında `veri_kapsam_disi`
+    kaydı gerekiyor (kullanıcı kararı). T5'i yükleyip `fact_uretim_il_
+    geneli` tarafında karşılığı olmadan bırakmak `mutabakat_uretim.py`'yi
+    HER ZAMAN 'bir_taraf_eksik' işaretlemeye zorlardı — bunun yerine
+    Lisanssız'ı HER İKİ tabloda da SİMETRİK olarak kapsam dışı bırakıyoruz
+    (2016-2017 Karar 4 ile AYNI ilke, mutabakata istisna eklemek YERİNE
+    ilgili periyot için veri hiç yüklenmiyor — mutabakat'ın karşılaştıracağı
+    bir şey kalmıyor). `t5_oku()` yazıldı ama HİÇBİR YERDEN çağrılmıyor."""
     dosya_adi = MANIFEST_2025[ay]
     yol = klasor / dosya_adi
     yil = 2025
@@ -996,11 +998,24 @@ def isle_ay_uretim_geneli(
             "tarih_id": tarih_id,
             "kaynak": "word_2025_uretim_geneli",
             "tablolar": audit_tablolar,
-            "not": "Yalnız Lisanslı (T2+T3) - Lisanssız (T5) 2025'te T6 "
-            "karşılığı YOK (Bulgu E), kullanıcı kararı bekleniyor, bkz. "
-            "dokumanlar/09_PROJE_DURUMU.md.",
+            "not": "Yalnız Lisanslı (T2+T3) yüklendi - Lisanssız (T5/T6) "
+            "kapsam dışı işaretlendi (Bulgu H, Karar 4'ün 2025'e genişlemesi).",
         },
     )
+
+    for tablo_adi in ("fact_uretim_kaynak_geneli", "fact_uretim_il_geneli"):
+        pipeline.kapsam_disi_isaretle(
+            conn,
+            tarih_id=tarih_id,
+            fact_tablosu=tablo_adi,
+            sebep="2025'te T6 (Lisanssız, il bazında) karşılığı bir tablo "
+            "hiç yok (yalnız kaynak-bazında T5 var) - bkz. 12_word_uretim_"
+            "envanteri.md Bulgu H/E. Simetri için T5 de yüklenmiyor (2016-"
+            "2017 Karar 4 ile aynı ilke).",
+            karar_referansi="Karar 4 genişletildi (2026-09-13, Bulgu H)",
+            nitelik="lisans_durumu=Lisanssız",
+        )
+    print("  [KAPSAM DIŞI] Lisanssız (T5/T6) her iki tabloda da işaretlendi.")
 
     uygun, sebep = pipeline.otomatik_onaya_uygun(sonuc)
     print(f"  otomatik_onaya_uygun() = {uygun}" + (f" ({sebep})" if sebep else ""))

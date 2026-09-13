@@ -77,6 +77,7 @@ her yeni rakam için geçerlidir.
 | v1.27 | 2026-09-09 | ADIM 5 — KPI-02/03/06/07 `fact_uretim_kaynak_geneli`'ye, KPI-05 `kapasite_faktoru_girdisi_getir()`'e (lisans-tutarlı pay/payda) bağlandı — §5.13, `04_kpi_sozlesmeleri.md` KPI-02 formülü (yalnız Lisanslı) uygulandı, dashboard kartlarına kaynak/kapsam notu eklendi | Canlı 2026-01..06: KPI-02 23,9-31,3 TWh, KPI-03 %39,7-72,0, KPI-05 %32,0-42,3 (makul aralık), KPI-06 HHI 0,175-0,246, KPI-07 %3,5-12,4 — hepsi gerçek Supabase sorgusuyla üretildi. Sessiz-hata testi (`test_kapasite_faktoru_girdisi_lisans_filtresi_olmadan_yanilticidir`) filtresiz/doğru yolun GERÇEKTEN farklı çıktığını (≈%27,8 vs ≈%41,7) kanıtladı. `test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz` wiring sonrası tekrar PASSED. Disposable postgres:17: 52/52 entegrasyon (ingest+pipeline+job_worker+analytics+fetch_weather) + 237/237 unit (59 skip, DB'siz) |
 | v1.28 | 2026-09-09 | **Gün sonu kapanışı (3).** KPI-04 kontrolü — §5.13'teki "kapsam dışı" karakterizasyonu YANLIŞTI (kullanıcı itirazı haklı çıktı), gerçekte KPI-03/06 ile aynı formül/kaynak — `uretim_kaynak_geneli`'ye bağlandı, §5.14. Aşama 3'ün "boş KPI'ları aç" hedefi KPI-01..07'nin TAMAMI için (2026-01'den itibaren) gerçekleşti | Canlı 2026-01..06 kaynak payları toplamı 6/6 ay %99,9-100,2 (yuvarlama payı, hesap hatası değil). Regresyon testi genişletildi (toplam ~%100 kontrolü). Disposable postgres:17: CI-tam-sırayla 52/52 + unit-only 237/237 yeşil (bugün, WSL2 port-forward köprüsü ara sıra bağlantı zaman aşımı verdi — container'ın kendisi sağlıklıydı, temiz bir pencerede tekrar koşulup doğrulandı, kod regresyonu değil). ruff/mypy/bandit temiz, CI+Security canlıda yeşil, git temiz |
 | v1.29 | 2026-09-13 | ADIM 4 başladı — 2025 Word T2/T3 (Lisanslı üretim, kaynak+il) `word_2025.py`'ye eklendi, `word_ortak.py`'ye 2 yeni paylaşımlı yardımcı (`hedef_donem_kolonu_bul()` normalize_label'lı, `iki_blokta_il_degerlerini_oku()`) — §5.15. T5 (Lisanssız kaynak) okuyucu yazıldı ama YÜKLENMİYOR — T6 (Lisanssız il) 2025'te HİÇ YOK (Bulgu E kesin doğrulandı), kullanıcı kararı bekleniyor. Ayrıca: `scheduled-backup.yml`'in İLK gerçek cron koşusu doğrulandı (2026-09-13) | 2 gerçek format sürprizi gerçek dosyaya karşı bulunup regresyona dönüştürüldü (T2'nin yıl-önce/büyük-harf dönem satırı; T3'te 2025-01 Kilis'in satır olarak hiç görünmemesi). Disposable postgres:17: 2025'in 12/12 ayı yüklendi, `mutabakat_uretim.py` T2↔T3 12/12 uyumlu. 122/122 mevcut Word yılı regresyon testi (2016-2025) hedef_donem_kolonu_bul() değişikliğinden SONRA da yeşil, +19 yeni test (word_2025). Canlıya UYGULANMADI (yalnız disposable, kullanıcı onayı bekliyor) |
+| v1.30 | 2026-09-13 | T5/T6 (Lisanssız) 10 yılın TAMAMI (120 ay) tarandı — Bulgu H, `12_word_uretim_envanteri.md`. Desen KARIŞIK (2016-2022 çoğunlukla var, 2022 Haziran'dan itibaren tanım riski, 2023 yıl-içi bölünmüş, 2024-2025 tamamen yok) — karar önceden verilmiş kurala göre ONAY BEKLENMEDEN uygulandı: yıl/ay bazında `veri_kapsam_disi`, mutabakata İSTİSNA YOK — §5.16 | `word_2025.py:isle_ay_uretim_geneli()` artık her ay için Lisanssız'ı HER İKİ tabloda da (`nitelik='lisans_durumu=Lisanssız'`, Karar 4 genişletildi) kapsam dışı işaretliyor. Disposable postgres:17: 12/12 ay, 24 satır `veri_kapsam_disi`'ye eklendi, `mutabakat_uretim.py` hâlâ 12/12 uyumlu (Lisanslı etkilenmedi). KPI-07 dışlaması GEREKMEDİ (desen "hiçbir yılda yok" değil, kpi_07 yalnız kaynak tablosuna bağımlı). 244/244 unit test yeşil |
 
 ---
 
@@ -884,6 +885,45 @@ tarafında hiç karşılığı olmaması, `mutabakat_uretim.py`'nin bu
 (uyumsuz) işaretleyip aktivasyonu SÜRESİZ bloklamasına yol açar — bu,
 2016-2017 Karar 4'e benzer ama YENİ bir veri_kapsam_disi kararı
 gerektiren açık bir madde (detay: `dokumanlar/09_PROJE_DURUMU.md`).
+
+### 5.16 T5/T6 (Lisanssız) 10 yılın TAMAMI tarandı, karar uygulandı — Bulgu H (2026-09-13)
+
+§5.15'in açık maddesi (T6'nın 2025'te yokluğu) tek yıla bakılarak
+kapatılmadı — kullanıcı talimatı gereği TÜM 10 yıl (120 ay, filtre
+olmadan tam tablo taraması) tarandı. Sonuç: `dokumanlar/12_word_uretim_
+envanteri.md` Bulgu H — desen **KARIŞIK**: T6 2016-2022 yapısal olarak
+var (2022 Haziran'dan itibaren "İhtiyaç Fazlası Satın Alınan" diye
+yeniden adlandırılıp Bulgu D'nin kaynak-seviyesi tanım sorununu İL
+seviyesinde tekrarlıyor), 2023 yıl-içi bölünmüş (Ocak-Haziran var, eski
+başlığa dönmüş; Temmuz-Aralık YOK), 2024-2025 tamamen YOK.
+
+**Karar (Ahmet, önceden verilmiş kural gereği ONAY BEKLENMEDEN
+uygulandı):** Karışık desen → yıl/ay bazında `veri_kapsam_disi` kaydı.
+Mutabakat kontrolüne İSTİSNA EKLENMEDİ (kullanıcı talimatı: "o kontrol
+bu projede iki gerçek bug yakaladı, özel durumlarla körelmesin") — yokluk
+yalnızca ilgili periyot için Lisanssız verisinin HİÇ YÜKLENMEMESİYLE
+ifade ediliyor, mutabakatın karşılaştıracağı bir şey kalmıyor.
+
+**Uygulama (`word_2025.py:isle_ay_uretim_geneli()`):** her ay için T2+T3
+(Lisanslı) yüklendikten SONRA, `pipeline.kapsam_disi_isaretle()` HER İKİ
+tabloya da (`fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli`,
+`nitelik='lisans_durumu=Lisanssız'`, `karar_referansi='Karar 4
+genişletildi (2026-09-13, Bulgu H)'`) çağrılıyor — 2016-2017 Karar 4 ile
+AYNI desen, T5 kaynak-tarafında teknik olarak çalışsa bile SİMETRİ için
+YÜKLENMİYOR (bir taraf dolu diğeri boş asimetrik durum yaratılmıyor).
+Disposable postgres:17'de doğrulandı: 12/12 ay, 24 satır (2 tablo × 12
+ay) `veri_kapsam_disi`'ye eklendi, `mutabakat_uretim.py` hâlâ 12/12
+uyumlu (Lisanslı taraf hiç etkilenmedi).
+
+**KPI-07 etkisi — DIŞLAMA GEREKMEDİ:** desen "T6 hiçbir yılda yok"
+DEĞİL (2016-2022 çoğunlukla var) — bu yüzden kullanıcının talimatındaki
+"T6 hiçbir yılda yoksa KPI-07 Word yıllarını dışlamalı" dalı BURADA
+UYGULANMIYOR. KPI-07 yalnız `fact_uretim_kaynak_geneli`'yi kullanıyor
+(il tablosuna bağımlı değil, bkz. `worker/kpi.py:kpi_07_lisanssiz_pay()`)
+— 2025 için Lisanssız hiç yüklenmediğinden (yukarıdaki simetri kararı)
+zaten doğal olarak 'hesaplanamaz' dönüyor, EK bir kod değişikliği
+gerekmedi. 2018-2022 gibi T6'nın GERÇEKTEN sağlam olduğu yıllara
+gelindiğinde Lisanssız normal yüklenip KPI-07 gerçek değer üretecek.
 
 ---
 

@@ -130,9 +130,9 @@ yansıtıldı.**
   TAMAMLANDI (2026-09-08/09), Bulgu C/D kararları verilip uygulandı, ADIM
   5 (KPI bağlama, KPI-01..07'nin TAMAMI — KPI-04 dahil) TAMAMLANDI
   (2026-09-09), ADIM 4 (Word 2016-2025 üretim parser'ı) 2026-09-13'te
-  BAŞLADI — 2025 (T2+T3, Lisanslı) disposable'da tamamlandı, T5/T6
-  (Lisanssız) asimetrisi için kullanıcı kararı bekliyor** (bkz. "Sonraki
-  Oturum Devam Noktası" — tam liste orada).
+  BAŞLADI — 2025 TAMAMLANDI (T2+T3 Lisanslı yüklendi, T5/T6 Lisanssız
+  kararı verilip uygulandı: kapsam dışı), sıradaki iş 2024→2023** (bkz.
+  "Sonraki Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
   edilince T7 ile 4/6 ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11
@@ -363,12 +363,10 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
   doğrulandı. Yeni regresyon assertion'ı `test_uretim_kaynak_geneli_
   getir_sekil_ve_lisans_gorunumu`'a eklendi (payların toplamı %100'e
   yakın olmalı). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.14.
-- **🟡 ADIM 4 BAŞLADI (2026-09-13) — 2025 (T2+T3, Lisanslı) disposable'da
-  TAMAMLANDI, T5/T6 (Lisanssız) için KULLANICI KARARI BEKLİYOR:**
+- **🟢 ADIM 4 devam ediyor (2026-09-13) — 2025 (T2+T3 Lisanslı + T5/T6
+  Lisanssız kararı) TAMAMLANDI:**
   - Bulgu E bu turda 2025'in TAMAMI (12/12 ay) için KESİN doğrulandı:
-    T6 (Lisanssız, il bazında marjinal) tablosu **HİÇ YOK** — ne aynı
-    adla ne yeniden adlandırılmış, filtre olmadan tam tablo listesi
-    tarandı (yalnız T5, kaynak bazında, var).
+    T6 (Lisanssız, il bazında marjinal) tablosu **HİÇ YOK**.
   - T2 (Lisanslı kaynak) + T3 (Lisanslı il) `word_2025.py`'ye eklendi,
     disposable postgres:17'ye 12/12 ay yüklendi, `mutabakat_uretim.py`
     T2↔T3 çapraz kontrolü **12/12 uyumlu**. 2 gerçek format sürprizi
@@ -377,26 +375,26 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     görünmüyor). +19 test (`test_word_2025.py`), 122/122 mevcut Word
     yılı regresyonu hâlâ yeşil. Detay: `10_TEKNIK_MASTER_DOKUMAN.md`
     §5.15, `06_canli_veri_operasyon_gunlugu.md` 2026-09-13 (devam) kaydı.
-  - **⚠️ KARAR GEREKİYOR — T5/T6 asimetrisi:** `t5_oku()` yazıldı ama
-    HİÇBİR YERDEN çağrılmıyor. T5'i (Lisanssız kaynak) `fact_uretim_
-    kaynak_geneli`'ye yüklersek, `fact_uretim_il_geneli` tarafında
-    (T6 yok) hiç karşılığı olmayacağından `mutabakat_uretim.py` bu
-    (tarih_id, lisans_id=Lisanssız) çiftini HER ZAMAN 'bir_taraf_eksik'
-    işaretleyip aktivasyonu SÜRESİZ bloklar. Olası seçenekler (karar
-    VERİLMEDİ, yalnız envanterlendi):
-    1. 2025 (ve muhtemelen 2018-2025 geneli, T6 hepsinde yoksa) Lisanssız
-       üretimi TAMAMEN kapsam dışı say (2016-2017 Karar 4'e benzer,
-       `veri_kapsam_disi`'ye yeni satırlar) — Lisanslı seri kesintisiz
-       kalır, Lisanssız Word döneminde hiç yok.
-    2. `mutabakat_uretim.py`'ye "bilinen kapsam-dışı" bir istisna listesi
-       ekle (T6 hiç yoksa mutabakat o lisans_id için ATLANSIN, tek
-       taraflı T5 aktive edilsin) — KPI-07 Word yıllarında yalnız
-       kaynak-bazlı seriyle (il kırılımsız zaten) çalışırdı ama
-       `fact_uretim_il_geneli`'nin Lisanssız kolonu hep boş kalır.
-    3. Diğer yılları (2024, 2023...) da tarayıp T6'nın GERÇEKTEN hangi
-       yıldan itibaren kaybolduğunu tam tespit et, karar onu bilerek ver.
-    **Sonraki oturumun İLK işi:** kullanıcıya bu üç seçeneği sun, karar
-    alındıktan sonra 2025'i kapat, 2024'e geç.
+  - **✅ T5/T6 KARARI VERİLDİ VE UYGULANDI (Bulgu H — 10 yılın TAMAMI
+    tarandı, 120 ay, tek yıla bakılmadan):** desen KARIŞIK (2016-2022
+    çoğunlukla var — 2022 Haziran'dan itibaren "İhtiyaç Fazlası Satın
+    Alınan" diye yeniden adlandırılıp tanım riski taşıyor —, 2023 yıl-içi
+    bölünmüş: Ocak-Haziran var/Temmuz-Aralık yok, 2024-2025 tamamen yok).
+    Önceden verilen kural gereği: 2025 için Lisanssız (T5+T6) HER İKİ
+    tabloda da (`fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli`)
+    `pipeline.kapsam_disi_isaretle()` ile kapsam dışı işaretlendi
+    (`nitelik='lisans_durumu=Lisanssız'`, Karar 4'ün genişlemesi) —
+    mutabakat kontrolüne İSTİSNA EKLENMEDİ, T5 SİMETRİ için yüklenmedi.
+    Disposable postgres:17: 24 satır (2×12 ay) eklendi, mutabakat hâlâ
+    12/12 uyumlu. KPI-07 için Word-genelinde dışlama GEREKMEDİ (desen
+    "hiçbir yılda yok" değil, `kpi_07_lisanssiz_pay()` yalnız kaynak
+    tablosuna bağımlı). 2018-2022'nin T6'sı (özellikle rename öncesi)
+    o yıllar işlenirken AYRICA gerçek mutabakatla doğrulanacak — başlığın
+    normal görünmesi tek başına kanıt sayılmıyor. Detay: `dokumanlar/
+    12_word_uretim_envanteri.md` Bulgu H, `10_TEKNIK_MASTER_DOKUMAN.md`
+    §5.16, Sürüm Geçmişi v1.30.
+  - **Sıradaki iş:** ADIM 4'e devam — 2024, sonra 2023 (aynı kademeli
+    desen: yükle → mutabakat → regresyon testi → commit → CI yeşil).
   - **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatan notlar
     (hâlâ geçerli):**
   - `lisans_id` çözümü: **DOĞRULANDI, 2025 için ÇALIŞTI** — `t2_oku()`/

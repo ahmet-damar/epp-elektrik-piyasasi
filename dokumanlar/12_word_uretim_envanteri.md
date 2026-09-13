@@ -170,6 +170,52 @@ tablonun kendi "Genel Toplam"/"Toplam" satırının varlığı/konumu TEYİT
 EDİLMEDİ (yalnız ilk satır — başlık satırı — okundu, tarama derinliği
 kasıtlı sığ tutuldu) — ADIM 4'ün kod turunda erken bir adım bu olmalı.
 
+## Bulgu H — T5/T6 (Lisanssız) 10 yılın TAMAMI için tam taranmış envanteri (2026-09-13)
+
+Bulgu E'nin (2024/2025 için tek-yıl bulgusu) sonucu, TÜM 10 yıl (2016-2025,
+120 ay, filtre olmadan tam tablo listesi) için genelleştirildi — bu tur
+öncesi Bulgu A'nın Haziran-ağırlıklı spot-check'inin (bazı yıllarda yalnız
+1 ay) yerini alır:
+
+| Yıl | T5 (Lisanssız, kaynak) | T6 (Lisanssız, il) |
+|---|---|---|
+| 2016 | VAR (12/12) | VAR (12/12) — "...Üretiminin İllere Göre Dağılımı" |
+| 2017 | VAR (12/12) | VAR (12/12) — aynı başlık |
+| 2018 | VAR (12/12), "Brüt Lisanssız Üretim Miktarı" kolonu VAR | VAR (12/12) |
+| 2019 | VAR (12/12) | VAR (12/12) |
+| 2020 | VAR (12/12) | VAR (12/12) |
+| 2021 | VAR (12/12) | VAR (12/12) |
+| 2022 | VAR (12/12) | VAR (12/12) **ama Haziran'dan itibaren yeniden adlandırıldı**: Ocak-Mayıs "...Üretiminin İllere Göre Dağılımı", Haziran-Aralık "...İHTİYAÇ FAZLASI SATIN ALINAN Lisanssız Elektrik Üretiminin İllere Göre Dağılımı" — Bulgu D'nin kaynak-seviyesi tanım sorununun İL seviyesinde bir tekrarı |
+| 2023 | VAR (12/12) | VAR yalnız Ocak-Haziran (eski başlığa DÖNDÜ — "İhtiyaç Fazlası" değil), **Temmuz-Aralık'ta YOK** (6/12) |
+| 2024 | VAR (12/12) | **YOK (0/12)** |
+| 2025 | VAR (12/12) | **YOK (0/12)** |
+
+**Not — 2016-2017 zaten kapsam dışı (Bulgu D/Karar 4):** bu iki yılın
+T6'sı yapısal olarak VAR ama Karar 4 zaten bu yılların Lisanssız verisini
+(kaynak seviyesindeki "Brüt Üretim" kolonu eksikliği yüzünden) kapsam dışı
+bırakmıştı — T6'nın varlığı bu kararı değiştirmez, yalnız gerekçeyi
+güçlendirir (aynı yıllarda hem kaynak HEM il tarafı zaten sorunlu).
+
+**Sonuç — desen KARIŞIK (ne "hep var" ne "hiç yok"):** 2016-2022 (7 yıl)
+T6 yapısal olarak var (2022 Haziran'dan itibaren tanım riski VAR), 2023
+yıl-içi bölünmüş (H1 var, H2 yok), 2024-2025 tamamen yok. Bu, kullanıcı
+kararı gereği "yıl yıl (gerekirse ay ay) `veri_kapsam_disi` kaydı"
+gerektiren KARIŞIK durumdur — ne "2025 istisna" ne "hiçbir yılda yok"
+basit kuralı uygulanamaz.
+
+**✅ KARAR (2026-09-13, Ahmet):** Karışık desen doğrulandı — yıl/ay
+bazında `veri_kapsam_disi` kaydı uygulanacak, mutabakat kontrolüne
+İSTİSNA EKLENMEYECEK (yokluk zaten ilgili periyot için hiç veri
+YÜKLENMEYEREK ifade edilir — mutabakat'ın karşılaştıracağı bir şey
+kalmaz). T6 hiçbir yılda tamamen yok DEĞİL, bu yüzden KPI-07'nin Word
+yıllarının TAMAMINDA dışlanması GEREKMİYOR — yalnız T6'nın gerçekten
+YOK/şüpheli olduğu spesifik dönemlerde (2025 tümü, 2024 tümü, 2023
+Temmuz-Aralık, ve 2022 Haziran-2023 Haziran'ın tanım-riskli aralığı
+gelecek turlarda değerlendirilecek) hem `fact_uretim_kaynak_geneli` HEM
+`fact_uretim_il_geneli`'nde Lisanssız simetrik olarak kapsam dışı
+bırakılıyor (2016-2017 Karar 4 ile AYNI ilke — bir taraf yüklenip diğeri
+yüklenmeyen asimetrik bir durum YARATILMIYOR).
+
 ## Özet — ADIM 4 (Word üretim backfill'i) için önerilen sıra (öneri, karar DEĞİL)
 
 1. Bulgu E'yi çöz: 2023-Aralık + 2024/2025'in TAM tablo listesini (filtre
