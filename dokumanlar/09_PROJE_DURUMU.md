@@ -129,8 +129,10 @@ yansıtıldı.**
 - **Aşama 3 (boş KPI'ları açma) — ADIM 1-3'ün TAMAMI (kod + canlı)
   TAMAMLANDI (2026-09-08/09), Bulgu C/D kararları verilip uygulandı, ADIM
   5 (KPI bağlama, KPI-01..07'nin TAMAMI — KPI-04 dahil) TAMAMLANDI
-  (2026-09-09), yalnız ADIM 4 (Word 2016-2025 üretim parser'ı) HENÜZ
-  BAŞLAMADI** (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
+  (2026-09-09), ADIM 4 (Word 2016-2025 üretim parser'ı) 2026-09-13'te
+  BAŞLADI — 2025 (T2+T3, Lisanslı) disposable'da tamamlandı, T5/T6
+  (Lisanssız) asimetrisi için kullanıcı kararı bekliyor** (bkz. "Sonraki
+  Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
   edilince T7 ile 4/6 ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11
@@ -361,26 +363,48 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
   doğrulandı. Yeni regresyon assertion'ı `test_uretim_kaynak_geneli_
   getir_sekil_ve_lisans_gorunumu`'a eklendi (payların toplamı %100'e
   yakın olmalı). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.14.
-- **🔵 SIRADAKİ İŞ — ADIM 4 (orijinal numaralandırma — Word yılları
-  backfill'i, 2016-2025 üretim parser'ı):** henüz başlamadı,
-  `dokumanlar/12_word_uretim_envanteri.md`'deki envanterle hazır (Bulgu
-  E/G hâlâ açık teknik sorular — ilk iş bunları çözmek). Bulgu C kararı
-  gereği Word'ün il×kaynak Lisanssız tablosu **KULLANILMAYACAK**
-  (yukarıdaki Bulgu C/D maddesine bkz.) — yalnız ülke geneli/kaynak
-  bazlı Tablo 1.6/1.11 (Lisanslı/Lisanssız) ve il bazlı Tablo 1.7/1.12
-  parse edilecek. **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü
-  ucuzlatacak notlar:**
-  - `lisans_id` çözümü: `worker/ingest.py:dim_lisans_id_bul()` GENEL bir
-    yardımcı (Türkçe VEYA ASCII etiket kabul eder, `_LISANS_KODU` ile
-    çevirip `dim_lisans.tur`'a bakar) — Excel T2/T5 parser'ları zaten
-    bunu kullanıyor (`fact_uretim_kaynak_geneli_yukle()`). Kontrol
-    edildi: `worker/scripts/word_ortak.py`'de ŞU AN hiç `lisans` alanı
-    YOK (yalnız tüketim/T11 için yazılmış, üretim Word parser'ı henüz
-    YAZILMADI) — ADIM 4'ün üretim Word parser'ı yazılırken tek gereken,
-    Word Tablo 1.6/1.11 (Lisanslı/Lisanssız ayrı tablolar, bkz. `12_
-    word_uretim_envanteri.md`) satırlarına aynı `dim_lisans_id_bul()`'u
-    çağırmak — YENİ bir lisans-çözümleme mekanizması İCAT ETMEYE gerek
-    yok, mevcut yardımcı doğrudan reuse edilebilir.
+- **🟡 ADIM 4 BAŞLADI (2026-09-13) — 2025 (T2+T3, Lisanslı) disposable'da
+  TAMAMLANDI, T5/T6 (Lisanssız) için KULLANICI KARARI BEKLİYOR:**
+  - Bulgu E bu turda 2025'in TAMAMI (12/12 ay) için KESİN doğrulandı:
+    T6 (Lisanssız, il bazında marjinal) tablosu **HİÇ YOK** — ne aynı
+    adla ne yeniden adlandırılmış, filtre olmadan tam tablo listesi
+    tarandı (yalnız T5, kaynak bazında, var).
+  - T2 (Lisanslı kaynak) + T3 (Lisanslı il) `word_2025.py`'ye eklendi,
+    disposable postgres:17'ye 12/12 ay yüklendi, `mutabakat_uretim.py`
+    T2↔T3 çapraz kontrolü **12/12 uyumlu**. 2 gerçek format sürprizi
+    bulunup regresyona dönüştürüldü (T2'nin dönem satırı sırası/büyük-
+    harfi T10'dan farklı; T3'te 2025-01 Kilis satır olarak hiç
+    görünmüyor). +19 test (`test_word_2025.py`), 122/122 mevcut Word
+    yılı regresyonu hâlâ yeşil. Detay: `10_TEKNIK_MASTER_DOKUMAN.md`
+    §5.15, `06_canli_veri_operasyon_gunlugu.md` 2026-09-13 (devam) kaydı.
+  - **⚠️ KARAR GEREKİYOR — T5/T6 asimetrisi:** `t5_oku()` yazıldı ama
+    HİÇBİR YERDEN çağrılmıyor. T5'i (Lisanssız kaynak) `fact_uretim_
+    kaynak_geneli`'ye yüklersek, `fact_uretim_il_geneli` tarafında
+    (T6 yok) hiç karşılığı olmayacağından `mutabakat_uretim.py` bu
+    (tarih_id, lisans_id=Lisanssız) çiftini HER ZAMAN 'bir_taraf_eksik'
+    işaretleyip aktivasyonu SÜRESİZ bloklar. Olası seçenekler (karar
+    VERİLMEDİ, yalnız envanterlendi):
+    1. 2025 (ve muhtemelen 2018-2025 geneli, T6 hepsinde yoksa) Lisanssız
+       üretimi TAMAMEN kapsam dışı say (2016-2017 Karar 4'e benzer,
+       `veri_kapsam_disi`'ye yeni satırlar) — Lisanslı seri kesintisiz
+       kalır, Lisanssız Word döneminde hiç yok.
+    2. `mutabakat_uretim.py`'ye "bilinen kapsam-dışı" bir istisna listesi
+       ekle (T6 hiç yoksa mutabakat o lisans_id için ATLANSIN, tek
+       taraflı T5 aktive edilsin) — KPI-07 Word yıllarında yalnız
+       kaynak-bazlı seriyle (il kırılımsız zaten) çalışırdı ama
+       `fact_uretim_il_geneli`'nin Lisanssız kolonu hep boş kalır.
+    3. Diğer yılları (2024, 2023...) da tarayıp T6'nın GERÇEKTEN hangi
+       yıldan itibaren kaybolduğunu tam tespit et, karar onu bilerek ver.
+    **Sonraki oturumun İLK işi:** kullanıcıya bu üç seçeneği sun, karar
+    alındıktan sonra 2025'i kapat, 2024'e geç.
+  - **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatan notlar
+    (hâlâ geçerli):**
+  - `lisans_id` çözümü: **DOĞRULANDI, 2025 için ÇALIŞTI** — `t2_oku()`/
+    `t3_oku()`/`t5_oku()` `"lisans"` alanını ("Lisanslı"/"Lisanssız")
+    kendi çıktılarına doğrudan gömüyor, `ingest.fact_uretim_kaynak_
+    geneli_yukle()`/`fact_uretim_il_geneli_yukle()` bunu (Excel'deki
+    AYNI şekilde) `dim_lisans_id_bul()` ile çözüyor — YENİ bir mekanizma
+    gerekmedi, tahmin doğru çıktı.
   - 2016-2017 KPI-07 'hesaplanamaz' geçişi: `fact_uretim_kaynak_geneli`
     o yıllar için (Bulgu D kararı gereği) HİÇ satır almayacak — bu
     turda `uretim_kaynak_geneli_getir()` zaten BOŞ DataFrame'i doğru

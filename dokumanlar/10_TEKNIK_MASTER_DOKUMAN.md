@@ -76,6 +76,7 @@ her yeni rakam için geçerlidir.
 | v1.26 | 2026-09-09 | `validate_role_access.py` canlı RLS doğrulama boşluğu kapatıldı — v1.25'teki "SET ROLE canlıda çalışmıyor" bulgusu YANLIŞ bağlantıya dayanıyordu, doğru bağlantı `DATABASE_URL_DASHBOARD` (`app_dashboard_service`, 2026-09-04'te tam bunun için `SET TRUE` ile kurulmuş) — §5.12 | Canlıda İKİ ayrı bağlantıyla 3/3 senaryo GERÇEKTEN doğrulandı: `DATABASE_URL_DASHBOARD` ile viewer×2 (claim'siz→0 satır, doğru claim→satır döner), `DATABASE_URL` ile anon (TABLE seviyesinde reddedildi). Script artık `[ATLANDI]` ile hangi senaryonun hangi bağlantıyla test edilebildiğini AÇIKÇA raporluyor (sessiz varsayım yok). Disposable postgres:17'de regresyon yok (3/3 tek bağlantıyla) |
 | v1.27 | 2026-09-09 | ADIM 5 — KPI-02/03/06/07 `fact_uretim_kaynak_geneli`'ye, KPI-05 `kapasite_faktoru_girdisi_getir()`'e (lisans-tutarlı pay/payda) bağlandı — §5.13, `04_kpi_sozlesmeleri.md` KPI-02 formülü (yalnız Lisanslı) uygulandı, dashboard kartlarına kaynak/kapsam notu eklendi | Canlı 2026-01..06: KPI-02 23,9-31,3 TWh, KPI-03 %39,7-72,0, KPI-05 %32,0-42,3 (makul aralık), KPI-06 HHI 0,175-0,246, KPI-07 %3,5-12,4 — hepsi gerçek Supabase sorgusuyla üretildi. Sessiz-hata testi (`test_kapasite_faktoru_girdisi_lisans_filtresi_olmadan_yanilticidir`) filtresiz/doğru yolun GERÇEKTEN farklı çıktığını (≈%27,8 vs ≈%41,7) kanıtladı. `test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz` wiring sonrası tekrar PASSED. Disposable postgres:17: 52/52 entegrasyon (ingest+pipeline+job_worker+analytics+fetch_weather) + 237/237 unit (59 skip, DB'siz) |
 | v1.28 | 2026-09-09 | **Gün sonu kapanışı (3).** KPI-04 kontrolü — §5.13'teki "kapsam dışı" karakterizasyonu YANLIŞTI (kullanıcı itirazı haklı çıktı), gerçekte KPI-03/06 ile aynı formül/kaynak — `uretim_kaynak_geneli`'ye bağlandı, §5.14. Aşama 3'ün "boş KPI'ları aç" hedefi KPI-01..07'nin TAMAMI için (2026-01'den itibaren) gerçekleşti | Canlı 2026-01..06 kaynak payları toplamı 6/6 ay %99,9-100,2 (yuvarlama payı, hesap hatası değil). Regresyon testi genişletildi (toplam ~%100 kontrolü). Disposable postgres:17: CI-tam-sırayla 52/52 + unit-only 237/237 yeşil (bugün, WSL2 port-forward köprüsü ara sıra bağlantı zaman aşımı verdi — container'ın kendisi sağlıklıydı, temiz bir pencerede tekrar koşulup doğrulandı, kod regresyonu değil). ruff/mypy/bandit temiz, CI+Security canlıda yeşil, git temiz |
+| v1.29 | 2026-09-13 | ADIM 4 başladı — 2025 Word T2/T3 (Lisanslı üretim, kaynak+il) `word_2025.py`'ye eklendi, `word_ortak.py`'ye 2 yeni paylaşımlı yardımcı (`hedef_donem_kolonu_bul()` normalize_label'lı, `iki_blokta_il_degerlerini_oku()`) — §5.15. T5 (Lisanssız kaynak) okuyucu yazıldı ama YÜKLENMİYOR — T6 (Lisanssız il) 2025'te HİÇ YOK (Bulgu E kesin doğrulandı), kullanıcı kararı bekleniyor. Ayrıca: `scheduled-backup.yml`'in İLK gerçek cron koşusu doğrulandı (2026-09-13) | 2 gerçek format sürprizi gerçek dosyaya karşı bulunup regresyona dönüştürüldü (T2'nin yıl-önce/büyük-harf dönem satırı; T3'te 2025-01 Kilis'in satır olarak hiç görünmemesi). Disposable postgres:17: 2025'in 12/12 ayı yüklendi, `mutabakat_uretim.py` T2↔T3 12/12 uyumlu. 122/122 mevcut Word yılı regresyon testi (2016-2025) hedef_donem_kolonu_bul() değişikliğinden SONRA da yeşil, +19 yeni test (word_2025). Canlıya UYGULANMADI (yalnız disposable, kullanıcı onayı bekliyor) |
 
 ---
 
@@ -817,6 +818,72 @@ test_uretim_kaynak_geneli_getir_sekil_ve_lisans_gorunumu` genişletildi —
 %100'e (±0.2 tolerans) yakın olduğu artık regresyonla korunuyor.
 Disposable postgres:17'de CI-tam-sırayla (ingest→pipeline→job_worker→
 analytics→fetch_weather) 52/52, unit-only (DB'siz) 237/237 yeşil.
+
+### 5.15 ADIM 4 başladı — 2025 Word T2/T3 (Lisanslı üretim), T5/T6 açık madde (2026-09-13)
+
+**Sıra kararı hatırlatması:** Word yılları en Excel'e yakından en uzağa
+(2025→2024→2023) işlenir — bu turda YALNIZ 2025, YALNIZ disposable
+postgres:17 (canlıya UYGULANMADI, kullanıcı onayı bekliyor).
+
+**word_ortak.py'ye iki yeni paylaşımlı yardımcı:**
+- `hedef_donem_kolonu_bul()` artık `normalize_label()` ile karşılaştırıyor
+  (GERİYE UYUMLU, sıkılaştırma değil genişletme) — GERÇEK bir format
+  sürprizi bunu gerektirdi: T2'nin dönem satırı `'2025 HAZİRAN'` (yıl-
+  önce, TÜM-BÜYÜK, Türkçe noktalı İ), T10'un `'Haziran 2025'`inden
+  (ay-önce, başlık-harf) FARKLI sırada/harfte. Python'un çıplak
+  `.upper()`'ı `'Haziran'`ı YANLIŞ şekilde `'HAZIRAN'` (noktasız I)
+  üretiyor, dokümandaki gerçek `'HAZİRAN'`le (noktalı İ) birebir
+  eşleşmiyordu — `normalize_label()` ikisini de AYNI ASCII-sadeleştirilmiş
+  forma (`'HAZIRAN'`) indirgeyip düzeltiyor. 122/122 mevcut Word yılı
+  regresyon testi (2016-2025) bu değişiklikten SONRA da yeşil — geriye
+  dönük kırılma yok.
+- `iki_blokta_il_degerlerini_oku()` — Bulgu F (il-bazında üretim
+  tabloları, HER YIL, iki-sütunlu sayfa düzeni: `['İLLER','ÜRETİM
+  (MWh)','ORAN (%)','İLLER','ÜRETİM (MWh)','ORAN (%)']`) için genel
+  amaçlı birleştirici, il eşleme/sayı ayrıştırma YAPMAZ (çağıranın işi).
+
+**`word_2025.py`'ye üç yeni okuyucu:**
+- `t2_oku()` — Lisanslı, kaynak bazında, dönemler-arası-karşılaştırma
+  (Bulgu B) — `hedef_donem_kolonu_bul()` + kendi Genel Toplam'ıyla
+  aritmetik tutarlılık (T4 ile AYNI ilke).
+- `t3_oku()` — Lisanslı, il bazında, TEK dönem, iki-sütunlu düzen. **Gerçek
+  veride bulunan yeni bir kenar durumu:** 2025-01'de üretimi sıfıra yakın
+  bir il (Kilis, plaka 79) satır olarak HİÇ görünmüyor — T4'ün Bulgu 5
+  madde 4'üyle AYNI desen (kapasitesi/üretimi sıfıra yakın iller bazen
+  satır olarak basılmıyor). Katı "81 il" assertion'ı YERİNE T4'teki
+  yöntem uygulandı: eksik iller `uretim_mwh=0.0` ile AÇIKÇA tamamlanır,
+  asıl güvence kendi Genel Toplam'ıyla aritmetik tutarlılıktır.
+- `t5_oku()` — Lisanssız, kaynak bazında, TEK dönem. 2025'te başlık
+  "...Üretimi ve Yapılan Ödeme Miktarının Kaynaklara Göre Dağılımı
+  (MWh-TL)" — üretim VE ödeme birleşik 7 kolonlu tek tabloda. Bulgu D
+  (Karar 4) gereği "Brüt Lisanssız Üretim Miktarı (MWh)" kolonu
+  kullanılıyor, aynı tabloda duran "İhtiyaç Fazlası Satın Alınan Enerji
+  Miktarı" (dar bir alt-küme) DEĞİL — regresyon testiyle iki kolonun
+  KASITLI farklı değerlerle ayrıştırıldığı doğrulandı. **Ayrıca "Rüzgâr"
+  (inceltme işaretli â) yazımı bulundu** — T2/T4'ün â'sız "RÜZGAR"/
+  "Rüzgar"ından farklı; `worker/parser.py` DEĞİŞTİRİLMEDİ (mimari karar),
+  `word_2025.py:_KAYNAK_TAKMA_ADLAR`'a tek satırlık bir takma ad eklendi.
+
+**`isle_ay_uretim_geneli()` — YALNIZ Lisanslı (T2+T3) yükleniyor:**
+`pipeline.isle_ay_uretim_excel()` ile AYNI desen (iki tabloyu da AYNI
+batch_id altında yazar). Disposable postgres:17'de 12/12 ay yüklendi,
+`mutabakat_uretim.py` T2↔T3 çapraz kontrolü **12/12 uyumlu** (uyumsuz
+batch: 0) — format sürprizleri (yukarıdaki ikisi) gerçek veriye karşı
+TESTLE değil, doğrudan gerçek dosyaya karşı çalıştırılarak bulundu, sonra
+regresyon testine dönüştürüldü.
+
+**⚠️ AÇIK MADDE — kullanıcı kararı bekliyor (T5/T6 asimetrisi):** Bulgu
+E bu turda 2025'in TAMAMI (12/12 ay) için kesin doğrulandı — T6
+(Lisanssız, il bazında marjinal) karşılığı bir tablo **HİÇ YOK** (ne
+aynı ad altında ne yeniden adlandırılmış — tam tablo listesi filtre
+olmadan tarandı). Yalnız T5 (Lisanssız, kaynak bazında) var. `t5_oku()`
+YAZILDI ama `isle_ay_uretim_geneli()` içinden ÇAĞRILMIYOR: T5'i
+`fact_uretim_kaynak_geneli`'ye yüklemek ama `fact_uretim_il_geneli`
+tarafında hiç karşılığı olmaması, `mutabakat_uretim.py`'nin bu
+(tarih_id, lisans_id=Lisanssız) çiftini HER ZAMAN 'bir_taraf_eksik'
+(uyumsuz) işaretleyip aktivasyonu SÜRESİZ bloklamasına yol açar — bu,
+2016-2017 Karar 4'e benzer ama YENİ bir veri_kapsam_disi kararı
+gerektiren açık bir madde (detay: `dokumanlar/09_PROJE_DURUMU.md`).
 
 ---
 

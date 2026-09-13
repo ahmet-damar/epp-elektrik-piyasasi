@@ -60,6 +60,7 @@ from worker.scripts.word_ortak import (
     genel_toplam_satirini_oku,
     grup_kolonlarini_coz,
     hedef_donem_kolonu_bul,
+    iki_blokta_il_degerlerini_oku,
     t4_tablosunu_bul,
     tek_aday_bul,
 )
@@ -99,7 +100,15 @@ _ATLA_ETIKETLERI = {"Genel Toplam", "Toplam", "İl Toplam", "Türkiye", "TÜRKİ
 # (dokumanlar/07_word_parser_kapsam.md) 4 farklı yıl/şablonda hiç alias
 # gerekmedi. YENİ bir ay YENİ bir varyant getirirse kaynak_esle_zorunlu()
 # ValueError fırlatır.
-_KAYNAK_TAKMA_ADLAR: dict[str, str] = {}
+# 2026-09-13 (ADIM 4, T5): T5 tablosu "Rüzgâr" yazıyor (inceltme işaretli
+# â) — worker/parser.py:KAYNAK_ESLEME'nin "Rüzgar" anahtarı (â'sız) T4/T2
+# tablolarındaki yazımla eşleşiyor ama â'yı ASCII'ye katlamıyor (_TR_SADE
+# çevrim tablosunda â/Â yok, yalnız word_2025.py'nin kendi
+# `_SIRKUMFLEKS_DUZELT`'i il adları için var) — worker/parser.py'ye
+# dokunmadan (mimari karar) burada tek satırlık bir takma ad yeterli.
+_KAYNAK_TAKMA_ADLAR: dict[str, str] = {
+    "Rüzgâr": "Rüzgar",
+}
 _KAYNAK_ATLA_ETIKETLERI = {"Genel Toplam", "Toplam", "İl Toplam"}
 # Türkiye'nin 81 ili, plaka kodu 1-81 — T4-karşılığı tabloda kapasitesi
 # sıfır olan iller bazı dönemlerde satır olarak hiç görünmeyebilir (bkz.
@@ -338,6 +347,192 @@ def t4_oku(tbl, tarih_id: int) -> pd.DataFrame:
             f"T4: hesaplanan toplam {hesaplanan:.2f} MW, tablonun kendi Genel "
             f"Toplam'ı {genel_toplam_deger:.2f} MW — fark {fark:.2f} MW toleransı "
             f"({tolerans:.2f}) aşıyor, bir hizalama/parse sorunu olabilir"
+        )
+    return df
+
+
+def t2_oku(tbl, tarih_id: int, hedef_ay_yil: str) -> pd.DataFrame:
+    """T2-karşılığı: Lisanslı Elektrik Üretimi, kaynak bazında,
+    dönemler-arası-karşılaştırma format (Bulgu B, dokumanlar/12_word_
+    uretim_envanteri.md) — satır0=dönem etiketleri ('2025 HAZİRAN' gibi,
+    T10'un 'Haziran 2025'inden FARKLI sıra/büyük-harf — bkz. word_ortak.py:
+    hedef_donem_kolonu_bul() docstring'i), satır1=alt-başlıklar
+    ('ÜRETİM (MWh)'/'ORAN (%)'). Kendi 'Genel Toplam' satırıyla aritmetik
+    tutarlılık kontrol edilir (T4 ile AYNI desen)."""
+    donem_satiri = [c.text.strip() for c in tbl.rows[0].cells]
+    baslik_satiri = [c.text.strip() for c in tbl.rows[1].cells]
+    hedef_kolon = hedef_donem_kolonu_bul(
+        donem_satiri, baslik_satiri, hedef_ay_yil, "ÜRETİM"
+    )
+
+    satirlar = []
+    genel_toplam_deger: float | None = None
+    for row in tbl.rows[2:]:
+        hucreler = [c.text.strip() for c in row.cells]
+        kaynak_ham = hucreler[0]
+        if not kaynak_ham:
+            continue
+        if kaynak_ham.strip() in ("Genel Toplam", "Toplam"):
+            genel_toplam_deger = parse_sayi(hucreler[hedef_kolon])
+            continue
+        kaynak = kaynak_esle_zorunlu(kaynak_ham)
+        if kaynak is None:
+            continue
+        satirlar.append(
+            {
+                "tarih_id": tarih_id,
+                "kaynak": kaynak,
+                "lisans": "Lisanslı",
+                "uretim_mwh": parse_sayi(hucreler[hedef_kolon]),
+            }
+        )
+    df = pd.DataFrame(satirlar, columns=["tarih_id", "kaynak", "lisans", "uretim_mwh"])
+
+    if genel_toplam_deger is None:
+        raise ValueError("T2: 'Genel Toplam' satırı bulunamadı")
+    hesaplanan = float(df["uretim_mwh"].sum())
+    fark = abs(hesaplanan - genel_toplam_deger)
+    tolerans = max(0.5, abs(genel_toplam_deger) * 0.001)
+    if fark > tolerans:
+        raise ValueError(
+            f"T2: hesaplanan toplam {hesaplanan:.2f} MWh, tablonun kendi Genel "
+            f"Toplam'ı {genel_toplam_deger:.2f} MWh — fark {fark:.2f} MWh toleransı "
+            f"({tolerans:.2f}) aşıyor"
+        )
+    return df
+
+
+def t3_oku(tbl, tarih_id: int) -> pd.DataFrame:
+    """T3-karşılığı: Lisanslı Elektrik Üretimi, il bazında, TEK dönem,
+    iki-sütunlu sayfa düzeninde (Bulgu F) — `iki_blokta_il_degerlerini_
+    oku()` ile sol+sağ blok birleştirilir. Sağ bloğun SON satırı 'Genel
+    Toplam' etiketini taşıyor (sol blok o satırda boş) — kendi Genel
+    Toplam'ıyla aritmetik tutarlılık burada da kontrol edilir (T2/T4 ile
+    AYNI ilke); asıl çapraz doğrulama `mutabakat_uretim.py`'nin T2↔T3
+    toplam karşılaştırmasıdır.
+
+    **2025-01'de gerçek veride bulundu:** üretimi (o ay) sıfıra yakın
+    olan bir il (Kilis, plaka 79) satır olarak HİÇ görünmüyor — T4'ün
+    Bulgu 5 madde 4'ündeki AYNI davranış (kurulu güç DEĞİL ama aynı
+    "boş/sıfır ilin satırı basılmıyor" deseni), bu yüzden katı bir "81
+    il" assertion'ı YERİNE T4 ile AYNI yöntem: eksik iller `uretim_
+    mwh=0.0` ile AÇIKÇA tamamlanır (satır atlama YOK), asıl güvence
+    tablonun kendi Genel Toplam'ıyla aritmetik tutarlılıktır."""
+    ham_ciftler = iki_blokta_il_degerlerini_oku(tbl)
+
+    satirlar = []
+    gorulen_iller: set[int] = set()
+    genel_toplam_deger: float | None = None
+    for il_adi_ham, deger_ham in ham_ciftler:
+        il_adi = _il_adi_temizle(il_adi_ham)
+        if not il_adi:
+            continue
+        if il_adi.upper() in ("GENEL TOPLAM", "TOPLAM", "İL TOPLAM"):
+            genel_toplam_deger = parse_sayi(deger_ham)
+            continue
+        il_kodu = il_kodu_bul(il_adi)
+        if il_kodu is None:
+            raise ValueError(f"T3: il_kodu bulunamadı: {il_adi!r}")
+        gorulen_iller.add(il_kodu)
+        deger = parse_sayi(deger_ham)
+        satirlar.append(
+            {
+                "il_kodu": il_kodu,
+                "tarih_id": tarih_id,
+                "lisans": "Lisanslı",
+                "uretim_mwh": deger if deger is not None else 0.0,
+            }
+        )
+
+    eksik_iller = TUM_IL_KODLARI - gorulen_iller
+    for il_kodu in sorted(eksik_iller):
+        satirlar.append(
+            {
+                "il_kodu": il_kodu,
+                "tarih_id": tarih_id,
+                "lisans": "Lisanslı",
+                "uretim_mwh": 0.0,
+            }
+        )
+
+    df = pd.DataFrame(satirlar, columns=["il_kodu", "tarih_id", "lisans", "uretim_mwh"])
+
+    if genel_toplam_deger is None:
+        raise ValueError("T3: 'Genel Toplam' satırı bulunamadı")
+    hesaplanan = float(df["uretim_mwh"].sum())
+    fark = abs(hesaplanan - genel_toplam_deger)
+    tolerans = max(0.5, abs(genel_toplam_deger) * 0.001)
+    if fark > tolerans:
+        raise ValueError(
+            f"T3: hesaplanan toplam {hesaplanan:.2f} MWh, tablonun kendi Genel "
+            f"Toplam'ı {genel_toplam_deger:.2f} MWh — fark {fark:.2f} MWh toleransı "
+            f"({tolerans:.2f}) aşıyor"
+        )
+    if len(df) != 81:
+        raise ValueError(
+            f"T3: beklenen 81 il (eksikler 0 ile tamamlandı), gerçek {len(df)}"
+        )
+    return df
+
+
+def t5_oku(tbl, tarih_id: int) -> pd.DataFrame:
+    """T5-karşılığı: Lisanssız Elektrik Üretimi, kaynak bazında, TEK
+    dönem. 2025'te başlık 'Lisanssız Elektrik Üretimi ve Yapılan Ödeme
+    Miktarının Kaynaklara Göre Dağılımı (MWh-TL)' — üretim VE ödeme
+    birleşik tek tabloda, 7 kolon. Bulgu D (Karar 4) gereği 'Brüt
+    Lisanssız Üretim Miktarı (MWh)' kolonu kullanılır — 'İhtiyaç Fazlası
+    Satın Alınan Enerji Miktarı' (aynı tabloda, farklı bir kolon) DEĞİL,
+    o dar bir alt-küme (bkz. dokumanlar/12_word_uretim_envanteri.md
+    Bulgu D). **Bu fonksiyon 2026-09-13 itibarıyla HİÇBİR isle_ay_*()
+    tarafından ÇAĞRILMIYOR** — 2025'te T6 (Lisanssız il bazında) karşılığı
+    HİÇ YOK (Bulgu E, bu turda TAM doğrulandı: 12/12 ay), bu yüzden
+    `fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli` çapraz mutabakatı
+    (lisans_id=Lisanssız için) hiçbir zaman sağlanamaz — kullanıcı kararı
+    bekleniyor (bkz. dokumanlar/09_PROJE_DURUMU.md)."""
+    baslik_satir = [c.text.strip() for c in tbl.rows[0].cells]
+    brut_kolon_idx: int | None = None
+    for idx, hucre in enumerate(baslik_satir):
+        if "Brüt Lisanssız Üretim Miktarı" in hucre:
+            brut_kolon_idx = idx
+            break
+    if brut_kolon_idx is None:
+        raise ValueError(
+            f"T5: 'Brüt Lisanssız Üretim Miktarı' kolonu bulunamadı, başlık={baslik_satir}"
+        )
+
+    satirlar = []
+    genel_toplam_deger: float | None = None
+    for row in tbl.rows[1:]:
+        hucreler = [c.text.strip() for c in row.cells]
+        kaynak_ham = hucreler[0]
+        if not kaynak_ham:
+            continue
+        if kaynak_ham.strip() in ("Genel Toplam", "Toplam"):
+            genel_toplam_deger = parse_sayi(hucreler[brut_kolon_idx])
+            continue
+        kaynak = kaynak_esle_zorunlu(kaynak_ham)
+        if kaynak is None:
+            continue
+        satirlar.append(
+            {
+                "tarih_id": tarih_id,
+                "kaynak": kaynak,
+                "lisans": "Lisanssız",
+                "uretim_mwh": parse_sayi(hucreler[brut_kolon_idx]),
+            }
+        )
+    df = pd.DataFrame(satirlar, columns=["tarih_id", "kaynak", "lisans", "uretim_mwh"])
+
+    if genel_toplam_deger is None:
+        raise ValueError("T5: 'Genel Toplam' satırı bulunamadı")
+    hesaplanan = float(df["uretim_mwh"].sum())
+    fark = abs(hesaplanan - genel_toplam_deger)
+    tolerans = max(0.5, abs(genel_toplam_deger) * 0.001)
+    if fark > tolerans:
+        raise ValueError(
+            f"T5: hesaplanan toplam {hesaplanan:.2f} MWh, tablonun kendi Genel "
+            f"Toplam'ı {genel_toplam_deger:.2f} MWh — fark {fark:.2f} MWh toleransı "
+            f"({tolerans:.2f}) aşıyor"
         )
     return df
 
@@ -651,6 +846,171 @@ def isle_ay_t4(
     return sonuc
 
 
+def isle_ay_uretim_geneli(
+    conn,
+    *,
+    klasor: Path,
+    ay: int,
+    actor_name: str,
+    dry_run: bool = False,
+) -> pipeline.IslemSonucu | None:
+    """`fact_uretim_kaynak_geneli` + `fact_uretim_il_geneli`'ni 2025 Word
+    aylarına doldurur — `pipeline.isle_ay_uretim_excel()` ile AYNI desen
+    (İKİ tabloyu da AYNI batch_id altında yazar), `isle_ay`/`isle_ay_t4`nin
+    T11/T10/T4 akışlarına DOKUNMAZ.
+
+    **2026-09-13 (ADIM 4 kod turu) — YALNIZ Lisanslı (T2+T3):** Bulgu E
+    bu turda TAM doğrulandı (12/12 ay) — 2025'te T6 (Lisanssız, il
+    bazında) karşılığı bir tablo HİÇ YOK (yalnız kaynak-bazında T5 var,
+    il×kaynak joint tablo da Bulgu C kararı gereği zaten kullanılmıyor).
+    T5'i buraya eklemek `fact_uretim_kaynak_geneli`'ye Lisanssız satır
+    yazar ama `fact_uretim_il_geneli` tarafında hiç karşılığı olmadığından
+    `mutabakat_uretim.py` bunu HER ZAMAN 'bir_taraf_eksik' (uyumsuz)
+    olarak işaretler ve aktivasyonu SÜRESİZ bloklar — bu, kullanıcı
+    kararını gerektiren açık bir madde (bkz. dokumanlar/
+    09_PROJE_DURUMU.md). Karar verilene kadar yalnız Lisanslı yükleniyor;
+    `t5_oku()` yazıldı ama HİÇBİR YERDEN çağrılmıyor."""
+    dosya_adi = MANIFEST_2025[ay]
+    yol = klasor / dosya_adi
+    yil = 2025
+    tarih_id = yil * 100 + ay
+    ay_adi = ingest.AY_ADLARI[ay]
+    ay_yil = f"{yil} {ay_adi.upper()}"  # bkz. t2_oku docstring - T2'nin KENDİ sırası/büyük-harfi
+    source_period = f"{yil}-{ay:02d}"
+    parser_version = "word-2025-uretim-geneli-v1"
+
+    print(f"\n=== Üretim Geneli (Lisanslı) {ay_adi} {yil} — {dosya_adi} ===")
+
+    if not dry_run:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT ib.batch_id, ib.status FROM ingestion_batch ib
+                JOIN source_asset sa ON sa.source_asset_id = ib.source_asset_id
+                WHERE sa.source_type = 'epdk_aylik_word' AND sa.source_period = %s
+                  AND ib.parser_version = %s AND ib.status != 'failed'
+                ORDER BY ib.batch_id
+                """,
+                (source_period, parser_version),
+            )
+            mevcut = cur.fetchall()
+        if mevcut:
+            print(f"  [ATLA] Üretim Geneli {source_period} zaten işlenmiş: {mevcut}")
+            return None
+
+    icerik = yol.read_bytes()
+    doc = Document(BytesIO(icerik))
+    basliklar = basliklari_topla(doc)
+
+    t2_tbl, t2_baslik = tek_aday_bul(
+        basliklar,
+        icerir=["Lisanslı Elektrik Üretiminin Kaynak Bazında Dağılımı"],
+        etiket="T2",
+    )
+    print(f"  T2 başlık: {t2_baslik!r}")
+    t3_tbl, t3_baslik = tek_aday_bul(
+        basliklar,
+        icerir=["Lisanslı Elektrik Üretiminin İl Bazında Dağılımı"],
+        etiket="T3",
+    )
+    print(f"  T3 başlık: {t3_baslik!r}")
+
+    kaynak_ham = t2_oku(t2_tbl, tarih_id, ay_yil)
+    il_ham = t3_oku(t3_tbl, tarih_id)
+    print(
+        f"  T2 (kaynak): {len(kaynak_ham)} satır, toplam={kaynak_ham['uretim_mwh'].sum():,.2f} MWh"
+    )
+    print(
+        f"  T3 (il): {len(il_ham)} satır, toplam={il_ham['uretim_mwh'].sum():,.2f} MWh"
+    )
+
+    if dry_run:
+        print("  [DRY-RUN] DB'ye yazılmadı.")
+        return None
+
+    source_asset_id = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="epdk_aylik_word",
+        dosya_adi=dosya_adi,
+        icerik=icerik,
+        donem_tipi="aylik",
+        source_period=source_period,
+        uploaded_by=None,
+    )
+    batch_id = ingest.batch_olustur(conn, source_asset_id, parser_version, "1")
+    if not ingest.batch_sahiplen(conn, batch_id):
+        print(f"  [ATLA] batch_id={batch_id} zaten sahiplenilmiş/işlenmiş.")
+        return None
+
+    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+
+    sonuc = pipeline.IslemSonucu(batch_id=batch_id)
+    audit_tablolar: dict[str, dict[str, object]] = {}
+    toplam_yuklenen = 0
+
+    for tablo_adi, ham_df, yukle_fn in (
+        (
+            "fact_uretim_kaynak_geneli",
+            kaynak_ham,
+            ingest.fact_uretim_kaynak_geneli_yukle,
+        ),
+        ("fact_uretim_il_geneli", il_ham, ingest.fact_uretim_il_geneli_yukle),
+    ):
+        dogrulanan = kpi.dogrula_uretim_geneli(ham_df)
+        yuklenen, atlanan = yukle_fn(conn, dogrulanan.kabul, batch_id)
+        toplam_yuklenen += yuklenen
+        sonuc.tablolar[tablo_adi] = pipeline.TabloSonucu(
+            toplam=len(ham_df),
+            red=len(dogrulanan.red),
+            karantina=len(dogrulanan.karantina),
+            yuklenen=yuklenen,
+            atlanan=atlanan,
+        )
+        audit_tablolar[tablo_adi] = {
+            "toplam": len(ham_df),
+            "red": len(dogrulanan.red),
+            "karantina": len(dogrulanan.karantina),
+            "yuklenen": yuklenen,
+            "atlanan": atlanan,
+            "red_satirlari": dogrulanan.red.to_dict("records"),
+        }
+        if dogrulanan.red.shape[0]:
+            print(f"  [DİKKAT] {tablo_adi}: red={len(dogrulanan.red)}")
+
+    ingest.batch_durumu_guncelle(
+        conn,
+        batch_id,
+        "running",
+        total_row_count=len(kaynak_ham) + len(il_ham),
+        accepted_row_count=toplam_yuklenen,
+        rejected_row_count=len(kaynak_ham) + len(il_ham) - toplam_yuklenen,
+    )
+    ingest.audit_log_yaz(
+        conn,
+        table_name="ingestion_batch",
+        record_id=batch_id,
+        action_type="INSERT",
+        actor_name=actor_name,
+        payload={
+            "olay": "ingest_tamamlandi",
+            "tarih_id": tarih_id,
+            "kaynak": "word_2025_uretim_geneli",
+            "tablolar": audit_tablolar,
+            "not": "Yalnız Lisanslı (T2+T3) - Lisanssız (T5) 2025'te T6 "
+            "karşılığı YOK (Bulgu E), kullanıcı kararı bekleniyor, bkz. "
+            "dokumanlar/09_PROJE_DURUMU.md.",
+        },
+    )
+
+    uygun, sebep = pipeline.otomatik_onaya_uygun(sonuc)
+    print(f"  otomatik_onaya_uygun() = {uygun}" + (f" ({sebep})" if sebep else ""))
+    print(
+        "  [NOT] onayla ÇAĞRILMADI (gece-boyu kural) — mutabakat_uretim.py "
+        "ile çapraz kontrol AYRICA yapılmalı, batch running/is_active=false kalıyor."
+    )
+    return sonuc
+
+
 def isle_ay_ulke_geneli(
     conn,
     *,
@@ -832,13 +1192,23 @@ def main() -> int:
         action="store_true",
         help="T11/T10 yerine YALNIZ fact_tuketim_ulke_geneli'yi işle (ayrı batch)",
     )
+    ap.add_argument(
+        "--uretim-geneli",
+        action="store_true",
+        help="T11/T10 yerine YALNIZ fact_uretim_kaynak_geneli+il_geneli'yi "
+        "(T2+T3, yalnız Lisanslı) işle — ayrı batch",
+    )
     args = ap.parse_args()
 
     aylar = [args.ay] if args.ay else sorted(MANIFEST_2025)
     isleyici = (
-        isle_ay_ulke_geneli
-        if args.ulke_geneli
-        else (isle_ay_t4 if args.t4 else isle_ay)
+        isle_ay_uretim_geneli
+        if args.uretim_geneli
+        else (
+            isle_ay_ulke_geneli
+            if args.ulke_geneli
+            else (isle_ay_t4 if args.t4 else isle_ay)
+        )
     )
 
     if args.dry_run:

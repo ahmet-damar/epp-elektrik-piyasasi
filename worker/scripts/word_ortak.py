@@ -20,7 +20,7 @@ from docx.document import Document
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
-from worker.parser import parse_sayi
+from worker.parser import normalize_label, parse_sayi
 
 
 def gez(document: Document):
@@ -89,16 +89,48 @@ def hedef_donem_kolonu_bul(
     """Dönemler-arası-karşılaştırma tablolarında (T10/T9-karşılığı gibi)
     hedef döneme ait kolonu METİN aramasıyla bulur. Hücre metni
     '2024\\nMart' gibi satır-içi kesik/ters sıralı olabilir (gerçek veride
-    doğrulandı) — kelime bazlı, sırasız karşılaştırma yapılır."""
-    hedef_kelimeler = set(hedef_ay_yil.split())
+    doğrulandı) — kelime bazlı, sırasız karşılaştırma yapılır.
+
+    Kelimeler `normalize_label()` ile karşılaştırılır (2026-09-13, ADIM 4/
+    T2 bulgusu): T10'un dönem satırı "Haziran 2025" (başlık-harf) iken
+    T2'ninki "2025 HAZİRAN" (tüm-büyük, Türkçe noktalı İ) — ham Python
+    `.upper()` "Haziran"ı yanlış şekilde "HAZIRAN" (noktasız I) üretir,
+    dokümandaki gerçek "HAZİRAN" ile birebir eşleşmez. `normalize_label()`
+    ikisini de AYNI ASCII-sadeleştirilmiş forma indirger ("HAZIRAN") —
+    büyük/küçük harf ve İ/I varyasyonlarından bağımsız, hâlâ yıl-bağımsız
+    bir yardımcı (bkz. modül notu)."""
+    hedef_kelimeler = {normalize_label(k) for k in hedef_ay_yil.split()}
     for idx, (donem, baslik) in enumerate(zip(donem_satiri, baslik_satiri)):
-        donem_kelimeler = set(donem.split())
+        donem_kelimeler = {normalize_label(k) for k in donem.split()}
         if hedef_kelimeler.issubset(donem_kelimeler) and baslik_iceren in baslik:
             return idx
     raise ValueError(
         f"Hedef dönem {hedef_ay_yil!r} için {baslik_iceren!r} içeren kolon bulunamadı.\n"
         f"donem_satiri={donem_satiri}\nbaslik_satiri={baslik_satiri}"
     )
+
+
+def iki_blokta_il_degerlerini_oku(
+    tbl: Table, deger_kolon_ofset: int = 1
+) -> list[tuple[str, str]]:
+    """Bulgu F (dokumanlar/12_word_uretim_envanteri.md): il-bazında üretim
+    tabloları (Lisanslı/Lisanssız, HER YIL) TEK bir Word tablosu içinde il
+    listesini ikiye bölüp YAN YANA iki blok olarak basıyor — başlık satırı
+    `['İLLER', 'ÜRETİM (MWh)', 'ORAN (%)', 'İLLER', 'ÜRETİM (MWh)', 'ORAN
+    (%)']` (sol blok kolon 0-2, sağ blok kolon 3-5). Bu fonksiyon HER İKİ
+    bloğu ayrı ayrı okuyup (il_adı_ham, değer_metni_ham) çiftlerinin düz
+    bir listesini döner — il eşleme/sayı ayrıştırma YAPMAZ (worker/
+    parser.py'nin il_kodu_bul()/parse_sayi()'si çağıranın işi, T4/T11
+    okuyucularıyla AYNI ilke). Boş hücreli slotlar (sağ blok bir kısa
+    kaldığında, örn. 81 il tek sayı ise) atlanır."""
+    sonuc: list[tuple[str, str]] = []
+    for row in tbl.rows[1:]:
+        hucreler = [c.text.strip() for c in row.cells]
+        if hucreler[0]:
+            sonuc.append((hucreler[0], hucreler[deger_kolon_ofset]))
+        if len(hucreler) > 3 and hucreler[3]:
+            sonuc.append((hucreler[3], hucreler[3 + deger_kolon_ofset]))
+    return sonuc
 
 
 def t4_tablosunu_bul(basliklar: list[tuple[Table, str]]) -> tuple[Table, str]:

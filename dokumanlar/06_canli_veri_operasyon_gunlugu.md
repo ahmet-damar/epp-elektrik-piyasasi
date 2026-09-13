@@ -1675,3 +1675,53 @@ GÖSTERİLDİ.
 
 **Sonuç: cron yolu ÇALIŞIYOR, artifact gerçek ve makul, retention doğru.**
 Açık madde yok.
+
+## 2026-09-13 (devam) — ADIM 4 başladı: 2025 Word T2/T3 (Lisanslı) disposable'da doğrulandı
+
+Word 10 yıl üretim parser'ının İLK yılı (2025, Excel'e en yakın format)
+işlendi — YALNIZ disposable postgres:17, canlıya UYGULANMADI.
+
+**Gerçek dosyaya (`C:\Users\adama\Downloads\EPDK Verileri`, MANIFEST_2025)
+karşı bulunan iki format sürprizi:**
+1. T2'nin (Lisanslı, kaynak bazında) dönem satırı `'2025 HAZİRAN'`
+   formatında (yıl-önce, tüm-büyük, Türkçe noktalı İ) — T10'un
+   `'Haziran 2025'`inden (ay-önce, başlık-harf) FARKLI. `word_ortak.py:
+   hedef_donem_kolonu_bul()` `normalize_label()` kullanacak şekilde
+   genişletildi (geriye uyumlu — 122/122 mevcut Word yılı testi
+   SONRASINDA da yeşil).
+2. T3'te (Lisanslı, il bazında) 2025-01'de Kilis (plaka 79) satır olarak
+   HİÇ görünmüyor — üretimi o ay sıfıra yakın olduğu için (T4'ün Bulgu 5
+   madde 4'üyle AYNI desen). `t3_oku()` eksik ili 0.0 ile açıkça
+   tamamlıyor, katı "81 il" assertion'ı YOK.
+
+**Disposable postgres:17 sonucu:**
+```
+12/12 ay yüklendi (isle_ay_uretim_geneli, yalnız Lisanslı T2+T3)
+mutabakat_uretim.py: Kontrol edilen (tarih_id, lisans_id) çifti: 12
+                     Uyumlu: 12, uyumsuz batch: 0
+```
+Aylık T2 toplamları (MWh): Oca 29.449.259,93 / Şub 27.326.453,03 /
+Mar 26.210.182,59 / Nis 24.723.282,21 / May 25.177.330,06 /
+Haz 24.655.321,00 / Tem 33.001.265,63 / Ağu 32.307.590,50 /
+Eyl 27.155.789,10 / Eki 25.491.942,08 / Kas 26.087.561,89 /
+Ara 30.237.671,94 — T3 ile ONDALIK BASAMAĞA YAKIN eşleşti (±0,15 MWh,
+1 il'e kadar yuvarlama farkı).
+
+**Ayrıca bulundu:** T5 (Lisanssız, kaynak bazında) tablosu "Rüzgâr"
+(inceltme işaretli â) yazıyor — T2/T4'ün â'sız yazımından farklı, tek
+satırlık bir takma ad (`_KAYNAK_TAKMA_ADLAR`) ile çözüldü.
+
+**⚠️ AÇIK MADDE (kullanıcı kararı bekliyor):** T6 (Lisanssız, il bazında
+marjinal) tablosu 2025'in 12 ayının TAMAMINDA yok — ne aynı adla ne
+yeniden adlandırılmış, filtre olmadan tam tablo listesi tarandı. T5
+YAZILDI ama YÜKLENMİYOR — yüklenirse `fact_uretim_il_geneli` tarafında
+karşılığı olmadığından `mutabakat_uretim.py` bu (tarih_id, Lisanssız)
+çiftini süresiz "bir_taraf_eksik" işaretler, aktivasyonu bloklar. Detay
+ve seçenekler: `09_PROJE_DURUMU.md`.
+
+19 yeni regresyon testi eklendi (`test_word_2025.py`), tüm 12 ay + iki
+format-sürprizi senaryosu synthetic docx ile pinlendi. Disposable
+postgres:17'de CI-tam-sırayla + unit-only tüm suite yeşil (244 unit +
+52 entegrasyon).
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.15, Sürüm Geçmişi v1.29.
