@@ -449,13 +449,14 @@ kapsamlı bir kanıt-of-concept, tam bir tahminleme motoruna atlamadan
 önce. 10 yıl gerçek veri artık var (2016-2025), bu kararı gözden
 geçirmek için önceki turlarda "erken" denen gerekçe artık geçerli değil.
 
-### İlk çalışacak zamanlanmış yedek — bir sonraki oturumun İLK işi
-`scheduled-backup.yml`'in cron'u (`0 3 * * 0`, her Pazar 03:00 UTC) ile
-İLK gerçek otomatik koşusu **2026-09-13 Pazar 03:00 UTC**'de olacak
-(bugüne kadarki koşular hep elle `workflow_dispatch` iledir). Bir sonraki
-oturum önce bunu kontrol etmeli: `gh run list --workflow=scheduled-
-backup.yml` ile o koşunun gerçekten tetiklendiğini ve başarılı olduğunu
-doğrula (artifact oluştu mu, dump boyutu makul mü). GitHub'ın kendi
-başarısızlık e-postası da açık (repo sahibi, "On GitHub + Email + yalnız
-başarısız workflow'lar" — kullanıcı tarafından teyit edildi) — ama bu,
-elle kontrolün YERİNE GEÇMEZ, yalnız bir ek güvenlik ağı.
+### ✅ Kapandı — İlk gerçek cron koşusu doğrulandı (2026-09-13)
+`scheduled-backup.yml`'in cron'u (`0 3 * * 0`) 2026-09-13 Pazar günü
+İLK KEZ `schedule` tetikleyicisiyle (elle `workflow_dispatch` DEĞİL)
+gerçekten koştu — run `34747084899`, `success`, artifact `epp-backup-
+34747084899` (1.657.776 bayt, retention tam 90 gün). Tek dikkat çeken
+nokta: 03:00 UTC yerine 08:11:52 UTC'de tetiklendi (~5s11dk gecikme) —
+GitHub'ın dokümante edilmiş `schedule` gecikme davranışı (yoğun yük
+dönemlerinde dakikalar-saatler mertebesinde), repo hareketsizliğiyle
+İLGİSİZ (bu repoda güncel commit aktivitesi var). Detay: `06_canli_veri_
+operasyon_gunlugu.md` 2026-09-13 kaydı. Açık madde YOK, tekrar kontrol
+gerekmiyor (mekanizma kanıtlandı).

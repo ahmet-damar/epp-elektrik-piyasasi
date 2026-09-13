@@ -1640,3 +1640,38 @@ tüm test paketi TEK BİR temiz pencerede sorunsuz koştu. Bilinen "WSL VM
 boşlukta duruyor" deseninin bir varyantı, kod regresyonuyla İLGİSİZ.
 
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.14, Sürüm Geçmişi v1.28.
+
+## 2026-09-13 — `scheduled-backup.yml`'in İLK gerçek cron koşusu doğrulandı
+
+Cron (`0 3 * * 0`, her Pazar 03:00 UTC) — 2026-09-13 gerçekten bir Pazar
+— için ilk otomatik (`schedule` tetikleyicili, `workflow_dispatch` DEĞİL)
+koşu kontrol edildi:
+
+```
+Run 34747084899 — trigger: schedule — status: success — 08:11:52 UTC
+Artifact: epp-backup-34747084899, 1.657.776 bayt (~1,58 MB)
+  created_at: 2026-09-13T08:12:28Z
+  expires_at: 2026-12-12T08:11:52Z  (tam 90 gün — retention-days: 90 doğru uygulandı)
+```
+
+**Gecikme notu (bulgu, sorun DEĞİL):** koşu 03:00 UTC yerine 08:11:52
+UTC'de tetiklendi (~5 saat 11 dakika gecikme). GitHub'ın kendi
+dokümantasyonu `schedule` olaylarının yoğun yük dönemlerinde dakikalar-
+saatler mertebesinde gecikebileceğini, ve bu gecikmenin repo'da uzun süre
+aktivite YOKSA arttığını belirtiyor — burada geçerli olan ikinci durum
+DEĞİL (bu repo'da 2026-09-09'a kadar günlük commit var). Tahmin
+yürütülmedi: birebir doğrulanabilir tek şey GitHub'ın kendi resmi
+davranışının bu olduğu, gecikmenin kesin nedeni (o saatte platformun genel
+kuyruk yükü) GitHub tarafında, bizim tarafımızdan gözlemlenemez. `main`
+branch'te olması, cron ifadesinin sözdizimi ve 60 günlük hareketsizlik
+eşiği (buraya uygulanamaz) doğrulandı — hiçbiri sorun değil.
+
+Artifact boyutu (1,58 MB) elle tetiklenen referans koşuyla (2026-09-08,
+1,61 MB) aynı mertebede — dump boş/bozuk değil. İçerik bu turda tekrar
+`pg_restore --list` ile açılmadı (bu adım 2026-09-08'de zaten uçtan uca
+doğrulanmıştı, bkz. Sürüm Geçmişi v1.9) — bugünkü kontrolün amacı yalnız
+CRON YOLUNUN (elle tetikleme değil) gerçekten çalıştığını göstermekti,
+GÖSTERİLDİ.
+
+**Sonuç: cron yolu ÇALIŞIYOR, artifact gerçek ve makul, retention doğru.**
+Açık madde yok.
