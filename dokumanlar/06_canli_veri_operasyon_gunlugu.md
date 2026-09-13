@@ -1917,3 +1917,82 @@ Sıradaki adımlar 2021→2020→2019→2018, sonra 2016-2017.
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.19, Sürüm Geçmişi v1.33,
 `12_word_uretim_envanteri.md` Bulgu L, `05_kaynak_dosya_sozlesmesi.md`
 Karar (Bulgu L).
+
+## 2026-09-13 (devam) — Ortam bulgusu: sahte/dinleyicisiz DATABASE_URL psycopg'i SONSUZA kadar asıyor (WSL köprüsü DEĞİL)
+
+2021'in (T2+T3) tam `pytest worker/tests -v` doğrulaması sırasında koşu
+**asılı kaldı** (arka planda 30+ dakika, sıfır byte çıktı). Şüphe önce
+2026-09-09'da not düşülen WSL2↔Windows port-forward köprüsüne yöneldi —
+**ÖLÇÜLEREK ELENDİ:**
+
+- Disposable container (`epp-pg-disposable`) WSL içinden doğrudan
+  kontrol edildi: `docker ps` → `Up 3 hours`, `pg_isready` → `accepting
+  connections`, `psql` sorgusu anında sonuç döndü (89 tablo).
+- Windows tarafından köprü üzerinden (`127.0.0.1:15433`) `psycopg.connect()`
+  ile bağlanma **58ms**'de başarılı — köprü SAĞLIKLI.
+- Asıl neden: asılan koşu, canlı-DB korumasını (`conftest.py`) atlatmak
+  için kullanılan **dinleyicisi olmayan sahte** `DATABASE_URL`
+  (`postgresql://user:pass@localhost:5432/dummy`) idi. `psycopg.connect()`
+  bu adrese karşı **30+ saniye boyunca hiçbir hataya düşmeden asılı
+  kaldı** (2 kez, hem `localhost` hem `127.0.0.1` host'uyla tekrar
+  üretildi) — oysa AYNI kapalı porta çıplak bir Python `socket.connect()`
+  ~2 saniyede `ConnectionRefusedError` ile hemen reddediliyor. Yani sorun
+  Postgres/WSL/köprü değil, bu makinede **psycopg/libpq'nun reddedilen
+  bir bağlantıya karşı normalden çok daha uzun süre beklemesi** — sebebi
+  netleştirilmedi (Windows Defender/güvenlik duvarının paket-inceleme
+  gecikmesi ihtimal dahilinde), ama davranış tutarlı ve tekrar üretilebilir.
+
+**Kalıcı çözüm:** `DATABASE_URL`'i ASLA dinleyicisi olmayan bir yer
+tutucuya (sahte host/port) işaret ettirme. Canlı-DB korumasını atlayıp
+gerçek bir bağlantı denemesi gerektirmeyen SAF birim testleri (tek dosya/
+`-k` alt kümesi) için sahte adres hâlâ güvenli (küçük yüzey, gerçek
+entegrasyon fixture'ları tetiklenmiyor — bkz. `test_word_2021.py`'nin 15
+testi sahte adresle 1.44s'de geçti). Ama TAM `worker/tests` paketi gibi
+entegrasyon fixture'larını da içerebilecek daha geniş bir koşu için
+`DATABASE_URL`'i doğrudan çalışan disposable'a
+(`postgresql://postgres:postgres@127.0.0.1:15433/postgres`) işaret ettir —
+bu şekilde tam paket **22.32 saniyede** tamamlandı (324 geçti, yalnızca
+`test_auth_integration.py`'nin bir testi `fact_tuketim` boş olduğu için
+düştü — disposable'a hiç Excel tüketim verisi yüklenmediği için beklenen
+bir sonuç, kod hatası DEĞİL, bu test zaten CI'nin "integration" job'ının
+sabit 5 dosyalık listesinde yok).
+
+Ayrıca güvenlik ağı olarak `pytest-timeout` eklendi (`requirements-dev.txt`,
+`.venv`'e kuruldu) — `--timeout=120` ile gelecekte benzer bir asılma
+sessizce saatler sürmek yerine 120 saniyede başarısız test olarak
+görünür hale gelir.
+
+2021'in T2/T3 doğrulaması bu ölçümden SONRA, gerçek disposable'a karşı
+tekrarlandı ve temiz geçti (bkz. aşağıdaki "2021 tamamlandı" girdisi).
+
+## 2026-09-13 (devam) — ADIM 4: 2021 (T2+T3 Lisanslı) tamamlandı
+
+`word_2021.py`'ye `t2_oku()`/`t3_oku()`/`isle_ay_uretim_geneli()` eklendi
+(2022 ile BİREBİR AYNI desen). Tek format sürprizi (Bulgu M): Nisan
+2021'in T2 tablosu `"RÜZGÂR"` (inceltmeli â, tüm-büyük) yazıyor, diğer 11
+ay ve T4'ün tamamı â'sız `"RÜZGAR"`. Dry-run sırasında bu ay
+`[BEKLEMEDE] Nisan 2021 dry-run'da hata: Tanınmayan kaynak türü
+etiketi: 'RÜZGÂR'` olarak yakalandı (2021'in kendi try/except direnç
+deseni sayesinde diğer 11 ay etkilenmeden) — `_KAYNAK_TAKMA_ADLAR`'a
+`{"RÜZGÂR": "Rüzgar"}` eklenip yeniden koşuldu, 12/12 ay temiz.
+
+Disposable postgres:17 (fresh rebuild, `setup_pg2.sh`, 30/30 migration):
+12 ayın tamamı yüklendi, her ay `[KAPSAM DIŞI] Lisanssız (T5/T6) her iki
+tabloda da işaretlendi (Bulgu L).` bastı. `mutabakat_uretim.py`:
+`Kontrol edilen (tarih_id, lisans_id) çifti: 12 / Uyumlu: 12, uyumsuz
+batch: 0`.
+
++6 regresyon testi (`test_word_2021.py`): RÜZGÂR alias
+(`kaynak_esle_zorunlu`), `t2_oku`/`t3_oku` normal senaryo, RÜZGÂR'lı
+sentetik T2, ve her ikisinin Genel-Toplam-uyuşmazlığı senaryosu.
+266/266 Word-parser unit test yeşil. `ruff format`/`ruff check`/
+`python -m mypy app worker --ignore-missing-imports
+--explicit-package-bases` temiz, `bandit -r worker/scripts/word_2021.py`
+sıfır bulgu.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.20, Sürüm Geçmişi v1.34,
+`12_word_uretim_envanteri.md` Bulgu M.
+
+**ADIM 4 durumu:** 2025/2024/2023/2022/2021 (T2+T3 Lisanslı) TAMAMLANDI,
+YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı. Sıradaki adımlar
+2020→2019→2018, sonra 2016-2017.

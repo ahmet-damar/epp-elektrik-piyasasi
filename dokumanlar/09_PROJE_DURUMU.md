@@ -130,11 +130,11 @@ yansıtıldı.**
   TAMAMLANDI (2026-09-08/09), Bulgu C/D kararları verilip uygulandı, ADIM
   5 (KPI bağlama, KPI-01..07'nin TAMAMI — KPI-04 dahil) TAMAMLANDI
   (2026-09-09), ADIM 4 (Word 2016-2025 üretim parser'ı) 2026-09-13'te
-  BAŞLADI — 2025/2024/2023/2022'nin "Excel'e en yakın 4 yıl" fazı
+  BAŞLADI — 2025/2024/2023/2022/2021'in "Excel'e en yakın 5 yıl" fazı
   TAMAMLANDI (T2+T3 Lisanslı yüklendi, Lisanssız TÜM Word yılları için
   kapsam dışı — Bulgu D/L, iki açık karar 2024-02/2022-T6 sayıyla
-  ölçülüp kapatıldı, bkz. Bulgu I/J/K/L), hepsi YALNIZ disposable,
-  canlıya UYGULANMADI, sıradaki iş 2021→2020→2019→2018** (bkz. "Sonraki
+  ölçülüp kapatıldı, bkz. Bulgu I/J/K/L/M), hepsi YALNIZ disposable,
+  canlıya UYGULANMADI, sıradaki iş 2020→2019→2018** (bkz. "Sonraki
   Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
@@ -448,14 +448,27 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     12/12 ay yüklendi, mutabakat **12/12 uyumlu**. +6 test (2 Bulgu J
     pinlemesi + 4 `test_word_2022.py`), 260/260 unit test yeşil. Detay:
     `10_TEKNIK_MASTER_DOKUMAN.md` §5.19, Sürüm Geçmişi v1.33.
-  - **🏁 ADIM 4'ün "Excel'e en yakın 4 yıl" fazı TAMAMLANDI (2025+2024+
-    2023+2022) — hepsi YALNIZ disposable postgres:17'de, canlıya
-    HİÇBİRİ UYGULANMADI.** Sıradaki adım 2021→2020→2019→2018, sonra
+  - **✅ 2021 TAMAMLANDI (2026-09-13):** T2+T3 (Lisanslı) yüklendi,
+    Lisanssız (Bulgu L kararıyla) TÜM yıl kapsam dışı. Tek format
+    sürprizi: **Bulgu M** — Nisan 2021'in T2'si `"RÜZGÂR"` (inceltmeli,
+    tüm-büyük) yazıyor, diğer 11 ay â'sız `"RÜZGAR"` — `word_2021.py`'nin
+    `_KAYNAK_TAKMA_ADLAR`'ına eklendi. Disposable: 12/12 ay yüklendi,
+    mutabakat **12/12 uyumlu**. +6 test (`test_word_2021.py`), 266/266
+    Word-parser unit test yeşil. Ayrıca bu turda bir ORTAM bulgusu
+    (kod DEĞİL) bulunup kalıcı çözüldü: sahte/dinleyicisiz bir
+    `DATABASE_URL` ile tam `pytest worker/tests` koşusu asılı kalıyordu
+    (psycopg'in reddedilen bağlantıya karşı anormal beklemesi — WSL
+    köprüsü ayrıca ölçülüp SAĞLIKLI bulundu); `pytest-timeout` güvenlik
+    ağı olarak eklendi. Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.20,
+    Sürüm Geçmişi v1.34, `06_canli_veri_operasyon_gunlugu.md` 2026-09-13
+    (devam).
+  - **🏁 ADIM 4'ün "Excel'e en yakın 5 yıl" fazı TAMAMLANDI (2025+2024+
+    2023+2022+2021) — hepsi YALNIZ disposable postgres:17'de, canlıya
+    HİÇBİRİ UYGULANMADI.** Sıradaki adım 2020→2019→2018, sonra
     2016-2017 (zaten Lisanssız kapsam dışı, ayrı bir turda, yalnız
     Lisanslı yüklenecek). Canlı backfill kullanıcı onayıyla TÜM yıllar
-    bittikten sonra TEK SEFERDE yapılacak — kalan açık madde: 2024-02'nin
-    T3 verisi için (T3'ü olduğu gibi mi kabul et yoksa EPDK'nın olası bir
-    düzeltmesini mi bekle) canlıya geçmeden önce nihai bir karar.
+    bittikten sonra TEK SEFERDE yapılacak — 2024-02/2022-T6 kararları
+    zaten yukarıda KAPATILDI, canlıya geçmeden önce başka açık karar YOK.
   - **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatan notlar
     (hâlâ geçerli):**
   - `lisans_id` çözümü: **DOĞRULANDI, 2025 için ÇALIŞTI** — `t2_oku()`/

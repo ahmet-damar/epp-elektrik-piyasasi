@@ -355,6 +355,23 @@ yüklenmeye devam etmiyor.
 Detay/güncelleme: `dokumanlar/05_kaynak_dosya_sozlesmesi.md` "Word
 yılları — üretim kararları" bölümüne Karar (Bulgu L) olarak eklendi.
 
+## Bulgu M — 2021 Nisan'ın T2'sinde "RÜZGÂR" (inceltmeli, tüm-büyük) etiketi (2026-09-13)
+
+2021'in T2 (Lisanslı, kaynak bazında) tablosu 12 ayın 11'inde â'sız
+`"Rüzgar"` yazıyor (T4'ün her ayında olduğu gibi); yalnız **Nisan 2021**
+`"RÜZGÂR"` (inceltme işaretli â, tüm-büyük) kullanıyor. Bu, daha önce
+2025'in T5'inde (titlecase `"Rüzgâr"`) ve 2023'te (dokumanlar/08) görülen
+AYNI sınıf yazım-varyansı — `worker/parser.py`'nin `_TR_SADE` çeviri
+tablosu â/Â'yı ASCII'ye katlamadığı için her yeni görülen tam-eşleşme
+kendi yılının `_KAYNAK_TAKMA_ADLAR`'ına eklenmek zorunda (mimari karar:
+`worker/parser.py`'ye dokunulmuyor). 2021'in daha önce boş olan
+`_KAYNAK_TAKMA_ADLAR`'ına `{"RÜZGÂR": "Rüzgar"}` eklendi. Bu ay dışında
+(2021'in diğer 11 ayı + tüm T4) format sürprizi YOK.
+
+**Sonuç:** disposable postgres:17'de 12/12 ay yüklendi, `mutabakat_
+uretim.py` **12/12 uyumlu**. +6 yeni regresyon testi (`test_word_2021.py`:
+RÜZGÂR alias, `t2_oku`/`t3_oku` normal+Genel-Toplam-uyuşmazlığı senaryoları).
+
 ## Özet — ADIM 4 (Word üretim backfill'i) için önerilen sıra (öneri, karar DEĞİL)
 
 1. Bulgu E'yi çöz: 2023-Aralık + 2024/2025'in TAM tablo listesini (filtre
