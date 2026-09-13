@@ -130,12 +130,13 @@ yansıtıldı.**
   TAMAMLANDI (2026-09-08/09), Bulgu C/D kararları verilip uygulandı, ADIM
   5 (KPI bağlama, KPI-01..07'nin TAMAMI — KPI-04 dahil) TAMAMLANDI
   (2026-09-09), ADIM 4 (Word 2016-2025 üretim parser'ı) 2026-09-13'te
-  BAŞLADI — 2025/2024/2023/2022/2021/2020/2019'un "Excel'e en yakın 7
-  yıl" fazı TAMAMLANDI (T2+T3 Lisanslı yüklendi, Lisanssız TÜM Word
+  BAŞLADI — 2025/2024/2023/2022/2021/2020/2019/2018'in "Excel'e en yakın
+  8 yıl" fazı TAMAMLANDI (T2+T3 Lisanslı yüklendi, Lisanssız TÜM Word
   yılları için kapsam dışı — Bulgu D/L, iki açık karar 2024-02/2022-T6
   sayıyla ölçülüp kapatıldı, bkz. Bulgu I/J/K/L/M/N), hepsi YALNIZ
-  disposable, canlıya UYGULANMADI, sıradaki iş 2018** (bkz. "Sonraki
-  Oturum Devam Noktası" — tam liste orada).
+  disposable, canlıya UYGULANMADI, sıradaki iş 2016-2017 için
+  GENİŞLETİLMİŞ dry-run (kod yazılmadan)** (bkz. "Sonraki Oturum Devam
+  Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
   edilince T7 ile 4/6 ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11
@@ -491,15 +492,29 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     etti, **23/24 uyumlu** (tek uyumsuz beklenen 202402). +3 test
     (`test_word_2019.py`). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.22,
     Sürüm Geçmişi v1.36.
-  - **🏁 ADIM 4'ün "Excel'e en yakın 7 yıl" fazı TAMAMLANDI (2025+2024+
-    2023+2022+2021+2020+2019) — hepsi YALNIZ disposable postgres:17'de,
-    canlıya HİÇBİRİ UYGULANMADI.** Sıradaki adım 2018, sonra 2016-2017
-    (zaten Lisanssız kapsam dışı, ayrı bir turda, yalnız Lisanslı
-    yüklenecek — ayrıca 2016-2017 için GENİŞLETİLMİŞ dry-run 2018
-    bitince yapılacak, kod yazılmadan). Canlı backfill kullanıcı
-    onayıyla TÜM yıllar bittikten sonra TEK SEFERDE yapılacak —
-    2024-02/2022-T6 kararları zaten yukarıda KAPATILDI, canlıya
-    geçmeden önce başka açık karar YOK.
+  - **✅ 2018 TAMAMLANDI (2026-09-13):** T2+T3 (Lisanslı) yüklendi,
+    Lisanssız (Bulgu L kararıyla) TÜM yıl kapsam dışı. Kod yazmadan
+    ÖNCE tam T2/T3 dökümüyle tarandı — iki desen bulundu, İKİSİ DE
+    bilinen sınıflardan: Bulgu I sınıfı (Temmuz-Aralık'ın T2'si
+    3-satırlık bölünmüş başlık, established while-loop çözdü) ve
+    Bulgu N (12 ayın TAMAMINDA — Aralık dahil — Hidrolik "AKARSU"+
+    "BARAJLI HİDROLİK" ikiye bölünmüş, aynı toplama çözümü). T3'ün il
+    sayısı ay ay değişti (78/79/80, established Bulgu G, kod
+    değişikliği gerekmedi). Disposable (fresh, tek başına — üç yılın
+    art arda yüklenmesi established sequence-drift kontaminasyonuna
+    yol açtığı için rebuild edildi): 12/12 ay yüklendi, mutabakat
+    **12/12 uyumlu**. +4 test (`test_word_2018.py`). Detay:
+    `10_TEKNIK_MASTER_DOKUMAN.md` §5.23, Sürüm Geçmişi v1.37.
+  - **🏁 ADIM 4'ün "Excel'e en yakın 8 yıl" fazı TAMAMLANDI (2025+2024+
+    2023+2022+2021+2020+2019+2018) — hepsi YALNIZ disposable
+    postgres:17'de, canlıya HİÇBİRİ UYGULANMADI.** Sıradaki adım:
+    2016-2017 için GENİŞLETİLMİŞ dry-run (KOD YAZILMADAN — il satır
+    sayısı, kaynak etiketleri, başlık/dönem kolonu yapısı çıkarılıp
+    `12_word_uretim_envanteri.md`'ye ayrı bölüm olarak yazılacak,
+    sonra DUR VE RAPORLA — 2016-2017'nin uygulaması ayrı bir tur).
+    Canlı backfill kullanıcı onayıyla TÜM yıllar bittikten sonra TEK
+    SEFERDE yapılacak — 2024-02/2022-T6 kararları zaten yukarıda
+    KAPATILDI, canlıya geçmeden önce başka açık karar YOK.
   - **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatan notlar
     (hâlâ geçerli):**
   - `lisans_id` çözümü: **DOĞRULANDI, 2025 için ÇALIŞTI** — `t2_oku()`/

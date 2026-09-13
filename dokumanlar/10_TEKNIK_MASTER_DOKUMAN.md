@@ -84,6 +84,7 @@ her yeni rakam için geçerlidir.
 | v1.34 | 2026-09-13 | ADIM 4 — 2021 (T2+T3 Lisanslı) tamamlandı — §5.20. Bulgu M: Nisan 2021'in T2'si `"RÜZGÂR"` (inceltmeli, tüm-büyük) yazıyor, diğer 11 ay â'sız — `word_2021.py`'nin `_KAYNAK_TAKMA_ADLAR`'ına eklendi. Ayrıca ortam bulgusu: tam `pytest worker/tests` koşusu sahte/dinleyicisiz bir `DATABASE_URL` yüzünden asılı kaldı (psycopg'in reddedilen bağlantıya karşı anormal beklemesi — WSL köprüsü SAĞLIKLI olduğu ölçülerek kanıtlandı), kalıcı çözüm: geniş koşularda `DATABASE_URL` HER ZAMAN çalışan disposable'a işaret etmeli; `pytest-timeout` güvenlik ağı olarak eklendi | Disposable postgres:17: 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu — sürpriz YOK (RÜZGÂR hariç). +6 test (`test_word_2021.py`). 266/266 Word-parser unit test yeşil; tam `worker/tests` (325 test) disposable'a karşı 22.32s'de 324/325 (tek düşen `test_auth_integration.py`, boş `fact_tuketim` yüzünden — 2021'den bağımsız, CI'nin "worker" job'ında zaten koşmuyor) |
 | v1.35 | 2026-09-13 | ADIM 4 — 2020 (T2+T3 Lisanslı) tamamlandı — §5.21. 12 ayın TAMAMI kod yazmadan ÖNCE dry-run ile tarandı, hiçbir format sürprizi (Bulgu I/M sınıfı) yok — tüm-büyük kaynak etiketleri (DOĞAL GAZ/İTHAL KÖMÜR/HİDROLİK/RÜZGAR/GÜNEŞ/JEOTERMAL/BİYOKÜTLE/LİNYİT/ASFALTİT/TAŞ KÖMÜRÜ/MOTORİN) hiçbiri yeni takma ad gerektirmedi. Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı (2020 zaten Bulgu L'nin ölçüm aralığındaydı) | Disposable postgres:17: 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu. +4 test (`test_word_2020.py`). ADIM 4'ün "Excel'e en yakın 6 yıl" fazı (2025-2020) TAMAMLANDI, hepsi YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı |
 | v1.36 | 2026-09-13 | 2024-02 kararı yeniden CANLI doğrulandı (bekleyen yoktu) + ADIM 4 — 2019 (T2+T3 Lisanslı) tamamlandı, Bulgu N — §5.22. Bulgu N: 2019'un T2'si Ocak-Kasım'da Hidrolik'i "AKARSU"+"BARAJLI HİDROLİK" diye İKİ satıra bölüyor (Aralık tek satır) — kod yazmadan ÖNCE tam T2 dökümüyle tespit edildi, `t2_oku()` artık T4'ün established "TOPLA" ilkesiyle aynı kaynağa eşlenen satırları biriktirip TEK satır üretiyor (UNIQUE kısıt ihlali önlendi). Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı | Disposable postgres:17: 12/12 ay yüklendi (UNIQUE ihlali YOK), `mutabakat_uretim.py` 2024 ile birlikte 24 çift kontrol etti, 23/24 uyumlu (tek uyumsuz beklenen 202402). +3 test (`test_word_2019.py`). Sıradaki adım 2018, sonra 2016-2017 |
+| v1.37 | 2026-09-13 | ADIM 4 — 2018 (T2+T3 Lisanslı) tamamlandı — §5.23. İki desen, ikisi de bilinen sınıflardan: Bulgu I sınıfı (Temmuz-Aralık'ın T2'si 3-satırlık bölünmüş başlık) ve Bulgu N (12 ayın TAMAMINDA — Aralık dahil — Hidrolik "AKARSU"+"BARAJLI HİDROLİK" ikiye bölünmüş). T3'ün il sayısı ay ay değişiyor (78/79/80, established Bulgu G). Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı | Disposable postgres:17 (fresh, tek başına — sequence-drift kontaminasyonunu önlemek için): 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu. +4 test (`test_word_2018.py`). ADIM 4'ün "Excel'e en yakın 8 yıl" fazı (2025-2018) TAMAMLANDI, hepsi YALNIZ disposable. Sıradaki adım: 2016-2017 için GENİŞLETİLMİŞ dry-run (kod YAZILMADAN) |
 
 ---
 
@@ -1131,6 +1132,29 @@ uretim.py` **12/12 uyumlu** (2024 ile birlikte 24 çift kontrol edildi,
 **ADIM 4 durumu (güncellendi):** 2025/2024/2023/2022/2021/2020/2019
 (T2+T3 Lisanslı) TAMAMLANDI, YALNIZ disposable — canlıya HİÇBİRİ
 uygulanmadı. Sıradaki adım 2018, sonra 2016-2017.
+
+### 5.23 ADIM 4 — 2018 (T2+T3 Lisanslı) tamamlandı, "Excel'e en yakın 8 yıl" fazı bitti (2026-09-13)
+
+Kod yazmadan ÖNCE tam T2/T3 dökümüyle 12 ay tarandı: iki desen, İKİSİ DE
+zaten bilinen sınıflardan — **Bulgu I sınıfı** (Temmuz-Aralık'ın T2'si
+3-satırlık bölünmüş başlık, established dinamik `veri_baslangic`
+while-loop'u sorunsuz çözdü) ve **Bulgu N** (12 ayın TAMAMINDA — 2019'dan
+farklı olarak Aralık DAHİL — Hidrolik "AKARSU"+"BARAJLI HİDROLİK" diye
+ikiye bölünmüş, aynı `dict` biriktirici çözümü). T3'ün il sayısı ay ay
+değişiyor (78/79/80, established Bulgu G) — kod değişikliği gerekmedi.
+Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı. Disposable
+postgres:17 (fresh, tek başına — üç yılın art arda aynı container'a
+yüklenmesi `test_ingest_integration.py`/`test_job_worker_integration.py`
+gibi hardcoded job_id/batch_id testlerinde established sequence-drift
+kontaminasyonuna yol açtığı için, temiz sinyal için rebuild edildi):
+12/12 ay yüklendi, `mutabakat_uretim.py` **12/12 uyumlu**. +4 yeni test
+(`test_word_2018.py`).
+
+**ADIM 4 durumu (güncellendi):** 2025/2024/2023/2022/2021/2020/2019/2018
+(T2+T3 Lisanslı) TAMAMLANDI — ADIM 4'ün "Excel'e en yakın 8 yıl" fazı
+BİTTİ, hepsi YALNIZ disposable, canlıya HİÇBİRİ uygulanmadı. Sıradaki
+adım: 2016-2017 için GENİŞLETİLMİŞ dry-run (kod YAZILMADAN) — bkz.
+`12_word_uretim_envanteri.md`'nin ilgili yeni bölümü.
 
 ---
 

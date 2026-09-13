@@ -424,6 +424,23 @@ her biri Hidrolik'i başarıyla TEK satıra indirdi, UNIQUE ihlali YOK),
 (`test_word_2019.py`: alias eşlemesi + `t2_oku`'nun toplama davranışı +
 Genel-Toplam-uyuşmazlığı).
 
+**2018 (T2+T3 Lisanslı) tamamlandı (2026-09-13):** kod yazmadan ÖNCE tam
+T2/T3 dökümüyle 12 ay tarandı — İKİ desen zaten bilinen sınıflardan:
+(1) **Bulgu I sınıfı** — Temmuz-Aralık'ın T2'si 3-satırlık BÖLÜNMÜŞ
+başlık kullanıyor ("ORAN (%)" iki satıra ayrılmış, 2024'ün Bulgu I'iyle
+AYNI desen), dinamik `veri_baslangic` while-loop'u (2020-2025'ten
+taşınan established mekanizma) sorunsuz atladı; (2) **Bulgu N** —
+2019'dan FARKLI olarak 12 ayın TAMAMINDA (Aralık DAHİL, 2019'da Aralık
+tekleşiyordu) Hidrolik "AKARSU"+"BARAJLI HİDROLİK" diye ikiye bölünmüş,
+AYNI `dict` biriktirici çözümü kullanıldı. T3'ün il sayısı ay ay
+değişiyor (Ocak 78, çoğu ay 79, Kasım 80 — established Bulgu G, kod
+değişikliği GEREKTİRMEDİ, `t3_oku()` zaten hiçbir sabit sayı
+varsaymıyor). Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı.
+Disposable postgres:17'de (fresh, tek başına) 12/12 ay yüklendi,
+`mutabakat_uretim.py` **12/12 uyumlu**. +4 yeni regresyon testi
+(`test_word_2018.py`: alias eşlemesi, `t2_oku`'nun toplama davranışı,
+3-satırlık bölünmüş başlık, Genel-Toplam-uyuşmazlığı).
+
 ## Özet — ADIM 4 (Word üretim backfill'i) için önerilen sıra (öneri, karar DEĞİL)
 
 1. Bulgu E'yi çöz: 2023-Aralık + 2024/2025'in TAM tablo listesini (filtre

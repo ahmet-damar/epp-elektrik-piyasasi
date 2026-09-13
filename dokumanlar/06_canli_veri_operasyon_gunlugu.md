@@ -2080,3 +2080,50 @@ Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.22, Sürüm Geçmişi v1.36,
 **ADIM 4 durumu:** 2025/2024/2023/2022/2021/2020/2019 (T2+T3 Lisanslı)
 TAMAMLANDI, YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı. Sıradaki
 adım 2018, sonra 2016-2017.
+
+## 2026-09-13 (devam) — ADIM 4: 2018 (T2+T3 Lisanslı) tamamlandı, "Excel'e en yakın 8 yıl" fazı bitti
+
+`word_2018.py`'ye `t2_oku()`/`t3_oku()`/`isle_ay_uretim_geneli()`
+eklendi. Kod yazmadan ÖNCE tam T2/T3 dökümüyle 12 ay tarandı, İKİ desen
+bulundu — ikisi de zaten bilinen sınıflardan:
+
+- **Bulgu I sınıfı:** Temmuz-Aralık'ın T2'si 3-satırlık BÖLÜNMÜŞ başlık
+  kullanıyor ("ORAN (%)" satır 1'de "ORAN" satır 2'de "(%)" olarak
+  ikiye bölünmüş, satır 2'nin cell[0]'ı hâlâ "KAYNAK TÜRÜ" diyor) —
+  2020-2025'ten taşınan dinamik `veri_baslangic` while-loop'u ek kod
+  gerekmeden sorunsuz çözdü.
+- **Bulgu N (2019'dan taşındı, GENİŞLEDİ):** 12 ayın TAMAMINDA (2019'dan
+  FARKLI olarak Aralık DAHİL, 2019'da Aralık tekleşiyordu) Hidrolik
+  "AKARSU"+"BARAJLI HİDROLİK" diye ikiye bölünmüş — aynı `dict`
+  biriktirici çözümü (T4'ün "Güneş TOPLA" ilkesiyle aynı) kullanıldı.
+
+T3'ün il sayısı ay ay değişti (Ocak 78, çoğu ay 79, Kasım 80 — tam
+dökümle doğrulandı: Ocak'ta 3 il eksik, Kasım'da yalnız 1 il eksik ama
+tablo 42 satır — established Bulgu G, `t3_oku()` zaten hiçbir sabit
+sayı varsaymadığından KOD DEĞİŞİKLİĞİ gerekmedi).
+
+Disposable postgres:17: ilk yükleme 2024+2019 ile aynı container'a
+eklendi (35/36 uyumlu, tek uyumsuz beklenen 202402) — ancak TAM
+`worker/tests` koşusunda `test_ingest_integration.py`/`test_job_worker_
+integration.py`'nin hardcoded job_id/batch_id testlerinde established
+sequence-drift kontaminasyonu görüldü (3 test düştü, "asserted 2 == 1"
+gibi) — bu session'ın DAHA ÖNCE belgelenen "disposable'ı ayrı script
+koşuları arasında paylaşma" bulgusunun AYNI, YENİ bir kod hatası DEĞİL.
+Fix: disposable fresh rebuild edildi, YALNIZ 2018 yüklendi —
+`mutabakat_uretim.py`: `12 / Uyumlu: 12, uyumsuz batch: 0`. Tam
+`worker/tests` bu temiz container'a karşı: 339 geçti, yalnız
+`test_auth_integration.py` düştü (boş `fact_tuketim` — beklenen,
+2018'den bağımsız).
+
++4 regresyon testi (`test_word_2018.py`): alias eşlemesi, `t2_oku`'nun
+toplama davranışı, 3-satırlık bölünmüş başlık, Genel-Toplam-uyuşmazlığı.
+`ruff format`/`ruff check`/`mypy` temiz, `bandit -r worker/scripts/
+word_2018.py` sıfır bulgu.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.23, Sürüm Geçmişi v1.37,
+`12_word_uretim_envanteri.md`'nin Bulgu N sonrası "2018 tamamlandı" notu.
+
+**ADIM 4 durumu:** 2025/2024/2023/2022/2021/2020/2019/2018 (T2+T3
+Lisanslı) TAMAMLANDI — "Excel'e en yakın 8 yıl" fazı BİTTİ, hepsi
+YALNIZ disposable, canlıya HİÇBİRİ uygulanmadı. Sıradaki adım: 2016-2017
+için GENİŞLETİLMİŞ dry-run (kod YAZILMADAN), sonra bulgulara göre karar.
