@@ -372,6 +372,19 @@ kendi yılının `_KAYNAK_TAKMA_ADLAR`'ına eklenmek zorunda (mimari karar:
 uretim.py` **12/12 uyumlu**. +6 yeni regresyon testi (`test_word_2021.py`:
 RÜZGÂR alias, `t2_oku`/`t3_oku` normal+Genel-Toplam-uyuşmazlığı senaryoları).
 
+**2020 (T2+T3 Lisanslı) tamamlandı (2026-09-13):** 12 ayın TAMAMI dry-run
+ile ÖNCEDEN tarandı — Bulgu I/M sınıfı bir format sürprizi (bölünmüş
+başlık, â/Â kaynak varyantı) YOK, hepsi düz 2-satırlı T2 + 2-sütunlu T3.
+Kaynak etiketleri tüm-büyük ama tümü zaten tanınıyor (DOĞAL GAZ, İTHAL
+KÖMÜR, HİDROLİK, RÜZGAR [â'sız], GÜNEŞ, JEOTERMAL, BİYOKÜTLE, LİNYİT,
+ASFALTİT, TAŞ KÖMÜRÜ, MOTORİN — hiçbiri yeni bir `_KAYNAK_TAKMA_ADLAR`
+girdisi gerektirmedi). Lisanssız (T5/T6) Bulgu L kararıyla (2020 zaten
+Bulgu L'nin ÖLÇÜM aralığının bir parçasıydı — Ocak/Haziran doğrudan
+kontrol edilmişti) TÜM yıl kapsam dışı. Disposable postgres:17'de 12/12
+ay yüklendi, `mutabakat_uretim.py` **12/12 uyumlu**. +4 yeni regresyon
+testi (`test_word_2020.py`: `t2_oku`/`t3_oku` normal+Genel-Toplam-
+uyuşmazlığı senaryoları).
+
 ## Özet — ADIM 4 (Word üretim backfill'i) için önerilen sıra (öneri, karar DEĞİL)
 
 1. Bulgu E'yi çöz: 2023-Aralık + 2024/2025'in TAM tablo listesini (filtre

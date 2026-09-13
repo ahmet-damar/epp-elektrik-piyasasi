@@ -130,11 +130,11 @@ yansıtıldı.**
   TAMAMLANDI (2026-09-08/09), Bulgu C/D kararları verilip uygulandı, ADIM
   5 (KPI bağlama, KPI-01..07'nin TAMAMI — KPI-04 dahil) TAMAMLANDI
   (2026-09-09), ADIM 4 (Word 2016-2025 üretim parser'ı) 2026-09-13'te
-  BAŞLADI — 2025/2024/2023/2022/2021'in "Excel'e en yakın 5 yıl" fazı
-  TAMAMLANDI (T2+T3 Lisanslı yüklendi, Lisanssız TÜM Word yılları için
-  kapsam dışı — Bulgu D/L, iki açık karar 2024-02/2022-T6 sayıyla
+  BAŞLADI — 2025/2024/2023/2022/2021/2020'nin "Excel'e en yakın 6 yıl"
+  fazı TAMAMLANDI (T2+T3 Lisanslı yüklendi, Lisanssız TÜM Word yılları
+  için kapsam dışı — Bulgu D/L, iki açık karar 2024-02/2022-T6 sayıyla
   ölçülüp kapatıldı, bkz. Bulgu I/J/K/L/M), hepsi YALNIZ disposable,
-  canlıya UYGULANMADI, sıradaki iş 2020→2019→2018** (bkz. "Sonraki
+  canlıya UYGULANMADI, sıradaki iş 2019→2018** (bkz. "Sonraki
   Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
@@ -462,9 +462,19 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     ağı olarak eklendi. Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.20,
     Sürüm Geçmişi v1.34, `06_canli_veri_operasyon_gunlugu.md` 2026-09-13
     (devam).
-  - **🏁 ADIM 4'ün "Excel'e en yakın 5 yıl" fazı TAMAMLANDI (2025+2024+
-    2023+2022+2021) — hepsi YALNIZ disposable postgres:17'de, canlıya
-    HİÇBİRİ UYGULANMADI.** Sıradaki adım 2020→2019→2018, sonra
+  - **✅ 2020 TAMAMLANDI (2026-09-13):** T2+T3 (Lisanslı) yüklendi,
+    Lisanssız (Bulgu L kararıyla) TÜM yıl kapsam dışı (2020 zaten Bulgu
+    L'nin ölçüm aralığındaydı, yeniden ölçüm gerekmedi). 12 ayın TAMAMI
+    kod yazmadan ÖNCE dry-run ile tarandı — Bulgu I/M sınıfı bir
+    sürpriz YOK, tüm-büyük kaynak etiketleri (DOĞAL GAZ/İTHAL KÖMÜR/
+    HİDROLİK/RÜZGAR/GÜNEŞ/JEOTERMAL/BİYOKÜTLE/LİNYİT/ASFALTİT/TAŞ
+    KÖMÜRÜ/MOTORİN) hiçbiri yeni takma ad gerektirmedi. Disposable:
+    12/12 ay yüklendi, mutabakat **12/12 uyumlu**. +4 test
+    (`test_word_2020.py`). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.21,
+    Sürüm Geçmişi v1.35.
+  - **🏁 ADIM 4'ün "Excel'e en yakın 6 yıl" fazı TAMAMLANDI (2025+2024+
+    2023+2022+2021+2020) — hepsi YALNIZ disposable postgres:17'de,
+    canlıya HİÇBİRİ UYGULANMADI.** Sıradaki adım 2019→2018, sonra
     2016-2017 (zaten Lisanssız kapsam dışı, ayrı bir turda, yalnız
     Lisanslı yüklenecek). Canlı backfill kullanıcı onayıyla TÜM yıllar
     bittikten sonra TEK SEFERDE yapılacak — 2024-02/2022-T6 kararları

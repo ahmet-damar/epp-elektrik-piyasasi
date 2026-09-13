@@ -1996,3 +1996,37 @@ Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.20, Sürüm Geçmişi v1.34,
 **ADIM 4 durumu:** 2025/2024/2023/2022/2021 (T2+T3 Lisanslı) TAMAMLANDI,
 YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı. Sıradaki adımlar
 2020→2019→2018, sonra 2016-2017.
+
+## 2026-09-13 (devam) — ADIM 4: 2020 (T2+T3 Lisanslı) tamamlandı
+
+`word_2020.py`'ye `t2_oku()`/`t3_oku()`/`isle_ay_uretim_geneli()` eklendi
+(2021 ile BİREBİR AYNI desen). Kod yazmadan ÖNCE 12 ayın TAMAMI dry-run
+ile tarandı (established discipline): T2/T3 tablo yapısı 12 ayda da
+BİREBİR AYNI (düz 2-satır başlık, 2-sütunlu il bloğu, 41 satır × 6 kolon)
+— Bulgu I/M sınıfı bir sürpriz YOK. Kaynak etiketleri ayrıca taranıp
+`kaynak_esle_zorunlu()`'ya karşı test edildi: `DOĞAL GAZ, İTHAL KÖMÜR,
+HİDROLİK, RÜZGAR, GÜNEŞ, JEOTERMAL, BİYOKÜTLE, LİNYİT, ASFALTİT, TAŞ
+KÖMÜRÜ, MOTORİN` — hepsi TANINDI, hiçbiri yeni bir `_KAYNAK_TAKMA_ADLAR`
+girdisi gerektirmedi (RÜZGÂR'ın â'lı hali bu yıl GÖRÜLMEDİ). İl adları da
+tarandı: her ay 79/80 dolu hücre (established Kilis-benzeri desen,
+`t3_oku()` zaten 0.0 ile tamamlıyor), tanınmayan il adı YOK.
+
+Disposable postgres:17 (fresh rebuild, `setup_pg2.sh`, 30/30 migration):
+12 ayın tamamı yüklendi, her ay `[KAPSAM DIŞI] Lisanssız (T5/T6) her iki
+tabloda da işaretlendi (Bulgu L).` bastı. `mutabakat_uretim.py`:
+`Kontrol edilen (tarih_id, lisans_id) çifti: 12 / Uyumlu: 12, uyumsuz
+batch: 0`.
+
++4 regresyon testi (`test_word_2020.py`): `t2_oku`/`t3_oku` normal
+senaryo + her ikisinin Genel-Toplam-uyuşmazlığı senaryosu. `ruff format`/
+`ruff check`/`mypy` temiz, `bandit -r worker/scripts/word_2020.py` sıfır
+bulgu. Tam `worker/tests` (gerçek disposable'a karşı, `DATABASE_URL`
+sahte bir yer tutucuya DEĞİL): 328 geçti, yalnız `test_auth_
+integration.py` düştü (boş `fact_tuketim` — beklenen, 2020'den bağımsız).
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.21, Sürüm Geçmişi v1.35,
+`12_word_uretim_envanteri.md`'nin Bulgu M sonrası "2020 tamamlandı" notu.
+
+**ADIM 4 durumu:** 2025/2024/2023/2022/2021/2020 (T2+T3 Lisanslı)
+TAMAMLANDI, YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı. Sıradaki
+adımlar 2019→2018, sonra 2016-2017.

@@ -82,6 +82,7 @@ her yeni rakam için geçerlidir.
 | v1.32 | 2026-09-13 | ADIM 4 — 2023 (T2+T3 Lisanslı) tamamlandı, Lisanssız TÜM yıl kapsam dışı (T6 yıl-içi bölünmüş, güvenli taraf seçildi) — §5.18. Bulgu K: yeni kaynak türü 'LPG' bulundu (12 ayda hep 0,00 MWh — atla sayıldı, Genel Toplam kontrolü güvence), 'Motorin'in gerçek üretimi (Kasım/Aralık) zaten mevcut altyapıyla (2026-08-19'dan beri) sorunsuz çözüldü — YENİ migration gerekmedi (ilk taslak redundant çıkıp silindi) | Disposable postgres:17: 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu (2024'ün Bulgu J'sine benzer bir sorun YOK). +4 test (`test_word_2023.py`, LPG atlama + Motorin tanıma dahil). 255/255 unit test yeşil. ADIM 4'ün "en yakın 3 yıl" (2023-2025) fazı TAMAMLANDI, hepsi YALNIZ disposable — canlıya UYGULANMADI |
 | v1.33 | 2026-09-13 | İki açık karar SAYIYLA ölçülüp kapatıldı + 2022 tamamlandı — §5.19. (1) 2024-02 (Bulgu J): T2 sağlam/T3 stale ölçümüyle doğrulandı, yalnız T2 yüklenip T3 o ay için ayrıca kapsam dışı işaretlendi (mutabakata istisna YOK, `'bir_taraf_eksik'` beklenen sonuç). (2) 2022 T6 rename sınırı (Bulgu L): sıçrama YOK ama T6 VAR OLDUĞU HER YIL (2020 dahil) "Brüt" DEĞİL "İhtiyaç Fazlası" ölçtüğü kanıtlandı — Bulgu H düzeltildi, T6 TÜM Word yılları için kapsam dışı (istisnasız), `05_kaynak_dosya_sozlesmesi.md`'ye yazıldı | Disposable postgres:17: 2022'nin 12/12 ayı yüklendi (T2+T3 Lisanslı, Lisanssız TÜM yıl kapsam dışı), `mutabakat_uretim.py` 12/12 uyumlu — 2024'ün sürprizleri YOK. +6 test (2 Bulgu J pinlemesi + 4 word_2022). 260/260 unit test yeşil. Lisanssız stratejisi artık TÜM Word yılları için NET (kapsam dışı, yeniden değerlendirme yok) |
 | v1.34 | 2026-09-13 | ADIM 4 — 2021 (T2+T3 Lisanslı) tamamlandı — §5.20. Bulgu M: Nisan 2021'in T2'si `"RÜZGÂR"` (inceltmeli, tüm-büyük) yazıyor, diğer 11 ay â'sız — `word_2021.py`'nin `_KAYNAK_TAKMA_ADLAR`'ına eklendi. Ayrıca ortam bulgusu: tam `pytest worker/tests` koşusu sahte/dinleyicisiz bir `DATABASE_URL` yüzünden asılı kaldı (psycopg'in reddedilen bağlantıya karşı anormal beklemesi — WSL köprüsü SAĞLIKLI olduğu ölçülerek kanıtlandı), kalıcı çözüm: geniş koşularda `DATABASE_URL` HER ZAMAN çalışan disposable'a işaret etmeli; `pytest-timeout` güvenlik ağı olarak eklendi | Disposable postgres:17: 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu — sürpriz YOK (RÜZGÂR hariç). +6 test (`test_word_2021.py`). 266/266 Word-parser unit test yeşil; tam `worker/tests` (325 test) disposable'a karşı 22.32s'de 324/325 (tek düşen `test_auth_integration.py`, boş `fact_tuketim` yüzünden — 2021'den bağımsız, CI'nin "worker" job'ında zaten koşmuyor) |
+| v1.35 | 2026-09-13 | ADIM 4 — 2020 (T2+T3 Lisanslı) tamamlandı — §5.21. 12 ayın TAMAMI kod yazmadan ÖNCE dry-run ile tarandı, hiçbir format sürprizi (Bulgu I/M sınıfı) yok — tüm-büyük kaynak etiketleri (DOĞAL GAZ/İTHAL KÖMÜR/HİDROLİK/RÜZGAR/GÜNEŞ/JEOTERMAL/BİYOKÜTLE/LİNYİT/ASFALTİT/TAŞ KÖMÜRÜ/MOTORİN) hiçbiri yeni takma ad gerektirmedi. Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı (2020 zaten Bulgu L'nin ölçüm aralığındaydı) | Disposable postgres:17: 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu. +4 test (`test_word_2020.py`). ADIM 4'ün "Excel'e en yakın 6 yıl" fazı (2025-2020) TAMAMLANDI, hepsi YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı |
 
 ---
 
@@ -1081,6 +1082,23 @@ Detay: `06_canli_veri_operasyon_gunlugu.md` 2026-09-13 (devam) girdisi.
 **ADIM 4 durumu (güncellendi):** 2025/2024/2023/2022/2021 (T2+T3
 Lisanslı) TAMAMLANDI, YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı.
 Sıradaki adımlar 2020→2019→2018, sonra 2016-2017.
+
+### 5.21 ADIM 4 — 2020 (T2+T3 Lisanslı) tamamlandı (2026-09-13)
+
+`word_2020.py`'ye `t2_oku()`/`t3_oku()`/`isle_ay_uretim_geneli()` eklendi
+(2021 ile BİREBİR AYNI desen). 12 ayın TAMAMI kod yazmadan ÖNCE dry-run
+ile tarandı: format Bulgu I/M sınıfı bir sürpriz YOK (düz 2-satır T2,
+2-sütunlu T3), tüm-büyük kaynak etiketleri (DOĞAL GAZ, İTHAL KÖMÜR,
+HİDROLİK, RÜZGAR [â'sız], GÜNEŞ, JEOTERMAL, BİYOKÜTLE, LİNYİT, ASFALTİT,
+TAŞ KÖMÜRÜ, MOTORİN) hiçbiri yeni bir takma ad gerektirmedi. Lisanssız
+(T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı (2020 zaten Bulgu L'nin
+kendi ölçüm aralığının bir parçasıydı). Disposable postgres:17: 12/12 ay
+yüklendi, `mutabakat_uretim.py` **12/12 uyumlu**. +4 yeni test
+(`test_word_2020.py`).
+
+**ADIM 4 durumu (güncellendi):** 2025/2024/2023/2022/2021/2020 (T2+T3
+Lisanslı) TAMAMLANDI, YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı.
+Sıradaki adımlar 2019→2018, sonra 2016-2017.
 
 ---
 
