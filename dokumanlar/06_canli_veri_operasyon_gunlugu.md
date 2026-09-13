@@ -2030,3 +2030,53 @@ Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.21, Sürüm Geçmişi v1.35,
 **ADIM 4 durumu:** 2025/2024/2023/2022/2021/2020 (T2+T3 Lisanslı)
 TAMAMLANDI, YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı. Sıradaki
 adımlar 2019→2018, sonra 2016-2017.
+
+## 2026-09-13 (devam) — 2024-02 kararı yeniden doğrulandı + ADIM 4: 2019 (T2+T3 Lisanslı) tamamlandı, Bulgu N
+
+**2024-02 kontrolü:** kod `word_2024.py:_STALE_IL_AYLAR`'da hâlâ mevcut
+(commit `a103a03`). Fresh disposable rebuild sonrası 2024'ün 12 ayı
+yeniden yüklendi — Şubat çıktısı: `[BULGU J] T3 (il) bu ay STALE kabul
+edildi, YÜKLENMEYECEK` ... `[KAPSAM DIŞI] fact_uretim_il_geneli
+(Lisanslı) bu ay için de işaretlendi (Bulgu J)`. `mutabakat_kontrol_et()`
+çıktısı doğrudan sorgulandı: `{'tarih_id': 202402, 'lisans_id': 1,
+'durum': 'bir_taraf_eksik', 'il_toplami': None, 'kaynak_toplami':
+25615763.19, 'uyumlu': False}` — beklenen/belgelenen sonuçla BİREBİR
+aynı. Bekleyen bir uygulama adımı YOKTU, yalnız yeniden doğrulama yapıldı.
+
+**2019 (T2+T3 Lisanslı):** `word_2019.py`'ye `t2_oku()`/`t3_oku()`/
+`isle_ay_uretim_geneli()` eklendi. Kod yazmadan ÖNCE dry-run + tam T2
+dökümü ile 12 ay tarandı: **Bulgu N** — Ocak-Kasım'ın T2'si Hidrolik'i
+`"AKARSU"` + `"BARAJLI HİDROLİK"` diye İKİ AYRI satıra bölüyor (Aralık
+tek `"HİDROLİK"` satırı). Tam T2 dökümü (Ocak/Temmuz/Aralık) doğrudan
+alınıp karşılaştırıldı — `worker/parser.py`'nin "Akarsu" alias'ı zaten
+var ama "Barajlı Hidrolik" (birleşik) eşleşmiyordu; zorla yüklenseydi
+`fact_uretim_kaynak_geneli`'nin `UNIQUE(tarih_id, kaynak_id, lisans_id,
+batch_id)` kısıtı ikinci "Hidrolik" satırını REDDEDERDİ. Çözüm:
+`_KAYNAK_TAKMA_ADLAR`'a `{"BARAJLI HİDROLİK": "Hidrolik"}` eklendi,
+`t2_oku()` artık (T4'ün "Güneş (Fotovoltaik)+Güneş (Yoğunlş.) TOPLA"
+ilkesiyle AYNI) bir `dict` biriktiricisiyle aynı kaynağa eşlenen
+satırları TOPLAYIP tek satır üretiyor.
+
+Dry-run sonrası tüm 12 ay temiz (`11-12 satır arası, ay ay değişiyor —
+LNG'nin bazı aylarda 0'a düşüp Doğal Gaz'a katılması gibi doğal
+varyasyon, sürpriz DEĞİL`). Disposable postgres:17 (fresh rebuild): 2024
+ile BİRLİKTE 2019'un 12 ayı da yüklendi (UNIQUE ihlali YOK).
+`mutabakat_uretim.py`: `Kontrol edilen (tarih_id, lisans_id) çifti: 24 /
+Uyumlu: 23, uyumsuz batch: 1` — tek uyumsuz olan zaten beklenen 202402
+(yukarıda). 2019'un 12/12'si tam uyumlu.
+
++3 regresyon testi (`test_word_2019.py`): alias eşlemesi
+(`kaynak_esle_zorunlu("BARAJLI HİDROLİK") == "Hidrolik"`), `t2_oku()`'nun
+toplama davranışı (sentetik tabloda AKARSU+BARAJLI HİDROLİK'in TEK
+"Hidrolik" satırına indiği doğrudan doğrulandı), Genel-Toplam-
+uyuşmazlığı senaryosu. `ruff format`/`ruff check`/`mypy` temiz, `bandit
+-r worker/scripts/word_2019.py` sıfır bulgu. Tam `worker/tests` (gerçek
+disposable'a karşı): 333 geçti, yalnız `test_auth_integration.py` düştü
+(boş `fact_tuketim` — beklenen, 2019'dan bağımsız).
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.22, Sürüm Geçmişi v1.36,
+`12_word_uretim_envanteri.md` Bulgu N.
+
+**ADIM 4 durumu:** 2025/2024/2023/2022/2021/2020/2019 (T2+T3 Lisanslı)
+TAMAMLANDI, YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı. Sıradaki
+adım 2018, sonra 2016-2017.

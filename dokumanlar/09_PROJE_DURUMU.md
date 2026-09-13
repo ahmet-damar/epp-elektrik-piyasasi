@@ -130,11 +130,11 @@ yansıtıldı.**
   TAMAMLANDI (2026-09-08/09), Bulgu C/D kararları verilip uygulandı, ADIM
   5 (KPI bağlama, KPI-01..07'nin TAMAMI — KPI-04 dahil) TAMAMLANDI
   (2026-09-09), ADIM 4 (Word 2016-2025 üretim parser'ı) 2026-09-13'te
-  BAŞLADI — 2025/2024/2023/2022/2021/2020'nin "Excel'e en yakın 6 yıl"
-  fazı TAMAMLANDI (T2+T3 Lisanslı yüklendi, Lisanssız TÜM Word yılları
-  için kapsam dışı — Bulgu D/L, iki açık karar 2024-02/2022-T6 sayıyla
-  ölçülüp kapatıldı, bkz. Bulgu I/J/K/L/M), hepsi YALNIZ disposable,
-  canlıya UYGULANMADI, sıradaki iş 2019→2018** (bkz. "Sonraki
+  BAŞLADI — 2025/2024/2023/2022/2021/2020/2019'un "Excel'e en yakın 7
+  yıl" fazı TAMAMLANDI (T2+T3 Lisanslı yüklendi, Lisanssız TÜM Word
+  yılları için kapsam dışı — Bulgu D/L, iki açık karar 2024-02/2022-T6
+  sayıyla ölçülüp kapatıldı, bkz. Bulgu I/J/K/L/M/N), hepsi YALNIZ
+  disposable, canlıya UYGULANMADI, sıradaki iş 2018** (bkz. "Sonraki
   Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
@@ -472,13 +472,34 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     12/12 ay yüklendi, mutabakat **12/12 uyumlu**. +4 test
     (`test_word_2020.py`). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.21,
     Sürüm Geçmişi v1.35.
-  - **🏁 ADIM 4'ün "Excel'e en yakın 6 yıl" fazı TAMAMLANDI (2025+2024+
-    2023+2022+2021+2020) — hepsi YALNIZ disposable postgres:17'de,
-    canlıya HİÇBİRİ UYGULANMADI.** Sıradaki adım 2019→2018, sonra
-    2016-2017 (zaten Lisanssız kapsam dışı, ayrı bir turda, yalnız
-    Lisanslı yüklenecek). Canlı backfill kullanıcı onayıyla TÜM yıllar
-    bittikten sonra TEK SEFERDE yapılacak — 2024-02/2022-T6 kararları
-    zaten yukarıda KAPATILDI, canlıya geçmeden önce başka açık karar YOK.
+  - **✅ 2024-02 kararı yeniden CANLI doğrulandı (2026-09-13):** kod
+    hâlâ mevcut (`_STALE_IL_AYLAR`, commit `a103a03`), fresh disposable'a
+    2024'ün 12 ayı yeniden yüklenip `mutabakat_kontrol_et()` çıktısı
+    doğrudan sorgulandı — `{'tarih_id': 202402, 'durum':
+    'bir_taraf_eksik', 'il_toplami': None, 'kaynak_toplami':
+    25615763.19}`, beklenenle BİREBİR aynı. Bekleyen bir uygulama adımı
+    YOKTU.
+  - **✅ 2019 TAMAMLANDI (2026-09-13):** T2+T3 (Lisanslı) yüklendi,
+    Lisanssız (Bulgu L kararıyla) TÜM yıl kapsam dışı. **Bulgu N:**
+    Ocak-Kasım'ın T2'si Hidrolik'i `"AKARSU"`+`"BARAJLI HİDROLİK"` diye
+    İKİ AYRI satıra bölüyor (Aralık tek satır) — kod yazmadan ÖNCE tam
+    T2 dökümüyle tespit edildi, `t2_oku()` artık T4'ün established
+    "TOPLA" ilkesiyle aynı kaynağa eşlenen satırları biriktirip TEK
+    satır üretiyor (aksi halde `UNIQUE(tarih_id, kaynak_id, lisans_id,
+    batch_id)` kısıtı ihlal edilirdi). Disposable: 12/12 ay yüklendi
+    (UNIQUE ihlali YOK), mutabakat 2024 ile birlikte 24 çift kontrol
+    etti, **23/24 uyumlu** (tek uyumsuz beklenen 202402). +3 test
+    (`test_word_2019.py`). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.22,
+    Sürüm Geçmişi v1.36.
+  - **🏁 ADIM 4'ün "Excel'e en yakın 7 yıl" fazı TAMAMLANDI (2025+2024+
+    2023+2022+2021+2020+2019) — hepsi YALNIZ disposable postgres:17'de,
+    canlıya HİÇBİRİ UYGULANMADI.** Sıradaki adım 2018, sonra 2016-2017
+    (zaten Lisanssız kapsam dışı, ayrı bir turda, yalnız Lisanslı
+    yüklenecek — ayrıca 2016-2017 için GENİŞLETİLMİŞ dry-run 2018
+    bitince yapılacak, kod yazılmadan). Canlı backfill kullanıcı
+    onayıyla TÜM yıllar bittikten sonra TEK SEFERDE yapılacak —
+    2024-02/2022-T6 kararları zaten yukarıda KAPATILDI, canlıya
+    geçmeden önce başka açık karar YOK.
   - **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatan notlar
     (hâlâ geçerli):**
   - `lisans_id` çözümü: **DOĞRULANDI, 2025 için ÇALIŞTI** — `t2_oku()`/

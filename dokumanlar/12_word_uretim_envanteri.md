@@ -385,6 +385,45 @@ ay yüklendi, `mutabakat_uretim.py` **12/12 uyumlu**. +4 yeni regresyon
 testi (`test_word_2020.py`: `t2_oku`/`t3_oku` normal+Genel-Toplam-
 uyuşmazlığı senaryoları).
 
+## Bulgu N — 2019 T2'de Hidrolik "AKARSU"+"BARAJLI HİDROLİK" diye İKİ satıra bölünmüş (2026-09-13)
+
+2019'un T2 (Lisanslı, kaynak bazında) tablosu **Ocak-Kasım'da** Hidrolik'i
+tek satır olarak DEĞİL, `"AKARSU"` + `"BARAJLI HİDROLİK"` diye İKİ AYRI
+satır olarak veriyor (**Aralık'ta tek `"HİDROLİK"` satırı** — established
+tekleşme, diğer yılların hepsindeki gibi). `worker/parser.py:KAYNAK_
+ESLEME`'de zaten `(["Akarsu", "Barajlı", "Hidrolik"], "Hidrolik", True)`
+girdisi var ve modül notu ("Akarsu+Barajlı→Hidrolik ... toplanmalı, ayrı
+satır üretilmez") bu iki alt-kategorinin TOPLANMASI gerektiğini baştan
+söylüyor — ama eşleme TAM METİN karşılaştırması (`_sade_anahtar`) olduğu
+için `"AKARSU"` tek başına eşleşirken `"BARAJLI HİDROLİK"` (iki kelime
+BİRLEŞİK) eşleşmiyor.
+
+Bu, T2'nin (uzun/dikey format) diğer yıllarda hiç karşılaşmadığı YENİ bir
+durum: aynı ay içinde İKİ FARKLI satırın AYNI kanonik kaynağa eşlenmesi.
+Önceki yıllarda bu durum yalnız T4'ün (matris format, "Güneş
+(Fotovoltaik)"+"Güneş (Yoğunlş.)" — 2019'un kendi T4'ünde de var, zaten
+çözülmüştü) YATAY (kolon) versiyonunda görülmüştü. **Ölçülmeden geçilip
+zorla yüklenirse:** `fact_uretim_kaynak_geneli`'nin `UNIQUE(tarih_id,
+kaynak_id, lisans_id, ingestion_batch_id)` kısıtı İKİNCİ "Hidrolik"
+satırının eklenmesini REDDEDER (batch hata verirdi) — kod yazılmadan önce
+tam T2 tablosu dökümü alınarak bu ÖNCEDEN tespit edildi, canlıda/
+disposable'da hataya düşülmeden.
+
+**Karar (kod, T4'ün established "TOPLA" ilkesiyle AYNI):** `word_2019.py`
+`_KAYNAK_TAKMA_ADLAR`'ına `{"BARAJLI HİDROLİK": "Hidrolik"}` eklendi
+("AKARSU" zaten `worker/parser.py`'nin kendi alias'ıyla "Hidrolik"e
+eşleniyor); `t2_oku()` artık satırları doğrudan DataFrame'e eklemek
+yerine `dict[kaynak, toplam]` biriktiricisiyle TOPLUYOR, tek "Hidrolik"
+satırı üretiyor. Aritmetik (Genel Toplam) etkilenmez — toplama işlemi
+toplamı korur, yalnız satır sayısını azaltır. Diğer 11 kaynak türü
+etkilenmedi.
+
+**Sonuç:** disposable postgres:17'de 12/12 ay yüklendi (Ocak-Kasım'ın
+her biri Hidrolik'i başarıyla TEK satıra indirdi, UNIQUE ihlali YOK),
+`mutabakat_uretim.py` **12/12 uyumlu**. +3 yeni regresyon testi
+(`test_word_2019.py`: alias eşlemesi + `t2_oku`'nun toplama davranışı +
+Genel-Toplam-uyuşmazlığı).
+
 ## Özet — ADIM 4 (Word üretim backfill'i) için önerilen sıra (öneri, karar DEĞİL)
 
 1. Bulgu E'yi çöz: 2023-Aralık + 2024/2025'in TAM tablo listesini (filtre

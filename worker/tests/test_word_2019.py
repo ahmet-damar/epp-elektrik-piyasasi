@@ -17,6 +17,8 @@ from worker.scripts.word_2019 import (
     _il_adi_temizle,
     grup_esle_zorunlu,
     kaynak_esle_zorunlu,
+    t2_oku,
+    t3_oku,
     t4_oku,
     t10_oku,
     t11_oku,
@@ -150,3 +152,90 @@ def test_t4_oku_gunes_varyantlari_tek_satira_toplanir() -> None:
     assert len(gunes_satirlari) == 1
     assert gunes_satirlari["kurulu_guc_mw"].iloc[0] == pytest.approx(5.0)
     assert float(df["kurulu_guc_mw"].sum()) == pytest.approx(6.0)
+
+
+# ---------------------------------------------------------------------------
+# ADIM 4 (2026-09-13) — T2/T3: Lisanslı ÜRETİM (kurulu güç DEĞİL). 2019'un
+# 12 ayının TAMAMI gerçek dosyaya karşı kontrol edildi — Bulgu N: Ocak-Kasım
+# Hidrolik'i "AKARSU"+"BARAJLI HİDROLİK" diye İKİ AYRI satıra bölüyor
+# (Aralık tek "HİDROLİK" satırı), t2_oku() bunları TOPLAYIP tek "Hidrolik"
+# satırına indirgemeli — aksi halde fact_uretim_kaynak_geneli'nin
+# UNIQUE(tarih_id, kaynak_id, lisans_id, batch_id) kısıtı ihlal edilir.
+# ---------------------------------------------------------------------------
+
+
+def test_kaynak_esle_zorunlu_barajli_hidrolik_hidrolige_esler() -> None:
+    assert kaynak_esle_zorunlu("BARAJLI HİDROLİK") == "Hidrolik"
+    assert kaynak_esle_zorunlu("AKARSU") == "Hidrolik"
+
+
+def test_t2_oku_akarsu_ve_barajli_hidrolik_tek_satira_toplanir() -> None:
+    """Bulgu N'in regresyon pini — 'AKARSU' ve 'BARAJLI HİDROLİK' AYRI
+    satırlar olarak gelse bile t2_oku() bunları TEK 'Hidrolik' satırına
+    TOPLAMALI, iki ayrı 'Hidrolik' satırı ÜRETİLMEMELİ (UNIQUE kısıtı)."""
+    donem_satiri = ["KAYNAK TÜRÜ", "2019 OCAK", "2019 OCAK"]
+    baslik_satiri = ["KAYNAK TÜRÜ", "ÜRETİM (MWh)", "ORAN (%)"]
+    satirlar = [
+        donem_satiri,
+        baslik_satiri,
+        ["AKARSU", "100,0", "40,0"],
+        ["BARAJLI HİDROLİK", "50,0", "20,0"],
+        ["Rüzgar", "100,0", "40,0"],
+        ["Genel Toplam", "250,0", "100,0"],
+    ]
+    tbl = _tablo_ekle(satirlar)
+
+    df = t2_oku(tbl, tarih_id=201901, hedef_ay_yil="2019 OCAK")
+
+    hidrolik_satirlari = df[df["kaynak"] == "Hidrolik"]
+    assert len(hidrolik_satirlari) == 1
+    assert hidrolik_satirlari["uretim_mwh"].iloc[0] == pytest.approx(150.0)
+    assert float(df["uretim_mwh"].sum()) == pytest.approx(250.0)
+
+
+def test_t2_oku_genel_toplam_uyusmazliginda_hata_verir() -> None:
+    donem_satiri = ["KAYNAK TÜRÜ", "2019 OCAK", "2019 OCAK"]
+    baslik_satiri = ["KAYNAK TÜRÜ", "ÜRETİM (MWh)", "ORAN (%)"]
+    satirlar = [
+        donem_satiri,
+        baslik_satiri,
+        ["HİDROLİK", "100,0", "100,0"],
+        ["Genel Toplam", "999,0", "100,0"],
+    ]
+    tbl = _tablo_ekle(satirlar)
+
+    with pytest.raises(ValueError, match="Genel"):
+        t2_oku(tbl, tarih_id=201901, hedef_ay_yil="2019 OCAK")
+
+
+def test_t3_oku_iki_sutunlu_blok_birlesir_ve_eksik_il_sifirlanir() -> None:
+    baslik = ["İLLER", "ÜRETİM (MWh)", "ORAN (%)", "İLLER", "ÜRETİM (MWh)", "ORAN (%)"]
+    satirlar = [baslik]
+    diger_iller = [il for il in TUM_ILLER if il != "Kilis"]
+    assert len(diger_iller) == 80
+    for i in range(0, 80, 2):
+        satirlar.append(
+            [diger_iller[i], "10,0", "1,0", diger_iller[i + 1], "10,0", "1,0"]
+        )
+    satirlar.append(["", "", "", "Genel Toplam", "800,0", "100,0"])
+    tbl = _tablo_ekle(satirlar)
+
+    df = t3_oku(tbl, tarih_id=201901)
+
+    assert len(df) == 81
+    assert df["il_kodu"].nunique() == 81
+    kilis_kodu = next(kod for kod, ad in _IL_ADI_KANONIK.items() if ad == "Kilis")
+    assert df[df["il_kodu"] == kilis_kodu]["uretim_mwh"].eq(0.0).all()
+    assert float(df["uretim_mwh"].sum()) == pytest.approx(800.0)
+
+
+def test_t3_oku_genel_toplam_uyusmazliginda_hata_verir() -> None:
+    baslik = ["İLLER", "ÜRETİM (MWh)", "ORAN (%)", "İLLER", "ÜRETİM (MWh)", "ORAN (%)"]
+    satirlar = [baslik]
+    for i in range(0, 80, 2):
+        satirlar.append([TUM_ILLER[i], "10,0", "1,0", TUM_ILLER[i + 1], "10,0", "1,0"])
+    satirlar.append(["", "", "", "Genel Toplam", "9999,0", "100,0"])
+    tbl = _tablo_ekle(satirlar)
+
+    with pytest.raises(ValueError, match="Genel"):
+        t3_oku(tbl, tarih_id=201901)

@@ -83,6 +83,7 @@ her yeni rakam için geçerlidir.
 | v1.33 | 2026-09-13 | İki açık karar SAYIYLA ölçülüp kapatıldı + 2022 tamamlandı — §5.19. (1) 2024-02 (Bulgu J): T2 sağlam/T3 stale ölçümüyle doğrulandı, yalnız T2 yüklenip T3 o ay için ayrıca kapsam dışı işaretlendi (mutabakata istisna YOK, `'bir_taraf_eksik'` beklenen sonuç). (2) 2022 T6 rename sınırı (Bulgu L): sıçrama YOK ama T6 VAR OLDUĞU HER YIL (2020 dahil) "Brüt" DEĞİL "İhtiyaç Fazlası" ölçtüğü kanıtlandı — Bulgu H düzeltildi, T6 TÜM Word yılları için kapsam dışı (istisnasız), `05_kaynak_dosya_sozlesmesi.md`'ye yazıldı | Disposable postgres:17: 2022'nin 12/12 ayı yüklendi (T2+T3 Lisanslı, Lisanssız TÜM yıl kapsam dışı), `mutabakat_uretim.py` 12/12 uyumlu — 2024'ün sürprizleri YOK. +6 test (2 Bulgu J pinlemesi + 4 word_2022). 260/260 unit test yeşil. Lisanssız stratejisi artık TÜM Word yılları için NET (kapsam dışı, yeniden değerlendirme yok) |
 | v1.34 | 2026-09-13 | ADIM 4 — 2021 (T2+T3 Lisanslı) tamamlandı — §5.20. Bulgu M: Nisan 2021'in T2'si `"RÜZGÂR"` (inceltmeli, tüm-büyük) yazıyor, diğer 11 ay â'sız — `word_2021.py`'nin `_KAYNAK_TAKMA_ADLAR`'ına eklendi. Ayrıca ortam bulgusu: tam `pytest worker/tests` koşusu sahte/dinleyicisiz bir `DATABASE_URL` yüzünden asılı kaldı (psycopg'in reddedilen bağlantıya karşı anormal beklemesi — WSL köprüsü SAĞLIKLI olduğu ölçülerek kanıtlandı), kalıcı çözüm: geniş koşularda `DATABASE_URL` HER ZAMAN çalışan disposable'a işaret etmeli; `pytest-timeout` güvenlik ağı olarak eklendi | Disposable postgres:17: 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu — sürpriz YOK (RÜZGÂR hariç). +6 test (`test_word_2021.py`). 266/266 Word-parser unit test yeşil; tam `worker/tests` (325 test) disposable'a karşı 22.32s'de 324/325 (tek düşen `test_auth_integration.py`, boş `fact_tuketim` yüzünden — 2021'den bağımsız, CI'nin "worker" job'ında zaten koşmuyor) |
 | v1.35 | 2026-09-13 | ADIM 4 — 2020 (T2+T3 Lisanslı) tamamlandı — §5.21. 12 ayın TAMAMI kod yazmadan ÖNCE dry-run ile tarandı, hiçbir format sürprizi (Bulgu I/M sınıfı) yok — tüm-büyük kaynak etiketleri (DOĞAL GAZ/İTHAL KÖMÜR/HİDROLİK/RÜZGAR/GÜNEŞ/JEOTERMAL/BİYOKÜTLE/LİNYİT/ASFALTİT/TAŞ KÖMÜRÜ/MOTORİN) hiçbiri yeni takma ad gerektirmedi. Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı (2020 zaten Bulgu L'nin ölçüm aralığındaydı) | Disposable postgres:17: 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu. +4 test (`test_word_2020.py`). ADIM 4'ün "Excel'e en yakın 6 yıl" fazı (2025-2020) TAMAMLANDI, hepsi YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı |
+| v1.36 | 2026-09-13 | 2024-02 kararı yeniden CANLI doğrulandı (bekleyen yoktu) + ADIM 4 — 2019 (T2+T3 Lisanslı) tamamlandı, Bulgu N — §5.22. Bulgu N: 2019'un T2'si Ocak-Kasım'da Hidrolik'i "AKARSU"+"BARAJLI HİDROLİK" diye İKİ satıra bölüyor (Aralık tek satır) — kod yazmadan ÖNCE tam T2 dökümüyle tespit edildi, `t2_oku()` artık T4'ün established "TOPLA" ilkesiyle aynı kaynağa eşlenen satırları biriktirip TEK satır üretiyor (UNIQUE kısıt ihlali önlendi). Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı | Disposable postgres:17: 12/12 ay yüklendi (UNIQUE ihlali YOK), `mutabakat_uretim.py` 2024 ile birlikte 24 çift kontrol etti, 23/24 uyumlu (tek uyumsuz beklenen 202402). +3 test (`test_word_2019.py`). Sıradaki adım 2018, sonra 2016-2017 |
 
 ---
 
@@ -1099,6 +1100,37 @@ yüklendi, `mutabakat_uretim.py` **12/12 uyumlu**. +4 yeni test
 **ADIM 4 durumu (güncellendi):** 2025/2024/2023/2022/2021/2020 (T2+T3
 Lisanslı) TAMAMLANDI, YALNIZ disposable — canlıya HİÇBİRİ uygulanmadı.
 Sıradaki adımlar 2019→2018, sonra 2016-2017.
+
+### 5.22 ADIM 4 — 2024-02 kararı yeniden doğrulandı + 2019 (T2+T3 Lisanslı) tamamlandı, Bulgu N (2026-09-13)
+
+**2024-02 kontrolü (istenen tek satırlık durum kontrolü):** kod hâlâ
+mevcut (`word_2024.py:_STALE_IL_AYLAR`, commit `a103a03`) — fresh
+disposable'da 2024'ün 12 ayı yeniden yüklenerek CANLI doğrulandı: Şubat
+`[BULGU J] T3 (il) bu ay STALE kabul edildi, YÜKLENMEYECEK` bastı, yalnız
+T2 yüklendi. `mutabakat_kontrol_et()` çıktısı: `{'tarih_id': 202402,
+'durum': 'bir_taraf_eksik', 'il_toplami': None, 'kaynak_toplami':
+25615763.19}` — tam olarak beklenen/belgelenen sonuç. **Bekleyen bir şey
+YOK, karar tam uygulanmış durumda.**
+
+**2019 (T2+T3 Lisanslı) tamamlandı — Bulgu N:** 2019'un T2'si (kaynak)
+**Ocak-Kasım'da** Hidrolik'i `"AKARSU"` + `"BARAJLI HİDROLİK"` diye İKİ
+AYRI satıra bölüyor (Aralık tek `"HİDROLİK"` satırı) — `worker/parser.py`
+zaten "Akarsu"yu "Hidrolik"e eşliyor ama "Barajlı Hidrolik" birleşik iki
+kelime olduğu için TAM eşleşmiyordu. Kod yazmadan ÖNCE tam T2 dökümü
+alınarak bu ÖNCEDEN tespit edildi (zorla yüklenip UNIQUE kısıt hatasına
+düşülmedi). Çözüm: `_KAYNAK_TAKMA_ADLAR`'a `{"BARAJLI HİDROLİK":
+"Hidrolik"}` eklendi, `t2_oku()` artık T4'ün established "Güneş
+(Fotovoltaik)+Güneş (Yoğunlş.) TOPLA" ilkesiyle AYNI şekilde bir `dict`
+biriktiricisiyle aynı kaynağa eşlenen satırları TOPLAYIP tek satır
+üretiyor. Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı.
+Disposable postgres:17: 12/12 ay yüklendi (UNIQUE ihlali YOK), `mutabakat_
+uretim.py` **12/12 uyumlu** (2024 ile birlikte 24 çift kontrol edildi,
+23/24 uyumlu — tek uyumsuz beklenen 202402). +3 yeni test
+(`test_word_2019.py`).
+
+**ADIM 4 durumu (güncellendi):** 2025/2024/2023/2022/2021/2020/2019
+(T2+T3 Lisanslı) TAMAMLANDI, YALNIZ disposable — canlıya HİÇBİRİ
+uygulanmadı. Sıradaki adım 2018, sonra 2016-2017.
 
 ---
 
