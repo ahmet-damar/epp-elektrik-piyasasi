@@ -2189,3 +2189,41 @@ Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.24, Sürüm Geçmişi v1.38,
 **KOD YAZILMADI** — bu tur yalnız envanter/tarama. 2016-2017'nin
 uygulaması (kod + yükleme + test) bulgulara göre karar verildikten
 sonra, ayrı bir turda yapılacak.
+
+## 2026-09-13 (gün sonu kapanışı) — 2016-2017 uygulaması ÖNCEDEN ONAYLANDI, oturum kapatıldı
+
+Ahmet, Bulgu O'nun bulgusuna dayanarak 2016-2017'nin uygulamasını
+BEKLEMEDEN onayladı: 2016'nın T2'si (tek-dönem 3-kolonlu format,
+`hedef_donem_kolonu_bul()` işlemiyor) için AYRI bir `t2_oku()`
+yazılması onaylandı — bu "yıl başına ayrı tarif" mimarisine ZATEN
+uygun (`word_2016.py`/`word_2017.py` gibi her yıl kendi sürprizlerini
+izole tutmak için var, bkz. her `word_20XX.py`'nin modül notu). Diğer
+sekiz yılla (2018-2025) AYNI desen geçerli kalıyor: dry-run ZATEN
+yapıldı (Bulgu O, `12_word_uretim_envanteri.md`) → yükle → çapraz
+mutabakat (`mutabakat_uretim.py`) → regresyon testi → doküman → commit
+→ CI yeşil → sonraki yıl. Lisanssız (T5/T6) Bulgu D ile zaten kapsam
+dışı, o taraf ek karar gerektirmiyor. **DUR ve raporla kuralı hâlâ
+geçerli:** Bulgu O'nun dry-run'ında görünmeyen YENİ bir yapısal
+sürpriz çıkarsa (özellikle Bulgu O'nun kendi uyarısı — tarama 2016 için
+`tbl.rows[2:]` kullandı, doğrusu `tbl.rows[1:]` olurdu, üretim turunda
+TAM offset'le yeniden taranmalı).
+
+**Bugün kapananlar (özet, D kuralı — tarih çapası):**
+- 2019 (T2+T3 Lisanslı) tamamlandı — commit `73a3e7f` (Bulgu N).
+- 2018 (T2+T3 Lisanslı) tamamlandı — commit `452c8e0` (Bulgu N + Bulgu
+  I sınıfı), ADIM 4'ün "Excel'e en yakın 8 yıl" (2025-2018) fazı BİTTİ.
+- 2016-2017 GENİŞLETİLMİŞ dry-run taraması — commit `0b3dcf1` (Bulgu O,
+  KOD YAZILMADI).
+- 2024-02 kararı yeniden CANLI doğrulandı (fresh disposable'a 2024'ün
+  12 ayı yeniden yüklenip `mutabakat_kontrol_et()` çıktısı doğrudan
+  sorgulandı) — bekleyen bir uygulama adımı YOKTU.
+
+**ADIM 4 durumu:** 10 yılın 8'i (2025→2018) TAMAMLANDI, kalan 2016-2017
+— uygulaması ÖNCEDEN ONAYLI, bir sonraki oturum karar beklemeden
+başlayabilir. Canlıya bu güne kadar HİÇBİR Word üretim verisi
+UYGULANMADI (yalnız disposable postgres:17'de doğrulandı) — 10 yılın
+TAMAMI bitince CANLI BACKFILL tek seferde, Ahmet'in onayıyla yapılacak.
+Sonrası Faz 4 (Tahminleme), kapsam kararı bekliyor.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` Sürüm Geçmişi v1.39,
+`09_PROJE_DURUMU.md` "SONRAKİ OTURUM DEVAM NOKTASI" güncellendi.

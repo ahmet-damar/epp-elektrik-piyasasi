@@ -137,9 +137,12 @@ yansıtıldı.**
   GENİŞLETİLMİŞ dry-run taraması da BİTTİ (Bulgu O, KOD YAZILMADI) —
   2016'nın T2'si diğer TÜM yıllardan yapısal olarak FARKLI (tek-dönem
   3-kolonlu), 4 "yok görünen" ay aslında yok DEĞİL (başlık/YTD-tablo
-  belirsizliği). Hiçbir yıl canlıya UYGULANMADI, sıradaki iş: 2016-2017
-  bulgularına göre KARAR + uygulama** (bkz. "Sonraki Oturum Devam
-  Noktası" — tam liste orada).
+  belirsizliği). **2016-2017'nin uygulaması Ahmet tarafından ÖNCEDEN
+  ONAYLANDI (2026-09-13) — bir sonraki oturum karar beklemeden
+  başlayabilir** (2016 için bespoke `t2_oku()`, established desen: dry-
+  run zaten yapıldı → yükle → mutabakat → test → doküman → commit → CI).
+  Hiçbir yıl canlıya UYGULANMADI, sıradaki iş: 2016-2017 uygulaması**
+  (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
   edilince T7 ile 4/6 ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11
@@ -531,11 +534,24 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
       Lisanssız (T5/T6) zaten Bulgu D ile kapsam dışı.
     - Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.24, Sürüm Geçmişi v1.38,
       `12_word_uretim_envanteri.md` Bulgu O (özet tablosu dahil).
-  - **Sıradaki adım: 2016-2017'nin uygulaması** (kod + yükleme + test),
-    Bulgu O'nun bulgularına göre karar verilip ayrı bir turda. Canlı
-    backfill kullanıcı onayıyla TÜM yıllar bittikten sonra TEK SEFERDE
-    yapılacak — 2024-02/2022-T6 kararları zaten yukarıda KAPATILDI,
-    canlıya geçmeden önce başka açık karar YOK.
+  - **✅ 2016-2017 uygulaması ÖNCEDEN ONAYLANDI (2026-09-13) — SIRADAKİ
+    İŞ, karar beklemiyor:** Bulgu O'daki 2016 T2 farkı (tek-dönem
+    3-kolonlu format) için AYRI bir `t2_oku()` yazılması onaylandı —
+    bu, "yıl başına ayrı tarif" mimarisine zaten uygun (`word_2016.py`
+    kendi sürprizlerini izole tutmak için var). Diğer yıllarla AYNI
+    desen geçerli: dry-run ZATEN yapıldı (Bulgu O) → yükle → çapraz
+    mutabakat → regresyon testi → doküman → commit → CI. Lisanssız
+    (T5/T6) Bulgu D ile zaten kapsam dışı, o taraf basit. **DUR ve
+    raporla kuralı geçerli kalıyor:** dry-run'da (Bulgu O) görünmeyen
+    YENİ bir yapısal sürpriz çıkarsa (Bulgu O'nun kendi uyarısı: tarama
+    2016 için yanlış offset — `tbl.rows[2:]` yerine `tbl.rows[1:]` —
+    kullandı, üretim turunda TAM offset'le yeniden taranmalı).
+  - 2016-2017 bitince (bu, "10 yılın TAMAMI" demek): **CANLI BACKFILL
+    tek seferde, Ahmet'in onayıyla.** Bu güne kadar canlıya HİÇBİR Word
+    üretim verisi UYGULANMADI, yalnız disposable postgres:17'de
+    doğrulandı — 2024-02/2022-T6 kararları zaten yukarıda KAPATILDI,
+    canlıya geçmeden önce başka açık karar YOK. Sonrası Faz 4
+    (Tahminleme) — aşağıda "Faz 4 (Tahminleme)" bölümüne bkz.
   - **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatan notlar
     (hâlâ geçerli):**
   - `lisans_id` çözümü: **DOĞRULANDI, 2025 için ÇALIŞTI** — `t2_oku()`/
