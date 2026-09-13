@@ -1777,3 +1777,45 @@ fonksiyonları bu projede zaten birim/entegrasyon testiyle değil, disposable
 DB'ye karşı elle çalıştırılıp doğrulanıyor, established pattern).
 
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.16, Sürüm Geçmişi v1.30.
+
+## 2026-09-13 (devam) — ADIM 4: 2024 (T2+T3 Lisanslı) tamamlandı, 2 gerçek bulgu
+
+2025 ile AYNI desen 2024'e uygulandı (Lisanssız zaten Bulgu H'de "YOK
+(0/12)" olarak işaretliydi — bu turda yalnız Lisanslı T2/T3 + Lisanssız
+kapsam-dışı marking). Gerçek dosyaya karşı çalıştırılırken 2 gerçek
+bulgu bulundu:
+
+**Bulgu I (parser hatası, düzeltildi):** Mayıs/Kasım/Aralık 2024'te T2
+tablosunun başlığı 3 satıra bölünmüş (Word'ün "ORAN (%)" hücresini
+ikiye bölmesi), 3. satır da hâlâ 'KAYNAK TÜRÜ' etiketini taşıyor —
+```
+İlk crash: ValueError: Tanınmayan kaynak türü etiketi: 'KAYNAK TÜRÜ'
+```
+`t2_oku()` artık ilk hücresi 'KAYNAK TÜRÜ' olan TÜM baştaki satırları
+dinamik atlıyor (kaç satır olursa olsun) — 2 regresyon testiyle
+(normal 2-satır + bölünmüş 3-satır senaryosu) sabitlendi.
+
+**Bulgu J (kaynak belge hatası, kod DEĞİL — ZORLA GEÇİRİLMEDİ):**
+```
+mutabakat_uretim.py çıktısı:
+  {'tarih_id': 202402, 'lisans_id': 1 (Lisanslı),
+   'il_toplami': 28549038.81, 'kaynak_toplami': 25615763.19,
+   'fark': 2933275.62, 'fark_yuzde': 11.45, 'uyumlu': False}
+```
+Araştırıldı: Şubat 2024'ün T3 (il bazında) tablosu başlığı doğru ayı
+gösteriyor ama içeriği (ÇANAKKALE'den itibaren TÜM satırlar, Genel
+Toplam dahil) Ocak 2024'ün T3'üyle ondalık basamağa kadar BİREBİR AYNI.
+Dosya bütünlüğü kontrol edildi — Ocak/Şubat dosyaları FARKLI (farklı
+boyut, farklı hash), bir manifest/kopyalama hatası DEĞİL. T2 (kaynak)
+tarafı Şubat için doğru/farklı veri taşıyor. Sonuç: EPDK'nın kendi
+yayımladığı Şubat 2024 raporunda GERÇEK bir veri hatası (Tablo 1.7'yi
+güncellemeyi unutmuşlar) — `mutabakat_uretim.py` TASARLANDIĞI GİBİ
+çalışıp yakaladı. 202402 (Lisanslı) disposable'da UYUMSUZ/aktive
+edilmemiş bırakıldı, mutabakat kontrolüne İSTİSNA EKLENMEDİ.
+
+**Sonuç:** disposable postgres:17'de 12/12 ay yüklendi, mutabakat
+**11/12 uyumlu** (yalnız 202402). +5 test, 249/249 unit test yeşil.
+Canlı backfill öncesi 202402'nin T3'ü için kullanıcı kararı gerekecek.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.17, Sürüm Geçmişi v1.31,
+`12_word_uretim_envanteri.md` Bulgu I/J.

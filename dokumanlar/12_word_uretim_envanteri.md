@@ -216,6 +216,46 @@ gelecek turlarda değerlendirilecek) hem `fact_uretim_kaynak_geneli` HEM
 bırakılıyor (2016-2017 Karar 4 ile AYNI ilke — bir taraf yüklenip diğeri
 yüklenmeyen asimetrik bir durum YARATILMIYOR).
 
+## Bulgu I — 2024 T2'de üç-satırlık bölünmüş başlık (Mayıs/Kasım/Aralık)
+
+2024'ün T2 (Lisanslı, kaynak bazında) tablosu, çoğu ayda 2025 ile AYNI
+2-satırlık başlık yapısında (`donem_satiri` + `ÜRETİM/ORAN alt-başlığı`),
+ama **Mayıs, Kasım ve Aralık 2024'te** Word'ün birleştirilmiş-hücre kaydı
+"ORAN (%)" etiketini İKİYE bölmüş — 3. satır da hâlâ `'KAYNAK TÜRÜ'`
+etiketini taşıyor, gerçek kaynak verisi 4. satırdan (index 3) başlıyor.
+`t2_oku()`'da katı `tbl.rows[2:]` varsayımı YERİNE, ilk hücresi
+`'KAYNAK TÜRÜ'` olan TÜM baştaki satırlar dinamik olarak atlanacak
+şekilde düzeltildi (kaç satır olursa olsun) — regresyon testiyle
+sabitlendi (`test_word_2024.py::test_t2_oku_uc_satirlik_bolunmus_
+baslikla_da_calisir`).
+
+## Bulgu J — 2024-02'nin T3 tablosu GERÇEKTEN hatalı (EPDK kaynak verisi, kod hatası DEĞİL)
+
+`mutabakat_uretim.py` (T2↔T3 çapraz kontrolü) Şubat 2024 için **%11,45
+fark** buldu — araştırıldı, ZORLA GEÇİRİLMEDİ:
+
+- Şubat 2024 dosyasının T3 tablosu (`Tablo 1.7 Şubat 2024 Döneminde
+  Lisanslı Elektrik Üretiminin İl Bazında Dağılımı`) **başlığı doğru
+  ayı gösteriyor** ama İÇERİĞİ (satır satır, ÇANAKKALE'den başlayarak)
+  **Ocak 2024'ün T3 tablosuyla ondalık basamağa kadar BİREBİR AYNI**
+  (kendi Genel Toplam'ı da 28.549.038,63 — Ocak'ın 28.549.038,81'ine
+  neredeyse eşit).
+- Dosya bütünlüğü doğrulandı: Ocak ve Şubat 2024 dosyaları FARKLI
+  dosyalar (farklı boyut, farklı SHA-256/MD5 hash) — bir manifest/
+  dosya-kopyalama hatası DEĞİL.
+- Şubat'ın T2 (kaynak bazında) tablosu ise GERÇEKTEN farklı/doğru veri
+  taşıyor (Ocak'tan bariz farklı toplam ve kaynak dağılımı) — yalnız T3
+  (il bazında) EPDK'nın kendi yayımladığı belgede STALE/kopyalanmış.
+- **Sonuç: bu EPDK'nın kendi kaynak belgesindeki gerçek bir veri
+  hatası** — `mutabakat_uretim.py`'nin TASARLANDIĞI GİBİ çalışıp
+  yakaladığı bir örnek (T2 (kaynak) 6/7. bulgudaki parser bug'ından
+  FARKLI olarak, burada BİZİM koddan değil KAYNAK belgeden kaynaklanan
+  bir tutarsızlık). Zorla geçirilmedi — 202402 (Lisanslı) `mutabakat_
+  uretim.py` çıktısında UYUMSUZ olarak işaretli kalıyor, disposable'da
+  aktive edilmedi. Canlı backfill öncesi kullanıcı kararı gerekecek
+  (T3'ü olduğu gibi mi kabul et, yoksa EPDK'nın olası bir düzeltme/
+  yayımını mı bekle).
+
 ## Özet — ADIM 4 (Word üretim backfill'i) için önerilen sıra (öneri, karar DEĞİL)
 
 1. Bulgu E'yi çöz: 2023-Aralık + 2024/2025'in TAM tablo listesini (filtre

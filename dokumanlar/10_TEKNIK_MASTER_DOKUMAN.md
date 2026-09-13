@@ -78,6 +78,7 @@ her yeni rakam için geçerlidir.
 | v1.28 | 2026-09-09 | **Gün sonu kapanışı (3).** KPI-04 kontrolü — §5.13'teki "kapsam dışı" karakterizasyonu YANLIŞTI (kullanıcı itirazı haklı çıktı), gerçekte KPI-03/06 ile aynı formül/kaynak — `uretim_kaynak_geneli`'ye bağlandı, §5.14. Aşama 3'ün "boş KPI'ları aç" hedefi KPI-01..07'nin TAMAMI için (2026-01'den itibaren) gerçekleşti | Canlı 2026-01..06 kaynak payları toplamı 6/6 ay %99,9-100,2 (yuvarlama payı, hesap hatası değil). Regresyon testi genişletildi (toplam ~%100 kontrolü). Disposable postgres:17: CI-tam-sırayla 52/52 + unit-only 237/237 yeşil (bugün, WSL2 port-forward köprüsü ara sıra bağlantı zaman aşımı verdi — container'ın kendisi sağlıklıydı, temiz bir pencerede tekrar koşulup doğrulandı, kod regresyonu değil). ruff/mypy/bandit temiz, CI+Security canlıda yeşil, git temiz |
 | v1.29 | 2026-09-13 | ADIM 4 başladı — 2025 Word T2/T3 (Lisanslı üretim, kaynak+il) `word_2025.py`'ye eklendi, `word_ortak.py`'ye 2 yeni paylaşımlı yardımcı (`hedef_donem_kolonu_bul()` normalize_label'lı, `iki_blokta_il_degerlerini_oku()`) — §5.15. T5 (Lisanssız kaynak) okuyucu yazıldı ama YÜKLENMİYOR — T6 (Lisanssız il) 2025'te HİÇ YOK (Bulgu E kesin doğrulandı), kullanıcı kararı bekleniyor. Ayrıca: `scheduled-backup.yml`'in İLK gerçek cron koşusu doğrulandı (2026-09-13) | 2 gerçek format sürprizi gerçek dosyaya karşı bulunup regresyona dönüştürüldü (T2'nin yıl-önce/büyük-harf dönem satırı; T3'te 2025-01 Kilis'in satır olarak hiç görünmemesi). Disposable postgres:17: 2025'in 12/12 ayı yüklendi, `mutabakat_uretim.py` T2↔T3 12/12 uyumlu. 122/122 mevcut Word yılı regresyon testi (2016-2025) hedef_donem_kolonu_bul() değişikliğinden SONRA da yeşil, +19 yeni test (word_2025). Canlıya UYGULANMADI (yalnız disposable, kullanıcı onayı bekliyor) |
 | v1.30 | 2026-09-13 | T5/T6 (Lisanssız) 10 yılın TAMAMI (120 ay) tarandı — Bulgu H, `12_word_uretim_envanteri.md`. Desen KARIŞIK (2016-2022 çoğunlukla var, 2022 Haziran'dan itibaren tanım riski, 2023 yıl-içi bölünmüş, 2024-2025 tamamen yok) — karar önceden verilmiş kurala göre ONAY BEKLENMEDEN uygulandı: yıl/ay bazında `veri_kapsam_disi`, mutabakata İSTİSNA YOK — §5.16 | `word_2025.py:isle_ay_uretim_geneli()` artık her ay için Lisanssız'ı HER İKİ tabloda da (`nitelik='lisans_durumu=Lisanssız'`, Karar 4 genişletildi) kapsam dışı işaretliyor. Disposable postgres:17: 12/12 ay, 24 satır `veri_kapsam_disi`'ye eklendi, `mutabakat_uretim.py` hâlâ 12/12 uyumlu (Lisanslı etkilenmedi). KPI-07 dışlaması GEREKMEDİ (desen "hiçbir yılda yok" değil, kpi_07 yalnız kaynak tablosuna bağımlı). 244/244 unit test yeşil |
+| v1.31 | 2026-09-13 | ADIM 4 — 2024 (T2+T3 Lisanslı) tamamlandı, Lisanssız kapsam dışı (Bulgu H'nin 2024 satırı) — §5.17. 2 gerçek bulgu: Bulgu I (3 satırlık bölünmüş başlık, Mayıs/Kasım/Aralık — parser hatası, düzeltildi), Bulgu J (2024-02'nin T3'ü GERÇEKTEN hatalı — EPDK'nın kendi belgesinde Ocak'ın stale kopyası, kod hatası DEĞİL, ZORLA GEÇİRİLMEDİ) | Disposable postgres:17: 12/12 ay yüklendi, `mutabakat_uretim.py` 11/12 uyumlu (yalnız 202402 uyumsuz — %11,45 fark, araştırıldı, kaynak belge hatası olarak doğrulandı, aktive edilmedi). +5 test (`test_word_2024.py`, 3 satırlık başlık + normal senaryo dahil). 249/249 unit test yeşil |
 
 ---
 
@@ -924,6 +925,36 @@ UYGULANMIYOR. KPI-07 yalnız `fact_uretim_kaynak_geneli`'yi kullanıyor
 zaten doğal olarak 'hesaplanamaz' dönüyor, EK bir kod değişikliği
 gerekmedi. 2018-2022 gibi T6'nın GERÇEKTEN sağlam olduğu yıllara
 gelindiğinde Lisanssız normal yüklenip KPI-07 gerçek değer üretecek.
+
+### 5.17 ADIM 4 — 2024 (T2+T3 Lisanslı) tamamlandı, 2 gerçek bulgu (2026-09-13)
+
+2024, 2025 ile BİREBİR AYNI desen (`t2_oku()`/`t3_oku()`/
+`isle_ay_uretim_geneli()`, Lisanssız kapsam dışı — Bulgu H'nin 2024
+satırı zaten "YOK (0/12)" idi) `word_2024.py`'ye eklendi. İki gerçek
+bulgu, gerçek dosyaya karşı çalıştırılırken bulundu:
+
+**Bulgu I — 3 satırlık bölünmüş başlık (Mayıs/Kasım/Aralık):** T2'nin
+2 satırlık sabit başlık varsayımı bu 3 ayda yetersizdi ("ORAN (%)"
+hücresi Word'de ikiye bölünmüş, 3. satır da 'KAYNAK TÜRÜ' etiketini
+taşıyor). `t2_oku()` artık ilk hücresi 'KAYNAK TÜRÜ' olan TÜM baştaki
+satırları dinamik atlıyor — regresyon testiyle (iki ayrı senaryo: normal
+2 satır + bölünmüş 3 satır) sabitlendi.
+
+**Bulgu J — 2024-02'nin T3'ü GERÇEKTEN hatalı (kod DEĞİL, kaynak
+belge):** `mutabakat_uretim.py` Şubat 2024 için %11,45 fark buldu.
+Araştırıldı, ZORLA GEÇİRİLMEDİ: Şubat'ın T3 tablosu (il bazında) başlığı
+doğru ayı gösterse de İÇERİĞİ Ocak 2024'ün T3'üyle ondalık basamağa
+kadar birebir aynı (EPDK'nın kendi belgesinde stale/kopyalanmış veri —
+dosya hash'leri FARKLI, manifest/kopyalama hatası değil). T2 (kaynak)
+tarafı Şubat için doğru/farklı veri taşıyor. Bu, `mutabakat_uretim.py`'nin
+TASARLANDIĞI GİBİ çalışıp yakaladığı gerçek bir örnek — 202402 (Lisanslı)
+disposable'da UYUMSUZ/aktive edilmemiş bırakıldı, canlı backfill öncesi
+kullanıcı kararı gerekecek.
+
+**Sonuç:** Disposable postgres:17'de 12/12 ay yüklendi, `mutabakat_
+uretim.py` **11/12 uyumlu** (yalnız 202402 uyumsuz, Bulgu J). +5 yeni
+test (`test_word_2024.py`), 249/249 unit test yeşil. Detay: `12_word_
+uretim_envanteri.md` Bulgu I/J.
 
 ---
 

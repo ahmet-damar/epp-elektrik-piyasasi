@@ -130,9 +130,10 @@ yansıtıldı.**
   TAMAMLANDI (2026-09-08/09), Bulgu C/D kararları verilip uygulandı, ADIM
   5 (KPI bağlama, KPI-01..07'nin TAMAMI — KPI-04 dahil) TAMAMLANDI
   (2026-09-09), ADIM 4 (Word 2016-2025 üretim parser'ı) 2026-09-13'te
-  BAŞLADI — 2025 TAMAMLANDI (T2+T3 Lisanslı yüklendi, T5/T6 Lisanssız
-  kararı verilip uygulandı: kapsam dışı), sıradaki iş 2024→2023** (bkz.
-  "Sonraki Oturum Devam Noktası" — tam liste orada).
+  BAŞLADI — 2025 ve 2024 TAMAMLANDI (T2+T3 Lisanslı yüklendi, Lisanssız
+  kapsam dışı — Bulgu H; 2024'te ayrıca 2 gerçek bulgu, biri parser
+  düzeltmesi biri EPDK kaynak belge hatası, bkz. Bulgu I/J), sıradaki iş
+  2023** (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
   edilince T7 ile 4/6 ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11
@@ -393,8 +394,29 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     normal görünmesi tek başına kanıt sayılmıyor. Detay: `dokumanlar/
     12_word_uretim_envanteri.md` Bulgu H, `10_TEKNIK_MASTER_DOKUMAN.md`
     §5.16, Sürüm Geçmişi v1.30.
-  - **Sıradaki iş:** ADIM 4'e devam — 2024, sonra 2023 (aynı kademeli
-    desen: yükle → mutabakat → regresyon testi → commit → CI yeşil).
+  - **✅ 2024 TAMAMLANDI (2026-09-13):** T2+T3 (Lisanslı) yüklendi,
+    Lisanssız (Bulgu H'nin 2024 satırı zaten "YOK") kapsam dışı
+    işaretlendi. 2 gerçek bulgu: **Bulgu I** (3 satırlık bölünmüş T2
+    başlığı, Mayıs/Kasım/Aralık — parser hatası, düzeltildi + 2 regresyon
+    testi). **Bulgu J** (2024-02'nin T3'ü GERÇEKTEN hatalı — EPDK'nın
+    kendi belgesinde Ocak'ın stale kopyası, dosya hash'leri farklı yani
+    kod/manifest hatası DEĞİL — `mutabakat_uretim.py` %11,45 farkla
+    doğru şekilde yakaladı, ZORLA GEÇİRİLMEDİ, 202402 Lisanslı
+    aktive edilmeden bırakıldı). Disposable: 12/12 ay yüklendi, mutabakat
+    **11/12 uyumlu**. +5 test, 249/249 unit test yeşil. Detay: `12_word_
+    uretim_envanteri.md` Bulgu I/J, `10_TEKNIK_MASTER_DOKUMAN.md` §5.17,
+    Sürüm Geçmişi v1.31.
+    - **⚠️ Canlı backfill öncesi açık madde:** 202402'nin T3 verisi için
+      karar gerekecek (olduğu gibi mi kabul, yoksa EPDK'nın olası bir
+      düzeltmesini mi bekle) — bu turda karar VERİLMEDİ, yalnız
+      belgelendi.
+  - **Sıradaki iş:** ADIM 4'e devam — 2023 (aynı kademeli desen: yükle →
+    mutabakat → regresyon testi → commit → CI yeşil). 2023'ün T6'sı
+    Bulgu H'ye göre yıl-içi bölünmüş (Ocak-Haziran var/eski başlıkla,
+    Temmuz-Aralık yok) — 2023 için de Lisanssız'ın TAMAMI (12/12 ay)
+    kapsam dışı bırakılacak (aynı simetri ilkesi), T6'nın Ocak-Haziran
+    kısmının GERÇEKTEN "Brüt Üretim" mi yoksa dar bir metrik mi taşıdığı
+    bu turda İNCELENMEDİ (2018-2022 işlenirken değerlendirilecek).
   - **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatan notlar
     (hâlâ geçerli):**
   - `lisans_id` çözümü: **DOĞRULANDI, 2025 için ÇALIŞTI** — `t2_oku()`/

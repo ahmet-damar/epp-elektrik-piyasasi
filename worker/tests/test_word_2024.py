@@ -21,6 +21,8 @@ from worker.scripts.word_2024 import (
     _ay_yil_dogrula,
     grup_esle_zorunlu,
     kaynak_esle_zorunlu,
+    t2_oku,
+    t3_oku,
     t4_oku,
     t10_oku,
     t11_oku,
@@ -185,3 +187,122 @@ def test_t4_oku_genel_toplam_uyusmazliginda_hata_verir() -> None:
 
     with pytest.raises(ValueError, match="Genel"):
         t4_oku(tbl, tarih_id=202404)
+
+
+# ---------------------------------------------------------------------------
+# ADIM 4 (2026-09-13) — T2/T3: Lisanslı ÜRETİM (kurulu güç DEĞİL). Gerçek
+# 2024 verisinde bulunan YENİ bir format sürprizi burada regresyonla
+# sabitlendi: Mayıs/Kasım/Aralık'ta 'ORAN (%)' hücresi Word'ün birleştirilmiş
+# hücre kaydında İKİYE bölünmüş, 3. satır da 'KAYNAK TÜRÜ' etiketini taşıyor
+# — 2025'in 2 satırlık sabit başlık varsayımı burada YETERSİZ, dinamik
+# atlama gerekiyor (bkz. t2_oku modül notu).
+# ---------------------------------------------------------------------------
+
+
+def test_t2_oku_normal_iki_satir_baslikla_calisir() -> None:
+    donem_satiri = [
+        "KAYNAK TÜRÜ",
+        "2023 HAZİRAN",
+        "2023 HAZİRAN",
+        "2024 HAZİRAN",
+        "2024 HAZİRAN",
+        "DEĞİŞİM\n(%)",
+    ]
+    baslik_satiri = [
+        "KAYNAK TÜRÜ",
+        "ÜRETİM (MWh)",
+        "ORAN\n (%)",
+        "ÜRETİM (MWh)",
+        "ORAN \n(%)",
+        "DEĞİŞİM\n(%)",
+    ]
+    satirlar = [
+        donem_satiri,
+        baslik_satiri,
+        ["Hidrolik", "100,0", "50,0", "140,0", "50,0", "40,0"],
+        ["Genel Toplam", "100,0", "100,0", "140,0", "100,0", "40,0"],
+    ]
+    tbl = _tablo_ekle(satirlar)
+
+    df = t2_oku(tbl, tarih_id=202406, hedef_ay_yil="2024 HAZİRAN")
+
+    assert len(df) == 1
+    assert float(df["uretim_mwh"].sum()) == pytest.approx(140.0)
+
+
+def test_t2_oku_uc_satirlik_bolunmus_baslikla_da_calisir() -> None:
+    """2024-05/11/12'de gerçek veride bulunan kenar durumu: 'ORAN (%)'
+    hücresi 3. satıra taşmış, o satırın ilk hücresi de HÂLÂ 'KAYNAK TÜRÜ' —
+    veri asıl 4. satırdan (index 3) başlıyor. Fix ÖNCESİ bu durum 'Hidrolik'
+    yerine 'KAYNAK TÜRÜ' metnini bir kaynak adı sanıp ValueError fırlatırdı."""
+    satirlar = [
+        [
+            "KAYNAK TÜRÜ",
+            "2023 MAYIS",
+            "2023 MAYIS",
+            "2024 MAYIS",
+            "2024 MAYIS",
+            "DEĞİŞİM",
+        ],
+        ["KAYNAK TÜRÜ", "ÜRETİM (MWh)", "ORAN", "ÜRETİM (MWh)", "ORAN", "(%)"],
+        ["KAYNAK TÜRÜ", "ÜRETİM (MWh)", "(%)", "ÜRETİM (MWh)", "(%)", ""],
+        ["Hidrolik", "100,0", "50,0", "140,0", "50,0", "40,0"],
+        ["Genel Toplam", "100,0", "100,0", "140,0", "100,0", "40,0"],
+    ]
+    tbl = _tablo_ekle(satirlar)
+
+    df = t2_oku(tbl, tarih_id=202405, hedef_ay_yil="2024 MAYIS")
+
+    assert len(df) == 1
+    assert (
+        df["kaynak"].iloc[0] == "Hidrolik"
+    )  # 'KAYNAK TÜRÜ' etiketi veri satırı SANILMADI
+    assert float(df["uretim_mwh"].sum()) == pytest.approx(140.0)
+
+
+def test_t2_oku_genel_toplam_uyusmazliginda_hata_verir() -> None:
+    donem_satiri = ["KAYNAK TÜRÜ", "2024 HAZİRAN", "2024 HAZİRAN"]
+    baslik_satiri = ["KAYNAK TÜRÜ", "ÜRETİM (MWh)", "ORAN (%)"]
+    satirlar = [
+        donem_satiri,
+        baslik_satiri,
+        ["Hidrolik", "100,0", "100,0"],
+        ["Genel Toplam", "999,0", "100,0"],
+    ]
+    tbl = _tablo_ekle(satirlar)
+
+    with pytest.raises(ValueError, match="Genel"):
+        t2_oku(tbl, tarih_id=202406, hedef_ay_yil="2024 HAZİRAN")
+
+
+def test_t3_oku_iki_sutunlu_blok_birlesir_ve_eksik_il_sifirlanir() -> None:
+    baslik = ["İLLER", "ÜRETİM (MWh)", "ORAN (%)", "İLLER", "ÜRETİM (MWh)", "ORAN (%)"]
+    satirlar = [baslik]
+    diger_iller = [il for il in TUM_ILLER if il != "Kilis"]
+    assert len(diger_iller) == 80
+    for i in range(0, 80, 2):
+        satirlar.append(
+            [diger_iller[i], "10,0", "1,0", diger_iller[i + 1], "10,0", "1,0"]
+        )
+    satirlar.append(["", "", "", "Genel Toplam", "800,0", "100,0"])
+    tbl = _tablo_ekle(satirlar)
+
+    df = t3_oku(tbl, tarih_id=202401)
+
+    assert len(df) == 81
+    assert df["il_kodu"].nunique() == 81
+    kilis_kodu = next(kod for kod, ad in _IL_ADI_KANONIK.items() if ad == "Kilis")
+    assert df[df["il_kodu"] == kilis_kodu]["uretim_mwh"].eq(0.0).all()
+    assert float(df["uretim_mwh"].sum()) == pytest.approx(800.0)
+
+
+def test_t3_oku_genel_toplam_uyusmazliginda_hata_verir() -> None:
+    baslik = ["İLLER", "ÜRETİM (MWh)", "ORAN (%)", "İLLER", "ÜRETİM (MWh)", "ORAN (%)"]
+    satirlar = [baslik]
+    for i in range(0, 80, 2):
+        satirlar.append([TUM_ILLER[i], "10,0", "1,0", TUM_ILLER[i + 1], "10,0", "1,0"])
+    satirlar.append(["", "", "", "Genel Toplam", "9999,0", "100,0"])
+    tbl = _tablo_ekle(satirlar)
+
+    with pytest.raises(ValueError, match="Genel"):
+        t3_oku(tbl, tarih_id=202401)
