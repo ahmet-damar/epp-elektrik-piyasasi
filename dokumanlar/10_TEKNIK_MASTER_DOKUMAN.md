@@ -79,6 +79,7 @@ her yeni rakam için geçerlidir.
 | v1.29 | 2026-09-13 | ADIM 4 başladı — 2025 Word T2/T3 (Lisanslı üretim, kaynak+il) `word_2025.py`'ye eklendi, `word_ortak.py`'ye 2 yeni paylaşımlı yardımcı (`hedef_donem_kolonu_bul()` normalize_label'lı, `iki_blokta_il_degerlerini_oku()`) — §5.15. T5 (Lisanssız kaynak) okuyucu yazıldı ama YÜKLENMİYOR — T6 (Lisanssız il) 2025'te HİÇ YOK (Bulgu E kesin doğrulandı), kullanıcı kararı bekleniyor. Ayrıca: `scheduled-backup.yml`'in İLK gerçek cron koşusu doğrulandı (2026-09-13) | 2 gerçek format sürprizi gerçek dosyaya karşı bulunup regresyona dönüştürüldü (T2'nin yıl-önce/büyük-harf dönem satırı; T3'te 2025-01 Kilis'in satır olarak hiç görünmemesi). Disposable postgres:17: 2025'in 12/12 ayı yüklendi, `mutabakat_uretim.py` T2↔T3 12/12 uyumlu. 122/122 mevcut Word yılı regresyon testi (2016-2025) hedef_donem_kolonu_bul() değişikliğinden SONRA da yeşil, +19 yeni test (word_2025). Canlıya UYGULANMADI (yalnız disposable, kullanıcı onayı bekliyor) |
 | v1.30 | 2026-09-13 | T5/T6 (Lisanssız) 10 yılın TAMAMI (120 ay) tarandı — Bulgu H, `12_word_uretim_envanteri.md`. Desen KARIŞIK (2016-2022 çoğunlukla var, 2022 Haziran'dan itibaren tanım riski, 2023 yıl-içi bölünmüş, 2024-2025 tamamen yok) — karar önceden verilmiş kurala göre ONAY BEKLENMEDEN uygulandı: yıl/ay bazında `veri_kapsam_disi`, mutabakata İSTİSNA YOK — §5.16 | `word_2025.py:isle_ay_uretim_geneli()` artık her ay için Lisanssız'ı HER İKİ tabloda da (`nitelik='lisans_durumu=Lisanssız'`, Karar 4 genişletildi) kapsam dışı işaretliyor. Disposable postgres:17: 12/12 ay, 24 satır `veri_kapsam_disi`'ye eklendi, `mutabakat_uretim.py` hâlâ 12/12 uyumlu (Lisanslı etkilenmedi). KPI-07 dışlaması GEREKMEDİ (desen "hiçbir yılda yok" değil, kpi_07 yalnız kaynak tablosuna bağımlı). 244/244 unit test yeşil |
 | v1.31 | 2026-09-13 | ADIM 4 — 2024 (T2+T3 Lisanslı) tamamlandı, Lisanssız kapsam dışı (Bulgu H'nin 2024 satırı) — §5.17. 2 gerçek bulgu: Bulgu I (3 satırlık bölünmüş başlık, Mayıs/Kasım/Aralık — parser hatası, düzeltildi), Bulgu J (2024-02'nin T3'ü GERÇEKTEN hatalı — EPDK'nın kendi belgesinde Ocak'ın stale kopyası, kod hatası DEĞİL, ZORLA GEÇİRİLMEDİ) | Disposable postgres:17: 12/12 ay yüklendi, `mutabakat_uretim.py` 11/12 uyumlu (yalnız 202402 uyumsuz — %11,45 fark, araştırıldı, kaynak belge hatası olarak doğrulandı, aktive edilmedi). +5 test (`test_word_2024.py`, 3 satırlık başlık + normal senaryo dahil). 249/249 unit test yeşil |
+| v1.32 | 2026-09-13 | ADIM 4 — 2023 (T2+T3 Lisanslı) tamamlandı, Lisanssız TÜM yıl kapsam dışı (T6 yıl-içi bölünmüş, güvenli taraf seçildi) — §5.18. Bulgu K: yeni kaynak türü 'LPG' bulundu (12 ayda hep 0,00 MWh — atla sayıldı, Genel Toplam kontrolü güvence), 'Motorin'in gerçek üretimi (Kasım/Aralık) zaten mevcut altyapıyla (2026-08-19'dan beri) sorunsuz çözüldü — YENİ migration gerekmedi (ilk taslak redundant çıkıp silindi) | Disposable postgres:17: 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu (2024'ün Bulgu J'sine benzer bir sorun YOK). +4 test (`test_word_2023.py`, LPG atlama + Motorin tanıma dahil). 255/255 unit test yeşil. ADIM 4'ün "en yakın 3 yıl" (2023-2025) fazı TAMAMLANDI, hepsi YALNIZ disposable — canlıya UYGULANMADI |
 
 ---
 
@@ -955,6 +956,40 @@ kullanıcı kararı gerekecek.
 uretim.py` **11/12 uyumlu** (yalnız 202402 uyumsuz, Bulgu J). +5 yeni
 test (`test_word_2024.py`), 249/249 unit test yeşil. Detay: `12_word_
 uretim_envanteri.md` Bulgu I/J.
+
+### 5.18 ADIM 4 — 2023 (T2+T3 Lisanslı) tamamlandı, yeni kaynak türü bulundu (2026-09-13)
+
+2023, 2024/2025 ile AYNI desen (`t2_oku()`/`t3_oku()`/`isle_ay_uretim_
+geneli()`). Lisanssız (T5/T6) TÜM yıl (12/12 ay) simetrik olarak kapsam
+dışı bırakıldı — Bulgu H'nin 2023 satırı yıl-içi bölünmüş (T6 Ocak-
+Haziran var/eski başlıkla, Temmuz-Aralık yok) ve Ocak-Haziran kısmının
+GERÇEKTEN "Brüt Üretim" taşıdığı bu turda doğrulanmadığından, güvenli/
+tutarlı taraf (TÜM yıl dışla) seçildi.
+
+**Bulgu K — yeni kaynak türü 'LPG' (parser fix), 'Motorin' zaten
+çözülmüştü:** T2 tablosunda Ağustos-Aralık 2023'te 'LPG' satırı bulundu
+— 12 ayın TAMAMINDA kendi (hedef ay) üretim değeri her zaman 0,00 MWh
+(2022'de küçük bir kalıntı vardı, "-100%" ile sıfırlanmış). `worker/
+parser.py` DEĞİŞTİRİLMEDİ — `word_2023.py:_KAYNAK_ATLA_ETIKETLERI`'ne
+eklendi, `t2_oku()`'nun Genel Toplam kontrolü gelecekte sıfır-olmayan
+bir LPG değeri çıkarsa bunu otomatik yakalayacak (regresyon testiyle bu
+güvence ayrıca kanıtlandı). Aynı tabloda 'Motorin'in GERÇEK, sıfır
+olmayan üretimi (Kasım 473,77 / Aralık 1.833,41 MWh) de bulundu ama
+**YENİ bir değişiklik GEREKMEDİ** — `worker/parser.py:KAYNAK_ESLEME` ve
+`dim_kaynak` ikisi de "Motorin" için zaten 2026-08-19'dan beri hazır
+(migration `20260819_0007`, 2026 Ocak Excel'inde bulunmuştu) — bu turda
+yalnız gerçek testle DOĞRULANDI, yeni migration YAZILMADI (ilk yazılan
+migration taslağı redundant olduğu anlaşılıp SİLİNDİ).
+
+**Sonuç:** disposable postgres:17'de 12/12 ay yüklendi, `mutabakat_
+uretim.py` **12/12 uyumlu** (2024'ün Bulgu J'sine benzer bir kaynak-
+belge hatası GÖRÜLMEDİ). +4 yeni test (`test_word_2023.py`), 255/255
+unit test yeşil. Detay: `12_word_uretim_envanteri.md` Bulgu K.
+
+**ADIM 4 durumu:** 2025/2024/2023 (T2+T3 Lisanslı) TAMAMLANDI, YALNIZ
+disposable postgres:17'de — canlıya HİÇBİRİ uygulanmadı. Sıradaki
+adımlar 2018-2022 (Bulgu H'nin "T6 çoğunlukla var" aralığı) — kullanıcı
+onayıyla canlı backfill bu 3 yılın TAMAMI bittikten sonra tek seferde.
 
 ---
 

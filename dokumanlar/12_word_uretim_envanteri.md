@@ -256,6 +256,37 @@ fark** buldu — araştırıldı, ZORLA GEÇİRİLMEDİ:
   (T3'ü olduğu gibi mi kabul et, yoksa EPDK'nın olası bir düzeltme/
   yayımını mı bekle).
 
+## Bulgu K — 2023'te yeni bir kaynak türü ('LPG'), Motorin zaten çözülmüştü
+
+2023'ün T2 (Lisanslı, kaynak bazında) tablosunda Ağustos-Aralık aylarında
+`'LPG'` adında, `worker/parser.py:KAYNAK_ESLEME`'de HİÇ karşılığı olmayan
+bir satır bulundu. İncelendi:
+
+- **LPG:** 12 ayın TAMAMINDA 2023'ün KENDİ üretim değeri (hedef_kolon,
+  yani hedef ayın gerçek sütunu) her zaman `0,00` MWh — yalnız 2022
+  karşılaştırma kolonunda küçük bir kalıntı var (Ağustos: 152,72 MWh,
+  Aralık: 309,99 MWh gibi), "DEĞİŞİM %" sütunu hepsinde `-100,00` (yani
+  2023'e gelindiğinde tamamen durmuş bir üretim). `worker/parser.py`'ye
+  dokunulmadı (mimari karar) — `word_2023.py:_KAYNAK_ATLA_ETIKETLERI`'ne
+  eklendi (kaynak_esle_zorunlu() bu etiketi 'atla' sayıyor). Güvence:
+  `t2_oku()`'nun kendi Genel Toplam kontrolü, LPG'nin gelecekte
+  sıfır-olmayan bir değer taşıdığı bir ay olursa bunu OTOMATİK yakalar
+  (toplam tutmaz, ValueError) — regresyon testiyle bu güvence AYRICA
+  kanıtlandı (kasıtlı sıfır-olmayan bir LPG değeriyle kurulan sentetik
+  tabloda satırın GERÇEKTEN atlandığı, sessizce toplama karışmadığı
+  doğrulandı).
+- **Motorin (aynı tabloda, Kasım/Aralık 2023'te GERÇEK, sıfır olmayan
+  üretim — 473,77 / 1.833,41 MWh):** araştırıldı ve YENİ bir değişiklik
+  GEREKMEDİĞİ bulundu — `worker/parser.py:KAYNAK_ESLEME`'nin "Motorin"
+  alias'ı zaten 2026-08-19'dan beri var, `dim_kaynak`'ta da zaten
+  seed edilmiş (migration `20260819_0007_dim_kaynak_motorin_nafta.sql`,
+  2026 Ocak Excel'inde bulunmuştu). Word 2023 verisi mevcut altyapıyla
+  sorunsuz yüklendi.
+
+**Sonuç:** disposable postgres:17'de 12/12 ay yüklendi, `mutabakat_
+uretim.py` **12/12 uyumlu** (2023'te 2024'ün Bulgu J'sine benzer bir
+kaynak-belge hatası GÖRÜLMEDİ).
+
 ## Özet — ADIM 4 (Word üretim backfill'i) için önerilen sıra (öneri, karar DEĞİL)
 
 1. Bulgu E'yi çöz: 2023-Aralık + 2024/2025'in TAM tablo listesini (filtre

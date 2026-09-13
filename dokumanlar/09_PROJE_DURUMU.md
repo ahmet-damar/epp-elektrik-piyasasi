@@ -130,10 +130,11 @@ yansıtıldı.**
   TAMAMLANDI (2026-09-08/09), Bulgu C/D kararları verilip uygulandı, ADIM
   5 (KPI bağlama, KPI-01..07'nin TAMAMI — KPI-04 dahil) TAMAMLANDI
   (2026-09-09), ADIM 4 (Word 2016-2025 üretim parser'ı) 2026-09-13'te
-  BAŞLADI — 2025 ve 2024 TAMAMLANDI (T2+T3 Lisanslı yüklendi, Lisanssız
-  kapsam dışı — Bulgu H; 2024'te ayrıca 2 gerçek bulgu, biri parser
-  düzeltmesi biri EPDK kaynak belge hatası, bkz. Bulgu I/J), sıradaki iş
-  2023** (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
+  BAŞLADI — 2025/2024/2023'ün "Excel'e en yakın 3 yıl" fazı TAMAMLANDI
+  (T2+T3 Lisanslı yüklendi, Lisanssız kapsam dışı — Bulgu H; 4 gerçek
+  bulgu bulundu, bkz. Bulgu I/J/K), hepsi YALNIZ disposable, canlıya
+  UYGULANMADI, sıradaki iş 2018-2022** (bkz. "Sonraki Oturum Devam
+  Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
   edilince T7 ile 4/6 ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11
@@ -410,13 +411,26 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
       karar gerekecek (olduğu gibi mi kabul, yoksa EPDK'nın olası bir
       düzeltmesini mi bekle) — bu turda karar VERİLMEDİ, yalnız
       belgelendi.
-  - **Sıradaki iş:** ADIM 4'e devam — 2023 (aynı kademeli desen: yükle →
-    mutabakat → regresyon testi → commit → CI yeşil). 2023'ün T6'sı
-    Bulgu H'ye göre yıl-içi bölünmüş (Ocak-Haziran var/eski başlıkla,
-    Temmuz-Aralık yok) — 2023 için de Lisanssız'ın TAMAMI (12/12 ay)
-    kapsam dışı bırakılacak (aynı simetri ilkesi), T6'nın Ocak-Haziran
-    kısmının GERÇEKTEN "Brüt Üretim" mi yoksa dar bir metrik mi taşıdığı
-    bu turda İNCELENMEDİ (2018-2022 işlenirken değerlendirilecek).
+  - **✅ 2023 TAMAMLANDI (2026-09-13):** T2+T3 (Lisanslı) yüklendi,
+    Lisanssız'ın TAMAMI (12/12 ay, T6 yıl-içi bölünmüş olduğu için güvenli
+    taraf seçildi) kapsam dışı işaretlendi. **Bulgu K:** yeni kaynak türü
+    'LPG' bulundu (12 ayda hep 0,00 MWh — atla sayıldı, `t2_oku()`'nun
+    Genel Toplam kontrolü güvence). 'Motorin'in gerçek üretimi (Kasım
+    473,77 / Aralık 1.833,41 MWh) için YENİ bir değişiklik GEREKMEDİ —
+    `worker/parser.py`/`dim_kaynak` ikisi de 2026-08-19'dan beri hazırdı
+    (ilk yazılan migration taslağı redundant çıkıp silindi). Disposable:
+    12/12 ay yüklendi, mutabakat **12/12 uyumlu** (2024'ün Bulgu J'si gibi
+    bir sorun YOK). +4 test, 255/255 unit test yeşil. Detay: `12_word_
+    uretim_envanteri.md` Bulgu K, `10_TEKNIK_MASTER_DOKUMAN.md` §5.18,
+    Sürüm Geçmişi v1.32.
+  - **🏁 ADIM 4'ün "Excel'e en yakın 3 yıl" fazı TAMAMLANDI (2025+2024+
+    2023) — hepsi YALNIZ disposable postgres:17'de, canlıya HİÇBİRİ
+    UYGULANMADI.** Sıradaki adım 2018-2022 (Bulgu H'nin T6'nın çoğunlukla
+    sağlam olduğu aralığı, 2022 Haziran'dan itibaren tanım-riskli kısmı
+    hâlâ ayrıca değerlendirilecek). Canlı backfill kullanıcı onayıyla bu
+    turun TAMAMI bittikten sonra TEK SEFERDE yapılacak — açık maddeler:
+    (1) 2024-02'nin T3 verisi için karar (Bulgu J), (2) 2022/2023 T6'nın
+    Ocak-Haziran kısmının gerçekten "Brüt Üretim" taşıyıp taşımadığı.
   - **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatan notlar
     (hâlâ geçerli):**
   - `lisans_id` çözümü: **DOĞRULANDI, 2025 için ÇALIŞTI** — `t2_oku()`/

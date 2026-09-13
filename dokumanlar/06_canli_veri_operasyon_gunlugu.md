@@ -1819,3 +1819,43 @@ Canlı backfill öncesi 202402'nin T3'ü için kullanıcı kararı gerekecek.
 
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.17, Sürüm Geçmişi v1.31,
 `12_word_uretim_envanteri.md` Bulgu I/J.
+
+## 2026-09-13 (devam) — ADIM 4: 2023 (T2+T3 Lisanslı) tamamlandı, yeni kaynak türü bulundu
+
+2023, 2024/2025 ile AYNI desen. Lisanssız (T5/T6) 2023'ün TAMAMI (12/12
+ay) için simetrik kapsam dışı bırakıldı — Bulgu H'nin 2023 satırı yıl-içi
+bölünmüş (T6 Ocak-Haziran var/eski başlıkla, Temmuz-Aralık yok) ve
+Ocak-Haziran kısmının GERÇEKTEN "Brüt Üretim" mi taşıdığı bu turda
+doğrulanmadığından, güvenli/tutarlı taraf seçildi.
+
+**Bulgu K — yeni kaynak türü, araştırıldı, ZORLA GEÇİRİLMEDİ:**
+```
+İlk crash: ValueError: Tanınmayan kaynak türü etiketi: 'LPG'
+```
+İncelendi — 2023 Ağustos-Aralık T2 tablosunda 'LPG' satırı bulundu, 12
+ayın TAMAMINDA kendi (hedef ay) üretim değeri her zaman 0,00 MWh (2022
+karşılaştırma kolonunda küçük bir kalıntı vardı — Ağustos 152,72 MWh,
+Aralık 309,99 MWh — "DEĞİŞİM %" hepsinde -100,00). `worker/parser.py`
+DEĞİŞTİRİLMEDİ — `word_2023.py:_KAYNAK_ATLA_ETIKETLERI`'ne eklendi.
+Aynı tabloda 'MOTORİN'in GERÇEK üretimi de bulundu (Kasım 473,77 MWh,
+Aralık 1.833,41 MWh) — bunun İÇİN bir migration TASLAĞI yazıldı ama
+disposable'a uygulanırken `dim_kaynak`'ta "Motorin" (ve "Nafta") satırının
+ZATEN VAR olduğu görüldü (migration `20260819_0007`, 2026-08-19'da 2026
+Ocak Excel'i işlenirken eklenmişti) — taslak migration REDUNDANT olduğu
+için SİLİNDİ, hiçbir yeni migration eklenmedi.
+
+**Sonuç:** disposable postgres:17'de 12/12 ay yüklendi, `mutabakat_
+uretim.py` **12/12 uyumlu** — 2024'ün Bulgu J'sindeki gibi bir kaynak-
+belge hatası bu yıl GÖRÜLMEDİ. +4 test (LPG atlama davranışı kasıtlı
+sıfır-olmayan bir değerle test edildi — "zaten sıfır olduğu için fark
+etmez" varsayımına güvenilmedi; Motorin'in gerçek değerinin df'e girdiği
+ayrıca doğrulandı). 255/255 unit test yeşil.
+
+**ADIM 4 durumu:** 2025/2024/2023 (Excel'e en yakın 3 yıl, T2+T3
+Lisanslı) TAMAMLANDI — hepsi YALNIZ disposable postgres:17'de, canlıya
+HİÇBİRİ uygulanmadı. Sıradaki adım 2018-2022 (Bulgu H'nin T6'nın
+çoğunlukla sağlam olduğu aralığı) — kullanıcı onayıyla canlı backfill bu
+turun TAMAMI bittikten sonra tek seferde yapılacak.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.18, Sürüm Geçmişi v1.32,
+`12_word_uretim_envanteri.md` Bulgu K.

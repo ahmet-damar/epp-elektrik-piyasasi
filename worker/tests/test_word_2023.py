@@ -22,6 +22,8 @@ from worker.scripts.word_2023 import (
     _il_adi_temizle,
     grup_esle_zorunlu,
     kaynak_esle_zorunlu,
+    t2_oku,
+    t3_oku,
     t4_oku,
     t10_oku,
     t11_oku,
@@ -70,6 +72,25 @@ def test_kaynak_esle_zorunlu_bilinen_kaynaklar() -> None:
     assert kaynak_esle_zorunlu("Biyokütle") is not None
     assert kaynak_esle_zorunlu("Doğal Gaz") is not None
     assert kaynak_esle_zorunlu("Genel Toplam") is None
+
+
+def test_kaynak_esle_zorunlu_lpg_atla_sayilir() -> None:
+    """Gerçek 2023 Ağustos-Aralık verisinde bulundu: 'LPG' satır olarak
+    görünüyor ama 12 ayın TAMAMINDA kendi üretim değeri her zaman 0,00
+    MWh — worker/parser.py'ye alias eklemek YERİNE (mimari karar) burada
+    'atla' sayıldı, t2_oku()'nun Genel Toplam kontrolü gelecekte
+    sıfır-olmayan bir değer çıkarsa bunu yakalar."""
+    assert kaynak_esle_zorunlu("LPG") is None
+
+
+def test_kaynak_esle_zorunlu_motorin_taniniyor() -> None:
+    """Gerçek 2023 Kasım/Aralık verisinde 'MOTORİN' satırının GERÇEK,
+    sıfır olmayan üretimi var (473,77 / 1.833,41 MWh) — worker/parser.py
+    zaten 'Motorin' alias'ını taşıyor (2026-08-19'dan beri, migration
+    20260819_0007) ve dim_kaynak'ta da zaten seed edilmiş, YENİ bir
+    değişiklik gerekmedi."""
+    assert kaynak_esle_zorunlu("MOTORİN") is not None
+    assert kaynak_esle_zorunlu("MOTORİN") == "Motorin"
 
 
 def test_il_adi_temizle_adiyaman_dipnot_yildizi_kaldirilir() -> None:
@@ -211,3 +232,121 @@ def test_t4_oku_genel_toplam_uyusmazliginda_hata_verir() -> None:
 
     with pytest.raises(ValueError, match="Genel"):
         t4_oku(tbl, tarih_id=202303)
+
+
+# ---------------------------------------------------------------------------
+# ADIM 4 (2026-09-13) — T2/T3: Lisanslı ÜRETİM (kurulu güç DEĞİL). Gerçek
+# 2023 verisinde bulunan yeni bir kaynak türü ('LPG') burada regresyonla
+# sabitlendi.
+# ---------------------------------------------------------------------------
+
+
+def test_t2_oku_lpg_atlanir_genel_toplam_yine_de_dogrulanir() -> None:
+    """LPG satırı VAR ama 'atla' sayıldığı için df'e girmiyor — kendi
+    Genel Toplam'ı yalnız GERÇEK kaynakların (LPG hariç) toplamıyla
+    eşleşmeli (LPG'nin gerçek değeri 0,0 olduğu için normal şartlarda
+    zaten fark yaratmaz, ama bu test LPG'yi BİLEREK sıfır-olmayan bir
+    değerle kurup satırın GERÇEKTEN atlandığını, sessizce toplama
+    KARIŞMADIĞINI kanıtlıyor — 'sıfır olduğu için fark etmiyor'
+    varsayımına güvenmiyor)."""
+    donem_satiri = [
+        "KAYNAK TÜRÜ",
+        "2022 ARALIK",
+        "2022 ARALIK",
+        "2023 ARALIK",
+        "2023 ARALIK",
+        "DEĞİŞİM\n(%)",
+    ]
+    baslik_satiri = [
+        "KAYNAK TÜRÜ",
+        "ÜRETİM (MWh)",
+        "ORAN (%)",
+        "ÜRETİM (MWh)",
+        "ORAN (%)",
+        "DEĞİŞİM\n(%)",
+    ]
+    satirlar = [
+        donem_satiri,
+        baslik_satiri,
+        ["Hidrolik", "100,0", "50,0", "140,0", "58,33", "40,0"],
+        ["LPG", "10,0", "5,0", "0,0", "0,00", "-100,0"],
+        ["Genel Toplam", "110,0", "100,0", "140,0", "100,0", "27,27"],
+    ]
+    tbl = _tablo_ekle(satirlar)
+
+    df = t2_oku(tbl, tarih_id=202312, hedef_ay_yil="2023 ARALIK")
+
+    assert len(df) == 1
+    assert "LPG" not in set(df["kaynak"])
+    assert float(df["uretim_mwh"].sum()) == pytest.approx(140.0)
+
+
+def test_t2_oku_motorin_gercek_deger_taniniyor() -> None:
+    """Gerçek Kasım/Aralık 2023 verisinde Motorin'in sıfır olmayan
+    üretimi var — LPG'den FARKLI olarak atlanmıyor, gerçek kaynak olarak
+    df'e giriyor."""
+    donem_satiri = [
+        "KAYNAK TÜRÜ",
+        "2022 ARALIK",
+        "2022 ARALIK",
+        "2023 ARALIK",
+        "2023 ARALIK",
+        "DEĞİŞİM\n(%)",
+    ]
+    baslik_satiri = [
+        "KAYNAK TÜRÜ",
+        "ÜRETİM (MWh)",
+        "ORAN (%)",
+        "ÜRETİM (MWh)",
+        "ORAN (%)",
+        "DEĞİŞİM\n(%)",
+    ]
+    satirlar = [
+        donem_satiri,
+        baslik_satiri,
+        ["Hidrolik", "100,0", "90,0", "140,0", "98,7", "40,0"],
+        ["Motorin", "10,0", "10,0", "1.833,41", "1,3", "18.234,1"],
+        ["Genel Toplam", "110,0", "100,0", "1.973,41", "100,0", "0,0"],
+    ]
+    tbl = _tablo_ekle(satirlar)
+
+    df = t2_oku(tbl, tarih_id=202312, hedef_ay_yil="2023 ARALIK")
+
+    assert len(df) == 2
+    assert "Motorin" in set(df["kaynak"])
+    assert df.loc[df["kaynak"] == "Motorin", "uretim_mwh"].iloc[0] == pytest.approx(
+        1833.41
+    )
+
+
+def test_t3_oku_iki_sutunlu_blok_birlesir_ve_eksik_il_sifirlanir() -> None:
+    baslik = ["İLLER", "ÜRETİM (MWh)", "ORAN (%)", "İLLER", "ÜRETİM (MWh)", "ORAN (%)"]
+    satirlar = [baslik]
+    diger_iller = [il for il in TUM_ILLER if il != "Kilis"]
+    assert len(diger_iller) == 80
+    for i in range(0, 80, 2):
+        satirlar.append(
+            [diger_iller[i], "10,0", "1,0", diger_iller[i + 1], "10,0", "1,0"]
+        )
+    satirlar.append(["", "", "", "Genel Toplam", "800,0", "100,0"])
+    tbl = _tablo_ekle(satirlar)
+
+    df = t3_oku(tbl, tarih_id=202301)
+
+    assert len(df) == 81
+    assert df["il_kodu"].nunique() == 81
+    kilis_kodu = next(kod for kod, ad in _IL_ADI_KANONIK.items() if ad == "Kilis")
+    assert df[df["il_kodu"] == kilis_kodu]["uretim_mwh"].eq(0.0).all()
+    assert float(df["uretim_mwh"].sum()) == pytest.approx(800.0)
+
+
+def test_t3_oku_genel_toplam_uyusmazliginda_hata_verir() -> None:
+    baslik = ["İLLER", "ÜRETİM (MWh)", "ORAN (%)", "İLLER", "ÜRETİM (MWh)", "ORAN (%)"]
+    satirlar = [baslik]
+    for i in range(0, 80, 2):
+        satirlar.append([TUM_ILLER[i], "10,0", "1,0", TUM_ILLER[i + 1], "10,0", "1,0"])
+    satirlar.append(["", "", "", "Genel Toplam", "9999,0", "100,0"])
+    tbl = _tablo_ekle(satirlar)
+
+    with pytest.raises(ValueError, match="Genel"):
+        t3_oku(tbl, tarih_id=202301)
