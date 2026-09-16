@@ -89,6 +89,7 @@ her yeni rakam için geçerlidir.
 | v1.39 | 2026-09-13 | **Gün sonu kapanışı.** Ahmet, 2016-2017'nin uygulamasını ÖNCEDEN ONAYLADI — bir sonraki oturum karar beklemeden başlayabilir: Bulgu O'daki 2016 T2 farkı (tek-dönem 3-kolonlu format) için AYRI bir `t2_oku()` yazılması onaylandı ("yıl başına ayrı tarif" mimarisine zaten uygun), diğer yıllarla AYNI desen (dry-run zaten yapıldı → yükle → mutabakat → test → doküman → commit → CI), Lisanssız Bulgu D ile zaten kapsam dışı. Bugün kapananlar: 2019 (`73a3e7f`), 2018 (`452c8e0`), 2016-2017 dry-run/Bulgu O (`0b3dcf1`); 2024-02 kararı yeniden CANLI doğrulandı, bekleyen bir şey yoktu | Kod değişikliği YOK, yalnız dokümantasyon (kapanış). ADIM 4: 10 yılın 8'i TAMAMLANDI (2025→2018), kalan 2016-2017 tek engel — ONAYLI. Canlıya Word üretim verisinden HİÇBİRİ uygulanmadı (yalnız disposable postgres:17), 10 yıl bitince TEK SEFERDE + Ahmet onayıyla yapılacak |
 | v1.40 | 2026-09-16 | ADIM 4 — 2017 (T2+T3 Lisanslı) tamamlandı — §5.25. Bulgu O'nun öngördüğü İKİ desen BİREBİR doğrulandı, YENİ sürpriz YOK: Bulgu N (12 ayın TAMAMINDA Hidrolik ikiye bölünmüş) + Bulgu I sınıfı (yalnız Ekim'de bölünmüş başlık). Kasım/Aralık'ın T2/T3 arama ambiguity'si (YTD kümülatif tablo) `icermez=["Ocak-"]` ile çözüldü. Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı | Disposable postgres:17 (fresh, tek başına): 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu. +5 test (`test_word_2017.py`). ADIM 4: 2025-2017 (9 yıl) TAMAMLANDI. Sıradaki ve SON adım: 2016 (bespoke `t2_oku()` gerekir) |
 | v1.41 | 2026-09-16 | **ADIM 4'ün 10 yılı da TAMAMLANDI** — §5.26. 2016 (T2+T3, BESPOKE): Bulgu O'nun en önemli öngörüsü (tek-dönem 3-kolonlu format, `hedef_donem_kolonu_bul()` kullanılamaz) doğrulandı — bespoke `t2_oku()` yazıldı. Bulgu N burada da geçerli ("Barajlı", alias gerekmedi). YENİ küçük bulgu: "Üretim" kolon başlığı ay ay case-değişiyor, `normalize_label()` ile çözüldü. Ardından TEK fresh disposable'da 10 yılın TAMAMI (120 ay) tek turda doğrulandı | Disposable postgres:17: 2016 tek başına 12/12 uyumlu, +7 test (`test_word_2016.py`). 10 yıl BİRLİKTE: `mutabakat_uretim.py` 120 çift kontrol etti, 119 uyumlu + 1 BEKLENEN istisna (202402). `fact_uretim_kaynak_geneli` 1.393 satır (120/120 ay), `fact_uretim_il_geneli` 9.639 satır (119/120 ay) — TÜMÜ `is_active=false` (gece-boyu kural). Bulgu tamlığı A→O (15 bulgu) doğrulandı, açık bulgu YOK. Canlıya HİÇBİR Word üretim verisi UYGULANMADI — ön-uçuş planı `09_PROJE_DURUMU.md`'ye yazıldı, uygulama bu turun kapsamı DIŞINDA |
+| v1.42 | 2026-09-16 | **CANLI BACKFILL UYGULANDI (Ahmet'in onayıyla) + KPI-07 kritik bulgu/düzeltmesi** — §5.27. Projede canlıya Word üretim verisinin İLK uygulanışı: kilit ön kontrolü temiz, 120 ay yüklendi, mutabakat aktivasyondan ÖNCE çalıştırıldı (132 çift, 131 uyumlu + 1 beklenen istisna), YENİ `worker/scripts/aktive_et_uretim_word.py` ile 119/120 ay aktive edildi (202402 established mekanizmayla kendiliğinden bloklandı, istisna EKLENMEDİ). **Backfill sonrası kritik bulgu:** `kpi_07_lisanssiz_pay()` Word yılları için sessizce yanlış '%0' döndürüyordu (Lisanssız veri BOŞ değil, hiç YOK — eski `toplam==0` güvenlik ağı yakalamıyordu; 2026-09-09'un "boş DataFrame gelir" varsayımı YANLIŞ çıktı) — düzeltildi: fonksiyon artık ZORUNLU `lisanssiz_kapsam_disi` parametresi alıyor. KPI-03/06 kontrol edildi, düzeltme gerekmedi ama Word yıllarında Lisanslı-only kapsamı caption'a yazıldı | Canlı satır sayıları disposable ile BİREBİR eşleşti (1.382+101=1.483 kaynak_geneli, 9.639+942=10.581 il_geneli aktif). KPI-07 düzeltmesi SONRASI canlıda yeniden ölçüldü: 3 Word ayı `None` (doğru), 1 kontrol ayı (2026-01) hâlâ gerçek sayı (BOZULMADI). +3 test, 4 mevcut test güncellendi. Tam `worker/tests`: 354/355 geçti (tek beklenen `test_auth_integration.py`). Streamlit canlıya karşı başlatılıp çökme OLMADIĞI doğrulandı |
 
 ---
 
@@ -1237,6 +1238,52 @@ hiçbir script `batch_onayla()` çağırmadı). Tam bulgu envanteri (A→O,
 adım canlı backfill, Ahmet'in onayıyla AYRI bir turda. Ön-uçuş planı
 `09_PROJE_DURUMU.md`'ye yazıldı (uygulama YOK, yalnız plan — bu turun
 kapsamı dışında).
+
+### 5.27 CANLI BACKFILL UYGULANDI (ONAYLI) + KPI-07 kritik bulgu/düzeltmesi (2026-09-16)
+
+Ahmet'in AÇIK onayıyla ön-uçuş planı BİREBİR uygulandı — projede canlı
+Supabase'e Word üretim verisinin İLK KEZ uygulandığı adım. Kilit ön
+kontrolü (`pg_stat_activity` idle-in-transaction taraması) temiz çıktı,
+hiçbir bağlantı sonlandırılmadı. 120 ay (10 yıl) `--uretim-geneli` ile
+canlıya yüklendi, sıfır hata. Aktivasyondan ÖNCE `mutabakat_uretim.py`
+çalıştırıldı: 132 çift (120 yeni Word + 12 önceden aktif Excel-era),
+131 uyumlu, tek beklenen istisna 202402 (Bulgu J). YENİ yazılan
+`worker/scripts/aktive_et_uretim_word.py` (established `backfill_
+uretim_excel.py` deseninin Word'ün 10 `parser_version`'ını kapsayacak
+genellemesi) ile 119/120 ay aktive edildi, 202402
+`periyot_aktivasyona_uygun_mu()` tarafından KENDİLİĞİNDEN bloklandı —
+mutabakat kontrolüne istisna EKLENMEDİ. Canlı satır sayıları disposable
+ile BİREBİR uyuştu: `fact_uretim_kaynak_geneli` 1.382 aktif (Word) +
+101 (Excel-era) = 1.483 toplam; `fact_uretim_il_geneli` 9.639 aktif
+(Word, disposable'la TAM eşleşme) + 942 (Excel-era) = 10.581 toplam.
+
+**Backfill SONRASI kritik bulgu:** kullanıcının istediği canlı ölçüm
+(2018-06/2021-03/2024-09) `kpi.kpi_07_lisanssiz_pay()`'in Word yılları
+için SESSİZCE yanlış bir '%0' döndürdüğünü kanıtladı ('hesaplanamaz'
+YERİNE) — Word yıllarında Lisanssız hiç yüklenmediği için `uretim_
+kaynak_geneli_getir()`'in çıktısı BOŞ DEĞİL (Lisanslı dolu, toplam
+nonzero), yalnız Lisanssız satırları YOK; eski `toplam == 0` güvenlik
+ağı bunu yakalamıyordu. **2026-09-09'da `04_kpi_sozlesmeleri.md`'ye
+yazılan "boş DataFrame gelir" varsayımı YANLIŞ çıktı.** Düzeltme:
+`kpi_07_lisanssiz_pay()` artık ZORUNLU keyword-only `lisanssiz_kapsam_
+disi: bool` parametresi alıyor (varsayılan YOK), `True` ise veri ne
+olursa olsun `None` döner; `app/dashboard.py` bunu `kapsam_disi`
+DataFrame'inden HER ZAMAN hesaplayıp geçiriyor. Düzeltme SONRASI aynı 3
+ay + 1 kontrol ayı (2026-01, Excel-era kombine) yeniden ölçüldü: 3 Word
+ayı `None` (doğru), kontrol ayı hâlâ gerçek bir sayı (%3,5, BOZULMADI).
+KPI-03/06 kontrol edildi — DÜZELTME GEREKMEDİ (hata fırlatmıyorlar) ama
+Word yıllarında Lisanslı-ONLY (Lisanssız'ın küçük payı sessizce hariç)
+— dashboard caption'ına AÇIKÇA yazıldı.
+
++3 yeni test (`test_golden.py`), 2+2 mevcut test yeni zorunlu
+parametreyle güncellendi (davranış DEĞİŞMEDİ). Tam `worker/tests`
+(disposable'a karşı, 355 test): 354 geçti, yalnız beklenen `test_auth_
+integration.py` düştü. Streamlit canlıya karşı başlatılıp çökme
+OLMADIĞI doğrulandı.
+
+**Sonuç: ADIM 4'ün TAMAMI (120 ay, 10 yıl) canlıya UYGULANDI.** 119/120
+ay aktif, 202402 bilinçli bekliyor. KPI-07 hatası backfill SONRASI AYNI
+oturumda bulunup düzeltildi, hiçbir kullanıcı yanlış bir değer GÖRMEDİ.
 
 ---
 

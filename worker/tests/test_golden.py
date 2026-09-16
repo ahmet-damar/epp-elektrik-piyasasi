@@ -122,20 +122,27 @@ def test_kpi_05_uretim_mwh_hic_yoksa_hesaplanamaz(hesaplanan: dict) -> None:
 
 def test_kpi_07_lisanssiz_pay_lisans_kolonu_yoksa_sifir(hesaplanan: dict) -> None:
     uretim = kpi.yukle_uretim(INPUT / "uretim.csv").kabul
-    assert kpi.kpi_07_lisanssiz_pay(uretim) == 0.0
+    assert kpi.kpi_07_lisanssiz_pay(uretim, lisanssiz_kapsam_disi=False) == 0.0
 
 
 def test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz() -> None:
     """2026-09-09, Bulgu D/Karar 4 (bkz. `04_kpi_sozlesmeleri.md` KPI-07
-    notu) — 2016-2017 Lisanssız üretim `veri_kapsam_disi`'de kapsam dışı
-    işaretli; ADIM 5 bu tabloyu `fact_uretim_kaynak_geneli`'ye wire
-    ettiğinde bu iki yıl için KPI-07'ye BOŞ (ya da tamamen NaN) bir
-    `uretim_mwh` girecek. Bu test, `kpi_07_lisanssiz_pay()`'in o durumda
-    zaten sahte bir %0/%100 DEĞİL, `None` ('hesaplanamaz') döndüğünü
-    SABİTLİYOR — henüz WIRING yapılmadı (ADIM 5 bu turda kapsam dışı),
-    yalnız mevcut korumanın davranışını pinliyor."""
+    notu) — bu test, `uretim_mwh` GERÇEKTEN boş/tamamen-NaN geldiğinde
+    (örn. dönem kaynakta hiç yok) `kpi_07_lisanssiz_pay()`'in `None`
+    döndüğünü sabitler — `lisanssiz_kapsam_disi` bayrağından BAĞIMSIZ bir
+    güvenlik ağı (`toplam == 0` kontrolü).
+
+    **2026-09-16'da düzeltilen YANLIŞ varsayım:** bu testin ORİJİNAL
+    (2026-09-09) hali, Word yıllarının kapsam-dışı bırakılmasının KPI-07'ye
+    'BOŞ (ya da tamamen NaN) bir uretim_mwh' olarak yansıyacağını
+    VARSAYMIŞTI. Canlı backfill SONRASI ölçüldü: bu YANLIŞTI — Word
+    yıllarında Lisanslı VERİ VAR (boş DEĞİL, toplam nonzero), yalnız
+    Lisanssız satırları HİÇ YOK. Bu durumda `toplam == 0` YAKALAMAZ —
+    işte bu yüzden `lisanssiz_kapsam_disi` (ZORUNLU keyword-only) bayrağı
+    eklendi (bkz. aşağıdaki `test_kpi_07_kapsam_disi_bayragi_*` testleri,
+    ve `worker/kpi.py` modül notu)."""
     bos = pd.DataFrame(columns=["kaynak", "yenilenebilir", "lisans", "uretim_mwh"])
-    assert kpi.kpi_07_lisanssiz_pay(bos) is None
+    assert kpi.kpi_07_lisanssiz_pay(bos, lisanssiz_kapsam_disi=False) is None
 
     tum_nan = pd.DataFrame(
         {
@@ -145,4 +152,47 @@ def test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz() -> None:
             "uretim_mwh": [None, None],
         }
     )
-    assert kpi.kpi_07_lisanssiz_pay(tum_nan) is None
+    assert kpi.kpi_07_lisanssiz_pay(tum_nan, lisanssiz_kapsam_disi=False) is None
+
+
+def test_kpi_07_kapsam_disi_bayragi_lisansli_only_veride_hesaplanamaz_dondurur() -> (
+    None
+):
+    """**2026-09-16 canlı backfill SONRASI bulunan GERÇEK hata, burada
+    düzeltiliyor.** Word yıllarının (2016-2025) GERÇEK şekli: yalnız
+    Lisanslı satırlar (Lisanssız hiç yüklenmedi), toplam NONZERO —
+    `lisanssiz_kapsam_disi=True` geçildiğinde, veri ne olursa olsun
+    (nonzero toplam dahil) sonuç `None` ('hesaplanamaz') OLMALI, sahte
+    bir '%0' DEĞİL."""
+    lisansli_only = pd.DataFrame(
+        {
+            "kaynak": ["Doğal Gaz", "Rüzgar"],
+            "yenilenebilir": [False, True],
+            "lisans": ["Lisanslı", "Lisanslı"],
+            "uretim_mwh": [7_000_000.0, 3_000_000.0],
+        }
+    )
+    assert kpi.kpi_07_lisanssiz_pay(lisansli_only, lisanssiz_kapsam_disi=True) is None
+
+
+def test_kpi_07_kapsam_disi_bayragi_yanlis_gecilirse_sessizce_sifir_uretir() -> None:
+    """Bulgu (2026-09-16) — `lisanssiz_kapsam_disi=False` YANLIŞLIKLA
+    geçilirse (çağıranın `veri_kapsam_disi`'yi kontrol ETMEDİĞİ durum),
+    fonksiyon AYNI Lisanslı-only veride SESSİZCE '%0' üretir — bu TAM
+    OLARAK canlıda 2026-09-16'dan ÖNCE bulunan hatanın kendisiydi (bkz.
+    dashboard.py'nin şimdi `kapsam_disi` DataFrame'inden bu bayrağı HER
+    ZAMAN hesapladığı yer). Bu test bilinçli olarak 'yanlış' yolu
+    ÇALIŞTIRIYOR — amacı, `lisanssiz_kapsam_disi`'nin GERÇEKTEN kritik
+    olduğunu ve çağıranın bunu ASLA atlayamayacağını (zorunlu parametre)
+    belgelemek, fonksiyonun KENDİSİNİ değil."""
+    lisansli_only = pd.DataFrame(
+        {
+            "kaynak": ["Doğal Gaz", "Rüzgar"],
+            "yenilenebilir": [False, True],
+            "lisans": ["Lisanslı", "Lisanslı"],
+            "uretim_mwh": [7_000_000.0, 3_000_000.0],
+        }
+    )
+    assert kpi.kpi_07_lisanssiz_pay(
+        lisansli_only, lisanssiz_kapsam_disi=False
+    ) == pytest.approx(0.0)

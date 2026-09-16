@@ -133,15 +133,17 @@ yansıtıldı.**
   BAŞLADI — 2025/2024/2023/2022/2021/2020/2019/2018'in "Excel'e en yakın
   8 yıl" fazı TAMAMLANDI (T2+T3 Lisanslı yüklendi, Lisanssız TÜM Word
   yılları için kapsam dışı — Bulgu D/L, iki açık karar 2024-02/2022-T6
-  sayıyla ölçülüp kapatıldı, bkz. Bulgu I/J/K/L/M/N/O). **ADIM 4'ün
-  TAMAMI (10 yıl, 2025-2016, 120 ay) 2026-09-16'da BİTTİ** — 2016
-  BESPOKE bir `t2_oku()` ile tamamlandı (Bulgu O'nun tek-dönem 3-kolonlu
-  format öngörüsü doğrulandı). Tek disposable'da 120 ayın TEK turda
-  doğrulaması yapıldı: `mutabakat_uretim.py` 119/120 uyumlu (tek istisna
-  202402, BEKLENEN). **Canlıya HİÇBİR Word üretim verisi HENÜZ
-  UYGULANMADI** — sıradaki ve SON iş: CANLI BACKFILL, ön-uçuş planı bu
-  oturumda hazırlandı (aşağıda "CANLI BACKFILL ÖN-UÇUŞ PLANI"), UYGULAMA
-  YOK, Ahmet'in onayı BEKLENİYOR**
+  sayıyla ölçülüp kapatıldı, bkz. Bulgu I/J/K/L/M/N/O). ADIM 4'ün TAMAMI
+  (10 yıl, 2025-2016, 120 ay) 2026-09-16'da BİTTİ — 2016 BESPOKE bir
+  `t2_oku()` ile tamamlandı. **AYNI GÜN, Ahmet'in onayıyla CANLI BACKFILL
+  UYGULANDI** — 120 ay canlıya yüklendi, mutabakat aktivasyondan ÖNCE
+  çalıştırıldı, 119/120 ay aktive edildi (202402 established mekanizmayla
+  kendiliğinden bloklandı, BEKLENEN). **Backfill SONRASI kritik bir bulgu
+  çıktı ve AYNI oturumda düzeltildi:** KPI-07 (Lisanssız pay) Word
+  yılları için sessizce yanlış '%0' döndürüyordu ('hesaplanamaz' YERİNE)
+  — `kpi_07_lisanssiz_pay()`'e zorunlu bir `lisanssiz_kapsam_disi`
+  parametresi eklenip düzeltildi, canlıda yeniden ölçülüp doğrulandı.
+  **ADIM 4 TAMAMEN BİTTİ — kod, disposable-doğrulama VE canlı uygulama.**
   (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
@@ -571,16 +573,27 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     kapatıldı ya da established desenle çözüldü, AÇIK bulgu YOK. Tam
     yıl-yıl özet tablosu `12_word_uretim_envanteri.md`'nin "ADIM 4
     KAPANIŞI" bölümünde.
-  - **CANLIYA HİÇBİR WORD ÜRETİM VERİSİ HENÜZ UYGULANMADI.** Sıradaki ve
-    SON iş: CANLI BACKFILL — Ahmet'in onayıyla AYRI bir turda. Ön-uçuş
-    planı aşağıda "CANLI BACKFILL ÖN-UÇUŞ PLANI" başlığında — bu turda
-    YALNIZ PLAN yazıldı, UYGULAMA YAPILMADI. Sonrası Faz 4 (Tahminleme)
-    — aşağıda "Faz 4 (Tahminleme)" bölümüne bkz.
+  - **✅ CANLI BACKFILL UYGULANDI (2026-09-16, Ahmet'in onayıyla) — ADIM
+    4 TAMAMEN BİTTİ:** 120 ay canlıya yüklendi, mutabakat aktivasyondan
+    ÖNCE çalıştırıldı (132 çift — 120 Word + 12 önceden aktif Excel-era
+    —, 131 uyumlu + 1 beklenen istisna), 119/120 ay aktive edildi
+    (202402 established mekanizmayla kendiliğinden bloklandı, istisna
+    EKLENMEDİ). Canlı satır sayıları disposable'la BİREBİR eşleşti.
+    **Backfill SONRASI kritik bulgu, AYNI oturumda düzeltildi:** KPI-07
+    Word yılları için sessizce yanlış '%0' döndürüyordu — `kpi_07_
+    lisanssiz_pay()`'e zorunlu `lisanssiz_kapsam_disi` parametresi
+    eklenip düzeltildi, canlıda yeniden ölçülüp doğrulandı. KPI-03/06
+    kontrol edildi, düzeltme gerekmedi (Lisanslı-only kapsamı captioned).
+    Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.27, Sürüm Geçmişi v1.42,
+    `06_canli_veri_operasyon_gunlugu.md` 2026-09-16 (devam) kaydı (tam
+    komut çıktıları/sayılar dahil).
+  - Sonrası Faz 4 (Tahminleme) — aşağıda "Faz 4 (Tahminleme)" bölümüne
+    bkz.
 
-### 🚦 CANLI BACKFILL ÖN-UÇUŞ PLANI (2026-09-16, ONAY BEKLİYOR — UYGULANMADI)
+### ✅ Kapandı — CANLI BACKFILL ÖN-UÇUŞ PLANI, UYGULANDI (2026-09-16)
 
-**Bu bölüm yalnız PLANDIR. Hiçbir adımı uygulanmadı, canlıya dokunulmadı.
-Ahmet'in AÇIK onayı olmadan hiçbir madde başlatılmamalı.**
+**Bu bölüm ARTIK UYGULANDI (aşağıdaki 5 madde BİREBİR takip edildi) —
+tarihsel referans olarak bırakıldı, yeniden aksiyon gerektirmiyor.**
 
 **1) Eksik migration var mı?** **HAYIR.** ADIM 4'ün Word üretim
 backfill'i için gereken TÜM şema zaten canlıda: `fact_uretim_kaynak_
@@ -686,17 +699,18 @@ kod GEREKMEZ) → `09_PROJE_DURUMU.md`/ops log'a sonucu yaz.
     geneli_yukle()`/`fact_uretim_il_geneli_yukle()` bunu (Excel'deki
     AYNI şekilde) `dim_lisans_id_bul()` ile çözüyor — YENİ bir mekanizma
     gerekmedi, tahmin doğru çıktı.
-  - 2016-2017 KPI-07 'hesaplanamaz' geçişi: `fact_uretim_kaynak_geneli`
-    o yıllar için (Bulgu D kararı gereği) HİÇ satır almayacak — bu
-    turda `uretim_kaynak_geneli_getir()` zaten BOŞ DataFrame'i doğru
-    şekilde işliyor (`kpi_07_lisanssiz_pay()` boş girdide `None`
-    döner, testle pinli). Tek fark: bu turda boşluk "veri yok" (dönem
-    hiç yüklenmemiş), ADIM 4 sonrası 2016-2017 için "hesaplanamaz"
-    (kasıtlı kapsam-dışı) olması gerekecek — ayrım `veri_kapsam_disi`
-    tablosundan (`analytics.kapsam_disi_getir()`, migration
-    `20260909_0002` zaten bu iki tabloyu kapsıyor) okunarak
-    dashboard'da metne yansıtılmalı; KOD DEĞİŞİKLİĞİ küçük (yalnız
-    caption/etiket seçimi, hesap mantığı DEĞİŞMEZ).
+  - **✅ KPI-07 'hesaplanamaz' geçişi — TAMAMLANDI ve DÜZELTİLDİ
+    (2026-09-16).** Bu maddenin ORİJİNAL (2026-09-09) hali YANLIŞ bir
+    varsayım içeriyordu: "`uretim_kaynak_geneli_getir()` kapsam dışı
+    yıllarda BOŞ DataFrame döner, `kpi_07_lisanssiz_pay()` zaten `None`
+    döner" diyordu. Canlı backfill SONRASI ÖLÇÜLDÜ — YANLIŞTI: Word
+    yıllarında Lisanslı veri VAR (boş DEĞİL), yalnız Lisanssız satırları
+    HİÇ YOK — eski kod bunu YAKALAMIYOR, sessizce yanlış bir '%0'
+    üretiyordu. Düzeltme: `kpi_07_lisanssiz_pay()` artık zorunlu
+    `lisanssiz_kapsam_disi` parametresi alıyor, `app/dashboard.py` bunu
+    `veri_kapsam_disi`'den (`analytics.kapsam_disi_getir()`) HER ZAMAN
+    hesaplayıp geçiriyor. Detay: `06_canli_veri_operasyon_gunlugu.md`
+    2026-09-16 (devam) kaydı, `04_kpi_sozlesmeleri.md` KPI-07 notu.
   - `kapasite_faktoru_girdisi_getir()` Word yılları için de OLDUĞU GİBİ
     çalışır (SQL sorguları `tarih_id` parametrik, tabloya Word verisi
     hangi batch'ten gelirse gelsin AYNI filtre mantığı geçerli) — ADIM

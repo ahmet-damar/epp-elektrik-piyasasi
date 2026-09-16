@@ -127,21 +127,31 @@ Jenerik formül: (son/ilk)^(1/n) − 1 ; **n = yıl farkı** (2021→2025 ⇒ n=
   CAGR üretirdi (KPI-25'in Sanayi dahil/hariç sorunuyla AYNI kök neden).
   Lisanslı'sı olmayan yıl "veri yok" sayılır (None/"hesaplanamaz"), sahte
   bir sayı ÜRETİLMEZ.
-- **KPI-07 — 2016-2017 için ileriye dönük şart (2026-09-09, Bulgu D/Karar
-  4, henüz WIRING YAPILMADI):** KPI-07 (Lisanssız pay) ve Lisanssız
-  üretimi kullanan HERHANGİ bir CAGR/yıllık seri, `fact_uretim_kaynak_
-  geneli`/`fact_uretim_il_geneli`'ye Word yıllarının (ADIM 4, henüz
-  başlamadı) bağlanmasıyla wire edildiğinde, **2016-2017'yi KPI-25/26/27
-  ile AYNI disiplinle DIŞLAMALIDIR** — bu iki yıl için Excel'in "Brüt
-  Lisanssız Üretim" tanımıyla eşleşen bir kaynak YOK (yalnız dar bir
-  alt-küme metriği var, bkz. `dokumanlar/12_word_uretim_envanteri.md`
-  Bulgu D). `veri_kapsam_disi`'de bu iki yıl için `fact_uretim_kaynak_
-  geneli`/`fact_uretim_il_geneli`, `nitelik='lisans_durumu=Lisanssız'`,
-  `karar_referansi='Karar 4 (2026-09-09, Bulgu D)'` olarak ZATEN
-  işaretli (canlıda 48 satır) — gelecekteki wiring bu işareti OKUMALI,
-  yeniden keşfetmemeli. `kpi.kpi_07_lisanssiz_pay()`'in kendisi zaten boş/
-  tamamen-NULL bir `uretim_mwh` girdisinde `None` döner (mevcut davranış,
-  `worker/tests/test_kpi.py:test_kpi_07_bos_veya_tum_nan_ise_hesaplanamaz`
-  ile sabitlendi) — bu, 2016-2017 kaynaktan hariç tutulduğunda (yukarıdaki
-  kapsam-dışı işaretiyle boş bir DataFrame beslendiğinde) KPI-07'nin doğru
-  şekilde 'hesaplanamaz' döneceğinin GÜVENCESİDİR.
+- **KPI-07 — Word yıllarının (2016-2025) TAMAMI için kapsam dışı, WIRE
+  EDİLDİ ve DÜZELTİLDİ (2026-09-16, canlı backfill sonrası).** 2026-09-09
+  tarihli bu notun ORİJİNAL hali YANLIŞ bir varsayım içeriyordu: "Lisanssız
+  kapsam dışı bırakıldığında KPI-07'ye boş/tamamen-NULL bir `uretim_mwh`
+  girer" diyordu. Canlı backfill SONRASI ÖLÇÜLDÜ — bu YANLIŞTI: Word
+  yıllarında Lisanslı veri VAR (boş DEĞİL, toplam nonzero), yalnız
+  Lisanssız satırları hiç YOK (Bulgu D/L gereği hiç yüklenmedi) —
+  `kpi.kpi_07_lisanssiz_pay()`'in eski `toplam == 0` güvenlik ağı bunu
+  YAKALAMIYORDU, kapsam dışı bir ölçü için SESSİZCE yanlış bir '%0'
+  üretiyordu (hata FIRLATMADAN — canlıda 2018-06/2021-03/2024-09 için
+  doğrudan ölçülüp doğrulandı).
+  **Düzeltme:** `kpi_07_lisanssiz_pay()` artık ZORUNLU keyword-only bir
+  `lisanssiz_kapsam_disi: bool` parametresi alıyor — `True` geçildiğinde
+  veri ne olursa olsun `None` ('hesaplanamaz') döner. `app/dashboard.py`
+  bu bayrağı `analytics.kapsam_disi_getir()`'in DÖNDÜRDÜĞÜ `veri_kapsam_
+  disi` satırlarından (`fact_tablosu` kaynak/il_geneli,
+  `nitelik='lisans_durumu=Lisanssız'`) HER ZAMAN hesaplayıp geçiriyor —
+  sessizce atlanamaz (zorunlu parametre). Test: `worker/tests/test_golden.
+  py:test_kpi_07_kapsam_disi_bayragi_lisansli_only_veride_hesaplanamaz_
+  dondurur` (doğru yol) + `..._yanlis_gecilirse_sessizce_sifir_uretir`
+  (yanlış yolun SONUCUNU belgeler, fonksiyonun kendisini DEĞİL — parametre
+  artık atlanamaz olduğundan).
+  **KPI-03/06 (yenilenebilir payı/HHI) — AYRI bir durum, DÜZELTME
+  GEREKMEDİ:** bunlar `uretim` DataFrame'i ne içeriyorsa onun üzerinden
+  hesaplanıyor (lisans filtresi YOK) — Word yıllarında bu Lisanslı-ONLY
+  demek (sessiz bir HATA değil, ama 2026 Excel aylarının Lisanslı+
+  Lisanssız KOMBİNE hesabından FARKLI bir kapsam) — `app/dashboard.py`
+  caption'ına bu fark AÇIKÇA yazıldı.

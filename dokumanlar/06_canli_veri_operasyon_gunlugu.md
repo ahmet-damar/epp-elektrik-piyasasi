@@ -2359,3 +2359,151 @@ fazı KAPANDI.** Canlıya HİÇBİR Word üretim verisi HENÜZ UYGULANMADI.
 Bir sonraki adım — CANLI BACKFILL — bu oturumda yalnız PLAN olarak
 hazırlandı (`09_PROJE_DURUMU.md`), UYGULANMADI; Ahmet'in onayıyla AYRI
 bir turda yapılacak.
+
+## 2026-09-16 (devam) — CANLI BACKFILL UYGULANDI (ONAYLI) + KPI-07 kritik bulgu ve düzeltmesi
+
+**Ahmet'in AÇIK onayıyla** ("ADIM 4'ün 120 aylık Word üretim verisi
+canlıya uygulanabilir. Ön-uçuş planı yeterli bulundu.") ön-uçuş planı
+BİREBİR uygulandı. Bu, projede canlı Supabase'e Word üretim verisinin
+İLK KEZ uygulandığı adımdır.
+
+### 1) Kilit ön kontrolü
+
+```sql
+SELECT pid, usename, state, state_change, query FROM pg_stat_activity
+WHERE state = 'idle in transaction' AND state_change < now() - interval '10 minutes';
+```
+Sonuç: **0 satır** — 2026-09-07'deki terk edilmiş Streamlit bağlantısı
+sınıfı bir risk YOKTU, hiçbir bağlantı sonlandırılmadı.
+
+### 2) Yükleme — 120 ay, tüm 10 yıl
+
+`word_2016.py`'den `word_2025.py`'ye kadar TÜMÜ `--uretim-geneli` ile
+canlıya karşı çalıştırıldı (sırayla). 120/120 ay `[KAPSAM DIŞI]
+Lisanssız (T5/T6) her iki tabloda da işaretlendi.` bastı, HİÇBİR
+`[BEKLEMEDE]`/`[HATA]`/`[ATLA]` çıkmadı, çıkış kodu 0.
+
+### 3) Mutabakat — aktivasyondan ÖNCE
+
+```
+mutabakat_uretim.py (canlı, aktivasyondan ÖNCE):
+  Kontrol edilen (tarih_id, lisans_id) çifti: 132
+  Uyumlu: 131, uyumsuz batch: 1
+    {'tarih_id': 202402, 'lisans_id': 1, 'durum': 'bir_taraf_eksik',
+     'il_toplami': None, 'kaynak_toplami': 25615763.19, 'uyumlu': False}
+```
+132 (120 yeni Word + 12 önceden aktif Excel-era 2026 ayı, KENDİLİĞİNDEN
+dahil oldu — mutabakat_uretim.py TÜM `(tarih_id, lisans_id)` çiftlerini
+tarar). Tek uyumsuzluk BEKLENEN (202402, Bulgu J) — disposable'daki
+120-ay turunun BİREBİR aynısı.
+
+### 4) Aktivasyon — yalnız geçenler
+
+Yeni yazılan `worker/scripts/aktive_et_uretim_word.py` (established
+`backfill_uretim_excel.py` deseninin AYNISI, yalnız Word'ün 10 farklı
+`parser_version`'ını `LIKE 'word-%-uretim-geneli-v1'` ile kapsayacak
+şekilde genelleştirildi) ÖNCE `--dry-run` ile doğrulandı (119 aktive
+edilecek, 202402 bloklanacak öngörüldü), SONRA gerçek çalıştırıldı:
+
+```
+Aktive edilen: [201601 ... 202512]  (119 ay)
+BLOKLANAN (aktive EDİLMEDİ): [(202402, 'tarih_id=202402: 1 lisans_id
+  uyumsuz (il≠kaynak toplamı)')]
+```
+`periyot_aktivasyona_uygun_mu()` 202402'yi KENDİLİĞİNDEN bloke etti —
+**mutabakat kontrolüne hiçbir istisna EKLENMEDİ**, established kural
+korundu. Script'in çıkış kodu 1 idi (`return 0 if not bloklanan else 1`
+— TEK bloklanan olduğu için BEKLENEN/tasarım gereği bir "hata", gerçek
+bir arıza DEĞİL).
+
+### 5) Doğrulama — canlı satır sayıları
+
+```
+fact_uretim_kaynak_geneli (Word, aktif): 1.382   (1.393 disposable
+  toplamı − 202402'nin 11 kaynak satırı [is_active=false kaldı] = 1.382 ✓)
+fact_uretim_il_geneli (Word, aktif):     9.639   (disposable'la BİREBİR
+  aynı ✓)
+fact_uretim_kaynak_geneli (TÜM aktif):   1.483   (1.382 Word + 101
+  önceden aktif Excel-era)
+fact_uretim_il_geneli (TÜM aktif):      10.581   (9.639 Word + 942
+  önceden aktif Excel-era)
+ingestion_batch (word-*-uretim-geneli-v1): 119 'succeeded', 1 'running'
+202402 kaynak_geneli: 11 satır, is_active=false (DOĞRU — aktive EDİLMEDİ)
+202402 il_geneli: 0 satır (DOĞRU — T3 hiç yüklenmedi, Bulgu J)
+veri_kapsam_disi: 120+120 Lisanssız satırı + 1 Lisanslı satırı (202402)
+  — disposable'la BİREBİR aynı
+```
+Tüm sayılar disposable'daki 120-ay doğrulama turuyla (2026-09-16,
+önceki kayıt) TAM UYUŞTU. **Backfill BAŞARIYLA tamamlandı, hiçbir
+anormallik YOK.**
+
+### 6) BACKFILL SONRASI KRİTİK BULGU — KPI-07 sessizce yanlış '%0' üretiyordu
+
+Kullanıcının istediği canlı ölçüm yapıldı — 2018-06/2021-03/2024-09
+için `kpi.kpi_07_lisanssiz_pay()`'in GERÇEKTE ne döndürdüğü doğrudan
+çağrılarak test edildi (dashboard ekranı DEĞİL, fonksiyon çağrısı):
+
+```
+tarih_id=201806: satır=12, lisans=['Lisanslı'], KPI-07 = 0.0   <- YANLIŞ
+tarih_id=202103: satır=11, lisans=['Lisanslı'], KPI-07 = 0.0   <- YANLIŞ
+tarih_id=202409: satır=11, lisans=['Lisanslı'], KPI-07 = 0.0   <- YANLIŞ
+```
+
+**Kök neden:** Word yıllarında Lisanssız kaynakta HİÇ YÜKLENMEDİĞİ için
+`uretim_kaynak_geneli_getir()`'in döndürdüğü DataFrame o dönemler için
+BOŞ DEĞİL (Lisanslı dolu, toplam NONZERO) — yalnız "lisans" kolonunda
+'Lisanssız' değeri hiç YOK. `kpi_07_lisanssiz_pay()`'in eski `toplam ==
+0` güvenlik ağı bunu YAKALAMIYORDU: `lisanssiz = 0.0` (satır yok) /
+`toplam` (nonzero) `* 100 = 0.0` — kapsam dışı bir ölçü için SESSİZCE
+yanlış bir '%0' üretiyordu, hata FIRLATMADAN. **Bu, 2026-09-09'da
+`04_kpi_sozlesmeleri.md`'ye yazılan "boş/tamamen-NULL DataFrame gelir"
+varsayımının YANLIŞ olduğunu kanıtladı** — kapsam dışı Lisanslı-only
+veri boş DEĞİL, dolu ama Lisanssız'sız geliyordu.
+
+**Düzeltme:** `worker/kpi.py:kpi_07_lisanssiz_pay()` artık ZORUNLU
+keyword-only bir `lisanssiz_kapsam_disi: bool` parametresi alıyor
+(varsayılan YOK — çağıran bu kararı sessizce atlayamaz). `True`
+geçildiğinde veri ne olursa olsun `None` ('hesaplanamaz') döner.
+`app/dashboard.py` bu bayrağı zaten fetch edilen `kapsam_disi`
+DataFrame'inden (`analytics.kapsam_disi_getir()`) HER ZAMAN hesaplayıp
+geçiriyor. Düzeltme SONRASI aynı 3 ay + bir KONTROL ayı (2026-01,
+Excel-era, kombine Lisanslı+Lisanssız) yeniden ölçüldü:
+
+```
+tarih_id=201806: KPI-07 = None  <- hesaplanamaz (DOĞRU)
+tarih_id=202103: KPI-07 = None  <- hesaplanamaz (DOĞRU)
+tarih_id=202409: KPI-07 = None  <- hesaplanamaz (DOĞRU)
+tarih_id=202601: KPI-07 = 3.5   <- SAYI döndü (KONTROL — kombine ay BOZULMADI)
+```
+
+**KPI-03 (yenilenebilir payı) / KPI-06 (HHI) kontrol edildi — DÜZELTME
+GEREKMEDİ, ama kapsam FARKLI:** bu iki fonksiyon `uretim` DataFrame'i
+ne içeriyorsa onun üzerinden hesaplıyor (lisans filtresi YOK, HATA
+FIRLATMIYOR) — Word yıllarında bu Lisanslı-ONLY demek (Lisanssız'ın
+küçük ama sıfır olmayan payı sessizce HARİÇ), 2026 Excel aylarında ise
+Lisanslı+Lisanssız KOMBİNE. Bu bir HATA değil ama TUTARSIZ bir kapsam —
+`app/dashboard.py`'nin KPI kartı caption'ına AÇIKÇA yazıldı.
+
++3 yeni regresyon testi (`worker/tests/test_golden.py`): doğru yolu
+pinleyen (`lisanssiz_kapsam_disi=True` → `None`, nonzero Lisanslı-only
+veride bile) + yanlış yolun SONUCUNU belgeleyen (`lisanssiz_kapsam_
+disi=False` ile AYNI veri → sessizce 0.0 — artık zorunlu parametre
+olduğu için çağıran bunu atlayamaz). 2 mevcut test (`test_analytics_
+integration.py`) + 2 mevcut test (`test_golden.py`) yeni zorunlu
+parametreyle güncellendi (davranışları DEĞİŞMEDİ, yalnız çağrı şekli).
+`ruff format`/`ruff check`/`mypy` temiz, `bandit` yalnız ÖNCEDEN var
+olan/ilgisiz 2 düşük-önem bulgusu gösterdi (dashboard.py:140/272,
+established `#noqa`'lı). Tam `worker/tests` (disposable'a karşı, 355
+test): 354 geçti, yalnız `test_auth_integration.py` düştü (beklenen,
+bu turdan bağımsız). Streamlit uygulaması başlatılıp (canlıya karşı,
+salt-okuma) çökme OLMADIĞI doğrulandı.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.27, Sürüm Geçmişi v1.42,
+`04_kpi_sozlesmeleri.md`'nin güncellenen KPI-07 notu.
+
+**ADIM 4'ün TAMAMI CANLIYA UYGULANDI (2026-09-16).** 119/120 ay aktif,
+202402 bilinçli olarak bekliyor (Bulgu J). KPI-07 sessiz-yanlış-sıfır
+hatası bulunup düzeltildi — canlıya çıkmadan ÖNCE fark edilseydi daha
+iyi olurdu, ama backfill SONRASI hemen yakalanıp DÜZELTİLDİ, hiçbir
+kullanıcı yanlış bir KPI-07 değeri GÖRMEDİ (aynı oturumda tespit +
+düzeltme + doğrulama).

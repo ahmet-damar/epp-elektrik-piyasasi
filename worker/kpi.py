@@ -185,7 +185,23 @@ def kpi_05_kapasite_faktoru(uretim: pd.DataFrame, saat: float) -> float | None:
     return round(uretim_toplam / (kurulu * saat) * 100, 1)
 
 
-def kpi_07_lisanssiz_pay(uretim: pd.DataFrame) -> float | None:
+def kpi_07_lisanssiz_pay(
+    uretim: pd.DataFrame, *, lisanssiz_kapsam_disi: bool
+) -> float | None:
+    """`lisanssiz_kapsam_disi`: bu dönem için Lisanssız üretim `veri_
+    kapsam_disi`'de işaretliyse (örn. Word yılları 2016-2025, Bulgu D/L —
+    `analytics.kapsam_disi_getir()`'den okunur) True geçilmeli.
+
+    **2026-09-16'da bulunan gerçek canlı bulgu:** Word yıllarında Lisanssız
+    kaynakta HİÇ YÜKLENMEDİĞİ için `uretim` DataFrame'inde o satırlar
+    HİÇ YOK (boş DataFrame DEĞİL — yalnız Lisanslı satırları dolu, toplam
+    NONZERO). Bu durumda ESKİ kod `lisanssiz = 0.0` bulup `0.0 / toplam *
+    100 = 0.0` DÖNDÜRÜYORDU — yani kapsam dışı bir ölçü için SESSİZCE
+    yanlış bir '%0' üretiyordu (hata FIRLATMADAN). ZORUNLU keyword-only
+    parametre (varsayılan YOK) — çağıran bu kararı HER ZAMAN açıkça
+    vermeli, sessizce unutulamaz/varsayılana düşemez."""
+    if lisanssiz_kapsam_disi:
+        return None
     toplam = float(uretim["uretim_mwh"].sum()) if not uretim.empty else 0.0
     if toplam == 0:
         return None

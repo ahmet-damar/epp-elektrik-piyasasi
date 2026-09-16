@@ -724,24 +724,50 @@ u5.metric(
     else "veri yok",
 )
 
+# 2026-09-16 (canlı backfill SONRASI kritik bulgu): Word yıllarında (2016-
+# 2025) Lisanssız kaynakta HİÇ YÜKLENMEDİĞİ için `uretim_kaynak_geneli`
+# o dönemler için BOŞ DEĞİL (Lisanslı dolu, toplam nonzero) — yalnız
+# "lisans" kolonunda 'Lisanssız' değeri hiç YOK. kpi_07_lisanssiz_pay()
+# bunu ESKİDEN ayırt edemiyordu, kapsam dışı bir ölçü için SESSİZCE
+# yanlış bir '%0' üretiyordu. `kapsam_disi` (yukarıda zaten fetch edildi)
+# bu durumu AÇIKÇA işaretliyor (`nitelik='lisans_durumu=Lisanssız'`,
+# `fact_tablosu` kaynak/il_geneli) — kpi_07 artık bu bayrağı ZORUNLU
+# keyword-only parametre olarak alıyor (bkz. worker/kpi.py modül notu).
+lisanssiz_kapsam_disi = bool(
+    (
+        kapsam_disi["fact_tablosu"].isin(
+            ["fact_uretim_kaynak_geneli", "fact_uretim_il_geneli"]
+        )
+        & kapsam_disi["nitelik"].str.contains("Lisanssız", na=False)
+    ).any()
+)
 lisanssiz_pay = (
-    kpi.kpi_07_lisanssiz_pay(uretim_kaynak_geneli) if kaynak_geneli_var else None
+    kpi.kpi_07_lisanssiz_pay(
+        uretim_kaynak_geneli, lisanssiz_kapsam_disi=lisanssiz_kapsam_disi
+    )
+    if kaynak_geneli_var
+    else None
 )
 u6.metric(
     "Lisanssız Üretim Payı (KPI-07)",
-    f"%{lisanssiz_pay:.1f}" if lisanssiz_pay is not None else "veri yok",
+    f"%{lisanssiz_pay:.1f}" if lisanssiz_pay is not None else "hesaplanamaz",
 )
 st.caption(
     "KPI-02/03/06/07 kaynağı: `fact_uretim_kaynak_geneli` (ülke geneli, "
-    "il kırılımı yok) — yalnız 2026-01'den itibaren mevcut (Excel T2/T5). "
-    "KPI-02 yalnız lisanslı üretimi sayar (formül gereği), 03/06/07 "
-    "lisanslı+lisanssız kombine karışımı kullanır. KPI-05'in pay VE "
+    "il kırılımı yok) — 2026-01'den itibaren (Excel) VE Word yılları "
+    "2016-2025'ten itibaren (2026-09-16 canlı backfill) mevcut. KPI-02 "
+    "yalnız lisanslı üretimi sayar (formül gereği). **Word yıllarında "
+    "(2016-2025) Lisanssız kaynakta HİÇ YOK** (Bulgu D/L, `veri_kapsam_"
+    "disi`'de işaretli, `12_word_uretim_envanteri.md`) — bu yüzden "
+    "03/06 (yenilenebilir payı/HHI) o yıllar için yalnız LİSANSLI "
+    "karışımı yansıtır (Lisanssız'ın küçük ama sıfır olmayan payı HARİÇ "
+    "— küçümsemeye yol açabilir), 2026 Excel ayları ise lisanslı+"
+    "lisanssız KOMBİNE. KPI-07 Word yıllarının TAMAMINDA (2016-2025) "
+    "kasıtlı kapsam-dışı kararıyla 'hesaplanamaz' gösterir (sessiz '%0' "
+    "DEĞİL — 2026-09-16'da bulunup düzeltildi). KPI-05'in pay VE "
     "paydası (kurulu güç) AYNI lisans (yalnız Lisanslı) filtresiyle "
     "geliyor — bkz. worker/analytics.py:kapasite_faktoru_girdisi_getir(). "
-    "'veri yok' burada dönem kaynakta hiç yok demek (örn. 2026-01 öncesi); "
-    "Word yılları (2016-2025) bağlandığında 2016-2017 için KPI-07 kasıtlı "
-    "kapsam-dışı kararıyla 'hesaplanamaz' gösterecek (veri eksikliğinden "
-    "AYRI bir durum) — bkz. dokumanlar/09_PROJE_DURUMU.md."
+    "'veri yok' burada dönem kaynakta hiç yok demek (2016 öncesi)."
 )
 
 # 2026-09-03: kpi_13_yoy() artık ÖZET rakam değil, DataFrame'lerin kendisini

@@ -84,7 +84,9 @@ def test_uretim_getir_sekil_ve_lisans_gorunumu(conn, aktif_batch) -> None:  # ty
 
     # kpi.py fonksiyonları değişiklik gerektirmeden bu şekli tüketebilmeli
     assert kpi.kpi_02_toplam_uretim(df) == pytest.approx(880000.0)
-    assert kpi.kpi_07_lisanssiz_pay(df) == pytest.approx(0.0)  # hepsi lisanslı
+    assert kpi.kpi_07_lisanssiz_pay(df, lisanssiz_kapsam_disi=False) == pytest.approx(
+        0.0
+    )  # hepsi lisanslı, ama Lisanssız kapsam dışı DEĞİL
 
 
 def _kaynak_geneli_satir_ekle(
@@ -140,7 +142,7 @@ def test_uretim_kaynak_geneli_getir_sekil_ve_lisans_gorunumu(conn) -> None:  # t
     assert kpi.kpi_02_toplam_uretim(df) == pytest.approx(105_000.0)
     lisansli = df.loc[df["lisans"] == "Lisanslı"]
     assert kpi.kpi_02_toplam_uretim(lisansli) == pytest.approx(100_000.0)
-    assert kpi.kpi_07_lisanssiz_pay(df) == pytest.approx(
+    assert kpi.kpi_07_lisanssiz_pay(df, lisanssiz_kapsam_disi=False) == pytest.approx(
         round(5_000.0 / 105_000.0 * 100, 1)
     )
 
