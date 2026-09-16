@@ -73,6 +73,27 @@ dönem-karşılaştırması, yıllık seri değil) uyarlanmış hâli — aynı
   worker/kpi.py + worker/analytics.py `kpi_11_12_hesapla()` ile production'a
   alındı. Yeterli geçmiş veri yoksa (regresyon/normlardan HERHANGİ biri)
   sahte değer ÜRETİLMEZ, ilgili alanlar None ('hesaplanamaz') kalır.
+- **"Sanayi dikişi" bulgusu ve düzeltmesi (2026-09-16, dashboard
+  incelemesi):** canlıda KPI-12 (Türkiye Geneli, 2026-06) sahte bir
+  +%92,9 gösteriyordu. Kök neden ÖLÇÜLEREK doğrulandı: `worker/
+  analytics.py:_il_tuketim_hava_getir()` (KPI-11/12'nin TEK veri kaynağı)
+  "tüm grup"u topluyordu — Word yıllarında (2016-2025) `fact_tuketim`
+  Sanayi grubunu HİÇ İÇERMEZ (Karar 2, yapısal), 2026 Excel aylarında
+  İÇERİR (2026-06: toplam 24.098.073 MWh, Sanayi 9.682.351 MWh = %40,2;
+  2021-2025 Haziran'ların HİÇBİRİNDE Sanayi satırı yok). β/γ regresyonu
+  VE 5-yıllık norm penceresi bu yüzden (Sanayi'siz) o anki ayla
+  (Sanayi'li) FARKLI kapsamlarda karşılaştırılıyordu. **Tercih sırasının
+  1. seçeneği (KPI-13/25'teki gibi `fact_tuketim_ulke_geneli`'ye taşıma)
+  ÇAKIŞTI** — KPI-11/12 il-bazlı β/γ regresyonu kullanır, `fact_tuketim_
+  ulke_geneli` il kırılımı TAŞIMAZ. **Karar: 2. seçenek — HER İKİ taraf
+  da (norm penceresi VE hedef dönem) Sanayi-HARİÇ yapıldı**, established
+  Karar 2 ilkesiyle tutarlı; `tuketim_getir()` (KPI-08/09/P0-2'nin
+  kaynağı) bu değişiklikten ETKİLENMEDİ. Düzeltme SONRASI 2026-06 için
+  KPI-12 +%15,4'e düştü (makul mertebe). Regresyon testleri: `worker/
+  tests/test_analytics_integration.py::test_il_tuketim_hava_getir_
+  sanayi_haric_tutulur` (doğru yolu pinler) + `test_kpi_11_12_hesapla_
+  sanayi_dikisi_karisik_donemde_sahte_sapma_uretmez` (yanlış yolun
+  SONUCUNU da hesaplayıp AYRICA belgeler).
 
 ## CAGR (Yıllık — n = son_yıl − ilk_yıl)
 Kaynak: EPP_SRS_Teknik-Gereksinim_v1.5.docx Tablo 26 (Ek B'de bu ikisi hiç
@@ -119,14 +140,22 @@ Jenerik formül: (son/ilk)^(1/n) − 1 ; **n = yıl farkı** (2021→2025 ⇒ n=
   TOPLANMAZ, yılın en güncel ayı alınır (bkz. worker/analytics.py
   `yillik_yenilenebilir_kurulu_guc_serisi_getir`).
   **2026-09-02'de eklenen kısıt:** yalnız Lisanslı verisi OLAN yıllar
-  seriye girer — Word (.docx) kaynaklı 2023-2025 dönemlerinde T1
-  (Lisanslı kurulu güç) hiç yok (kaynakta yok, dokumanlar/
+  seriye girer — Word (.docx) kaynaklı yıllarda (2026-09-16'da ADIM 4
+  TAMAMLANDI: 2016-2025'in TAMAMI, yalnız o zaman bilinen "2023-2025"
+  DEĞİL) T1 (Lisanslı kurulu güç) hiç yok (kaynakta yok, dokumanlar/
   07_word_parser_kapsam.md Bulgu 5 + Karar 3), yalnız T4 (Lisanssız,
   yenilenebilir kapasitenin küçük bir kesri) yüklendi — filtre olmasaydı
   bu yıllar 2026 (Excel, Lisanslı+Lisanssız TAM) ile karışıp sahte bir
   CAGR üretirdi (KPI-25'in Sanayi dahil/hariç sorunuyla AYNI kök neden).
   Lisanslı'sı olmayan yıl "veri yok" sayılır (None/"hesaplanamaz"), sahte
-  bir sayı ÜRETİLMEZ.
+  bir sayı ÜRETİLMEZ. **Dashboard metni düzeltildi (2026-09-16,
+  dashboard incelemesi madde 3):** genel "henüz yeterli geçmiş (backfill)
+  yüklenmemiş olabilir" notu KPI-26 için YANLIŞTI — gerçek neden YAPISAL
+  ve KALICI (2016-2025'te ikinci bir Lisanslı yıl ASLA gelmeyecek,
+  "henüz" değil), `app/dashboard.py`'ye Karar 3'e referans veren AYRI
+  bir KPI-26 kapsam notu eklendi (canlıda doğrulandı: kapsam yalnız
+  {2026}, KPI-26 hâlâ 'hesaplanamaz' — 2027+'de ikinci gerçek Excel
+  yılıyla otomatik çözülecek, kod değişikliği gerekmeyecek).
 - **KPI-07 — Word yıllarının (2016-2025) TAMAMI için kapsam dışı, WIRE
   EDİLDİ ve DÜZELTİLDİ (2026-09-16, canlı backfill sonrası).** 2026-09-09
   tarihli bu notun ORİJİNAL hali YANLIŞ bir varsayım içeriyordu: "Lisanssız

@@ -940,8 +940,8 @@ y3.metric(
 )
 if gercek_veri_var and (kpi_25 is None or kpi_26 is None or kpi_27 is None):
     st.caption(
-        "CAGR için en az iki farklı yıla ait aktif veri gerekir — henüz "
-        "yeterli geçmiş (backfill) yüklenmemiş olabilir."
+        "CAGR için en az iki farklı yıla ait aktif veri gerekir — nedeni "
+        "KPI'ye göre değişir, aşağıdaki kapsam notlarına bkz."
     )
 if gercek_veri_var:
     # KPI-25 kaynak/kapsam bilgisi (2026-09-08, Asama 2/C5): "hesaplanamaz"
@@ -962,6 +962,38 @@ if gercek_veri_var:
         "kırılımsız). Bir yıl yalnız TAM 12 ay VE 5/5 tüketici grubu "
         "mevcutsa kapsama girer — 2016 bu yüzden otomatik hariç (2016-12 "
         f"Tarımsal kaynakta hiç yüklenmedi, kasıtlı). Kapsam: {kpi_25_kapsam}."
+    )
+    # KPI-26 kaynak/kapsam bilgisi (2026-09-16, dashboard incelemesi madde
+    # 3) — genel "henüz yeterli geçmiş (backfill) yüklenmemiş olabilir"
+    # notu KPI-26 için YANLIŞTIR: gerçek neden YAPISAL — Word yıllarında
+    # (2016-2025) T1 (Lisanslı kurulu güç) HİÇ YOK (Karar 3, dokumanlar/
+    # 07_word_parser_kapsam.md Bulgu 5 — il×kaynak birleşik tablo kaynakta
+    # mevcut değil), yalnız Lisanssız (T4) yüklendi. Bu aralıkta İKİNCİ bir
+    # Lisanslı yıl ASLA gelmeyecek — "backfill bekleniyor" DEĞİL, kalıcı bir
+    # kapsam dışı durum. 2027+'de yeni bir gerçek Excel yılı geldiğinde
+    # otomatik olarak seriye girecek (bkz. worker/analytics.py:yillik_
+    # yenilenebilir_kurulu_guc_serisi_getir() docstring'i, kod değişikliği
+    # GEREKMEYECEK).
+    kpi_26_yillar = sorted(kurulu_serisi["yil"].astype(int).unique().tolist())
+    if len(kpi_26_yillar) >= 2:
+        kpi_26_kapsam = (
+            f"{kpi_26_yillar[0]}–{kpi_26_yillar[-1]} ({len(kpi_26_yillar)} yıl)"
+        )
+    elif len(kpi_26_yillar) == 1:
+        kpi_26_kapsam = (
+            f"yalnız {kpi_26_yillar[0]} — Word yıllarında (2016-2025) "
+            "Lisanslı kurulu güç hiç yok (Karar 3), ikinci bir yıl "
+            "ASLA gelmeyecek o aralıkta; 2027+'de yeni bir gerçek Excel "
+            "yılıyla otomatik hesaplanacak"
+        )
+    else:
+        kpi_26_kapsam = "Lisanslı kurulu güç verisi olan yıl yok"
+    st.caption(
+        f"KPI-26 kaynağı: `fact_uretim` (yenilenebilir kurulu güç, yılın "
+        "son ayı) — yalnız Lisanslı verisi OLAN yıllar kapsama girer "
+        "(Word yıllarında 2016-2025 Lisanslı hiç yok, Karar 3 — "
+        "'hesaplanamaz' burada 'henüz yüklenmedi' DEĞİL, 'yapısal olarak "
+        f"asla gelmeyecek' demektir). Kapsam: {kpi_26_kapsam}."
     )
 st.caption(
     "KPI-27, Sanayi grubunu TÜM yıllardan çıkararak hesaplanır (kaynağı "
@@ -1068,6 +1100,25 @@ with st.expander("📋 Ham veriyi göster"):
 # aksine daha taze kalması bekleniyor.
 if gercek_veri_var:
     st.divider()
+    joblar = _son_job_durumlari_getir_cached(db_handle)
+
+    # 2026-09-16 (dashboard incelemesi, madde 2) — Faz 1 worker'ı sürekli
+    # koşan bir daemon DEĞİL (cron/elle tetiklenir); `next_retry_at` geçmişte
+    # kalmış bir iş varsa, worker BİR SONRAKİ koşusuna kadar bu iş sessizce
+    # bekler — kimse fark etmezse SONSUZA kadar (bkz. worker/analytics.py:
+    # gecmis_kalan_isleri_bul() modül notu, gerçek canlı örnek). Uyarı
+    # expander'ın İÇİNE değil dışına/üstüne konuldu ki tıklamadan görünsün.
+    _gecmis_isler = analytics.gecmis_kalan_isleri_bul(joblar)
+    if not _gecmis_isler.empty:
+        st.warning(
+            f"⚠️ **{len(_gecmis_isler)} iş, planlanan zamanı geçmiş durumda "
+            "bekliyor — worker çalıştırılmayı bekliyor.** job_id: "
+            + ", ".join(str(j) for j in _gecmis_isler["job_id"].tolist())
+            + " (bkz. aşağıdaki 'Sistem Durumu'). Faz 1 worker'ı sürekli "
+            "koşan bir daemon değil — `python -m worker.job_worker` elle/"
+            "cron ile çalıştırılmadıkça bu işler kuyrukta bekler."
+        )
+
     with st.expander("🔧 Sistem Durumu (son batch'ler + iş kuyruğu)"):
         st.caption("Son 20 ingestion_batch")
         batchler = _son_batchler_getir_cached(db_handle)
@@ -1077,7 +1128,6 @@ if gercek_veri_var:
             st.dataframe(batchler, width="stretch", hide_index=True)
 
         st.caption("Son 20 job_status (Faz 1 asenkron kuyruk)")
-        joblar = _son_job_durumlari_getir_cached(db_handle)
         if joblar.empty:
             st.caption(
                 "Hiç iş kaydı bulunamadı (Faz 1 kuyruğu bu ortamda hiç kullanılmamış olabilir)."

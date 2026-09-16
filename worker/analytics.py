@@ -300,18 +300,39 @@ def sistem_parametre_getir(conn: Connection) -> dict[str, float]:
 
 def _il_tuketim_hava_getir(conn: Connection, il_kodu: int) -> pd.DataFrame:
     """KPI-11/12'nin TEK veri kaynağı: bir ilin tüm dönemlerinde toplam
-    tuketim_mwh (tüm grup/baglanti) + o dönemin hdd/cdd'si + yil/ay.
-    Regresyon (β/γ), hava normu ve tüketim normu hepsi bundan (pandas'ta
-    filtrelenerek) türetilir — bkz. kpi_11_12_hesapla()."""
+    tuketim_mwh (Sanayi HARİÇ, aşağıya bkz. — diğer TÜM grup/baglanti
+    dahil) + o dönemin hdd/cdd'si + yil/ay. Regresyon (β/γ), hava normu
+    ve tüketim normu hepsi bundan (pandas'ta filtrelenerek) türetilir —
+    bkz. kpi_11_12_hesapla().
+
+    **2026-09-16'da bulunup düzeltilen "Sanayi dikişi" hatası (canlı
+    dashboard incelemesinde bulundu, KPI-12 2026-06 için sahte +%92,9
+    gösteriyordu):** Word yıllarında (2016-2025) fact_tuketim Sanayi
+    grubunu HİÇ İÇERMEZ (Karar 2, yapısal — Word kaynağı bu kırılımı
+    yayımlamıyor), 2026 Excel aylarında İSE İÇERİR. Bu fonksiyon ÖNCEDEN
+    "tüm grup"u (Sanayi dahil, VARSA) topluyordu — bu yüzden β/γ
+    regresyonu VE 5-yıllık norm penceresi (Word yılları, Sanayi YOK) ile
+    o anki ay (2026, Sanayi VAR) FARKLI kapsamlarda karşılaştırılıyordu,
+    ölçülüp doğrulandı (2026-06: toplam 24.098.073 MWh, Sanayi
+    9.682.351 MWh = %40,2 — 2021-2025 Haziran'ların HİÇBİRİNDE Sanayi
+    satırı YOK). **Karar (tercih sırasının 1. seçeneği ÇAKIŞTI — bu
+    fonksiyon il-bazlı β/γ regresyonu kullanıyor, `fact_tuketim_ulke_
+    geneli` il kırılımı TAŞIMIYOR, KPI-13/25'in yaptığı taşıma burada
+    UYGULANAMAZ — bu yüzden 2. seçenek: HER İKİ taraf da Sanayi-HARİÇ
+    yapıldı, established Karar 2 ilkesiyle tutarlı.** `tuketim_getir()`
+    (KPI-08/09/P0-2'nin kaynağı) BU fonksiyondan TAMAMEN AYRI, Sanayi
+    dahil TÜM grupları döndürmeye devam ediyor — bu değişiklik yalnız
+    KPI-11/12'yi etkiler."""
     kolonlar = ["tarih_id", "yil", "ay", "tuketim_mwh", "hdd", "cdd"]
     sorgu = """
         SELECT dt.tarih_id, dt.yil, dt.ay, SUM(ft.tuketim_mwh) AS tuketim_mwh,
                fh.hdd, fh.cdd
         FROM fact_tuketim ft
         JOIN dim_tarih dt ON dt.tarih_id = ft.tarih_id
+        JOIN dim_tuketici_grubu dg ON dg.grup_id = ft.grup_id
         JOIN fact_hava_aylik fh
           ON fh.il_kodu = ft.il_kodu AND fh.tarih_id = ft.tarih_id
-        WHERE ft.il_kodu = %s AND ft.is_active
+        WHERE ft.il_kodu = %s AND ft.is_active AND dg.grup_adi != 'Sanayi'
         GROUP BY dt.tarih_id, dt.yil, dt.ay, fh.hdd, fh.cdd
         ORDER BY dt.tarih_id
     """
@@ -662,6 +683,35 @@ def son_job_durumlari_getir(conn: Connection, limit: int = 20) -> pd.DataFrame:
             "updated_at",
         ],
     )
+
+
+def gecmis_kalan_isleri_bul(
+    joblar: pd.DataFrame, simdi: pd.Timestamp | None = None
+) -> pd.DataFrame:
+    """`son_job_durumlari_getir()`'in döndürdüğü DataFrame'den, `next_retry_
+    at`'i GEÇMİŞTE kalmış (yani worker çalıştırılmadığı için sessizce
+    bekleyen) 'retrying'/'queued' işleri filtreler.
+
+    **2026-09-16 (dashboard incelemesi, madde 2):** Faz 1 worker'ı sürekli
+    koşan bir daemon DEĞİL (cron/elle tetiklenir) — `next_retry_at` geçmişte
+    kalmış bir iş, kimse worker'ı çalıştırmadıkça SONSUZA kadar bekler
+    (canlıda bulunan gerçek örnek: job_id=11/correlation_id=118, next_
+    retry_at'i 8 GÜN geçmişti, ayrıca gerçek bir ingestion_batch'e hiç
+    karşılık gelmediği — erken bir test kontaminasyonu artığı olduğu —
+    tespit edilip dead_letter'a alındı, bkz. `06_canli_veri_operasyon_
+    gunlugu.md` 2026-09-16 kaydı). Bu fonksiyon `app/dashboard.py`'nin
+    aynı sessiz-bekleme desenini bir daha GÖRÜNMEZ bırakmaması için
+    kullanılıyor — 'succeeded'/'failed'/'dead_letter' durumundaki işler
+    ASLA dahil edilmez (yalnız 'retrying'/'queued', gerçekten bekleyen)."""
+    if joblar.empty:
+        return joblar
+    if simdi is None:
+        simdi = pd.Timestamp.now(tz="UTC")
+    zamanli = joblar.dropna(subset=["next_retry_at"])
+    return zamanli[
+        zamanli["status"].isin(["retrying", "queued"])
+        & (zamanli["next_retry_at"] < simdi)
+    ]
 
 
 def iller_getir(conn: Connection) -> pd.DataFrame:

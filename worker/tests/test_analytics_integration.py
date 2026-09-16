@@ -507,6 +507,114 @@ def test_kpi_11_12_hesapla_yetersiz_gecmis_hesaplanamaz(conn) -> None:  # type: 
     }
 
 
+def _tuketim_satiri_ekle(
+    conn, il_kodu: int, tarih_id: int, grup_adi: str, tuketim_mwh: float, batch_id: int
+) -> None:  # type: ignore[no-untyped-def]
+    """Test yardımcısı: `fact_tuketim`'e tek bir aktif satır ekler
+    (2026-09-16, "Sanayi dikişi" testleri için — grup_adi PARAMETRİK,
+    `_tuketim_hava_gecmisi_kur()`'un sabit 'Mesken'inden FARKLI olarak)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO fact_tuketim
+                (il_kodu, tarih_id, grup_id, baglanti, tuketim_mwh, ingestion_batch_id, is_active)
+            VALUES (%s, %s, (SELECT grup_id FROM dim_tuketici_grubu WHERE grup_adi = %s),
+                    'dagitim', %s, %s, true)
+            ON CONFLICT ON CONSTRAINT uq_fact_tuketim_batch DO NOTHING
+            """,
+            (il_kodu, tarih_id, grup_adi, tuketim_mwh, batch_id),
+        )
+
+
+def test_il_tuketim_hava_getir_sanayi_haric_tutulur(conn) -> None:  # type: ignore[no-untyped-def]
+    """2026-09-16, "Sanayi dikişi" bulgusunun regresyon pini — canlıda
+    KPI-12 (Norm Sapması) 2026-06 için sahte +%92,9 gösteriyordu: Word
+    yıllarında (2016-2025) fact_tuketim Sanayi grubunu HİÇ İÇERMEZ
+    (Karar 2, yapısal), 2026 Excel aylarında İÇERİR — `_il_tuketim_hava_
+    getir()` ÖNCEDEN "tüm grup"u topluyordu, bu yüzden norm (Sanayi-siz
+    yıllar) ile o anki ay (Sanayi'li) FARKLI kapsamlarda karşılaştırılıp
+    sahte bir sapma üretiyordu (canlıda ölçülüp doğrulandı: 2026-06
+    toplam 24.098.073 MWh, Sanayi 9.682.351 MWh = %40,2 — 2021-2025
+    Haziran'ların HİÇBİRİNDE Sanayi satırı yok, `worker/analytics.py`
+    modül notu). Bu test, tek bir dönemde HEM Mesken HEM Sanayi satırı
+    varken `_il_tuketim_hava_getir()`'in yalnız Mesken'i döndürdüğünü
+    (Sanayi'yi TAMAMEN dışladığını) doğrudan pinler."""
+    il_kodu = 28
+    tarih_id = 209401
+    batch_id = _bos_batch(conn, "test-sanayi-dikisi")
+    ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+    _hava_upsert(conn, il_kodu, tarih_id, hdd=100.0, cdd=10.0, batch_id=batch_id)
+    _tuketim_satiri_ekle(conn, il_kodu, tarih_id, "Mesken", 5_000.0, batch_id)
+    _tuketim_satiri_ekle(conn, il_kodu, tarih_id, "Sanayi", 4_000.0, batch_id)
+
+    df = analytics._il_tuketim_hava_getir(conn, il_kodu)
+
+    satir = df[df["tarih_id"] == tarih_id]
+    assert len(satir) == 1
+    # Sanayi'nin 4.000 MWh'ı TOPLAMA KARIŞMAMALI - yalnız Mesken'in 5.000'i
+    assert satir["tuketim_mwh"].iloc[0] == pytest.approx(5_000.0)
+
+
+def test_kpi_11_12_hesapla_sanayi_dikisi_karisik_donemde_sahte_sapma_uretmez(  # type: ignore[no-untyped-def]
+    conn,
+) -> None:
+    """ "Sanayi dikişi" bulgusunun UÇTAN UCA regresyon pini — gerçek canlı
+    senaryoyu taklit eder: norm penceresindeki yıllar (Word'e karşılık
+    gelen) yalnız Mesken taşıyor, HEDEF dönem (2026 Excel'e karşılık
+    gelen) hem Mesken HEM Sanayi taşıyor. Sanayi'nin payı GERÇEK canlı
+    oranla (~%40) AYNI büyüklükte kurgulandı — düzeltme OLMASAYDI KPI-12
+    ~%67 (1/0,6 - 1) mertebesinde sahte bir sapma gösterirdi (YANLIŞ
+    YOLUN SONUCU, aşağıda hesaplanıp AYRICA doğrulanıyor); düzeltmeyle
+    Sanayi hedef dönemden de dışlandığından KPI-12 gürültüsüz-veride
+    0'a YAKIN kalmalı (DOĞRU YOL)."""
+    il_kodu = 29
+    batch_id = _bos_batch(conn, "test-kpi-11-12-sanayi-dikisi")
+    donemler = [(yil, ay) for yil in (2090, 2091, 2092) for ay in range(1, 13)]
+    donemler.append((2093, 1))
+    mesken_degerleri: dict[int, float] = {}
+    for yil, ay in donemler:
+        tarih_id = yil * 100 + ay
+        ingest.dim_tarih_getir_veya_olustur(conn, tarih_id)
+        hdd = max(0.0, 300.0 - (ay - 1) * 20.0)
+        cdd = float(ay) * 5.0 + float(yil - 2090) * 20.0
+        mesken_tuketim = 5000.0 + 4.0 * hdd + 2.0 * cdd
+        mesken_degerleri[tarih_id] = mesken_tuketim
+        _hava_upsert(conn, il_kodu, tarih_id, hdd, cdd, batch_id)
+        _tuketim_satiri_ekle(
+            conn, il_kodu, tarih_id, "Mesken", mesken_tuketim, batch_id
+        )
+
+    # YALNIZ hedef dönemde (2093-01) — 2026 Excel ayı gibi — Sanayi de VAR,
+    # gerçek canlı orana yakın bir büyüklükte (mesken'in ~%67'si -> toplamın ~%40'ı).
+    hedef_tarih_id = 209301
+    sanayi_tuketim = mesken_degerleri[hedef_tarih_id] * (0.402 / (1 - 0.402))
+    _tuketim_satiri_ekle(
+        conn, il_kodu, hedef_tarih_id, "Sanayi", sanayi_tuketim, batch_id
+    )
+
+    sonuc = analytics.kpi_11_12_hesapla(
+        conn, il_kodu, hedef_tarih_id, hava_norm_yil=3, tuketim_norm_yil=2
+    )
+
+    assert sonuc["kpi_12"] is not None
+    # DOĞRU YOL: Sanayi hedef dönemden de dışlandığı için gürültüsüz veride
+    # KPI-12 hâlâ ~0 olmalı (established tolerans, bkz. yukarıdaki kardeş test).
+    assert sonuc["kpi_12"] == pytest.approx(0.0, abs=0.5)
+
+    # YANLIŞ YOLUN SONUCU (belgeleme amaçlı, çalıştırılan kod ARTIK bunu
+    # üretemez — zorunlu Sanayi-hariç filtresi nedeniyle): Sanayi hedef
+    # dönemde dahil edilseydi (düzeltme ÖNCESİ davranış), arındırılmış
+    # tüketim normun ~%67 üzerinde çıkardı — canlıda ölçülen +%92,9'a
+    # (büyüme + Sanayi dikişi birleşimi) yakın mertebede sahte bir sapma.
+    yanlis_yol_kpi_12_tahmini = (
+        (mesken_degerleri[hedef_tarih_id] + sanayi_tuketim)
+        / mesken_degerleri[hedef_tarih_id]
+        - 1
+    ) * 100
+    assert yanlis_yol_kpi_12_tahmini == pytest.approx(67.2, abs=1.0)
+    assert sonuc["kpi_12"] < yanlis_yol_kpi_12_tahmini - 40  # doğru yol AÇIKÇA farklı
+
+
 _TUM_GRUPLAR = ("Mesken", "Sanayi", "Tarımsal", "Aydınlatma", "Kamu ve Özel Hizmetler")
 
 

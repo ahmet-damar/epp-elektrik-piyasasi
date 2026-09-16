@@ -90,6 +90,7 @@ her yeni rakam için geçerlidir.
 | v1.40 | 2026-09-16 | ADIM 4 — 2017 (T2+T3 Lisanslı) tamamlandı — §5.25. Bulgu O'nun öngördüğü İKİ desen BİREBİR doğrulandı, YENİ sürpriz YOK: Bulgu N (12 ayın TAMAMINDA Hidrolik ikiye bölünmüş) + Bulgu I sınıfı (yalnız Ekim'de bölünmüş başlık). Kasım/Aralık'ın T2/T3 arama ambiguity'si (YTD kümülatif tablo) `icermez=["Ocak-"]` ile çözüldü. Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı | Disposable postgres:17 (fresh, tek başına): 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu. +5 test (`test_word_2017.py`). ADIM 4: 2025-2017 (9 yıl) TAMAMLANDI. Sıradaki ve SON adım: 2016 (bespoke `t2_oku()` gerekir) |
 | v1.41 | 2026-09-16 | **ADIM 4'ün 10 yılı da TAMAMLANDI** — §5.26. 2016 (T2+T3, BESPOKE): Bulgu O'nun en önemli öngörüsü (tek-dönem 3-kolonlu format, `hedef_donem_kolonu_bul()` kullanılamaz) doğrulandı — bespoke `t2_oku()` yazıldı. Bulgu N burada da geçerli ("Barajlı", alias gerekmedi). YENİ küçük bulgu: "Üretim" kolon başlığı ay ay case-değişiyor, `normalize_label()` ile çözüldü. Ardından TEK fresh disposable'da 10 yılın TAMAMI (120 ay) tek turda doğrulandı | Disposable postgres:17: 2016 tek başına 12/12 uyumlu, +7 test (`test_word_2016.py`). 10 yıl BİRLİKTE: `mutabakat_uretim.py` 120 çift kontrol etti, 119 uyumlu + 1 BEKLENEN istisna (202402). `fact_uretim_kaynak_geneli` 1.393 satır (120/120 ay), `fact_uretim_il_geneli` 9.639 satır (119/120 ay) — TÜMÜ `is_active=false` (gece-boyu kural). Bulgu tamlığı A→O (15 bulgu) doğrulandı, açık bulgu YOK. Canlıya HİÇBİR Word üretim verisi UYGULANMADI — ön-uçuş planı `09_PROJE_DURUMU.md`'ye yazıldı, uygulama bu turun kapsamı DIŞINDA |
 | v1.42 | 2026-09-16 | **CANLI BACKFILL UYGULANDI (Ahmet'in onayıyla) + KPI-07 kritik bulgu/düzeltmesi** — §5.27. Projede canlıya Word üretim verisinin İLK uygulanışı: kilit ön kontrolü temiz, 120 ay yüklendi, mutabakat aktivasyondan ÖNCE çalıştırıldı (132 çift, 131 uyumlu + 1 beklenen istisna), YENİ `worker/scripts/aktive_et_uretim_word.py` ile 119/120 ay aktive edildi (202402 established mekanizmayla kendiliğinden bloklandı, istisna EKLENMEDİ). **Backfill sonrası kritik bulgu:** `kpi_07_lisanssiz_pay()` Word yılları için sessizce yanlış '%0' döndürüyordu (Lisanssız veri BOŞ değil, hiç YOK — eski `toplam==0` güvenlik ağı yakalamıyordu; 2026-09-09'un "boş DataFrame gelir" varsayımı YANLIŞ çıktı) — düzeltildi: fonksiyon artık ZORUNLU `lisanssiz_kapsam_disi` parametresi alıyor. KPI-03/06 kontrol edildi, düzeltme gerekmedi ama Word yıllarında Lisanslı-only kapsamı caption'a yazıldı | Canlı satır sayıları disposable ile BİREBİR eşleşti (1.382+101=1.483 kaynak_geneli, 9.639+942=10.581 il_geneli aktif). KPI-07 düzeltmesi SONRASI canlıda yeniden ölçüldü: 3 Word ayı `None` (doğru), 1 kontrol ayı (2026-01) hâlâ gerçek sayı (BOZULMADI). +3 test, 4 mevcut test güncellendi. Tam `worker/tests`: 354/355 geçti (tek beklenen `test_auth_integration.py`). Streamlit canlıya karşı başlatılıp çökme OLMADIĞI doğrulandı |
+| v1.43 | 2026-09-16 | **Dashboard incelemesinde bulunan 3 madde** — §5.28. (1) KPI-11/12 "Sanayi dikişi": `_il_tuketim_hava_getir()` Sanayi'yi tutarsız kapsıyordu (Word yıllarında yok, 2026'da var), canlı KPI-12 (2026-06) sahte +%92,9 gösteriyordu — ölçülüp doğrulandı (Sanayi payı canlıda tam %40,2), 1. seçenek (`fact_tuketim_ulke_geneli`'ye taşıma) il-bazlı regresyon mimarisiyle ÇAKIŞTI, 2. seçenek (her iki taraf Sanayi-hariç) uygulandı, düzeltme sonrası +%15,4'e düştü. (2) job_status id=11: 8 gündür asılıydı, araştırıldı — GERÇEK bir iş DEĞİL, erken bir test kontaminasyonu artığı (`locked_by='test-worker-1'`, batch_id=118 hiç var olmadı), dead_letter'a alındı + audit_log'a yazıldı; YAPISAL düzeltme: YENİ `gecmis_kalan_isleri_bul()` + dashboard'da görünür `st.warning()`. (3) KPI-26 açıklaması düzeltildi — "henüz backfill" YANLIŞ, gerçek neden YAPISAL/KALICI (Karar 3), dashboard'a Karar 3 referanslı ayrı kapsam notu eklendi | +2 test (Sanayi dikişi, `test_analytics_integration.py`) + 6 YENİ test (`test_analytics_pure.py`, job uyarısı). Canlıda KPI-11/12 3 örnek ayla + KPI-26 kapsamıyla doğrulandı. Tam `worker/tests` (fresh disposable): 363 test, 362 geçti. `ruff`/`mypy` temiz, `bandit` yalnız 4 önceden var olan/ilgisiz bulgu |
 
 ---
 
@@ -1284,6 +1285,56 @@ OLMADIĞI doğrulandı.
 **Sonuç: ADIM 4'ün TAMAMI (120 ay, 10 yıl) canlıya UYGULANDI.** 119/120
 ay aktif, 202402 bilinçli bekliyor. KPI-07 hatası backfill SONRASI AYNI
 oturumda bulunup düzeltildi, hiçbir kullanıcı yanlış bir değer GÖRMEDİ.
+
+### 5.28 Dashboard incelemesinde bulunan 3 madde (2026-09-16)
+
+Canlı backfill SONRASI yapılan bir dashboard incelemesinde 3 madde
+bulundu, üçü de aynı oturumda ölçülüp düzeltildi.
+
+**1) KPI-11/12 "Sanayi dikişi" (ÖNCELİKLİ, gerçek hataydı) — bkz.
+`04_kpi_sozlesmeleri.md` "Sanayi dikişi bulgusu ve düzeltmesi" notu (tam
+sayılar orada). Özet: `_il_tuketim_hava_getir()` Sanayi'yi tutarsız
+kapsıyordu (Word yıllarında yok, 2026'da var) — canlıda KPI-12 (2026-06)
+sahte +%92,9 gösteriyordu. Tercih sırasının 1. seçeneği (`fact_tuketim_
+ulke_geneli`'ye taşıma) il-bazlı β/γ regresyon mimarisiyle ÇAKIŞTI —
+2. seçenek (her iki taraf da Sanayi-hariç) uygulandı. Düzeltme SONRASI
+KPI-12 +%15,4'e düştü. +2 test (`test_analytics_integration.py`): doğru
+yolu pinleyen + yanlış yolun sonucunu belgeleyen.
+
+**2) job_status id=11, 8 gündür "retrying"de asılıydı.** Araştırıldı:
+`correlation_id=118`, `locked_by='test-worker-1'`, `created_at=2026-09-01`
+— GERÇEK bir iş DEĞİL, erken bir test kontaminasyonu artığı (batch_id=118
+hiçbir zaman `ingestion_batch`'te var olmadı; `job_worker.py`'nin async
+polling yolu KENDİ commit'lerini yaptığından bir test koşusunun standart
+rollback izolasyonunu bypass etmesiyle canlıya sızmış). Yeniden
+çalıştırmak `_batch_bilgisi_getir()`'in HER ZAMAN `RuntimeError`
+fırlatmasına yol açardı (`_MAX_DENEME=5`, `attempt_count` zaten 2) — 3
+boşa retry yerine doğrudan `dead_letter`'a alındı, `audit_log`'a tam
+gerekçeyle yazıldı (bkz. `06_canli_veri_operasyon_gunlugu.md` 2026-09-16
+kaydı). **Yapısal düzeltme:** `worker/analytics.py:gecmis_kalan_isleri_
+bul()` (YENİ, saf/DB'siz fonksiyon) `next_retry_at`'i geçmişte kalmış
+'retrying'/'queued' işleri bulur; `app/dashboard.py` bunu "Sistem
+Durumu" expander'ının DIŞINA/ÜSTÜNE bir `st.warning()` olarak koyar —
+aynı sessiz-bekleme deseni bir daha görünmez kalmaz. +6 test (YENİ
+`worker/tests/test_analytics_pure.py`, DB gerektirmez).
+
+**3) KPI-26 açıklaması yanıltıcıydı.** Genel "henüz yeterli geçmiş
+(backfill) yüklenmemiş olabilir" notu KPI-26 için YANLIŞ — gerçek neden
+YAPISAL ve KALICI: Word yıllarında (2016-2025) T1 (Lisanslı kurulu güç)
+hiç yok (Karar 3), ikinci bir Lisanslı yıl O ARALIKTA ASLA gelmeyecek.
+`app/dashboard.py`'ye Karar 3'e referans veren AYRI bir KPI-26 kapsam
+notu eklendi (KPI-25/27'nin zaten sahip olduğu detaylı-caption
+desenine uyumlu). Canlıda doğrulandı: kapsam yalnız `{2026}`, KPI-26
+hâlâ 'hesaplanamaz' (2027+'de otomatik çözülecek). Kod hesaplama
+mantığı DEĞİŞMEDİ (`yillik_yenilenebilir_kurulu_guc_serisi_getir()`
+zaten Karar 3'ü doğru uyguluyordu) — yalnız METİN düzeltildi, test
+gerekmedi (pure caption string, no new logic).
+
+Tam `worker/tests` (disposable'a karşı, fresh rebuild — established
+sequence-drift kontaminasyonunu önlemek için): 363 test, 362 geçti
+(tek beklenen `test_auth_integration.py`). `ruff format`/`ruff check`/
+`mypy` temiz, `bandit` yalnız ÖNCEDEN var olan/ilgisiz 4 düşük-önem
+bulgusu gösterdi.
 
 ---
 

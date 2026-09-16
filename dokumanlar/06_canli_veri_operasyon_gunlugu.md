@@ -2507,3 +2507,161 @@ hatası bulunup düzeltildi — canlıya çıkmadan ÖNCE fark edilseydi daha
 iyi olurdu, ama backfill SONRASI hemen yakalanıp DÜZELTİLDİ, hiçbir
 kullanıcı yanlış bir KPI-07 değeri GÖRMEDİ (aynı oturumda tespit +
 düzeltme + doğrulama).
+
+## 2026-09-16 (devam) — Dashboard incelemesinde bulunan 3 madde: KPI-11/12 "Sanayi dikişi", job_status id=11, KPI-26 metni
+
+Canlı backfill'in (2026-09-16) SONRASI yapılan bir dashboard
+incelemesinde 3 madde bulundu — üçü de bu turda ölçülüp düzeltildi.
+
+### 1) KPI-11/12 "Sanayi dikişi" — ÖLÇÜLDÜ, GERÇEK bir hataydı
+
+Şüphe: KPI-11/12 (hava normalizasyonu) `fact_tuketim`'den besleniyor;
+Word yıllarında (2016-2025) Sanayi YOK (Karar 2), 2026 Excel aylarında
+VAR. Canlıda KPI-12 (Norm Sapması, Türkiye Geneli) 2026-06 için sahte
+bir **+%92,9** gösteriyordu.
+
+**Doğrulama (ÖNCE ölçüldü, sonra düzeltildi):**
+```sql
+-- Türkiye geneli (81 il TOPLAM), Haziran 2021-2026, Sanayi dahil/hariç
+tarih_id=202106: toplam=11.470.755 MWh, Sanayi=0 MWh (%0,0), 0 Sanayi satırı
+tarih_id=202206: toplam=11.801.051 MWh, Sanayi=0 MWh (%0,0), 0 Sanayi satırı
+tarih_id=202306: toplam=11.892.444 MWh, Sanayi=0 MWh (%0,0), 0 Sanayi satırı
+tarih_id=202406: toplam=13.865.586 MWh, Sanayi=0 MWh (%0,0), 0 Sanayi satırı
+tarih_id=202506: toplam=14.102.798 MWh, Sanayi=0 MWh (%0,0), 0 Sanayi satırı
+tarih_id=202606: toplam=24.098.073 MWh, Sanayi=9.682.351 MWh (%40,2), 161 Sanayi satırı
+```
+`analytics.kpi_11_12_ulusal_hesapla(conn, 202606)` düzeltmeden ÖNCE:
+`{'arindirilmis': 24.041.252,79, 'kpi_12': 92.9, 'kapsam_il_sayisi': 81}`
+— canlı ekrandaki +%92,9 İLE BİREBİR EŞLEŞTİ. 2021-2025 Haziran'ların
+HİÇBİRİNDE Sanayi satırı yok (Word yıllarının yapısal özelliği, Karar
+2), 2026-06'da Sanayi toplamın tam %40,2'si — kullanıcının kendi
+tahmini (1/0,598 ≈ +%67, büyümeyle birlikte ≈+%94) neredeyse birebir
+tutuyordu.
+
+**Kök neden:** `worker/analytics.py:_il_tuketim_hava_getir()` (KPI-11/12
+β/γ regresyonunun TEK veri kaynağı) `SUM(ft.tuketim_mwh)`'yi "tüm
+grup/baglanti" olarak topluyordu — Sanayi filtresi YOKTU. Norm penceresi
+(2021-2025, Sanayi'siz Word yılları) ile hedef dönem (2026, Sanayi'li)
+bu yüzden FARKLI kapsamlarda karşılaştırılıyordu.
+
+**Tasarım çakışması ölçüldü, önceden verilen kurala göre çözüldü:**
+Tercih sırasının 1. seçeneği (KPI-13/25'in yaptığı gibi `fact_tuketim_
+ulke_geneli`'ye taşıma) GERÇEKTEN ÇAKIŞTI — `fact_tuketim_ulke_geneli`
+il kırılımı TAŞIMIYOR, KPI-11/12 ise HER il için AYRI β/γ regresyonu
+kullanıyor (İstanbul'u Hakkari'yle eşit ağırlıklandırmak fiziksel olarak
+anlamsız olurdu — `kpi_11_12_ulusal_hesapla()`'nın ZATEN reddettiği
+"Seçenek B" ile aynı sorun). Bu yüzden **2. seçenek uygulandı: HER İKİ
+taraf (norm penceresi VE hedef dönem) Sanayi-HARİÇ yapıldı**, established
+Karar 2 ilkesiyle (Word yıllarının zaten yapısal olarak Sanayi'siz
+olması) tutarlı. `tuketim_getir()` (KPI-08/09/P0-2'nin kaynağı) TAMAMEN
+AYRI bir fonksiyon, bu değişiklikten ETKİLENMEDİ.
+
+**Düzeltme SONRASI canlıda yeniden ölçüldü:**
+```
+tarih_id=202606: {'arindirilmis': 14.364.621,27, 'kpi_12': 15.4, 'kapsam_il_sayisi': 81}
+tarih_id=202506/202406/202306: None (10-yıllık hava-normu penceresi
+  henüz dolmuyor — 2016-2025 = tam 10 yıl, İLK yeterli ay 2026-06 —
+  established OD-2 parametresi, bu turun bulgusuyla İLGİSİZ)
+```
+KPI-12, +%92,9'dan **+%15,4**'e düştü — kullanıcının beklediği "birkaç
+on puan" mertebesinde, makul.
+
+**KPI-03/06 kontrolü (istenen, ayrıca yapıldı):** bu iki fonksiyon
+`uretim` DataFrame'i ne içeriyorsa onun üzerinden hesaplanıyor — ayrı
+bir sorun DEĞİL, KPI-11/12'den TAMAMEN BAĞIMSIZ bir veri kaynağı
+kullanıyorlar (`fact_uretim_kaynak_geneli`, il kırılımsız), bu yüzden
+"Sanayi dikişi" onları HİÇ ETKİLEMİYOR (Sanayi zaten bu tablonun bir
+kavramı değil — kaynak/lisans bazlı, tüketici-grubu bazlı DEĞİL).
+
++2 regresyon testi (`test_analytics_integration.py`):
+`test_il_tuketim_hava_getir_sanayi_haric_tutulur` (doğru yolu doğrudan
+pinler) + `test_kpi_11_12_hesapla_sanayi_dikisi_karisik_donemde_sahte_
+sapma_uretmez` (gerçek canlı oranı — %40,2 — taklit eden UÇTAN UCA
+senaryo, yanlış yolun SONUCUNU da hesaplayıp AYRICA doğruluyor: %67,2,
+canlıdaki +%92,9'un büyüme+dikiş bileşimine yakın mertebe).
+
+### 2) job_status id=11 — 8 gündür "retrying"de asılıydı, ARAŞTIRILDI ve DEAD_LETTER'A ALINDI
+
+```
+job_id: 11, correlation_id: 118, status: retrying, attempt_count: 2
+locked_by: test-worker-1, created_at: 2026-09-01 19:14:50
+next_retry_at: 2026-09-08 12:00:58  (8 gün geçmiş)
+ingestion_batch WHERE batch_id=118: BULUNAMADI
+```
+`correlation_id`, `worker/job_worker.py`'nin konvansiyonuyla `str(batch_
+id)`'dir — ama batch_id=118 `ingestion_batch`'te HİÇ YOK. `locked_by`
+değeri (`'test-worker-1'`) `worker/tests/test_job_worker_integration.py`
+testlerinin kullandığı actor adıyla BİREBİR aynı. **Sonuç: GERÇEK bir iş
+DEĞİL** — `job_worker.py`'nin async polling yolu (standart `conn`
+fixture'ının rollback tabanlı izolasyonunu BYPASS ederek) KENDİ
+commit'lerini yaptığından, canlıya yanlışlıkla bağlanmış erken bir test
+koşusunun (2026-09-01/02 civarı — `conftest.py`'nin 2026-09-02 tarihli
+kendi kontaminasyon geçmişiyle AYNI sınıf) artığı.
+
+Yeniden çalıştırmak (`job_worker.calistir_once()`) `_batch_bilgisi_
+getir()`'in her seferinde `RuntimeError("batch_id=118 ... bulunamadı")`
+fırlatmasına yol açardı — `_MAX_DENEME=5`, `attempt_count` zaten 2
+olduğundan bu 3 BOŞA retry (üstel geri çekilmeyle günler sürebilir)
+demekti, sonunda AYNI sonuca (dead_letter) varırdı. Bu yüzden doğrudan
+elle dead_letter'a alındı:
+```sql
+UPDATE job_status SET status = 'dead_letter', updated_at = now() WHERE job_id = 11;
+```
++ `audit_log`'a tam gerekçeyle yazıldı (`table_name='job_status'`,
+`record_id=11`, `actor_name='manual-cli:dashboard-review-2026-09-16'`).
+Sonuç doğrulandı: `(11, 'dead_letter', 2026-09-16 14:25:00 UTC)`.
+
+**Yapısal düzeltme (istenen, aynı sorunun TEKRARLANMAMASI için):** YENİ
+`worker/analytics.py:gecmis_kalan_isleri_bul()` (saf, DB gerektirmez) —
+`next_retry_at`'i geçmişte kalmış 'retrying'/'queued' işleri filtreler
+('succeeded'/'failed'/'dead_letter' HARİÇ, `next_retry_at IS NULL` olan
+'queued' işler de HARİÇ). `app/dashboard.py`, "Sistem Durumu"
+expander'ının İÇİNE değil DIŞINA/ÜSTÜNE bir `st.warning()` koyarak bunu
+kullanıcıya tıklamadan gösteriyor. +6 regresyon testi (YENİ `worker/
+tests/test_analytics_pure.py` — gerçek canlı örneği (job_id=11) pinleyen
+dahil, DB gerektirmez, CI'nin "worker" unit job'ında da çalışır).
+
+### 3) KPI-26 açıklaması yanıltıcıydı — METİN düzeltildi
+
+Genel caption ("CAGR için en az iki farklı yıla ait aktif veri gerekir
+— henüz yeterli geçmiş (backfill) yüklenmemiş olabilir") KPI-26 için
+YANLIŞ bir izlenim veriyordu — gerçek neden YAPISAL ve KALICI: Word
+yıllarında (2016-2025) T1 (Lisanslı kurulu güç) hiç yok (Karar 3,
+dokumanlar/07_word_parser_kapsam.md Bulgu 5) — ikinci bir Lisanslı yıl
+O ARALIKTA ASLA gelmeyecek, "henüz" değil. Hesaplama mantığı
+(`yillik_yenilenebilir_kurulu_guc_serisi_getir()`) zaten Karar 3'ü
+DOĞRU uyguluyordu — yalnız METİN yanıltıcıydı.
+
+`app/dashboard.py`'ye, KPI-25/27'nin zaten sahip olduğu detaylı-caption
+desenine uyumlu, Karar 3'e AÇIKÇA referans veren ayrı bir KPI-26 kapsam
+notu eklendi. Canlıda doğrulandı:
+```
+kurulu_serisi (analytics.yillik_yenilenebilir_kurulu_guc_serisi_getir):
+  yil=2026, kurulu_guc_mw=78.807,84
+Yıllar: [2026]
+KPI-26: None
+```
+Kapsam tam olarak beklendiği gibi yalnız `{2026}` — dashboard artık
+"yalnız 2026 — Word yıllarında (2016-2025) Lisanslı kurulu güç hiç yok
+(Karar 3), ikinci bir yıl ASLA gelmeyecek o aralıkta; 2027+'de yeni bir
+gerçek Excel yılıyla otomatik hesaplanacak" diyor. Kod DEĞİŞMEDİ (pure
+caption string), test gerekmedi.
+
+### Doğrulama (üç madde birlikte)
+
+`ruff format`/`ruff check`/`mypy` temiz. `bandit -r worker/analytics.py
+app/dashboard.py`: 4 bulgu, TÜMÜ önceden var olan/ilgisiz (2 established
+`#noqa`'lı `except Exception: pass`, 2 established `assert` — hiçbiri bu
+turun değişiklikleriyle İLGİLİ DEĞİL). Tam `worker/tests` (fresh
+disposable rebuild — established sequence-drift kontaminasyonunu
+önlemek için, bu container 8+ saattir art arda birçok manuel script/test
+koşusuna maruz kalmıştı): **363 test, 362 geçti**, tek beklenen
+`test_auth_integration.py` (boş `fact_tuketim`, bu turdan bağımsız).
+Streamlit canlıya karşı (salt-okuma) başlatılıp HTTP 200 + sunucu
+loglarında hata/traceback OLMADIĞI doğrulandı — tam interaktif/browser
+testi bu ortamda YAPILAMADI, ama dashboard'un kullandığı TÜM hesaplama
+fonksiyonları (KPI-07/11/12/26) doğrudan çağrılarak canlı veriyle
+AYRICA doğrulandı.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.28, Sürüm Geçmişi v1.43,
+`04_kpi_sozlesmeleri.md`'nin güncellenen KPI-11/12 ve KPI-26 notları.

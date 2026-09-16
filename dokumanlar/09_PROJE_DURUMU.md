@@ -144,6 +144,18 @@ yansıtıldı.**
   — `kpi_07_lisanssiz_pay()`'e zorunlu bir `lisanssiz_kapsam_disi`
   parametresi eklenip düzeltildi, canlıda yeniden ölçülüp doğrulandı.
   **ADIM 4 TAMAMEN BİTTİ — kod, disposable-doğrulama VE canlı uygulama.**
+  **Aynı gün (2026-09-16, devam) bir dashboard incelemesinde 3 madde
+  daha bulunup düzeltildi:** (1) KPI-11/12 "Sanayi dikişi" — canlı
+  KPI-12 (2026-06) sahte +%92,9 gösteriyordu, ölçülüp doğrulandı (Sanayi
+  payı %40,2), `_il_tuketim_hava_getir()` her iki taraf da Sanayi-hariç
+  yapılarak düzeltildi (1. seçenek il-bazlı regresyon mimarisiyle
+  ÇAKIŞTI, 2. seçenek uygulandı), düzeltme sonrası +%15,4; (2)
+  job_status id=11 (8 gündür asılı) araştırılıp GERÇEK bir iş OLMADIĞI
+  (erken bir test kontaminasyonu artığı) bulundu, dead_letter'a alındı,
+  YAPISAL olarak dashboard'a "worker çalıştırılmayı bekliyor" uyarısı
+  eklendi; (3) KPI-26 açıklaması Karar 3'e referans verecek şekilde
+  düzeltildi. Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.28, Sürüm Geçmişi
+  v1.43, `06_canli_veri_operasyon_gunlugu.md` 2026-09-16 (devam) kaydı.
   (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
@@ -589,6 +601,46 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     komut çıktıları/sayılar dahil).
   - Sonrası Faz 4 (Tahminleme) — aşağıda "Faz 4 (Tahminleme)" bölümüne
     bkz.
+
+### ✅ Kapandı — Dashboard incelemesinde bulunan 3 madde (2026-09-16, devam)
+
+Canlı backfill'in AYNI GÜN sonrasında yapılan bir dashboard
+incelemesinde 3 madde bulundu, üçü de ölçülüp düzeltildi. Tam detay/
+sayılar `06_canli_veri_operasyon_gunlugu.md` 2026-09-16 (devam) kaydında
+("Dashboard incelemesinde bulunan 3 madde" başlığı).
+
+1. **KPI-11/12 "Sanayi dikişi" (ÖNCELİKLİ, gerçek hataydı):** canlıda
+   KPI-12 (2026-06) sahte +%92,9 gösteriyordu. Kök neden ÖLÇÜLDÜ:
+   `worker/analytics.py:_il_tuketim_hava_getir()` Sanayi'yi tutarsız
+   kapsıyordu (Word yıllarında hiç yok — Karar 2 —, 2026'da var, ölçülen
+   pay %40,2). Tercih sırasının 1. seçeneği (`fact_tuketim_ulke_
+   geneli`'ye taşıma) il-bazlı β/γ regresyon mimarisiyle GERÇEKTEN
+   ÇAKIŞTI (il kırılımı yok) — 2. seçenek (her iki taraf Sanayi-hariç)
+   uygulandı. Düzeltme SONRASI KPI-12 +%15,4'e düştü. +2 test.
+2. **job_status id=11 (8 gündür "retrying"de asılı):** araştırıldı —
+   `correlation_id=118` hiçbir zaman gerçek bir `ingestion_batch`'e
+   karşılık gelmiyordu, `locked_by='test-worker-1'` erken bir test
+   kontaminasyonu artığı olduğunu gösteriyordu. Yeniden çalıştırmak
+   yalnız 3 boşa retry'a yol açardı — doğrudan `dead_letter`'a alındı,
+   `audit_log`'a tam gerekçeyle yazıldı. **Yapısal düzeltme:** YENİ
+   `worker/analytics.py:gecmis_kalan_isleri_bul()` + dashboard'da
+   expander'ın DIŞINDA görünür bir `st.warning()` — aynı sessiz-bekleme
+   deseni artık görünmez kalmıyor. +6 yeni test (`test_analytics_pure.py`).
+3. **KPI-26 açıklaması düzeltildi:** "henüz yeterli geçmiş (backfill)
+   yüklenmemiş olabilir" YANLIŞTI — gerçek neden YAPISAL/KALICI (Karar
+   3, Word yıllarında T1/Lisanslı hiç yok). Dashboard'a Karar 3'e AÇIKÇA
+   referans veren ayrı bir kapsam notu eklendi (KPI-25/27'nin zaten
+   sahip olduğu desene uyumlu). Kod hesaplama mantığı DEĞİŞMEDİ, yalnız
+   METİN.
+
+Doğrulama: `ruff`/`mypy` temiz, `bandit` yalnız 4 önceden var olan/
+ilgisiz bulgu, tam `worker/tests` (fresh disposable) 363 test → 362
+geçti (tek beklenen `test_auth_integration.py`). Streamlit canlıya karşı
+başlatılıp HTTP 200 + sunucu loglarında hata OLMADIĞI doğrulandı (tam
+interaktif/browser testi bu ortamda yapılamadı — dashboard'un kullandığı
+TÜM hesaplama fonksiyonları doğrudan çağrılarak canlı veriyle AYRICA
+doğrulandı). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.28, Sürüm Geçmişi
+v1.43.
 
 ### ✅ Kapandı — CANLI BACKFILL ÖN-UÇUŞ PLANI, UYGULANDI (2026-09-16)
 
