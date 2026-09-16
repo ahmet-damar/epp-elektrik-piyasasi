@@ -2665,3 +2665,86 @@ AYRICA doğrulandı.
 
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.28, Sürüm Geçmişi v1.43,
 `04_kpi_sozlesmeleri.md`'nin güncellenen KPI-11/12 ve KPI-26 notları.
+
+## 2026-09-16 (devam) — İki küçük iş: KPI-11/12 kart etiketi/kapsam notu + kpi_esik (KPI-12) yeniden kalibrasyon
+
+Aynı günün "Sanayi dikişi" düzeltmesinin (yukarıya bkz.) hemen ardından
+dashboard incelemesinde bulunan iki küçük ama gerçek iyileştirme.
+
+### 1) KPI-11/12 kart etiketi ve kapsam notu — kart METNİ eksikti, HESAPLAMA zaten doğruydu
+
+Sanayi dikişi düzeltmesi canlıda doğrulanmıştı (2026-06: KPI-11
+24.041.253 → 14.364.621 MWh, KPI-12 %+92,9 → %+15,4) ama kartlar hâlâ
+"Arındırılmış Tüketim (KPI-11)" / "Arındırılmış Tüketim (KPI-11, Türkiye
+Geneli)" diyordu — yanında Sanayi DAHİL KPI-08 (24,10 TWh) dururken
+açıklamasız okunduğunda kafa karıştırıcı.
+
+**Düzeltme (`app/dashboard.py`):** hem il-bazlı hem "Türkiye Geneli"
+kart başlıklarına "Sanayi Hariç" eklendi (`Arındırılmış Tüketim (KPI-11,
+Sanayi Hariç)`, `Norm Sapması (KPI-12, Sanayi Hariç)`, aynı desen
+"Türkiye Geneli" varyantında da), altına tek cümlelik gerekçe eklendi:
+Word yıllarında Sanayi il kırılımında hiç yok (Karar 2), norm penceresi
+ile hedef dönemin aynı tanımda kalması için gerçekleşenden de çıkarıldı.
+Kod/hesaplama DEĞİŞMEDİ — yalnız METİN (aynı desen, KPI-26'nın
+2026-09-16'daki ilk düzeltmesiyle tutarlı: hesap doğruydu, açıklama
+eksikti).
+
+### 2) `kpi_esik` (KPI-12) eşikleri kontrol edildi — MİSKALİBRE bulundu, yeniden ayarlandı
+
+**Kontrol:** `20260905_0001_kpi_esik_seed.sql`'in yorumu KPI-06/13/25/
+26/27 için gerçek dağılıma referans veriyor ("gerçek dağılıma dayalı",
+"n=114 ay" vb.) — **KPI-12 için HİÇBİR ampirik referans YOK**, yalnız
+"dashboard |değer| geçirecek" notu var. Aynı gün (2026-09-05), bu
+dosyanın kendi "KPI-11/12 doğrulaması" kaydı canlıda ZATEN Ankara için
+%52-81 aralığında değerler ölçmüştü — yani eşik (yeşil≤5, sarı≤10)
+seçilirken görünürde gerçek veriye HİÇ bakılmamış (bakılsaydı 5/10
+bandının pratikte hiçbir gözlemi kapsamadığı hemen görülürdü).
+**Sonuç: "şişik veriye göre kalibre edilmiş" değil, veriye hiç
+bakılmadan keyfi/genel bir yüzde seçilmiş — ama SONUÇ aynı: miskalibre.**
+
+**Yeniden ölçüm (Sanayi-dikişi düzeltmesi SONRASI, canlıya karşı,
+`kpi_11_12_hesapla()` doğrudan çağrılarak):** 81 il × 5 ay (2026-02..
+2026-06 — 10 yıllık hava-normu penceresinin ilk kez tam dolduğu aylar),
+n=403 geçerli (il, ay) gözlemi:
+```
+min=0.2  p10=7.7  p25=12.9  medyan=19.1  p75=24.7  p90=31.0  max=124.4
+```
+Eski eşikle (yeşil≤5, sarı≤10) gözlemlerin ezici çoğunluğu (kabaca %90'ı)
+"kırmızı" gösteriyordu — trafik ışığı TİPİK sapmayı anomaliymiş gibi
+işaretliyordu. Ulusal ("Türkiye Geneli") örneklem küçüktü (n=5:
+16,4/16,7/18,3/4,8/15,4) ama aynı yöne işaret ediyordu.
+
+**Yeni eşik (KPI-13/25/27'nin izlediği "ampirik persentile dayalı, temiz
+yuvarlak sayı" yöntemi):** `yesil_alt=15.0`, `sari_alt=30.0` (KPI-12,
+yon=alcelik değişmedi) — yeşil ≈ medyanın biraz altı (tipik/iyi), sarı
+≈ p90'a yakın (üstü, gözlenen dağılımın en uç ~%10'u, gerçekten dikkat
+çekici). Migration: `supabase/migrations/20260916_0001_kpi_esik_kpi12_
+yeniden_kalibrasyon.sql` (`UPDATE ... WHERE kpi_id='KPI-12' AND
+surum='v1'`, established `ON CONFLICT DO UPDATE` seed deseniyle aynı
+tabloyu hedefliyor). Bant hem il-bazlı kartı hem "Türkiye Geneli"
+toplamını aynı `kpi_esik` satırıyla kullanıyor — toplamın bireysel
+illerden daha düşük/istikrarlı çıkması (81 regresyonun ortalanması)
+BEKLENEN bir durum, ayrı bir eşik gerektirmiyor.
+
+**KPI-11'i girdi alan başka bir eşik var mı?** Kontrol edildi — HAYIR.
+`kpi_esik`'te yalnız KPI-06/12/13/25/26/27 satırları var; KPI-13/25/27
+kendi bağımsız `fact_tuketim_ulke_geneli`/`fact_tuketim` kaynaklarını
+kullanıyor, hiçbiri KPI-11'in arındırılmış tüketim çıktısını girdi
+almıyor. KPI-11'in kendisi zaten hiç ayrı bir trafik ışığı almadı
+(yalnız KPI-12 renklendirilir) — bu yüzden KPI-11 için ayrıca bir
+değişiklik gerekmedi.
+
+**Canlıya uygulama:** Kilit ön kontrolü (`pg_stat_activity`, 10 dk+
+idle-in-transaction) YOK bulundu. Migration disposable'a (fresh rebuild,
+31/31 uygulandı) karşı doğrulandıktan sonra canlıya uygulandı — tek
+satırlık `UPDATE`, geri alma yolu basit (aynı satırı eski değerlere
+`UPDATE` etmek yeterli, DELETE/DDL yok). Canlıda doğrulandı:
+`('KPI-12', 'v1', 15.000, 30.000, None, 'alcelik')`.
+
+### Doğrulama
+
+`ruff format`/`ruff check`/`mypy` temiz. Tam `worker/tests` (fresh
+disposable, 31/31 migration): sonuç aşağıdaki "Doğrulama" bölümünde. Kod
+değişikliği yalnız metin (dashboard.py) + config veri (migration) —
+yeni bir Python testi gerektirmedi (mevcut KPI-11/12 regresyon testleri
+zaten hesaplama mantığını pinliyor, bu turda hesaplama DEĞİŞMEDİ).

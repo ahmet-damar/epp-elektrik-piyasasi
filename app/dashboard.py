@@ -855,7 +855,7 @@ if secili_il_kodu is not None:
         db_handle, secili_il_kodu, secili_tarih_id, hava_norm_yil, tuketim_norm_yil
     )
     h3.metric(
-        "Arındırılmış Tüketim (KPI-11)",
+        "Arındırılmış Tüketim (KPI-11, Sanayi Hariç)",
         f"{kpi_11_12['arindirilmis']:,.0f} MWh"
         if kpi_11_12["arindirilmis"] is not None
         else "hesaplanamaz",
@@ -865,10 +865,17 @@ if secili_il_kodu is not None:
     # kpi.py:esik_rengi() sözleşmesi) — bu yüzden abs() geçiriliyor.
     _kpi_12_abs = abs(_kpi_12_deger) if _kpi_12_deger is not None else None
     h4.metric(
-        "Norm Sapması (KPI-12)",
+        "Norm Sapması (KPI-12, Sanayi Hariç)",
         f"{_trafik_isigi(_kpi_12_abs, 'KPI-12', esikler)}%{_kpi_12_deger:+.1f}"
         if _kpi_12_deger is not None
         else "hesaplanamaz",
+    )
+    st.caption(
+        "KPI-11/12 Sanayi hariç hesaplanır: Word yıllarında (2016-2025) "
+        "Sanayi il kırılımında hiç yok (Karar 2) — norm penceresi ile o "
+        "anki dönemin aynı tanımda kalması için gerçekleşen tüketimden de "
+        "çıkarıldı (2026-09-16, dashboard incelemesi, bkz. "
+        "`06_canli_veri_operasyon_gunlugu.md`)."
     )
 elif gercek_veri_var:
     # Görev 4 (2026-09-05, Seçenek A — dokumanlar/06_canli_veri_operasyon_
@@ -878,7 +885,7 @@ elif gercek_veri_var:
         db_handle, secili_tarih_id, hava_norm_yil, tuketim_norm_yil
     )
     h3.metric(
-        "Arındırılmış Tüketim (KPI-11, Türkiye Geneli)",
+        "Arındırılmış Tüketim (KPI-11, Türkiye Geneli, Sanayi Hariç)",
         f"{kpi_11_12_ulusal['arindirilmis']:,.0f} MWh"
         if kpi_11_12_ulusal["arindirilmis"] is not None
         else "hesaplanamaz",
@@ -888,18 +895,26 @@ elif gercek_veri_var:
         abs(_kpi_12_ulusal_deger) if _kpi_12_ulusal_deger is not None else None
     )
     h4.metric(
-        "Norm Sapması (KPI-12, Türkiye Geneli)",
+        "Norm Sapması (KPI-12, Türkiye Geneli, Sanayi Hariç)",
         f"{_trafik_isigi(_kpi_12_ulusal_abs, 'KPI-12', esikler)}%{_kpi_12_ulusal_deger:+.1f}"
         if _kpi_12_ulusal_deger is not None
         else "hesaplanamaz",
     )
-    if kpi_11_12_ulusal["kapsam_il_sayisi"]:
-        st.caption(
-            f"81 ilin {kpi_11_12_ulusal['kapsam_il_sayisi']}'i yeterli geçmişe "
-            "sahip olduğu için ulusal toplama dahil edildi (Görev 4, Seçenek A "
-            "— her il kendi β/γ regresyonuyla hesaplanıp toplanır, tek bir "
-            "'ulusal HDD/CDD' uydurulmaz)."
-        )
+    _kpsm_notu = (
+        f"81 ilin {kpi_11_12_ulusal['kapsam_il_sayisi']}'i yeterli geçmişe "
+        "sahip olduğu için ulusal toplama dahil edildi (Görev 4, Seçenek A "
+        "— her il kendi β/γ regresyonuyla hesaplanıp toplanır, tek bir "
+        "'ulusal HDD/CDD' uydurulmaz). "
+        if kpi_11_12_ulusal["kapsam_il_sayisi"]
+        else ""
+    )
+    st.caption(
+        _kpsm_notu + "KPI-11/12 Sanayi hariç hesaplanır: Word yıllarında "
+        "(2016-2025) Sanayi il kırılımında hiç yok (Karar 2) — norm "
+        "penceresi ile o anki dönemin aynı tanımda kalması için "
+        "gerçekleşen tüketimden de çıkarıldı (2026-09-16, dashboard "
+        "incelemesi, bkz. `06_canli_veri_operasyon_gunlugu.md`)."
+    )
 else:
     h3.metric("Arındırılmış Tüketim (KPI-11)", "hesaplanamaz")
     h4.metric("Norm Sapması (KPI-12)", "hesaplanamaz")

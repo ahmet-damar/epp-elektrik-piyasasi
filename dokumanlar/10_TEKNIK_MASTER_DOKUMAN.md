@@ -91,6 +91,7 @@ her yeni rakam için geçerlidir.
 | v1.41 | 2026-09-16 | **ADIM 4'ün 10 yılı da TAMAMLANDI** — §5.26. 2016 (T2+T3, BESPOKE): Bulgu O'nun en önemli öngörüsü (tek-dönem 3-kolonlu format, `hedef_donem_kolonu_bul()` kullanılamaz) doğrulandı — bespoke `t2_oku()` yazıldı. Bulgu N burada da geçerli ("Barajlı", alias gerekmedi). YENİ küçük bulgu: "Üretim" kolon başlığı ay ay case-değişiyor, `normalize_label()` ile çözüldü. Ardından TEK fresh disposable'da 10 yılın TAMAMI (120 ay) tek turda doğrulandı | Disposable postgres:17: 2016 tek başına 12/12 uyumlu, +7 test (`test_word_2016.py`). 10 yıl BİRLİKTE: `mutabakat_uretim.py` 120 çift kontrol etti, 119 uyumlu + 1 BEKLENEN istisna (202402). `fact_uretim_kaynak_geneli` 1.393 satır (120/120 ay), `fact_uretim_il_geneli` 9.639 satır (119/120 ay) — TÜMÜ `is_active=false` (gece-boyu kural). Bulgu tamlığı A→O (15 bulgu) doğrulandı, açık bulgu YOK. Canlıya HİÇBİR Word üretim verisi UYGULANMADI — ön-uçuş planı `09_PROJE_DURUMU.md`'ye yazıldı, uygulama bu turun kapsamı DIŞINDA |
 | v1.42 | 2026-09-16 | **CANLI BACKFILL UYGULANDI (Ahmet'in onayıyla) + KPI-07 kritik bulgu/düzeltmesi** — §5.27. Projede canlıya Word üretim verisinin İLK uygulanışı: kilit ön kontrolü temiz, 120 ay yüklendi, mutabakat aktivasyondan ÖNCE çalıştırıldı (132 çift, 131 uyumlu + 1 beklenen istisna), YENİ `worker/scripts/aktive_et_uretim_word.py` ile 119/120 ay aktive edildi (202402 established mekanizmayla kendiliğinden bloklandı, istisna EKLENMEDİ). **Backfill sonrası kritik bulgu:** `kpi_07_lisanssiz_pay()` Word yılları için sessizce yanlış '%0' döndürüyordu (Lisanssız veri BOŞ değil, hiç YOK — eski `toplam==0` güvenlik ağı yakalamıyordu; 2026-09-09'un "boş DataFrame gelir" varsayımı YANLIŞ çıktı) — düzeltildi: fonksiyon artık ZORUNLU `lisanssiz_kapsam_disi` parametresi alıyor. KPI-03/06 kontrol edildi, düzeltme gerekmedi ama Word yıllarında Lisanslı-only kapsamı caption'a yazıldı | Canlı satır sayıları disposable ile BİREBİR eşleşti (1.382+101=1.483 kaynak_geneli, 9.639+942=10.581 il_geneli aktif). KPI-07 düzeltmesi SONRASI canlıda yeniden ölçüldü: 3 Word ayı `None` (doğru), 1 kontrol ayı (2026-01) hâlâ gerçek sayı (BOZULMADI). +3 test, 4 mevcut test güncellendi. Tam `worker/tests`: 354/355 geçti (tek beklenen `test_auth_integration.py`). Streamlit canlıya karşı başlatılıp çökme OLMADIĞI doğrulandı |
 | v1.43 | 2026-09-16 | **Dashboard incelemesinde bulunan 3 madde** — §5.28. (1) KPI-11/12 "Sanayi dikişi": `_il_tuketim_hava_getir()` Sanayi'yi tutarsız kapsıyordu (Word yıllarında yok, 2026'da var), canlı KPI-12 (2026-06) sahte +%92,9 gösteriyordu — ölçülüp doğrulandı (Sanayi payı canlıda tam %40,2), 1. seçenek (`fact_tuketim_ulke_geneli`'ye taşıma) il-bazlı regresyon mimarisiyle ÇAKIŞTI, 2. seçenek (her iki taraf Sanayi-hariç) uygulandı, düzeltme sonrası +%15,4'e düştü. (2) job_status id=11: 8 gündür asılıydı, araştırıldı — GERÇEK bir iş DEĞİL, erken bir test kontaminasyonu artığı (`locked_by='test-worker-1'`, batch_id=118 hiç var olmadı), dead_letter'a alındı + audit_log'a yazıldı; YAPISAL düzeltme: YENİ `gecmis_kalan_isleri_bul()` + dashboard'da görünür `st.warning()`. (3) KPI-26 açıklaması düzeltildi — "henüz backfill" YANLIŞ, gerçek neden YAPISAL/KALICI (Karar 3), dashboard'a Karar 3 referanslı ayrı kapsam notu eklendi | +2 test (Sanayi dikişi, `test_analytics_integration.py`) + 6 YENİ test (`test_analytics_pure.py`, job uyarısı). Canlıda KPI-11/12 3 örnek ayla + KPI-26 kapsamıyla doğrulandı. Tam `worker/tests` (fresh disposable): 363 test, 362 geçti. `ruff`/`mypy` temiz, `bandit` yalnız 4 önceden var olan/ilgisiz bulgu |
+| v1.44 | 2026-09-16 | **İki küçük iş: KPI-11/12 kart etiketi + `kpi_esik` (KPI-12) yeniden kalibrasyon** — §5.29. (1) Kartlara "Sanayi Hariç" etiketi + Karar 2 referanslı kapsam notu eklendi (hesaplama değişmedi, yalnız metin). (2) `kpi_esik`'in KPI-12 eşiği (yeşil≤5, sarı≤10, 2026-09-05'te seed edildi) kontrol edildi — HİÇBİR ampirik gerekçesi olmadığı bulundu (diğer KPI'ların aksine); Sanayi-dikişi düzeltmesi SONRASI canlıda ölçülen gerçek dağılım (81 il × 5 ay, n=403: medyan=19,1 p90=31,0) eski eşikle gözlemlerin ~%90'ının "kırmızı" göründüğünü gösterdi. Yeni eşik `yesil_alt=15,0`/`sari_alt=30,0`, migration `20260916_0001` ile canlıya uygulandı. KPI-11'i girdi alan başka eşik yok (kontrol edildi) | Kod değişikliği yalnız metin + config veri, hesaplama mantığı değişmedi (mevcut testler zaten pinliyor). Migration disposable'da (31/31) doğrulanıp canlıya uygulandı, canlıda `('KPI-12','v1',15.000,30.000,None,'alcelik')` teyit edildi |
 
 ---
 
@@ -257,7 +258,7 @@ kolon(ları), `ingestion_batch_id FK`, `is_active BOOLEAN`, iki kısıt
 | `job_status` | Faz 1 asenkron kuyruk — `status ∈ {queued,running,succeeded,failed,retrying,dead_letter}`, `attempt_count`, `heartbeat_at` (bayat-heartbeat kurtarma) |
 | `veri_kapsam_disi` | "Kaynakta gerçekten yok" (parser hatası DEĞİL) kaydı — PK `(tarih_id, fact_tablosu, nitelik)`, `ingestion_batch`'ten BİLİNÇLİ BAĞIMSIZ (migration 0012, 2026-09-02) |
 | `sistem_parametre` | Koda gömülmeyen config (HDD/CDD baz sıcaklıkları, hava/tüketim norm yılı — OD-1/OD-2) |
-| `kpi_esik` | Dashboard'daki trafik-ışığı renk eşikleri (migration 20260905_0001) |
+| `kpi_esik` | Dashboard'daki trafik-ışığı renk eşikleri (migration 20260905_0001; KPI-12 eşiği ampirik olarak yeniden kalibre edildi, migration 20260916_0001, bkz. §5.29) |
 
 ### 3.4 Sürümleme Modelleri — İKİ FARKLI Desen
 1. **Batch + is_active** (fact_tuketim, fact_uretim, fact_abone,
@@ -1335,6 +1336,40 @@ sequence-drift kontaminasyonunu önlemek için): 363 test, 362 geçti
 (tek beklenen `test_auth_integration.py`). `ruff format`/`ruff check`/
 `mypy` temiz, `bandit` yalnız ÖNCEDEN var olan/ilgisiz 4 düşük-önem
 bulgusu gösterdi.
+
+### 5.29 İki küçük iş: KPI-11/12 kart etiketi + `kpi_esik` (KPI-12) yeniden kalibrasyon (2026-09-16, devam)
+
+§5.28'in hemen ardından, dashboard incelemesinin devamında bulunan iki
+küçük ama gerçek iyileştirme.
+
+**1) Kart etiketi/kapsam notu.** Sanayi dikişi düzeltmesi canlıda
+doğrulanmıştı ama kartlar hâlâ yalnız "Arındırılmış Tüketim (KPI-11)"
+diyordu — Sanayi DAHİL KPI-08 (24,10 TWh) ile yan yana kafa karıştırıcı.
+`app/dashboard.py`'deki hem il-bazlı hem "Türkiye Geneli" KPI-11/12
+kart başlıklarına "Sanayi Hariç" eklendi, altına Karar 2'ye referans
+veren tek cümlelik gerekçe eklendi. Hesaplama DEĞİŞMEDİ, yalnız metin.
+
+**2) `kpi_esik` (KPI-12) yeniden kalibrasyon.** Kontrol: `20260905_0001`
+seed'i KPI-06/13/25/26/27 için gerçek dağılıma referans veriyordu, ama
+KPI-12 için HİÇBİR ampirik gerekçe YOKTU — aynı günün ops-log kaydı
+canlıda ZATEN %52-81 aralığında değerler ölçmüştü, yani eşik (yeşil≤5,
+sarı≤10) seçilirken görünürde veriye hiç bakılmamıştı. Sanayi dikişi
+düzeltmesi SONRASI canlıya karşı ölçülen gerçek dağılım (81 il × 5 ay,
+n=403 gözlem): min=0,2 p10=7,7 p25=12,9 medyan=19,1 p75=24,7 p90=31,0
+max=124,4. Eski eşikle gözlemlerin ~%90'ı "kırmızı" gösteriyordu. Yeni
+eşik: `yesil_alt=15,0`, `sari_alt=30,0` (KPI-13/25/27'nin izlediği
+ampirik-persentil yöntemi, medyan/p90'a yakın). Migration
+`20260916_0001_kpi_esik_kpi12_yeniden_kalibrasyon.sql` — kilit ön
+kontrolü temiz, disposable'da (31/31 migration) doğrulandı, canlıya
+uygulandı (`UPDATE ... WHERE kpi_id='KPI-12' AND surum='v1'`, tek satır,
+geri alma basit). KPI-11'i girdi alan başka bir eşik YOK (kontrol
+edildi) — KPI-11 için ayrı bir değişiklik gerekmedi.
+
+Kod değişikliği yalnız metin (dashboard.py) + config veri (migration) —
+KPI-11/12'nin hesaplama mantığı hiç değişmedi, mevcut regresyon testleri
+zaten onu pinliyor; yeni test gerekmedi. Detay:
+`06_canli_veri_operasyon_gunlugu.md` 2026-09-16 (devam) kaydı,
+`04_kpi_sozlesmeleri.md`.
 
 ---
 

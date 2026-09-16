@@ -156,6 +156,14 @@ yansıtıldı.**
   eklendi; (3) KPI-26 açıklaması Karar 3'e referans verecek şekilde
   düzeltildi. Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.28, Sürüm Geçmişi
   v1.43, `06_canli_veri_operasyon_gunlugu.md` 2026-09-16 (devam) kaydı.
+  **Aynı gün, ayrıca iki küçük iş kapandı:** KPI-11/12 kart başlıklarına
+  "Sanayi Hariç" + Karar 2 referanslı kapsam notu eklendi (metin, hesap
+  değişmedi); `kpi_esik`'in KPI-12 eşiği (yeşil≤5/sarı≤10) HİÇBİR
+  ampirik gerekçesi olmadığı bulunup canlıya karşı ölçülen gerçek
+  dağılımla (81 il×5 ay, n=403, medyan=%19,1, p90=%31,0) yeniden kalibre
+  edildi (`yesil_alt=15,0`/`sari_alt=30,0`, migration `20260916_0001`,
+  canlıya uygulandı). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.29, Sürüm
+  Geçmişi v1.44.
   (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
@@ -601,6 +609,40 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     komut çıktıları/sayılar dahil).
   - Sonrası Faz 4 (Tahminleme) — aşağıda "Faz 4 (Tahminleme)" bölümüne
     bkz.
+
+### ✅ Kapandı — İki küçük iş: KPI-11/12 kart etiketi + `kpi_esik` (KPI-12) yeniden kalibrasyon (2026-09-16, devam)
+
+Dashboard incelemesindeki 3 maddenin (bkz. aşağıdaki bölüm) hemen
+ardından bulunan iki küçük ama gerçek iyileştirme. Tam detay/sayılar
+`06_canli_veri_operasyon_gunlugu.md` 2026-09-16 (devam, "İki küçük iş")
+kaydında.
+
+1. **KPI-11/12 kart etiketi/kapsam notu:** Sanayi dikişi düzeltmesi
+   canlıda doğrulanmıştı ama kartlar hâlâ yalnız "Arındırılmış Tüketim
+   (KPI-11)" diyordu — Sanayi DAHİL KPI-08 (24,10 TWh) ile yan yana kafa
+   karıştırıcı. Başlıklara "Sanayi Hariç" + Karar 2 referanslı tek
+   cümlelik gerekçe eklendi (hem il-bazlı hem "Türkiye Geneli" kartlar).
+   Hesaplama DEĞİŞMEDİ, yalnız metin.
+2. **`kpi_esik` (KPI-12) MİSKALİBRE bulundu, yeniden kalibre edildi:**
+   2026-09-05 seed'i KPI-12 için hiçbir ampirik gerekçe içermiyordu
+   (diğer KPI'ların aksine) — aynı günün canlı ölçümü zaten %52-81
+   aralığında değerler göstermişti, yani veriye bakılmadan seçilmiş.
+   Sanayi dikişi düzeltmesi SONRASI canlıya karşı ölçülen gerçek dağılım
+   (81 il × 5 ay, n=403): medyan=%19,1, p90=%31,0 — eski eşikle (yeşil≤5,
+   sarı≤10) gözlemlerin ~%90'ı "kırmızı" gösteriyordu. Yeni eşik:
+   `yesil_alt=15,0`, `sari_alt=30,0` (KPI-13/25/27'nin izlediği
+   ampirik-persentil yöntemi). Migration `20260916_0001_kpi_esik_kpi12_
+   yeniden_kalibrasyon.sql` — kilit ön kontrolü temiz, disposable'da
+   (31/31) doğrulanıp **canlıya uygulandı**, canlıda `('KPI-12','v1',
+   15.000,30.000,None,'alcelik')` teyit edildi. KPI-11'i girdi alan
+   başka bir eşik YOK (kontrol edildi) — KPI-11 için ayrı bir değişiklik
+   gerekmedi.
+
+Doğrulama: kod değişikliği yalnız metin (dashboard.py) + config veri
+(migration) — KPI-11/12'nin hesaplama mantığı DEĞİŞMEDİ, mevcut
+regresyon testleri zaten onu pinliyor, yeni test gerekmedi. `ruff`/
+`mypy` temiz. Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.29, Sürüm Geçmişi
+v1.44.
 
 ### ✅ Kapandı — Dashboard incelemesinde bulunan 3 madde (2026-09-16, devam)
 

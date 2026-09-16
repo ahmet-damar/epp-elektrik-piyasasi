@@ -94,6 +94,26 @@ dönem-karşılaştırması, yıllık seri değil) uyarlanmış hâli — aynı
   sanayi_haric_tutulur` (doğru yolu pinler) + `test_kpi_11_12_hesapla_
   sanayi_dikisi_karisik_donemde_sahte_sapma_uretmez` (yanlış yolun
   SONUCUNU da hesaplayıp AYRICA belgeler).
+- **Dashboard kart etiketi/kapsam notu (2026-09-16, devam):** Sanayi
+  dikişi düzeltmesi SONRASI kartlar hâlâ yalnız "Arındırılmış Tüketim
+  (KPI-11)" diyordu — Sanayi DAHİL KPI-08 ile yan yana kafa karıştırıcı.
+  Başlıklara "Sanayi Hariç" eklendi + altına tek cümlelik gerekçe
+  (Karar 2'ye referans). Hesaplama DEĞİŞMEDİ, yalnız metin.
+- **`kpi_esik` (KPI-12) eşikleri MİSKALİBRE bulundu, yeniden kalibre
+  edildi (2026-09-16, devam):** `20260905_0001` seed'i KPI-12 için
+  hiçbir ampirik gerekçe içermiyordu (diğer KPI'ların aksine). Sanayi
+  dikişi düzeltmesi SONRASI canlıya karşı ölçülen gerçek dağılım (81 il
+  × 5 ay, n=403): min=0,2 p10=7,7 p25=12,9 **medyan=19,1** p75=24,7
+  **p90=31,0** max=124,4. Eski eşikle (yeşil≤5, sarı≤10) gözlemlerin
+  ~%90'ı "kırmızı" gösteriyordu — tipik sapma anomali gibi
+  işaretleniyordu. Yeni eşik: **yeşil_alt=15,0, sari_alt=30,0**
+  (medyan/p90'a yakın, KPI-13/25/27'nin izlediği ampirik-persentil
+  yöntemiyle). Migration: `20260916_0001_kpi_esik_kpi12_yeniden_
+  kalibrasyon.sql`, canlıya uygulandı. KPI-11'i girdi alan başka bir
+  eşik YOK (kontrol edildi — `kpi_esik`'teki diğer satırlar bağımsız
+  kaynaklardan besleniyor), bu yüzden KPI-11 için ayrı bir değişiklik
+  gerekmedi. Detay: `06_canli_veri_operasyon_gunlugu.md` 2026-09-16
+  (devam) kaydı.
 
 ## CAGR (Yıllık — n = son_yıl − ilk_yıl)
 Kaynak: EPP_SRS_Teknik-Gereksinim_v1.5.docx Tablo 26 (Ek B'de bu ikisi hiç
