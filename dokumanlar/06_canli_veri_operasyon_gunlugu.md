@@ -2270,3 +2270,92 @@ Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.25, Sürüm Geçmişi v1.40,
 **ADIM 4 durumu:** 2025-2017 (9 yıl) TAMAMLANDI, YALNIZ disposable,
 canlıya HİÇBİRİ uygulanmadı. Sıradaki ve SON adım: 2016 (bespoke
 `t2_oku()` — Bulgu O §2, tek-dönem 3-kolonlu format).
+
+## 2026-09-16 (devam) — ADIM 4: 2016 (T2+T3, BESPOKE) tamamlandı, 10 yılın TAMAMI BİTTİ
+
+`word_2016.py`'ye Bulgu O'nun öngördüğü BESPOKE `t2_oku()` eklendi (diğer
+9 yılın `hedef_donem_kolonu_bul()`'a dayanan imzasından kasıtlı FARKLI —
+`hedef_ay_yil` parametresi YOK). Kod yazmadan önce Bulgu O'nun öngörüleri
+tam T2/T3 dökümüyle bir kez daha doğrulandı (`_KAYNAK_TAKMA_ADLAR`'ın
+DOĞRU offset'le — `tbl.rows[1:]`, Bulgu O'nun kendi uyardığı `tbl.rows[2:]`
+HATASI değil):
+
+- **T2 formatı:** 12 ayın TAMAMI tek-dönem 3-kolonlu (`Kaynak Türü |
+  Üretim Miktarı (MWh) | Oran (%)`) — dönem karşılaştırması YOK,
+  `hedef_donem_kolonu_bul()` KULLANILMADI, doğrudan kolon 1 okunuyor.
+- **Arama metni:** Ocak/Şubat'ın "Lisanslı"sız başlığını kapsayacak
+  şekilde `icerir=["Elektrik Üretiminin Kaynak/İl Bazında Dağılımı"]`
+  (Lisanslı ÇIKARILDI) + `icermez=["Lisanssız"]` (savunma amaçlı) —
+  tüm 12 ay tek adayla bulundu.
+- **Bulgu N:** Hidrolik "AKARSU"+"BARAJLI" (â'sız kısa biçim, "BARAJLI
+  HİDROLİK" DEĞİL) diye ikiye bölünmüş — worker/parser.py'nin kendi
+  "Barajlı" alias'ı zaten tanıdığı için YENİ takma ad GEREKMEDİ, ama
+  `dict` biriktiricisiyle toplama YİNE DE gerekti.
+- **YENİ küçük bulgu (dry-run'da bulunup ÇÖZÜLDÜ, kod yazma sırasında):**
+  "Üretim" kolon başlığı ay ay büyük/küçük harf DEĞİŞİYOR (Haziran/
+  Temmuz/Ağustos/Aralık "ÜRETİM (MWh)" tüm-büyük, diğer aylar "Üretim
+  Miktarı (MWh)" title-case) — ilk dry-run 4 ayda `[BEKLEMEDE]` verdi
+  (`"Üretim" not in baslik_satir[1]`, case-sensitive), `normalize_label()`
+  ile Türkçe-güvenli karşılaştırmaya geçilip düzeltildi, yeniden
+  çalıştırıldı, 12/12 temiz.
+- **İl satır bütünlüğü (kullanıcının özellikle istediği kontrol):**
+  önceki Word genişlemesinden bilinen İstanbul-bölünmüş-satır (T11'e
+  özgü, Ocak-Mart) ve Adana-kayıp (T11'e özgü, Temmuz) sınıfı sürprizler
+  T2/T3'te (üretim) GÖRÜLMEDİ — yalnız T11 (tüketim) etkileniyordu. İl
+  sayısı ay ay değişti (77-81, established Bulgu G) ama `t3_oku()`'nun
+  0-fill+Genel-Toplam güvencesi zaten bunu kapsıyor.
+
+Disposable postgres:17 (fresh, tek başına): 12/12 ay yüklendi,
+`mutabakat_uretim.py`: `Kontrol edilen: 12 / Uyumlu: 12, uyumsuz batch:
+0` (Temmuz'daki ~0,0012%'lik T2/T3 çapraz-tablo farkı established %0,5
+toleransın çok altında — sorun DEĞİL, EPDK'nın iki bağımsız tablosu
+arasındaki normal yuvarlama varyansı).
+
++7 regresyon testi (`test_word_2016.py`): alias eşlemesi, tek-dönem
+format okuma, toplama davranışı, Üretim-kolonu-bulunamama hatası,
+Genel-Toplam-uyuşmazlığı × 2. `ruff format`/`ruff check`/`mypy` temiz,
+`bandit -r worker/scripts/word_2016.py` sıfır bulgu. Tam `worker/tests`
+(gerçek disposable'a karşı, 353 test): 352 geçti, yalnız `test_auth_
+integration.py` düştü (boş `fact_tuketim` — beklenen, 2016'dan bağımsız).
+
+### ADIM 4 KAPANIŞI — 10 yılın TAMAMI tek disposable'da tek turda doğrulandı
+
+2016 tamamlandıktan sonra disposable FRESH rebuild edildi, 2016→2025
+sırasıyla `--uretim-geneli` ile yeniden yüklendi (tek seferlik, tam
+kapsamlı doğrulama turu):
+
+```
+mutabakat_uretim.py:
+  Kontrol edilen (tarih_id, lisans_id) çifti: 120
+  Uyumlu: 119, uyumsuz batch: 1
+    {'tarih_id': 202402, 'lisans_id': 1, 'durum': 'bir_taraf_eksik',
+     'il_toplami': None, 'kaynak_toplami': 25615763.19, 'uyumlu': False}
+```
+
+Tek BEKLENEN/belgelenmiş istisna (202402, Bulgu J) dışında 120 ayın
+TAMAMI uyumlu. Veritabanı durumu doğrudan sorgulandı:
+
+- `fact_uretim_kaynak_geneli`: **1.393 satır**, 120/120 ay, tarih_id
+  201601-202512, TÜMÜ `is_active=false`.
+- `fact_uretim_il_geneli`: **9.639 satır**, 119/120 ay (202402 hariç —
+  Bulgu J, kasıtlı), TÜMÜ `is_active=false`.
+- `veri_kapsam_disi`: Lisanssız (T5/T6) 120+120 satır (her iki tablo,
+  her ay), + 1 Lisanslı satır (202402, Bulgu J).
+- `ingestion_batch`: 120 batch, TÜMÜ `status='running'` — HİÇBİRİ
+  aktive edilmedi (gece-boyu kural, tasarım gereği — aktivasyon canlı
+  backfill turunda AYRI bir adım).
+
+**Bulgu tamlığı:** A'dan O'ya 15 bulgu, hepsi ya bir kararla kapatıldı
+(Bulgu C/D/L) ya da established bir kod deseniyle çözüldü (Bulgu I/N
+sınıfları). Açık bulgu YOK. Tam yıl-yıl özet tablosu
+`12_word_uretim_envanteri.md`'nin "ADIM 4 KAPANIŞI" bölümünde.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.26, Sürüm Geçmişi v1.41,
+`12_word_uretim_envanteri.md`'nin "2016 tamamlandı" notu + "ADIM 4
+KAPANIŞI" bölümü.
+
+**ADIM 4'ün TAMAMI (10 yıl, 120 ay) BİTTİ — kod/disposable-doğrulama
+fazı KAPANDI.** Canlıya HİÇBİR Word üretim verisi HENÜZ UYGULANMADI.
+Bir sonraki adım — CANLI BACKFILL — bu oturumda yalnız PLAN olarak
+hazırlandı (`09_PROJE_DURUMU.md`), UYGULANMADI; Ahmet'in onayıyla AYRI
+bir turda yapılacak.

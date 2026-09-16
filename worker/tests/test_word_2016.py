@@ -23,6 +23,8 @@ from worker.scripts.word_2016 import (
     _il_adi_temizle,
     grup_esle_zorunlu,
     kaynak_esle_zorunlu,
+    t2_oku,
+    t3_oku,
     t4_oku,
     t11_oku,
 )
@@ -306,3 +308,115 @@ def test_t4_oku_gunes_varyantlari_tek_satira_toplanir() -> None:
     gunes_satirlari = df[(df["il_kodu"] == eskisehir_kodu) & (df["kaynak"] == "Güneş")]
     assert len(gunes_satirlari) == 1
     assert gunes_satirlari["kurulu_guc_mw"].iloc[0] == pytest.approx(5.0)
+
+
+# ---------------------------------------------------------------------------
+# ADIM 4 (2026-09-16) — T2/T3: Lisanslı ÜRETİM (kurulu güç DEĞİL). 2016'nın
+# T2'si Bulgu O'nun bulduğu gibi TÜM diğer yıllardan (2017-2025) YAPISAL
+# OLARAK FARKLI — tek-dönem 3-kolonlu format, hedef_ay_yil/kolon-seçimi YOK.
+# 12 ayın TAMAMI gerçek dosyaya karşı kontrol edildi. Bulgu N (Hidrolik
+# "AKARSU"+"BARAJLI" ikiye bölünmüş — 2016'da â'sız kısa "BARAJLI", YENİ
+# alias gerekmedi ama toplama gerekiyor) da doğrulandı.
+# ---------------------------------------------------------------------------
+
+
+def test_kaynak_esle_zorunlu_barajli_hidrolige_esler() -> None:
+    """2016'da "BARAJLI HİDROLİK" DEĞİL, â'sız kısa "BARAJLI" — worker/
+    parser.py'nin kendi alias'ıyla zaten tanınıyor, YENİ takma ad
+    gerekmedi (2017/2018/2019'un "BARAJLI HİDROLİK"'inden FARKLI)."""
+    assert kaynak_esle_zorunlu("BARAJLI") == "Hidrolik"
+    assert kaynak_esle_zorunlu("AKARSU") == "Hidrolik"
+
+
+def test_t2_oku_tek_donem_3_kolonlu_format_dogru_okunur() -> None:
+    """Bulgu O'nun regresyon pini — 2016'nın T2'si dönemler-arası
+    karşılaştırma DEĞİL, tek-dönem: Kaynak Türü | Üretim Miktarı (MWh) |
+    Oran (%). t2_oku() hedef_ay_yil parametresi ALMAZ (diğer yılların
+    imzasından kasıtlı olarak farklı)."""
+    satirlar = [
+        ["Kaynak Türü", "Üretim Miktarı (MWh)", "Oran (%)"],
+        ["Doğal Gaz", "100,0", "50,0"],
+        ["Rüzgar", "100,0", "50,0"],
+        ["Genel Toplam", "200,0", "100,0"],
+    ]
+    tbl = _tablo_ekle(satirlar)
+
+    df = t2_oku(tbl, tarih_id=201603)
+
+    assert len(df) == 2
+    assert float(df["uretim_mwh"].sum()) == pytest.approx(200.0)
+
+
+def test_t2_oku_akarsu_ve_barajli_tek_satira_toplanir() -> None:
+    """Bulgu N'in regresyon pini (2016'da â'sız "BARAJLI" etiketiyle)."""
+    satirlar = [
+        ["KAYNAK TÜRÜ", "ÜRETİM (MWh)", "ORAN (%)"],
+        ["AKARSU", "100,0", "40,0"],
+        ["BARAJLI", "50,0", "20,0"],
+        ["Rüzgar", "100,0", "40,0"],
+        ["Genel Toplam", "250,0", "100,0"],
+    ]
+    tbl = _tablo_ekle(satirlar)
+
+    df = t2_oku(tbl, tarih_id=201601)
+
+    hidrolik_satirlari = df[df["kaynak"] == "Hidrolik"]
+    assert len(hidrolik_satirlari) == 1
+    assert hidrolik_satirlari["uretim_mwh"].iloc[0] == pytest.approx(150.0)
+    assert float(df["uretim_mwh"].sum()) == pytest.approx(250.0)
+
+
+def test_t2_oku_uretim_kolonu_bulunamazsa_hata_verir() -> None:
+    satirlar = [
+        ["Kaynak Türü", "Kurulu Güç (MW)", "Oran (%)"],
+        ["Doğal Gaz", "100,0", "100,0"],
+    ]
+    tbl = _tablo_ekle(satirlar)
+
+    with pytest.raises(ValueError, match="Üretim"):
+        t2_oku(tbl, tarih_id=201601)
+
+
+def test_t2_oku_genel_toplam_uyusmazliginda_hata_verir() -> None:
+    satirlar = [
+        ["Kaynak Türü", "Üretim Miktarı (MWh)", "Oran (%)"],
+        ["Hidrolik", "100,0", "100,0"],
+        ["Genel Toplam", "999,0", "100,0"],
+    ]
+    tbl = _tablo_ekle(satirlar)
+
+    with pytest.raises(ValueError, match="Genel"):
+        t2_oku(tbl, tarih_id=201601)
+
+
+def test_t3_oku_iki_sutunlu_blok_birlesir_ve_eksik_il_sifirlanir() -> None:
+    baslik = ["İLLER", "ÜRETİM (MWh)", "ORAN (%)", "İLLER", "ÜRETİM (MWh)", "ORAN (%)"]
+    satirlar = [baslik]
+    diger_iller = [il for il in TUM_ILLER if il != "Kilis"]
+    assert len(diger_iller) == 80
+    for i in range(0, 80, 2):
+        satirlar.append(
+            [diger_iller[i], "10,0", "1,0", diger_iller[i + 1], "10,0", "1,0"]
+        )
+    satirlar.append(["", "", "", "Genel Toplam", "800,0", "100,0"])
+    tbl = _tablo_ekle(satirlar)
+
+    df = t3_oku(tbl, tarih_id=201601)
+
+    assert len(df) == 81
+    assert df["il_kodu"].nunique() == 81
+    kilis_kodu = next(kod for kod, ad in _IL_ADI_KANONIK.items() if ad == "Kilis")
+    assert df[df["il_kodu"] == kilis_kodu]["uretim_mwh"].eq(0.0).all()
+    assert float(df["uretim_mwh"].sum()) == pytest.approx(800.0)
+
+
+def test_t3_oku_genel_toplam_uyusmazliginda_hata_verir() -> None:
+    baslik = ["İLLER", "ÜRETİM (MWh)", "ORAN (%)", "İLLER", "ÜRETİM (MWh)", "ORAN (%)"]
+    satirlar = [baslik]
+    for i in range(0, 80, 2):
+        satirlar.append([TUM_ILLER[i], "10,0", "1,0", TUM_ILLER[i + 1], "10,0", "1,0"])
+    satirlar.append(["", "", "", "Genel Toplam", "9999,0", "100,0"])
+    tbl = _tablo_ekle(satirlar)
+
+    with pytest.raises(ValueError, match="Genel"):
+        t3_oku(tbl, tarih_id=201601)

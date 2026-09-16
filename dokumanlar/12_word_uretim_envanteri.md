@@ -613,3 +613,73 @@ dışlanmadı — doğrulandı). Disposable postgres:17'de 12/12 ay yüklendi,
    TÜM 12 ayı gerçek dosyaya karşı doğrulanmalı (Bulgu A'nın "numara
    kaybı ay ay değişebiliyor" bulgusunun gösterdiği gibi tek bir ayın
    testi yıl için temsili sayılamaz).
+
+**2016 (T2+T3 Lisanslı) tamamlandı (2026-09-16) — ADIM 4'ün SON yılı:**
+Bulgu O'nun en önemli öngörüsü (tek-dönem 3-kolonlu format) BİREBİR
+doğrulandı. `word_2016.py`'ye BESPOKE bir `t2_oku()` yazıldı (diğer
+yılların `hedef_donem_kolonu_bul()`'a dayanan imzasından kasıtlı olarak
+FARKLI — `hedef_ay_yil` parametresi YOK, tablo zaten tek dönem). Arama
+metni Ocak/Şubat'ın "Lisanslı"sız başlığını da kapsayacak şekilde
+daraltıldı (`icerir=["Elektrik Üretiminin Kaynak/İl Bazında Dağılımı"]`,
+`icermez=["Lisanssız"]`). Bulgu N burada da geçerli: Hidrolik "AKARSU"+
+"BARAJLI" (â'sız kısa biçim, "BARAJLI HİDROLİK" DEĞİL) diye ikiye
+bölünmüş — worker/parser.py'nin kendi "Barajlı" alias'ı zaten tanıdığı
+için YENİ bir takma ad GEREKMEDİ, ama `dict` biriktiricisiyle toplama
+YİNE DE gerekti. Tek YENİ küçük bulgu: T2'nin "Üretim" kolon başlığı ay
+ay büyük/küçük harf değiştiriyor (Haziran/Temmuz/Ağustos/Aralık
+"ÜRETİM (MWh)" tüm-büyük, diğer aylar "Üretim Miktarı (MWh)" title-case)
+— `normalize_label()` ile Türkçe-güvenli karşılaştırmaya geçilerek
+çözüldü. İl satır bütünlüğü (İstanbul-bölünmüş-satır sınıfı sürprizler)
+T2/T3'te GÖRÜLMEDİ — o sınıf sürpriz yalnız T11'e (tüketim) özgüydü,
+üretim tarafında tekrarlamadı; il sayısı ay ay değişti (77-81, established
+Bulgu G) ama `t3_oku()`'nun 0-fill+Genel-Toplam güvencesi zaten bunu
+kapsıyor. Disposable postgres:17 (fresh, tek başına): 12/12 ay yüklendi,
+`mutabakat_uretim.py` **12/12 uyumlu** (Temmuz'daki ~0,0012%'lik T2/T3
+çapraz-tablo farkı established %0,5 toleransın çok altında, sorun DEĞİL).
++7 yeni regresyon testi (`test_word_2016.py`).
+
+## ADIM 4 KAPANIŞI (2026-09-16) — 10 yılın TAMAMI, Word üretim (T2+T3 Lisanslı) parser'ı BİTTİ
+
+**Bulgu tamlığı:** Bu envanterde A'dan O'ya kadar 15 bulgu belgelendi,
+hepsi ya bir karar ile kapatıldı (Bulgu D/L → Karar 4/Bulgu L, Karar 4
+"Lisanssız TÜM Word yılları kapsam dışı"; Bulgu C → kullanılmayacak) ya
+da established bir kod deseniyle çözüldü (Bulgu I/N sınıfları her
+tekrarında AYNI mekanizmayla, YENİ bir tasarım kararı GEREKMEDEN). Açık
+kalan bulgu YOK.
+
+**10 yılın nihai durumu (T2+T3, yalnız Lisanslı — Lisanssız TÜM yıllarda
+Bulgu D/L ile kapsam dışı):**
+
+| Yıl | Format | Özel bulgular | Mutabakat | Test sayısı |
+|---|---|---|---|---|
+| 2025 | Standart (6 kolon) | Bulgu E (T5/T6 hiç yok, kaynak taraması) | 12/12 | 19 |
+| 2024 | Standart | Bulgu I (3 satır başlık) + Bulgu J (202402 T3 stale, kapsam dışı) | 11/12 (202402 beklenen istisna) | 17 |
+| 2023 | Standart | Bulgu K (LPG/Motorin) | 12/12 | 19 |
+| 2022 | Standart | Bulgu L'nin ölçüm yılı (T6 tanım testi) | 12/12 | 17 |
+| 2021 | Standart | Bulgu M (RÜZGÂR, Nisan) | 12/12 | 15 |
+| 2020 | Standart | Sürpriz yok | 12/12 | 12 |
+| 2019 | Standart | Bulgu N (Hidrolik bölünmesi, Ara hariç) | 12/12 | 13 |
+| 2018 | Standart | Bulgu N (TÜM 12 ay) + Bulgu I sınıfı (Tem-Ara) | 12/12 | 15 |
+| 2017 | Standart | Bulgu N (TÜM 12 ay) + Bulgu I sınıfı (yalnız Eki) + Kas/Ara arama ambiguity | 12/12 | 17 |
+| 2016 | **BESPOKE** (tek-dönem, 3 kolon) | Bulgu N ("Barajlı", alias'sız) + Oca/Şub arama farkı + kolon başlığı case-varyansı | 12/12 | 21 |
+
+**Tek disposable'da 10 yılın TAMAMI (120 ay) — tek doğrulama turu
+(2026-09-16, fresh rebuild, sırayla 2016→2025 yüklendi):**
+
+| Metrik | Değer |
+|---|---|
+| Toplam ay (10 yıl × 12 ay) | 120 |
+| `fact_uretim_kaynak_geneli`'ne yüklenen ay | 120/120 |
+| `fact_uretim_il_geneli`'ne yüklenen ay | 119/120 (202402 hariç — Bulgu J, kasıtlı) |
+| `mutabakat_uretim.py` kontrolü — uyumlu | 119/120 |
+| `mutabakat_uretim.py` kontrolü — uyumsuz | 1/120 (202402, `bir_taraf_eksik`, BEKLENEN/belgelenmiş) |
+| Lisanssız (T5/T6) kapsam dışı işaretlenen ay (her iki tablo) | 120/120 |
+| Lisanslı kapsam dışı işaretlenen ay (Bulgu J istisnası) | 1/120 (202402, yalnız `fact_uretim_il_geneli`) |
+| `fact_uretim_kaynak_geneli` toplam satır | 1.393 |
+| `fact_uretim_il_geneli` toplam satır | 9.639 |
+| Aktive edilen (`is_active=true`) batch/satır | **0** (gece-boyu kural — hiçbir script `pipeline.batch_onayla()` çağırmadı, TÜM batch'ler `running`/`is_active=false` — bu KASITLI, aktivasyon canlı backfill turunda AYRI bir adım) |
+
+**Sonuç:** ADIM 4'ün kod/disposable-doğrulama fazı TAMAMEN BİTTİ.
+Canlıya HİÇBİR Word üretim verisi (T2/T3/kapsam-dışı işaretleri) HENÜZ
+UYGULANMADI — bir sonraki adım canlı backfill, kullanıcı onayıyla AYRI
+bir turda (bkz. `09_PROJE_DURUMU.md`'deki ön-uçuş planı).

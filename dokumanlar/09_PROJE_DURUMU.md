@@ -133,15 +133,15 @@ yansıtıldı.**
   BAŞLADI — 2025/2024/2023/2022/2021/2020/2019/2018'in "Excel'e en yakın
   8 yıl" fazı TAMAMLANDI (T2+T3 Lisanslı yüklendi, Lisanssız TÜM Word
   yılları için kapsam dışı — Bulgu D/L, iki açık karar 2024-02/2022-T6
-  sayıyla ölçülüp kapatıldı, bkz. Bulgu I/J/K/L/M/N). 2016-2017 için
-  GENİŞLETİLMİŞ dry-run taraması da BİTTİ (Bulgu O, KOD YAZILMADI) —
-  2016'nın T2'si diğer TÜM yıllardan yapısal olarak FARKLI (tek-dönem
-  3-kolonlu), 4 "yok görünen" ay aslında yok DEĞİL (başlık/YTD-tablo
-  belirsizliği). Ahmet'in önceki onayıyla (2026-09-13) **2017
-  TAMAMLANDI (2026-09-16)** — Bulgu O'nun öngördüğü desenler (Bulgu N +
-  Bulgu I sınıfı + Kasım/Aralık arama ambiguity'si) BİREBİR doğrulandı,
-  YENİ sürpriz YOK. **9 yıl (2025-2017) TAMAMLANDI**, hiçbiri canlıya
-  UYGULANMADI, sıradaki ve SON iş: 2016 (bespoke `t2_oku()`)**
+  sayıyla ölçülüp kapatıldı, bkz. Bulgu I/J/K/L/M/N/O). **ADIM 4'ün
+  TAMAMI (10 yıl, 2025-2016, 120 ay) 2026-09-16'da BİTTİ** — 2016
+  BESPOKE bir `t2_oku()` ile tamamlandı (Bulgu O'nun tek-dönem 3-kolonlu
+  format öngörüsü doğrulandı). Tek disposable'da 120 ayın TEK turda
+  doğrulaması yapıldı: `mutabakat_uretim.py` 119/120 uyumlu (tek istisna
+  202402, BEKLENEN). **Canlıya HİÇBİR Word üretim verisi HENÜZ
+  UYGULANMADI** — sıradaki ve SON iş: CANLI BACKFILL, ön-uçuş planı bu
+  oturumda hazırlandı (aşağıda "CANLI BACKFILL ÖN-UÇUŞ PLANI"), UYGULAMA
+  YOK, Ahmet'in onayı BEKLENİYOR**
   (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
@@ -546,28 +546,138 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı. Disposable: 12/12 ay
     yüklendi, mutabakat **12/12 uyumlu**. +5 test (`test_word_2017.py`).
     Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.25, Sürüm Geçmişi v1.40.
-  - **🏁 9 yıl (2025-2017) TAMAMLANDI — hepsi YALNIZ disposable
-    postgres:17'de, canlıya HİÇBİRİ UYGULANMADI.** Sıradaki ve SON
-    adım: **2016** — Bulgu O'daki T2 farkı (tek-dönem 3-kolonlu format)
-    için AYRI bir `t2_oku()` yazılması ONAYLI (2026-09-13) — bu, "yıl
-    başına ayrı tarif" mimarisine zaten uygun (`word_2016.py` kendi
-    sürprizlerini izole tutmak için var). Diğer yıllarla AYNI desen
-    geçerli: dry-run ZATEN yapıldı (Bulgu O) → yükle → çapraz mutabakat
-    → regresyon testi → doküman → commit → CI. Lisanssız (T5/T6) Bulgu
-    D ile zaten kapsam dışı, o taraf basit. **DUR ve raporla kuralı
-    geçerli kalıyor:** dry-run'da (Bulgu O) görünmeyen YENİ bir yapısal
-    sürpriz çıkarsa (Bulgu O'nun kendi uyarısı: tarama 2016 için yanlış
-    offset — `tbl.rows[2:]` yerine `tbl.rows[1:]` — kullandı, üretim
-    turunda TAM offset'le yeniden taranmalı; önceki Word genişlemesinden
-    bilinen İstanbul-bölünmüş-satır/eksik-il gibi sürprizler üretim
-    tarafında da çıkabilir, il satır bütünlüğü yükleme sırasında AYRICA
-    kontrol edilmeli).
-  - 2016 bitince (bu, "10 yılın TAMAMI" demek): **CANLI BACKFILL tek
-    seferde, Ahmet'in onayıyla.** Bu güne kadar canlıya HİÇBİR Word
-    üretim verisi UYGULANMADI, yalnız disposable postgres:17'de
-    doğrulandı — 2024-02/2022-T6 kararları zaten yukarıda KAPATILDI,
-    canlıya geçmeden önce başka açık karar YOK. Sonrası Faz 4
-    (Tahminleme) — aşağıda "Faz 4 (Tahminleme)" bölümüne bkz.
+  - **✅ 2016 TAMAMLANDI (2026-09-16) — ADIM 4'ün 10 yılı da BİTTİ:**
+    Bulgu O'nun en önemli öngörüsü (T2'nin tek-dönem 3-kolonlu formatı,
+    diğer yılların `hedef_donem_kolonu_bul()` mantığı işlemiyor) BİREBİR
+    doğrulandı — BESPOKE bir `t2_oku()` yazıldı (`hedef_ay_yil`
+    parametresi YOK). Bulgu N burada da geçerli ("Barajlı", â'sız kısa
+    biçim — YENİ alias gerekmedi, toplama gerekti). YENİ küçük bulgu:
+    "Üretim" kolon başlığı ay ay case-değişiyor, `normalize_label()` ile
+    çözüldü. Önceki Word genişlemesinden bilinen İstanbul-bölünmüş-
+    satır/Adana-kayıp sınıfı sürprizler T2/T3'te (üretim) AYRICA kontrol
+    edildi — GÖRÜLMEDİ (yalnız T11'e/tüketime özgüydü). Disposable:
+    12/12 ay yüklendi, mutabakat **12/12 uyumlu**. +7 test
+    (`test_word_2016.py`). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.26,
+    Sürüm Geçmişi v1.41.
+  - **🏁 ADIM 4 KAPANIŞI — 10 yılın TAMAMI (120 ay) tek disposable'da
+    tek turda doğrulandı (2026-09-16):** fresh rebuild, 2016→2025
+    sırasıyla yeniden yüklendi. `mutabakat_uretim.py`: **120 çift
+    kontrol etti, 119 uyumlu, 1 BEKLENEN istisna (202402, `bir_taraf_
+    eksik`, Bulgu J)**. `fact_uretim_kaynak_geneli`: 1.393 satır
+    (120/120 ay). `fact_uretim_il_geneli`: 9.639 satır (119/120 ay).
+    TÜM 120 batch `status='running'`, TÜM fact satırları
+    `is_active=false` (gece-boyu kural — aktivasyon HİÇ çağrılmadı).
+    Bulgu tamlığı doğrulandı: A'dan O'ya 15 bulgu, hepsi kararla
+    kapatıldı ya da established desenle çözüldü, AÇIK bulgu YOK. Tam
+    yıl-yıl özet tablosu `12_word_uretim_envanteri.md`'nin "ADIM 4
+    KAPANIŞI" bölümünde.
+  - **CANLIYA HİÇBİR WORD ÜRETİM VERİSİ HENÜZ UYGULANMADI.** Sıradaki ve
+    SON iş: CANLI BACKFILL — Ahmet'in onayıyla AYRI bir turda. Ön-uçuş
+    planı aşağıda "CANLI BACKFILL ÖN-UÇUŞ PLANI" başlığında — bu turda
+    YALNIZ PLAN yazıldı, UYGULAMA YAPILMADI. Sonrası Faz 4 (Tahminleme)
+    — aşağıda "Faz 4 (Tahminleme)" bölümüne bkz.
+
+### 🚦 CANLI BACKFILL ÖN-UÇUŞ PLANI (2026-09-16, ONAY BEKLİYOR — UYGULANMADI)
+
+**Bu bölüm yalnız PLANDIR. Hiçbir adımı uygulanmadı, canlıya dokunulmadı.
+Ahmet'in AÇIK onayı olmadan hiçbir madde başlatılmamalı.**
+
+**1) Eksik migration var mı?** **HAYIR.** ADIM 4'ün Word üretim
+backfill'i için gereken TÜM şema zaten canlıda: `fact_uretim_kaynak_
+geneli`+`fact_uretim_il_geneli` (migration `20260909_0001`) ve
+`veri_kapsam_disi.fact_tablosu` CHECK genişletmesi (migration
+`20260909_0002`) — ikisi de 2026-09-09'da canlıya UYGULANDI (bkz.
+`10_TEKNIK_MASTER_DOKUMAN.md` v1.25). Bu iki migration'dan SONRA (ADIM
+4'ün TAMAMI boyunca) `supabase/migrations/`'a HİÇBİR yeni dosya
+eklenmedi (`git log -- supabase/migrations/` ile doğrulandı, 30 dosya
+sabit kaldı) — Motorin/LPG gibi yeni kaynak türleri bile ÖNCEDEN var
+olan `dim_kaynak` seed'leriyle (migration `20260819_0007`) çözüldü,
+YENİ migration gerekmedi. **Sonuç: canlı backfill saf VERİ yüklemesi,
+DDL değişikliği YOK.**
+
+**2) Kaç ay/satır yüklenecek, hangi aylar kapsam dışı/aktive edilmeyecek?**
+Disposable'daki 120-ay doğrulama turunun BİREBİR AYNISI canlıda
+tekrarlanacak:
+- **Yüklenecek:** `fact_uretim_kaynak_geneli`'ne 120 ay (2016-01 →
+  2025-12, ~1.393 satır), `fact_uretim_il_geneli`'ne 119 ay (2024-02
+  HARİÇ, ~9.639 satır).
+- **Kapsam dışı (Lisanssız, T5/T6):** 120 ayın TAMAMI, HER İKİ tabloda
+  — Bulgu D/L kararı (`karar_referansi='Bulgu L (2026-09-13, ölçümle
+  doğrulandı)'` veya yıla göre `'Karar 4 genişletildi'`), `nitelik=
+  'lisans_durumu=Lisanssız'`.
+- **Kapsam dışı (Lisanslı, TEK istisna):** 2024-02'nin `fact_uretim_il_
+  geneli` verisi — Bulgu J (`karar_referansi='Bulgu J (2026-09-13, EPDK
+  kaynak belge hatası)'`, `nitelik='lisans_durumu=Lisanslı'`) — T3'ün o
+  ay Ocak'ın birebir kopyası olduğu ÖLÇÜLEREK doğrulandı, T2 (kaynak)
+  sağlam, yalnız T2 yüklenecek.
+- **Aktive EDİLMEYECEK aylar:** hiçbiri otomatik aktive edilmeyecek —
+  aşağıdaki madde 3'e bkz. (mutabakat kontrolü aktivasyondan ÖNCE
+  şart).
+
+**3) Mutabakat kontrolünün aktivasyondan ÖNCE çalışacağının teyidi:**
+`worker/scripts/mutabakat_uretim.py:periyot_aktivasyona_uygun_mu()`
+zaten (ADIM 3 madde 3'te, 2026-09-09'da) canlıda doğrulanmış bir
+mekanizma — `otomatik_onaya_uygun()`/manuel `onayla.py` akışı bu
+fonksiyonu ÇAĞIRMADAN bir (tarih_id, lisans_id) çiftini aktive ETMEZ.
+Backfill script'lerinin KENDİSİ (`word_20XX.py --uretim-geneli`)
+`pipeline.batch_onayla()`'yı HİÇ ÇAĞIRMIYOR (gece-boyu kural, TÜM
+batch'ler bilinçli olarak `running`/`is_active=false` bırakılıyor) —
+yani yükleme adımı ile aktivasyon adımı ZATEN AYRI, aktivasyon YALNIZ
+mutabakat kontrolü 202402 DIŞINDAKİ TÜM aylarda "uyumlu" derse elle/
+ayrı bir adımda tetiklenecek. **Önerilen sıra:** (a) 120 ayı yükle →
+(b) `mutabakat_uretim.py`'yi canlıya karşı çalıştır, disposable'daki
+119/120 sonucunu BİREBİR doğrula → (c) YALNIZ uyumlu aylar için
+aktivasyon (202402 zaten kapsam dışı olduğundan `bir_taraf_eksik`
+durumu aktivasyonu DOĞAL olarak engeller, `periyot_aktivasyona_uygun_
+mu()` onu reddeder).
+
+**4) Geri alma yolu (bir şey ters giderse):** Yükleme adımı (batch
+oluşturma + fact satırları yazma) `running`/`is_active=false` bırakır —
+**bu adım kendiliğinden GERİ ALINABİLİR risk taşımıyor**, çünkü hiçbir
+mevcut canlı sorgu/dashboard `is_active=false` satırları GÖRMEZ (RLS/
+sorgu katmanı zaten yalnız aktif satırları döndürüyor — ADIM 3'ten beri
+established davranış). Eğer yükleme YARIDA kalırsa: (a) o ayın batch'i
+`running` kalır, sonraki koşu `[ATLA] ... zaten işlenmiş` diyerek
+GÜVENLE atlar (idempotent, established pattern — TÜM `word_20XX.py`
+script'lerinde `ingestion_batch` üzerinde `source_period`+
+`parser_version` kontrolü var); (b) eğer bir batch YANLIŞ veri içeriyor
+tespit edilirse, aktivasyon TEK bir transaction içinde yapıldığından
+(`pipeline.batch_onayla()`, ADIM 3'te canlıda doğrulanmış davranış) HENÜZ
+aktive edilmemiş satırlar zaten "canlı görünürlükte" DEĞİL — düzeltme
+yalnız o batch'i `failed` işaretleyip yeniden çalıştırmak. **Aktivasyon
+SONRASI bir sorun bulunursa** (nadir, çünkü mutabakat+kapsam-dışı
+kontrolleri önceden koşuyor): `is_active=false` yaparak GERİ ALINABİLİR
+— şema `ON CONFLICT`/`is_active` sütunu üzerinden çalışıyor, DELETE
+GEREKMİYOR (established pattern, ADIM 3 madde 4'ün canlı uygulamasında
+KULLANILMADI ama mekanizma migration `20260909_0001`'de zaten mevcut).
+
+**5) Kilit riski — Streamlit bağlantısı ön kontrolü:** 2026-09-07'de
+`C4` migration'ı (`20260907_0001`), `app_dashboard_service` rolüyle
+Supavisor üzerinden 3+ saattir "idle in transaction" kalmış TERK
+EDİLMİŞ bir Streamlit oturumunun `job_status` üzerindeki kilidi yüzünden
+`QueryCanceled: statement timeout` ile durmuştu (bkz.
+`06_canli_veri_operasyon_gunlugu.md` 2026-09-07 kaydı) — bağlantı
+yalnız salt-okunur bir SELECT çalıştırdığı için `pg_terminate_backend()`
+ile güvenle sonlandırılmıştı. **Backfill YALNIZ veri yazıyor (DDL/ALTER
+TABLE YOK), o yüzden AYNI sınıf lock-timeout riski DAHA DÜŞÜK** ama
+YİNE DE ön kontrol önerilir: backfill'e başlamadan önce
+```sql
+SELECT pid, usename, state, state_change, query
+FROM pg_stat_activity
+WHERE state = 'idle in transaction' AND state_change < now() - interval '10 minutes';
+```
+ile uzun süredir asılı kalmış bağlantı VAR MI kontrol edilmeli — varsa,
+2026-09-07'deki AYNI karar kuralı uygulanır (yalnız salt-okunur/eski bir
+oturumsa `pg_terminate_backend()` ile güvenle sonlandırılır, YAZMA
+işlemi yapan bir bağlantıysa DOKUNULMAZ, araştırılır).
+
+**Özet — canlı backfill'in sırası (onay SONRASI, bu turun kapsamı
+DIŞINDA):** ön kontrol (madde 5) → 120 ayı yükle (madde 2) →
+`mutabakat_uretim.py`'yi canlıya karşı çalıştır, disposable'daki 119/120
+sonucunu doğrula (madde 3) → yalnız uyumlu aylar için aktivasyon →
+canlı KPI-02/03/06/07'nin Word yılları için de doğru değer ürettiğini
+spot-check et (ADIM 5'in wiring'i zaten `tarih_id` parametrik, ekstra
+kod GEREKMEZ) → `09_PROJE_DURUMU.md`/ops log'a sonucu yaz.
   - **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatan notlar
     (hâlâ geçerli):**
   - `lisans_id` çözümü: **DOĞRULANDI, 2025 için ÇALIŞTI** — `t2_oku()`/

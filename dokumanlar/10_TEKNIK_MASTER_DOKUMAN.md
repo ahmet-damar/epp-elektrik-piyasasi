@@ -88,6 +88,7 @@ her yeni rakam için geçerlidir.
 | v1.38 | 2026-09-13 | 2016-2017 GENİŞLETİLMİŞ dry-run taraması — §5.24, `12_word_uretim_envanteri.md` Bulgu O. KOD YAZILMADI, yalnız envanter. En önemli bulgu: 2016'nın T2'si TÜM diğer yıllardan (2017-2025) YAPISAL OLARAK FARKLI — tek-dönem 3-kolonlu format, `hedef_donem_kolonu_bul()` kullanılamaz, bespoke `t2_oku()` gerekir. Görünüşte "tablo yok" olan 4 ay (2016 Oca/Şub, 2017 Kas/Ara) araştırıldı, İKİSİ DE gerçek yokluk DEĞİL (başlık metni/YTD-tablo belirsizliği). Bulgu N her iki yılda da var, Bulgu I sınıfı yalnız 2017 Ekim'de | Kod değişikliği YOK, yalnız `12_word_uretim_envanteri.md`/`10_TEKNIK_MASTER_DOKUMAN.md` güncellendi. Karar bekliyor — 2016-2017'nin uygulaması ayrı bir turda |
 | v1.39 | 2026-09-13 | **Gün sonu kapanışı.** Ahmet, 2016-2017'nin uygulamasını ÖNCEDEN ONAYLADI — bir sonraki oturum karar beklemeden başlayabilir: Bulgu O'daki 2016 T2 farkı (tek-dönem 3-kolonlu format) için AYRI bir `t2_oku()` yazılması onaylandı ("yıl başına ayrı tarif" mimarisine zaten uygun), diğer yıllarla AYNI desen (dry-run zaten yapıldı → yükle → mutabakat → test → doküman → commit → CI), Lisanssız Bulgu D ile zaten kapsam dışı. Bugün kapananlar: 2019 (`73a3e7f`), 2018 (`452c8e0`), 2016-2017 dry-run/Bulgu O (`0b3dcf1`); 2024-02 kararı yeniden CANLI doğrulandı, bekleyen bir şey yoktu | Kod değişikliği YOK, yalnız dokümantasyon (kapanış). ADIM 4: 10 yılın 8'i TAMAMLANDI (2025→2018), kalan 2016-2017 tek engel — ONAYLI. Canlıya Word üretim verisinden HİÇBİRİ uygulanmadı (yalnız disposable postgres:17), 10 yıl bitince TEK SEFERDE + Ahmet onayıyla yapılacak |
 | v1.40 | 2026-09-16 | ADIM 4 — 2017 (T2+T3 Lisanslı) tamamlandı — §5.25. Bulgu O'nun öngördüğü İKİ desen BİREBİR doğrulandı, YENİ sürpriz YOK: Bulgu N (12 ayın TAMAMINDA Hidrolik ikiye bölünmüş) + Bulgu I sınıfı (yalnız Ekim'de bölünmüş başlık). Kasım/Aralık'ın T2/T3 arama ambiguity'si (YTD kümülatif tablo) `icermez=["Ocak-"]` ile çözüldü. Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı | Disposable postgres:17 (fresh, tek başına): 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu. +5 test (`test_word_2017.py`). ADIM 4: 2025-2017 (9 yıl) TAMAMLANDI. Sıradaki ve SON adım: 2016 (bespoke `t2_oku()` gerekir) |
+| v1.41 | 2026-09-16 | **ADIM 4'ün 10 yılı da TAMAMLANDI** — §5.26. 2016 (T2+T3, BESPOKE): Bulgu O'nun en önemli öngörüsü (tek-dönem 3-kolonlu format, `hedef_donem_kolonu_bul()` kullanılamaz) doğrulandı — bespoke `t2_oku()` yazıldı. Bulgu N burada da geçerli ("Barajlı", alias gerekmedi). YENİ küçük bulgu: "Üretim" kolon başlığı ay ay case-değişiyor, `normalize_label()` ile çözüldü. Ardından TEK fresh disposable'da 10 yılın TAMAMI (120 ay) tek turda doğrulandı | Disposable postgres:17: 2016 tek başına 12/12 uyumlu, +7 test (`test_word_2016.py`). 10 yıl BİRLİKTE: `mutabakat_uretim.py` 120 çift kontrol etti, 119 uyumlu + 1 BEKLENEN istisna (202402). `fact_uretim_kaynak_geneli` 1.393 satır (120/120 ay), `fact_uretim_il_geneli` 9.639 satır (119/120 ay) — TÜMÜ `is_active=false` (gece-boyu kural). Bulgu tamlığı A→O (15 bulgu) doğrulandı, açık bulgu YOK. Canlıya HİÇBİR Word üretim verisi UYGULANMADI — ön-uçuş planı `09_PROJE_DURUMU.md`'ye yazıldı, uygulama bu turun kapsamı DIŞINDA |
 
 ---
 
@@ -1203,6 +1204,39 @@ yeni test (`test_word_2017.py`).
 **ADIM 4 durumu (güncellendi):** 2025-2017 (9 yıl) TAMAMLANDI, YALNIZ
 disposable, canlıya HİÇBİRİ uygulanmadı. Sıradaki ve SON adım: 2016
 (bespoke `t2_oku()` gerekir, Bulgu O §2).
+
+### 5.26 ADIM 4 — 2016 (T2+T3 Lisanslı, BESPOKE) tamamlandı — ADIM 4'ün 10 yılı da BİTTİ (2026-09-16)
+
+Bulgu O'nun en önemli öngörüsü BİREBİR doğrulandı: 2016'nın T2'si TÜM
+diğer yıllardan (2017-2025) yapısal olarak farklı — tek-dönem 3-kolonlu
+format (`Kaynak Türü | Üretim Miktarı (MWh) | Oran (%)`), yıl
+karşılaştırması YOK. `word_2016.py`'ye BESPOKE bir `t2_oku()` yazıldı
+(diğer yılların imzasından kasıtlı FARKLI — `hedef_ay_yil` parametresi
+YOK). Arama metni Ocak/Şubat'ın "Lisanslı"sız başlığını kapsayacak
+şekilde daraltıldı. Bulgu N burada da geçerli (Hidrolik "AKARSU"+
+"BARAJLI" — â'sız kısa biçim, YENİ alias GEREKMEDİ ama toplama gerekti).
+Tek YENİ küçük bulgu: "Üretim" kolon başlığının ay ay büyük/küçük harf
+değişmesi — `normalize_label()` ile çözüldü. Önceki Word genişlemesinden
+bilinen İstanbul-bölünmüş-satır/Adana-kayıp sınıfı sürprizler T2/T3'te
+(üretim) GÖRÜLMEDİ — yalnız T11'e (tüketim) özgüydü. Disposable
+postgres:17 (fresh, tek başına): 12/12 ay yüklendi, `mutabakat_uretim.py`
+**12/12 uyumlu**. +7 yeni test (`test_word_2016.py`).
+
+**ADIM 4'ün 10 yılı da TAMAMLANDI (2025-2016).** Ardından TEK bir fresh
+disposable'da 10 yılın TAMAMI (120 ay) sırayla yeniden yüklenip TEK bir
+doğrulama turu yapıldı: `mutabakat_uretim.py` **120 çift kontrol etti,
+119 uyumlu, 1 uyumsuz (202402, `bir_taraf_eksik`, BEKLENEN/belgelenmiş)**.
+`fact_uretim_kaynak_geneli`: 1.393 satır (120/120 ay), `fact_uretim_il_
+geneli`: 9.639 satır (119/120 ay, 202402 hariç). TÜM batch'ler `status=
+'running'`, TÜM fact satırları `is_active=false` (gece-boyu kural —
+hiçbir script `batch_onayla()` çağırmadı). Tam bulgu envanteri (A→O,
+15 bulgu) ve yıl-yıl özet tablosu `12_word_uretim_envanteri.md`'nin
+"ADIM 4 KAPANIŞI" bölümünde.
+
+**Canlıya HİÇBİR Word üretim verisi HENÜZ UYGULANMADI** — bir sonraki
+adım canlı backfill, Ahmet'in onayıyla AYRI bir turda. Ön-uçuş planı
+`09_PROJE_DURUMU.md`'ye yazıldı (uygulama YOK, yalnız plan — bu turun
+kapsamı dışında).
 
 ---
 
