@@ -575,6 +575,19 @@ KORUYOR, yeniden ölçüm gerekmedi (kullanıcının önceden verdiği kural).
 | T3 il sayısı değişimi | Var (77-80), established desen | Var (76-80), established desen |
 | Lisanssız (T5/T6) | Bulgu D ile zaten kapsam dışı | Bulgu D ile zaten kapsam dışı |
 
+**2017 (T2+T3 Lisanslı) tamamlandı (2026-09-16):** Bulgu O'nun öngörüleri
+BİREBİR doğrulandı, YENİ bir sürpriz çıkmadı. `_KAYNAK_TAKMA_ADLAR`'a
+`{"BARAJLI HİDROLİK": "Hidrolik"}` eklendi (Bulgu N, 12 ayın TAMAMINDA
+`dict`-biriktiricisiyle toplanıyor — 2018 ile AYNI, Aralık'ta bile
+tekleşmiyor). Ekim'in 3-satırlık bölünmüş başlığı (Bulgu I sınıfı)
+established dinamik `veri_baslangic` while-loop'uyla sorunsuz geçti.
+Kasım/Aralık'ın T2/T3 arama ambiguity'si `icermez=["Ocak-"]` ile
+çözüldü (YTD kümülatif tablo dışlandı, Ocak'ın kendi ayı yanlışlıkla
+dışlanmadı — doğrulandı). Disposable postgres:17'de 12/12 ay yüklendi,
+`mutabakat_uretim.py` **12/12 uyumlu**. +5 yeni regresyon testi
+(`test_word_2017.py`: alias eşlemesi, `t2_oku`'nun toplama davranışı,
+3-satırlık bölünmüş başlık, Genel-Toplam-uyuşmazlığı × 2).
+
 ## Özet — ADIM 4 (Word üretim backfill'i) için önerilen sıra (öneri, karar DEĞİL)
 
 1. Bulgu E'yi çöz: 2023-Aralık + 2024/2025'in TAM tablo listesini (filtre

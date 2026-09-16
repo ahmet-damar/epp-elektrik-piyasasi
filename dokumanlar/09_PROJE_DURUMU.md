@@ -137,11 +137,11 @@ yansıtıldı.**
   GENİŞLETİLMİŞ dry-run taraması da BİTTİ (Bulgu O, KOD YAZILMADI) —
   2016'nın T2'si diğer TÜM yıllardan yapısal olarak FARKLI (tek-dönem
   3-kolonlu), 4 "yok görünen" ay aslında yok DEĞİL (başlık/YTD-tablo
-  belirsizliği). **2016-2017'nin uygulaması Ahmet tarafından ÖNCEDEN
-  ONAYLANDI (2026-09-13) — bir sonraki oturum karar beklemeden
-  başlayabilir** (2016 için bespoke `t2_oku()`, established desen: dry-
-  run zaten yapıldı → yükle → mutabakat → test → doküman → commit → CI).
-  Hiçbir yıl canlıya UYGULANMADI, sıradaki iş: 2016-2017 uygulaması**
+  belirsizliği). Ahmet'in önceki onayıyla (2026-09-13) **2017
+  TAMAMLANDI (2026-09-16)** — Bulgu O'nun öngördüğü desenler (Bulgu N +
+  Bulgu I sınıfı + Kasım/Aralık arama ambiguity'si) BİREBİR doğrulandı,
+  YENİ sürpriz YOK. **9 yıl (2025-2017) TAMAMLANDI**, hiçbiri canlıya
+  UYGULANMADI, sıradaki ve SON iş: 2016 (bespoke `t2_oku()`)**
   (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
@@ -534,20 +534,36 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
       Lisanssız (T5/T6) zaten Bulgu D ile kapsam dışı.
     - Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.24, Sürüm Geçmişi v1.38,
       `12_word_uretim_envanteri.md` Bulgu O (özet tablosu dahil).
-  - **✅ 2016-2017 uygulaması ÖNCEDEN ONAYLANDI (2026-09-13) — SIRADAKİ
-    İŞ, karar beklemiyor:** Bulgu O'daki 2016 T2 farkı (tek-dönem
-    3-kolonlu format) için AYRI bir `t2_oku()` yazılması onaylandı —
-    bu, "yıl başına ayrı tarif" mimarisine zaten uygun (`word_2016.py`
-    kendi sürprizlerini izole tutmak için var). Diğer yıllarla AYNI
-    desen geçerli: dry-run ZATEN yapıldı (Bulgu O) → yükle → çapraz
-    mutabakat → regresyon testi → doküman → commit → CI. Lisanssız
-    (T5/T6) Bulgu D ile zaten kapsam dışı, o taraf basit. **DUR ve
-    raporla kuralı geçerli kalıyor:** dry-run'da (Bulgu O) görünmeyen
-    YENİ bir yapısal sürpriz çıkarsa (Bulgu O'nun kendi uyarısı: tarama
-    2016 için yanlış offset — `tbl.rows[2:]` yerine `tbl.rows[1:]` —
-    kullandı, üretim turunda TAM offset'le yeniden taranmalı).
-  - 2016-2017 bitince (bu, "10 yılın TAMAMI" demek): **CANLI BACKFILL
-    tek seferde, Ahmet'in onayıyla.** Bu güne kadar canlıya HİÇBİR Word
+  - **✅ 2017 TAMAMLANDI (2026-09-16):** Ahmet'in önceki onayıyla
+    (2026-09-13) 2016-2017'ye başlandı, önce 2017 (az sürprizli).
+    T2+T3 (Lisanslı) yüklendi, Bulgu O'nun ÖNGÖRDÜĞÜ desenler BİREBİR
+    doğrulandı — YENİ sürpriz YOK: Bulgu N (12 ayın TAMAMINDA Hidrolik
+    "AKARSU"+"BARAJLI HİDROLİK" ikiye bölünmüş, alias+toplama ile
+    çözüldü), Bulgu I sınıfı (yalnız Ekim'de bölünmüş başlık,
+    established while-loop çözdü), Kasım/Aralık arama ambiguity'si
+    (EPDK'nın YTD kümülatif tablosu, `icermez=["Ocak-"]` ile çözüldü —
+    Ocak'ın kendi ayı yanlışlıkla dışlanmadığı doğrulandı). Lisanssız
+    (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı. Disposable: 12/12 ay
+    yüklendi, mutabakat **12/12 uyumlu**. +5 test (`test_word_2017.py`).
+    Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.25, Sürüm Geçmişi v1.40.
+  - **🏁 9 yıl (2025-2017) TAMAMLANDI — hepsi YALNIZ disposable
+    postgres:17'de, canlıya HİÇBİRİ UYGULANMADI.** Sıradaki ve SON
+    adım: **2016** — Bulgu O'daki T2 farkı (tek-dönem 3-kolonlu format)
+    için AYRI bir `t2_oku()` yazılması ONAYLI (2026-09-13) — bu, "yıl
+    başına ayrı tarif" mimarisine zaten uygun (`word_2016.py` kendi
+    sürprizlerini izole tutmak için var). Diğer yıllarla AYNI desen
+    geçerli: dry-run ZATEN yapıldı (Bulgu O) → yükle → çapraz mutabakat
+    → regresyon testi → doküman → commit → CI. Lisanssız (T5/T6) Bulgu
+    D ile zaten kapsam dışı, o taraf basit. **DUR ve raporla kuralı
+    geçerli kalıyor:** dry-run'da (Bulgu O) görünmeyen YENİ bir yapısal
+    sürpriz çıkarsa (Bulgu O'nun kendi uyarısı: tarama 2016 için yanlış
+    offset — `tbl.rows[2:]` yerine `tbl.rows[1:]` — kullandı, üretim
+    turunda TAM offset'le yeniden taranmalı; önceki Word genişlemesinden
+    bilinen İstanbul-bölünmüş-satır/eksik-il gibi sürprizler üretim
+    tarafında da çıkabilir, il satır bütünlüğü yükleme sırasında AYRICA
+    kontrol edilmeli).
+  - 2016 bitince (bu, "10 yılın TAMAMI" demek): **CANLI BACKFILL tek
+    seferde, Ahmet'in onayıyla.** Bu güne kadar canlıya HİÇBİR Word
     üretim verisi UYGULANMADI, yalnız disposable postgres:17'de
     doğrulandı — 2024-02/2022-T6 kararları zaten yukarıda KAPATILDI,
     canlıya geçmeden önce başka açık karar YOK. Sonrası Faz 4

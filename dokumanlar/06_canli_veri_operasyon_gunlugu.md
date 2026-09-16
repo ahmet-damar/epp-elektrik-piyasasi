@@ -2227,3 +2227,46 @@ Sonrası Faz 4 (Tahminleme), kapsam kararı bekliyor.
 
 Detay: `10_TEKNIK_MASTER_DOKUMAN.md` Sürüm Geçmişi v1.39,
 `09_PROJE_DURUMU.md` "SONRAKİ OTURUM DEVAM NOKTASI" güncellendi.
+
+## 2026-09-16 — ADIM 4: 2017 (T2+T3 Lisanslı) tamamlandı, Bulgu O doğrulandı
+
+Ahmet'in önceki onayıyla (2026-09-13) ADIM 4'ün son iki yılına başlandı
+— sıra 2017 (az sürprizli), sonra 2016 (bespoke). `word_2017.py`'ye
+`t2_oku()`/`t3_oku()`/`isle_ay_uretim_geneli()` eklendi.
+
+Bulgu O'nun 2026-09-13'te ÖNGÖRDÜĞÜ desenler üretim turunda BİREBİR
+doğrulandı — YENİ bir sürpriz ÇIKMADI:
+
+- **Bulgu N:** 12 ayın TAMAMINDA Hidrolik "AKARSU"+"BARAJLI HİDROLİK"
+  diye ikiye bölünmüş (2018 ile AYNI, Aralık'ta bile tekleşmiyor) —
+  `_KAYNAK_TAKMA_ADLAR`'a `{"BARAJLI HİDROLİK": "Hidrolik"}` eklendi,
+  `t2_oku()` `dict` biriktiricisiyle topluyor.
+- **Bulgu I sınıfı:** yalnız Ekim'de 3-satırlık bölünmüş başlık —
+  established dinamik `veri_baslangic` while-loop'u ek kod gerekmeden
+  çözdü.
+- **Kasım/Aralık arama ambiguity'si:** Bulgu O'nun bulduğu gibi EPDK bu
+  iki ayda AYRICA bir YTD kümülatif karşılaştırma tablosu ekliyor, AYNI
+  arama alt-dizisini taşıyor — `tek_aday_bul()`'a `icermez=["Ocak-"]`
+  eklendi. Dry-run'da doğrulandı: Ocak'ın KENDİ ayı ("Ocak 2017
+  Döneminde", tire YOK) yanlışlıkla dışlanmadı, Kasım/Aralık'ın YTD
+  tablosu ("Ocak-Kasım"/"Ocak-Aralık", tire VAR) doğru dışlandı.
+
+Disposable postgres:17 (fresh, tek başına): 12 ayın tamamı yüklendi,
+her ay `[KAPSAM DIŞI] Lisanssız (T5/T6) her iki tabloda da işaretlendi
+(Bulgu L).` bastı. `mutabakat_uretim.py`: `Kontrol edilen (tarih_id,
+lisans_id) çifti: 12 / Uyumlu: 12, uyumsuz batch: 0`.
+
++5 regresyon testi (`test_word_2017.py`): alias eşlemesi, `t2_oku`'nun
+toplama davranışı, 3-satırlık bölünmüş başlık, her iki fonksiyonun
+Genel-Toplam-uyuşmazlığı senaryosu. `ruff format`/`ruff check`/`mypy`
+temiz, `bandit -r worker/scripts/word_2017.py` sıfır bulgu. Tam
+`worker/tests` (gerçek disposable'a karşı, 346 test): 345 geçti, yalnız
+`test_auth_integration.py` düştü (boş `fact_tuketim` — beklenen,
+2017'den bağımsız).
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.25, Sürüm Geçmişi v1.40,
+`12_word_uretim_envanteri.md`'nin Bulgu O sonrası "2017 tamamlandı" notu.
+
+**ADIM 4 durumu:** 2025-2017 (9 yıl) TAMAMLANDI, YALNIZ disposable,
+canlıya HİÇBİRİ uygulanmadı. Sıradaki ve SON adım: 2016 (bespoke
+`t2_oku()` — Bulgu O §2, tek-dönem 3-kolonlu format).

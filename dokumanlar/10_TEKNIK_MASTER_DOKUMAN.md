@@ -87,6 +87,7 @@ her yeni rakam için geçerlidir.
 | v1.37 | 2026-09-13 | ADIM 4 — 2018 (T2+T3 Lisanslı) tamamlandı — §5.23. İki desen, ikisi de bilinen sınıflardan: Bulgu I sınıfı (Temmuz-Aralık'ın T2'si 3-satırlık bölünmüş başlık) ve Bulgu N (12 ayın TAMAMINDA — Aralık dahil — Hidrolik "AKARSU"+"BARAJLI HİDROLİK" ikiye bölünmüş). T3'ün il sayısı ay ay değişiyor (78/79/80, established Bulgu G). Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı | Disposable postgres:17 (fresh, tek başına — sequence-drift kontaminasyonunu önlemek için): 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu. +4 test (`test_word_2018.py`). ADIM 4'ün "Excel'e en yakın 8 yıl" fazı (2025-2018) TAMAMLANDI, hepsi YALNIZ disposable. Sıradaki adım: 2016-2017 için GENİŞLETİLMİŞ dry-run (kod YAZILMADAN) |
 | v1.38 | 2026-09-13 | 2016-2017 GENİŞLETİLMİŞ dry-run taraması — §5.24, `12_word_uretim_envanteri.md` Bulgu O. KOD YAZILMADI, yalnız envanter. En önemli bulgu: 2016'nın T2'si TÜM diğer yıllardan (2017-2025) YAPISAL OLARAK FARKLI — tek-dönem 3-kolonlu format, `hedef_donem_kolonu_bul()` kullanılamaz, bespoke `t2_oku()` gerekir. Görünüşte "tablo yok" olan 4 ay (2016 Oca/Şub, 2017 Kas/Ara) araştırıldı, İKİSİ DE gerçek yokluk DEĞİL (başlık metni/YTD-tablo belirsizliği). Bulgu N her iki yılda da var, Bulgu I sınıfı yalnız 2017 Ekim'de | Kod değişikliği YOK, yalnız `12_word_uretim_envanteri.md`/`10_TEKNIK_MASTER_DOKUMAN.md` güncellendi. Karar bekliyor — 2016-2017'nin uygulaması ayrı bir turda |
 | v1.39 | 2026-09-13 | **Gün sonu kapanışı.** Ahmet, 2016-2017'nin uygulamasını ÖNCEDEN ONAYLADI — bir sonraki oturum karar beklemeden başlayabilir: Bulgu O'daki 2016 T2 farkı (tek-dönem 3-kolonlu format) için AYRI bir `t2_oku()` yazılması onaylandı ("yıl başına ayrı tarif" mimarisine zaten uygun), diğer yıllarla AYNI desen (dry-run zaten yapıldı → yükle → mutabakat → test → doküman → commit → CI), Lisanssız Bulgu D ile zaten kapsam dışı. Bugün kapananlar: 2019 (`73a3e7f`), 2018 (`452c8e0`), 2016-2017 dry-run/Bulgu O (`0b3dcf1`); 2024-02 kararı yeniden CANLI doğrulandı, bekleyen bir şey yoktu | Kod değişikliği YOK, yalnız dokümantasyon (kapanış). ADIM 4: 10 yılın 8'i TAMAMLANDI (2025→2018), kalan 2016-2017 tek engel — ONAYLI. Canlıya Word üretim verisinden HİÇBİRİ uygulanmadı (yalnız disposable postgres:17), 10 yıl bitince TEK SEFERDE + Ahmet onayıyla yapılacak |
+| v1.40 | 2026-09-16 | ADIM 4 — 2017 (T2+T3 Lisanslı) tamamlandı — §5.25. Bulgu O'nun öngördüğü İKİ desen BİREBİR doğrulandı, YENİ sürpriz YOK: Bulgu N (12 ayın TAMAMINDA Hidrolik ikiye bölünmüş) + Bulgu I sınıfı (yalnız Ekim'de bölünmüş başlık). Kasım/Aralık'ın T2/T3 arama ambiguity'si (YTD kümülatif tablo) `icermez=["Ocak-"]` ile çözüldü. Lisanssız (T5/T6) Bulgu L kararıyla TÜM yıl kapsam dışı | Disposable postgres:17 (fresh, tek başına): 12/12 ay yüklendi, `mutabakat_uretim.py` 12/12 uyumlu. +5 test (`test_word_2017.py`). ADIM 4: 2025-2017 (9 yıl) TAMAMLANDI. Sıradaki ve SON adım: 2016 (bespoke `t2_oku()` gerekir) |
 
 ---
 
@@ -1182,6 +1183,26 @@ envanteri.md` Bulgu O. Özet:
 
 **Karar bekliyor, uygulama YAPILMADI** — 2016-2017 ayrı bir turda
 kararlarla birlikte uygulanacak.
+
+### 5.25 ADIM 4 — 2017 (T2+T3 Lisanslı) tamamlandı, Bulgu O'nun öngörüleri doğrulandı (2026-09-16)
+
+Ahmet'in önceki onayıyla (2026-09-13) — 2017 önce, 2016 sonra. `word_
+2017.py`'ye `t2_oku()`/`t3_oku()`/`isle_ay_uretim_geneli()` eklendi.
+Bulgu O'nun ÖNGÖRDÜĞÜ İKİ desen BİREBİR doğrulandı, YENİ bir sürpriz
+YOK: (1) Bulgu N — 12 ayın TAMAMINDA Hidrolik "AKARSU"+"BARAJLI
+HİDROLİK" ikiye bölünmüş, `_KAYNAK_TAKMA_ADLAR`'a alias eklendi + `dict`
+biriktiricisiyle toplandı; (2) Bulgu I sınıfı — yalnız Ekim'de 3-satırlık
+bölünmüş başlık, established while-loop çözdü. Ayrıca Bulgu O'nun
+belirlediği Kasım/Aralık T2/T3 arama ambiguity'si (EPDK'nın eklediği YTD
+kümülatif tablo) `icermez=["Ocak-"]` ile çözüldü — Ocak'ın kendi ayı
+yanlışlıkla dışlanmadığı doğrulandı. Lisanssız (T5/T6) Bulgu L
+kararıyla TÜM yıl kapsam dışı. Disposable postgres:17 (fresh, tek
+başına): 12/12 ay yüklendi, `mutabakat_uretim.py` **12/12 uyumlu**. +5
+yeni test (`test_word_2017.py`).
+
+**ADIM 4 durumu (güncellendi):** 2025-2017 (9 yıl) TAMAMLANDI, YALNIZ
+disposable, canlıya HİÇBİRİ uygulanmadı. Sıradaki ve SON adım: 2016
+(bespoke `t2_oku()` gerekir, Bulgu O §2).
 
 ---
 
