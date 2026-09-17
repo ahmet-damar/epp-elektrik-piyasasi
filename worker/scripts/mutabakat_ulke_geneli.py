@@ -170,6 +170,57 @@ def mutabakat_kontrol_et(
     return uyumsuz_batch_idler, detaylar
 
 
+def il_kardinalite_kontrol_et(
+    conn: psycopg.Connection, *, beklenen_il_sayisi: int = 81
+) -> list[dict]:
+    """`mutabakat_kontrol_et()`in YAKALAYAMADIĞI bir hata sınıfını
+    hedefleyen, DEĞER kontrolünün YANINA eklenen (YERİNE DEĞİL) YENİ bir
+    kontrol (2026-09-17, doğrulama turu — kapsam raporundaki Madde 2/3).
+
+    **Neden gerekli — ÖLÇÜLEREK doğrulandı (2023-01/02, Adıyaman ve
+    Kahramanmaraş):** EPDK'nın kendi kaynak belgesi, 06/02/2023
+    depreminden etkilenen bu iki ilin dağıtım şirketi (Akedaş) mücbir
+    sebep bildirimi yaptığından T11 tablosunda bu illerin 4 tüketici
+    grubu (Sanayi hariç) hücrelerini BOŞ bırakmıştı — parser hatası
+    DEĞİL, kaynakta GERÇEK bir yokluk. Ama T11'in kendi "Genel Toplam"
+    satırı da (fact_tuketim_ulke_geneli'nin kaynağı) AYNI boş hücrelerden
+    hesaplandığından, il-toplamı (79/81 il) ile ülke-geneli DEĞERİ
+    neredeyse BİREBİR örtüşüyor (canlıda ölçülen fark: 0,00-0,05 MWh,
+    ~20 milyon MWh'lik bir tabanda) — `mutabakat_kontrol_et()`in
+    `tolerans_oran` NE KADAR SIKI olursa olsun bu YAKALANAMAZ, çünkü
+    KARŞILAŞTIRILAN İKİ DEĞER DE AYNI eksik kaynaktan türüyor. Toleransı
+    daraltmak yuvarlama gürültüsünü geri getirir ve bu sınıf hatayı YİNE
+    yakalamaz — asıl ihtiyaç DEĞER değil KARDİNALİTE (kaç il katkı
+    verdi) kontrolüdür.
+
+    Döner: her (tarih_id, grup) için `beklenen_il_sayisi`'nden (varsayılan
+    81, TÜM iller) SAPAN aktif DISTINCT il_kodu sayısını içeren kayıtların
+    listesi — boşsa hiçbir sapma yok demektir."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT ft.tarih_id, dg.grup_adi, count(DISTINCT ft.il_kodu) AS il_sayisi
+            FROM fact_tuketim ft
+            JOIN dim_tuketici_grubu dg ON dg.grup_id = ft.grup_id
+            WHERE ft.is_active
+            GROUP BY ft.tarih_id, dg.grup_adi
+            HAVING count(DISTINCT ft.il_kodu) != %s
+            ORDER BY ft.tarih_id, dg.grup_adi
+            """,
+            (beklenen_il_sayisi,),
+        )
+        rows = cur.fetchall()
+    return [
+        {
+            "tarih_id": r[0],
+            "grup": r[1],
+            "il_sayisi": r[2],
+            "beklenen_il_sayisi": beklenen_il_sayisi,
+        }
+        for r in rows
+    ]
+
+
 def main() -> int:
     database_url = get_database_url()
     if not database_url:
@@ -177,12 +228,25 @@ def main() -> int:
         return 1
     with psycopg.connect(database_url, prepare_threshold=None) as conn:
         uyumsuz, detaylar = mutabakat_kontrol_et(conn)
+        kardinalite_sapmalari = il_kardinalite_kontrol_et(conn)
     uyumlu_sayisi = sum(1 for d in detaylar if d.get("uyumlu"))
     print(f"Kontrol edilen (tarih_id, grup) çifti: {len(detaylar)}")
     print(f"Uyumlu: {uyumlu_sayisi}, uyumsuz batch: {len(uyumsuz)}")
     for d in detaylar:
         if not d.get("uyumlu", True):
             print(" ", d)
+    # 2026-09-17 (doğrulama turu): DEĞER kontrolünün YANINDA, bilgi
+    # amaçlı — henüz hiçbir aktivasyon kapısına BAĞLANMADI (Ahmet'in
+    # onayı gerekir, bkz. kapsam raporu "Doğrulama Turu" eki).
+    if kardinalite_sapmalari:
+        print(
+            f"\n[BİLGİ] Kardinalite kontrolü {len(kardinalite_sapmalari)} "
+            "(tarih_id, grup) çiftinde beklenen il sayısından (81) sapma buldu "
+            "(DEĞER kontrolü bunları uyumlu sayabilir — bkz. il_kardinalite_"
+            "kontrol_et() docstring'i):"
+        )
+        for k in kardinalite_sapmalari:
+            print(" ", k)
     return 0 if not uyumsuz else 1
 
 

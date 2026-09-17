@@ -1882,3 +1882,364 @@ Ayrıca makine-okunur CSV: `worker/out/kapsam_yillik_tamlik_2026-09-16.csv` — 
 | fact_hava_aylik | 2024 | 12 | 12 | ✅ |
 | fact_hava_aylik | 2025 | 12 | 12 | ✅ |
 | fact_hava_aylik | 2026 | 9 | 8 | ❌ |
+
+---
+
+## Doğrulama Turu — 2026-09-17
+
+**Amaç:** yukarıdaki rapordan çıkan 5 maddeyi ÖLÇEREK kesin sonuca
+bağlamak. **Yöntem:** canlıya yalnız SALT OKUMA (SELECT, `conn.read_only
+= True`) sorguları + gerçek EPDK kaynak .docx dosyalarının doğrudan
+açılması + disposable postgres'te sentetik/izole testler. **Canlıda tek
+satır değişmedi** — bu turda hiçbir INSERT/UPDATE/DELETE çalıştırılmadı,
+batch 732'ye DOKUNULMADI. Tüm zaman damgaları UTC, sorgu anı: 2026-09-17
+(bu bölümdeki "canlıda şu an" ifadeleri bu tarihi işaret eder).
+
+### Madde 1 — Batch 732 (`fact_uretim_kaynak_geneli`, 2024-02, `running`)
+
+**a) Batch'in tüm alanları (canlıdan, 2026-09-17):**
+```
+batch_id=732, source_asset_id=726, parser_version='word-2024-uretim-geneli-v1',
+schema_version='1', status='running', total_row_count=11, accepted_row_count=11,
+rejected_row_count=0, error_summary=NULL,
+created_at=2026-09-16 06:58:57.190411+00 (source_asset created_at İLE AYNI —
+tek bir script çalıştırmasında oluşturuldu)
+source_asset: source_type='epdk_aylik_word', source_period='2024-02',
+file_name='_PortalAdmin_Uploads_Content_FastAccess_415ed30988964.docx',
+file_hash='952384c21f5ba988df5eec7e039a73423206a4f148a5259d0d8cc40f07332179'
+```
+
+**b) audit_log + mutabakat kanıtı — "mutabakat blokladı" iddiası DOĞRULANDI:**
+
+`audit_log` sorgusu (`table_name='ingestion_batch' AND record_id=732`) **TAM
+OLARAK 1 satır** döndürdü (audit_id=881, action_type='INSERT',
+actor='manual-cli:word-2024', 2026-09-16 06:58:57). Bu kayıt **YÜKLEME**
+olayını belgeliyor (T2: 11/11 satır kabul edildi, 0 red; T3 Bulgu J
+gereği bilerek yüklenmedi) — **mutabakat REDDİNİ belgeleyen AYRI bir
+audit_log satırı YOK**, çünkü `worker/scripts/aktive_et_uretim_word.py`
+bir batch'i bloklarken (`if not uygun: bloklanan.append(...); continue`)
+`audit_log_yaz()` HİÇ ÇAĞIRMIYOR — yalnız konsola yazdırıyor (kod
+okumasıyla doğrulandı). Yani: **iddia "mutabakat blokladı" audit_log'da
+DEĞİL, kod+konsol kaydında (06_canli_veri_operasyon_gunlugu.md 2026-09-16)
+belgeli.** Bu iddiayı BAĞIMSIZ olarak, canlıya karşı YENİDEN ÇALIŞTIRARAK
+doğruladım:
+
+```
+mutabakat_uretim.periyot_aktivasyona_uygun_mu(conn, 202402)  # canlıda, 2026-09-17
+  -> uygun=False, sebep="tarih_id=202402: 1 lisans_id uyumsuz (il≠kaynak toplamı)"
+mutabakat_uretim.mutabakat_kontrol_et(conn) -> 202402/Lisanslı satırı:
+  {'tarih_id': 202402, 'lisans_id': 1, 'durum': 'bir_taraf_eksik',
+   'il_toplami': None, 'kaynak_toplami': 25615763.19, 'uyumlu': False}
+```
+`il_toplami=None` çünkü T3 (il, Lisanslı) Bulgu J kararıyla o ay HİÇ
+YÜKLENMEDİ (kapsam dışı kaydı var, aşağıya bkz.) — `kaynak_toplami` dolu
+(T2 sağlam). **Mekanizma bugün de AYNI şekilde çalışıyor ve AYNI sonucu
+üretiyor** — bu bir kerelik/geçmiş bir olay değil, kalıcı/tekrarlanabilir
+bir durum. **SONUÇ: KANITLANDI** — mutabakat gerçekten çalıştı ve
+gerçekten (doğru) bir sebeple bloke etti; bu bir "yarıda kalma" değil,
+sistemin TASARLANDIĞI GİBİ çalışmasının bir sonucu. Tek eksik: bu doğru
+kararın audit_log'a AYRICA yazılmaması (bkz. madde d, öneri).
+
+**c) UNIQUE(source_asset_id, parser_version, schema_version) — 2024-02
+batch 732 dururken yeniden yüklenebilir mi? Disposable'da BİREBİR test
+edildi (`worker/tests/test_batch_yeniden_yukleme_arastirma.py`):**
+
+- Kod okuması: `word_2024.py:isle_ay_uretim_geneli()`, DB'ye yazmadan
+  ÖNCE `SELECT ... WHERE source_period=%s AND parser_version=%s AND
+  status != 'failed'` kontrolü yapıyor — bir satır bulursa `[ATLA]`
+  basıp `None` döner, YENİ batch OLUŞTURMAZ. Bu KORUMA application
+  katmanında, ŞEMADA DEĞİL.
+- Ampirik test: `kaynak_asset_olustur()` HER ÇAĞRIDA yeni bir
+  `source_asset_id` üretir (dosya hash'i aynı olsa bile — dedup YOK,
+  sade bir INSERT). UNIQUE kısıt yalnız AYNI `source_asset_id` tekrar
+  denendiğinde devreye girer (`batch_olustur()`'ın `ON CONFLICT DO
+  UPDATE` ile var olan `batch_id`'yi dönmesiyle — test: `test_ayni_
+  source_asset_id_ile_tekrar_batch_olustur_DUPLICATE_URETMEZ`, PASSED).
+  Ama YENİ bir `source_asset_id` ile (gerçek bir dosya-yükleme
+  denemesinde HER ZAMAN olduğu gibi) denendiğinde şema TAMAMEN SESSİZ
+  kalır ve YENİ, AYRI bir batch satırı oluşur (test: `test_farkli_
+  source_asset_id_ile_ayni_donem_AYNI_PARSER_ILE_YENI_BATCH_URETIR`,
+  PASSED — aynı (source_period, parser_version) için 2 AYRI batch_id
+  üretildi, şema hiçbir şeyi engellemedi).
+
+**SONUÇ: KANITLANDI** — "2024-02 aynı parser sürümüyle yeniden
+yüklenebilir mi?" sorusunun cevabı EVET, ŞEMA SEVİYESİNDE hiçbir engel
+YOK; tek koruma `word_2024.py`'nin kendi ön-kontrolüdür (application
+disiplini, DB garantisi değil).
+
+**d) Durum makinesi — kaç durum, hangileri terminal, "mutabakat
+reddetti" için terminal durum var mı?**
+
+`ingestion_batch.status` CHECK kısıtı 6 değer izin veriyor: `queued`,
+`running`, `succeeded`, `failed`, `retrying`, `dead_letter`. Fiilen
+TERMİNAL olanlar: `succeeded`, `failed`, `dead_letter` (bir daha
+değişmesi beklenmez); `queued`/`running`/`retrying` GEÇİCİ/ara
+durumlardır. **"Mutabakat tarafından KALICI OLARAK reddedildi" için AYRI
+bir terminal durum YOK** — batch 732 gibi bir batch, mutabakat ASLA
+geçemeyeceği bir durumda olsa bile (T3 kasıtlı olarak hiç yüklenmediği
+için `bir_taraf_eksik` SONSUZA KADAR geçerli olacak) sonsuza dek
+`running`'de kalır; `job_status.next_retry_at`'in geçmişte kalmasıyla
+AYNI sınıf sessiz-bekleme riski (2026-09-16'da bulunan/düzeltilen
+madde). **Bu bir EKSİKLİK — RAPORLANIYOR.**
+
+**Öneri (migration YAZILMADI, yalnız öneri):** `ingestion_batch.status`
+CHECK kısıtına yeni bir terminal değer eklensin, örn. `'mutabakat_
+reddedildi'` (ya da mevcut `'dead_letter'`in semantiği bu durumu da
+kapsayacak şekilde genişletilsin — ama `dead_letter` şu an "N kez
+retry'dan sonra pes edildi" anlamına geliyor, "mutabakat kalıcı olarak
+reddetti" farklı bir kavram, KARIŞTIRILMAMALI). `aktive_et_uretim_word.
+py`/`onayla.py`'nin blok yolu bu YENİ durumu SET etmeli VE `audit_log_
+yaz()` çağırmalı (madde b'nin bulduğu boşluğu da kapatır). Bu, Ahmet'in
+onayına bağlı bir tasarım/migration kararı — UYGULANMADI.
+
+**e) "Hiçbir batch N saatten uzun 'running' kalamaz" kontrolü — KALICI
+script yazıldı ve testlendi:**
+
+`worker/scripts/running_batch_kontrolu.py` (SALT OKUMA,
+`takili_running_batchleri_bul(conn, esik_saat=24.0, simdi=None)`) —
+`status='running' AND created_at < şimdi-esik_saat` sorgusu. Varsayılan
+eşik 24 saat. **Canlıda ÇALIŞTIRILDI (salt-okuma, 2026-09-17):**
+```
+⚠️ 1 batch 24 saatten uzun 'running' durumunda takılı:
+  batch_id=732 parser_version=word-2024-uretim-geneli-v1
+  created_at=2026-09-16T06:58:57.190411+00:00 (~29 saattir çalışıyor)
+```
+Script'in KENDİSİ batch 732'yi buldu — beklenen/doğru davranış, canlı bir
+doğrulama. Test: `worker/tests/test_running_batch_kontrolu_integration.py`
+(4 test: eşikten eski batch yakalanır, taze batch yakalanmaz, `succeeded`
+durumundaki eski batch'ler yoksayılır, batch 732'nin gerçek yaşının
+küçük ölçekli bir taklidi eşiği aştığını doğrular) — 4/4 PASSED.
+
+**MADDE 1 GENEL SONUÇ: KANITLANDI** (b, c, d, e'nin her biri ölçüldü/
+test edildi, tahmin YOK). Canlıya uygulanması gereken bir şey YOK (batch
+732'ye dokunulmadı, D kuralı gereği Ahmet karar verecek) — yalnız (d)'de
+bir şema/tasarım ÖNERİSİ var, uygulanmadı.
+
+### Madde 2 — `fact_tuketim` 2023-01/2023-02'de 79/81 il [EN ÖNCELİKLİ]
+
+**a) Eksik iller İSİMLERİYLE:** **Adıyaman (il_kodu=2)** ve
+**Kahramanmaraş (il_kodu=46)** — HER İKİ AYDA DA AYNI 2 il (canlıda
+ölçüldü, `dim_il` LEFT JOIN ile doğrulandı; bu illerin `fact_tuketim`'de
+202301/202302 için — aktif YA DA pasif — HİÇBİR satırı yok, herhangi bir
+batch'te de yok).
+
+**b) Kaynak docx AÇILDI ve doğrudan incelendi** (`_PortalAdmin_Uploads_
+Content_FastAccess_e2cde10c50359.docx` = Ocak 2023, `..._40fd93b367429.
+docx` = Şubat 2023, ikisi de yerelde mevcut, T11 tablosu = "Tablo 2.6 ...
+Faturalanan Elektrik Tüketiminin İl ve Tüketici Türü Bazında Dağılımı"):
+
+```
+[  2] ['ADIYAMAN*', '', '', '', '26.346,44', '', '26.346,44', '0,13%']      (Ocak)
+[ 42] ['KAHRAMANMARAŞ*', '', '', '', '89.497,19', '', '89.497,19', '0,43%'] (Ocak)
+[  2] ['ADIYAMAN*', '', '', '', '8.736,75', '', '8.736,75', '0,05%']       (Şubat)
+[ 42] ['KAHRAMANMARAŞ*', '', '', '', '34.505,39', '', '34.505,39', '0,18%'](Şubat)
+```
+(Kolonlar: İller, Aydınlatma, Kamu ve Özel Hiz., Mesken, **Sanayi**,
+Tarımsal, Genel Toplam, Pay — Sanayi HARİÇ 4 kolon BOŞ, yalnız Sanayi
+dolu.) **Satır adları asteriksli** (`ADIYAMAN*`, `KAHRAMANMARAŞ*`) — doc
+içindeki dipnot doğrudan bulundu:
+
+> *"06/02/2023 tarihinde meydana gelen depremden etkilenen illerde
+> (Adıyaman ve Kahramanmaraş) faaliyet gösteren Akedaş Elektrik Dağıtım
+> Anonim Şirketi (Şirket); bildirimlerini, Enerji Piyasası Bildirim
+> Yönetmeliğinin 9 uncu maddesinin ikinci fıkrası kapsamında mücbir
+> sebep hali olan söz konusu depremden dolayı yapamadığından, 2023 Ocak
+> ve Şubat verilerinde Şirketin verileri yer almamaktadır."*
+
+**Bu KAYNAKTA GERÇEK bir yokluk — parser hatası DEĞİL.** `t11_oku()`'nun
+81×grup satır-sayısı kontrolü (81 il satırının HEPSİ mevcut, hard
+`ValueError` tetiklenmedi) BAŞARIYLA geçti — parser il adını doğru
+tanıdı, satırı doğru işledi; yalnız hücreler BOŞ olduğundan `parse_sayi()`
+(`worker/parser.py`) doğru şekilde `None` döndürdü, `fact_tuketim_yukle()`
+bu `None`'ları **sahte bir 0 YAZMADAN "atlanan" sayacına ekledi**
+(canlı audit_log'da doğrulandı: her ay 8 "atlanan" = 2 il × 4 grup,
+"red_satirlari" listesinde bu iki il HİÇ YOK — Tarımsal'daki 4/2 ayrı
+negatif-değer reddi ile KARIŞTIRILMAMALI, o TAMAMEN farklı iller/nedendir).
+**Bilinen "İstanbul-bölünmüş/Adana-kayıp" sınıfına GİRMİYOR** (o sınıf
+birleşik/bölünmüş HÜCRE veya yanlış-yazım kaynaklı satır KAYBIDIR; burada
+satır TAM, yalnız EPDK'nın kendi belgesinde değer hücreleri kasıtlı boş).
+
+**c) 2016-2025 TAMAMI tarandı:** yalnız **2023-01 ve 2023-02** 81'in
+altında (79 il) — 2016-2025 arasındaki DİĞER 118 ayın TAMAMI tam 81 il.
+**Tek vaka, bir desenin ucu DEĞİL** — deprem tarihiyle (06/02/2023) ve
+etkilenen 2 ilin isimleriyle birebir örtüşen, izole bir olay.
+
+**MADDE 2 GENEL SONUÇ: KANITLANDI.** Eksik iller Adıyaman+Kahramanmaraş,
+her iki ayda aynı, kaynakta EPDK'nın KENDİ belgelediği mücbir-sebep
+nedeniyle gerçekten yok, parser hatası değil, izole (2016-2025'te başka
+örneği yok).
+
+**Öneri (veri_kapsam_disi kaydı — YAZILMADI, yalnız öneri, 4 satır):**
+```
+(202301, 'fact_tuketim', 'il_kodu=2 (Adıyaman)',       <EPDK dipnotu>, 'EPDK kaynak belgesi dipnotu (06/02/2023 depremi, Akedaş mücbir sebep bildirimi)')
+(202301, 'fact_tuketim', 'il_kodu=46 (Kahramanmaraş)', <EPDK dipnotu>, 'EPDK kaynak belgesi dipnotu (06/02/2023 depremi, Akedaş mücbir sebep bildirimi)')
+(202302, 'fact_tuketim', 'il_kodu=2 (Adıyaman)',       <EPDK dipnotu>, 'EPDK kaynak belgesi dipnotu (06/02/2023 depremi, Akedaş mücbir sebep bildirimi)')
+(202302, 'fact_tuketim', 'il_kodu=46 (Kahramanmaraş)', <EPDK dipnotu>, 'EPDK kaynak belgesi dipnotu (06/02/2023 depremi, Akedaş mücbir sebep bildirimi)')
+```
+(`<EPDK dipnotu>` = yukarıdaki tam dipnot metni, `sebep` kolonuna
+birebir.)
+
+### Madde 3 — Mutabakat neden yakalamadı? [Madde 2 ile birlikte]
+
+**a) `mutabakat_ulke_geneli.py` okundu:** `tolerans_oran=0.005` (%0,5),
+`tolerans_min_mwh=1.0` — gerçek tolerans `max(1.0, |ülke_geneli_değeri|
+× 0,005)`. Karşılaştırma: il-toplamı (+ audit_log'daki KAYITLI reddedilen
+negatif satırlar geri eklenerek düzeltilmiş) vs `fact_tuketim_ulke_
+geneli`'nin DEĞERİ.
+
+**b) HESAPLANDI — 2023-01'de eksik 2 ilin tüketimi, ülke toplamının
+yüzde kaçı?** Doğrudan tahmin YERİNE, önce GERÇEK mutabakat sonucunu
+canlıda YENİDEN ÇALIŞTIRDIM:
+```
+mutabakat_ulke_geneli.mutabakat_kontrol_et(conn) — 202301/202302, Sanayi-hariç 4 grup:
+  TÜMÜ uyumlu=True, fark = 0,00 ile 0,05 MWh arası (yuvarlama gürültüsü mertebesinde)
+  Toplam uyumsuz batch (TÜM aylar, TÜM tarih): 0
+```
+**Bunun nedeni ÖLÇÜLDÜ:** `fact_tuketim_ulke_geneli`'nin DEĞERİ, T11'in
+KENDİ "Genel Toplam" satırından geliyor — EPDK bu satırı da AYNI (boş
+hücreli) tablodan hesaplıyor, yani ülke-geneli toplam da bu 2 ili zaten
+İÇERMİYOR. Canlıda doğrulandı: 202301 Mesken il-toplamı=5.703.791,36,
+ülke-geneli=5.703.791,36 (fark=0,00 TAM). **Kayıp tutarı proxy ile TAHMİN
+edildi (2022 Ocak/Şubat + 2024 Ocak/Şubat ORTALAMASI, İKİ ilin 4
+grubunun toplamı — bu bir TAHMİNDİR, gerçek değer değil, açıkça
+belirtiliyor):**
+```
+Adıyaman+Kahramanmaraş, Ocak proxy toplamı (4 grup) ≈ 189.209 MWh
+2023-01 ülke toplamı (Sanayi hariç 4 grup, gerçek/ölçülen) = 12.168.582 MWh
+Oran ≈ %1,55 (Sanayi dahil 20.947.393 MWh tabanına göre ≈ %0,90)
+```
+**c) Tolerans bunu "yutuyor" mu? İNCE bir cevap — HAYIR, ama bambaşka bir
+nedenle:** Eğer eksik veri yalnız BİR tarafı (örn. yalnız il-toplamını)
+etkileseydi, %0,90-1,55'lik bir fark %0,5'lik toleransı AŞARDI ve
+YAKALANIRDI. Ama BURADA iki taraf da (il-toplamı VE ülke-geneli) AYNI
+kaynaktan (EPDK'nın aynı boş-hücreli tablosu) türediği için GERÇEK fark
+~0 — **tolerans ne kadar SIKI olursa olsun (0'a kadar daraltılsa bile)
+bu asla yakalanamaz**, çünkü karşılaştırılan iki değer zaten birbirine
+eşit. Bu, "toleransı daraltmak" tavsiyesinin NEDEN yanlış yön olduğunu
+kanıtlıyor — ihtiyaç DEĞER değil KARDİNALİTE kontrolüdür.
+
+**Yeni kontrol EKLENDİ (toleransa DOKUNULMADI):**
+`worker/scripts/mutabakat_ulke_geneli.py:il_kardinalite_kontrol_et()` —
+her (tarih_id, grup) için aktif DISTINCT il_kodu sayısının 81'den
+sapmasını bulur, mevcut `mutabakat_kontrol_et()`in YANINA eklendi (onun
+YERİNE değil, `main()`'de ayrı bir "[BİLGİ]" bloğu olarak — hiçbir
+aktivasyon kapısına henüz BAĞLANMADI, bu bir tasarım kararı, Ahmet'e
+bırakıldı).
+
+**Test — İKİSİ DE gösterildi** (`worker/tests/test_mutabakat_ulke_
+geneli_kardinalite.py::test_deger_kontrolu_79_81_ili_yakalamaz_ama_
+kardinalite_yakalar`, sentetik/izole 2023-01 taklidi, disposable'da
+PASSED):
+```
+ESKİ kontrol (mutabakat_kontrol_et):     uyumlu=True,  fark≈0.0   -> YAKALAMADI
+YENİ kontrol (il_kardinalite_kontrol_et): il_sayisi=79, beklenen=81 -> YAKALADI
+```
+
+**MADDE 3 GENEL SONUÇ: KANITLANDI.** Tolerans boyutu sorunun nedeni
+DEĞİL — sorun yapısal (aynı kaynaktan türeyen iki değerin karşılaştırılması,
+DEĞER bazlı hiçbir kontrolün yakalayamayacağı bir kör nokta). Kardinalite
+kontrolü eklendi ve testle kanıtlandı; toleransa dokunulmadı.
+
+### Madde 4 — `fact_uretim_kaynak_geneli`'nde 52 ayın kaynak_id sapması
+
+**Tek soru: kaynak kümesi MONOTONİK genişliyor mu? — HAYIR, ÇÜRÜTÜLDÜ.**
+
+Canlıda TÜM aktif ayların kaynak kümesi (`array_agg(DISTINCT kaynak_adı)`)
+çıkarılıp ardışık aylar arasında diff alındı (2016-01 → 2026-06, 126 ay).
+Bulgu: kaynak kümesi eklene-eklene büyümüyor — **"Motorin" ve "Nafta"
+tekrar tekrar KAYBOLUP GERİ GELİYOR** (bilinen "Hidrolik→AKARSU+BARAJLI"
+ve "2024 LPG" istisnalarıyla HİÇ İLGİSİ YOK — bu tablo o ayrımları
+içermiyor, farklı bir kaynak/tablo). Kullanıcının kendi kriterine göre
+("kaybolup geri geliyorsa → parser şüphesi, o ayları ayrıca raporla")
+bu ARAŞTIRILDI:
+
+**"Nafta":** yalnız 2016-01 ve 2016-04/05'te görülüyor, 2016-06'dan
+SONRA bir daha HİÇ görünmüyor — tek, temiz bir kalıcı emeklilik deseni
+(flicker DEĞİL), araştırma gerektirmiyor.
+
+**"Motorin":** tekrarlayan, GİDEREK UZAYAN kayıp aralıkları:
+```
+201602-201604 (3 ay), 201804 (1 ay), 201808 (1 ay), 201901-201902 (2 ay),
+201904 (1 ay), 201907-201908 (2 ay), 202001-202004 (4 ay),
+202101-202106 (6 ay), 202309-202310 (2 ay), 202401-202410 (10 ay!),
+202501-202511 (11 ay!), 202601-202606 (6+ ay, HÂLÂ devam ediyor)
+```
+**Doğrudan kaynak kontrolü yapıldı** (2020-04, yerel .docx dosyası
+`_PortalAdmin_Uploads_Content_FastAccess_92acc29d48309.docx`'un T2
+tablosu tam DÖKÜLDÜ): EPDK'nın KENDİ tablosunda "MOTORİN" satırı O AY
+İÇİN HİÇ YOK (11 kaynak satırı var, Motorin bunların arasında değil,
+BOŞ hücre de değil — satır TAMAMEN GİRİLMEMİŞ). **Parser hatası DEĞİL**
+— tablo gerçekten bu kaynağı o ay listelemiyor. Ayrıca: bu desen HEM
+Word-dönemi (2016-2025, docx parser) HEM Excel-dönemi (2026, TAMAMEN
+FARKLI bir parser) verisinde AYNI şekilde (2026-01'den beri sürekli
+yok) görülüyor — iki BAĞIMSIZ parser'ın AYNI sonucu üretmesi, paylaşılan
+bir parser hatasını ÇOK daha az olası kılıyor.
+
+**Kapsam/dürüstlük notu:** yukarıdaki ~15 kayıp aralığından yalnız
+BİRİNİ (2020-04) doğrudan kaynak dosyasıyla doğruladım — TÜMÜNÜ tek tek
+açıp doğrulamadım (zaman kısıtı). Bu yüzden madde 4'ün sonucu, "kaynak
+kümesi monotonik genişlemiyor" sorusu için KESİN (çürütüldü), ama
+"HER bir Motorin kaybının kaynakta GERÇEK olduğu" iddiası için tam
+kapsamlı değil — yalnız TEMSİLİ ÖLÇÜM + iki-bağımsız-parser tutarlılığı
+kanıtı var.
+
+**MADDE 4 GENEL SONUÇ:** Monotonik-genişleme hipotezi **ÇÜRÜTÜLDÜ**.
+Kullanıcının "kaybolup geri geliyorsa parser şüphesi" tetikleyicisi
+HAKLI ÇIKTI (araştırmayı gerektirdi) ama araştırma SONUCU parser hatası
+DEĞİL, muhtemelen gerçek/azalan Motorin-yakıtlı üretim (temsili örnekle
+KANITLANDI, TAM kapsamla BELİRSİZ kaldı — 14/15 aralık doğrudan
+doğrulanmadı). Kapsam raporuna not: bkz. aşağıdaki "Rapora düşülecek
+not".
+
+### Madde 5 — `fact_uretim` 2022-07
+
+**KAYITLI mı, çıkarım mı? — KAYITLI, doğrulandı.** `veri_kapsam_disi`de
+tarih_id=202207 için **5 kayıt** var, ikisi doğrudan ilgili:
+
+- `fact_uretim` / `lisans_durumu=Lisanslı` (TÜM Word ayları için geçerli,
+  yalnız Temmuz 2022'ye özgü değil): *"Word (.docx) kaynağında Lisanslı
+  kurulu güç için il×kaynak birleşik tablo yok"* — `Karar 3`.
+- `fact_uretim` / `lisans_durumu=Lisanssız` (BU AYA ÖZGÜ): *"EPDK
+  raporlama hatasi - Temmuz 2022'nin 'Illere ve Kaynaklara Gore Dagilim'
+  (T4-karsiligi) tablosu, bir onceki tablonun (Tablo 1.9, il-ONLY, kaynak
+  yok) BIREBIR kopyasi. Gercek il x kaynak kirilimi bu ay icin kaynakta
+  hic yayinlanmamis (kopyala-yapistir hatasi) - mekanik olarak elde
+  edilemez."* — `karar_referansi='08_word_2016_2022_kapsam.md'`.
+
+Bu ikisi BİRLİKTE 2022-07'yi `fact_uretim`'de TAMAMEN boş bırakıyor
+(canlıda doğrulandı: `SELECT count(*) FROM fact_uretim WHERE tarih_id=
+202207` → **0 satır, hiçbir durumda**) — rapordaki "bilinen kalıcı
+kaynak hatası" ifadesi doğru VE zaten belgeli, yeni bir kayıt önerisi
+GEREKMİYOR.
+
+**MADDE 5 GENEL SONUÇ: KANITLANDI** (kayıtlı, kaynak dosyası tekrar
+açılmasına gerek kalmadı — gerekçe zaten spesifik/doğrulanabilir bir
+EPDK belge hatası tanımlıyor).
+
+### Rapora düşülecek not (kullanıcı talimatı, Madde 4)
+
+Madde 4'ün sonucu ("monotonik değil ama muhtemelen gerçek/azalan
+üretim") kapsam_raporu.md'nin ana gövdesindeki `fact_uretim_kaynak_
+geneli` bölümüne şu not olarak düşülmelidir (bu turda ANA rapor
+DEĞİŞTİRİLMEDİ, yalnız bu ek bölüme yazıldı — kullanıcı talimatı
+gereği): *"Kaynak kümesi sapması DOĞRULANDI, BEKLENEN DAVRANIŞ — Motorin/
+Nafta kaynaklarının aralıklı kayboluşu (52 aydan ~15'i) EPDK'nın kendi
+tablosunda bu kaynakları o ay hiç LİSTELEMEMESİNDEN kaynaklanıyor (bir
+örnek — 2020-04 — doğrudan kaynak dosyasıyla doğrulandı; TAMAMI tek tek
+açılmadı). Parser hatası DEĞİL. 2026-01'den beri sürekli yok, hem Word
+hem Excel parser'ında aynı — muhtemelen gerçek/azalan Motorin-yakıtlı
+üretim."*
+
+### Doğrulama (kod/test)
+
+`ruff format`/`ruff check` temiz. `mypy app worker --ignore-missing-
+imports --explicit-package-bases`: 71 kaynak dosyada sorun yok. Tam
+`worker/tests` (fresh disposable, 31/31 migration): **398 test, 397
+geçti** (tek beklenen boşluk `test_auth_integration.py`, bu turdan
+bağımsız). `bandit -r worker app -x worker/tests -s B101 --severity-
+level medium` (CI'nin kendi komutu): **0 bulgu**. Yeni dosyalar:
+`worker/scripts/running_batch_kontrolu.py` (+4 test), `worker/scripts/
+mutabakat_ulke_geneli.py:il_kardinalite_kontrol_et()` (+2 test),
+`worker/tests/test_batch_yeniden_yukleme_arastirma.py` (+2 test, Madde
+1c). Canlıda hiçbir INSERT/UPDATE/DELETE çalıştırılmadı — tüm canlı
+sorgular `conn.read_only = True` ile açıldı, batch 732'ye dokunulmadı.
