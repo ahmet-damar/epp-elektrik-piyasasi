@@ -41,7 +41,11 @@ yükleyen, Open-Meteo ile zenginleştiren, KPI üreten açık kaynak platform.
    - Batch tekilliği (batch_id VAR): UNIQUE (...,baglanti,ingestion_batch_id)
    Aktif index'e ASLA batch_id ekleme.
 2. **P0-3 source_asset:** source_kind file|api; api'de file yok (source_uri+request_hash).
-3. **P0-5 ingestion_batch:** UNIQUE(source_asset_id, parser_version, schema_version).
+3. **P0-5 ingestion_batch:** UNIQUE(source_asset_id, parser_version, schema_version)
+   — **2026-09-17'de düzeltildi:** `source_asset` dedup'lanmadığı için bu kısıt
+   pratikte hiç tetiklenmiyordu; gerçek koruma her loader'ın kendi ön-kontrolünde
+   (bkz. `10_TEKNIK_MASTER_DOKUMAN.md` §14 madde 5). `status`'a 2026-09-18'de
+   7. bir terminal durum eklendi: `mutabakat_reddedildi` (bkz. §6.1).
 4. **P0-4 aktivasyon:** eski pasifleme = yeni aktifleme, aynı doğal-anahtar kapsamı, tek transaction.
 5. **P0-6 KPI:** Faz 0 production = KPI-01..10,13,23,24. KPI-11/12 yalnız altyapı; β/γ Faz 3.
 6. **OD-1/OD-2:** hdd_baz=18, cdd_baz=22 sistem_parametre'den. Hava normu 10y sabit, tüketim 5y rolling.
@@ -67,3 +71,16 @@ migrations/ · data/ (git'e girmez) · dokumanlar/ (md — kod DEĞİL)
 
 ## Yanıt Dili
 Açıklamalar Türkçe; kod/kolon adları İngilizce snake_case.
+
+## Çalışma Akışı — Prompt/Kapanış Dosyaları (2026-09-18'den beri kalıcı kural)
+- **Görev girişi:** `Claude outputs/PROMPT_*.md` — kullanıcı bir görevi bu
+  dosyaya yazıp "oku ve uygula" der.
+- **Kapanış çıktısı:** her turun kapanış raporu SOHBETE DEĞİL, DOSYAYA
+  yazılır: `Claude outputs/kapanis_<YYYY-MM-DD>_<kisa_konu>.md`. Sohbete
+  yalnız 3-5 satırlık bir özet + dosya yolu yazılır — uzun rapor asla
+  doğrudan sohbete basılmaz.
+- `Claude outputs/` `.gitignore`'dadır — bu dosyalar (hem prompt hem
+  kapanış) repoya HİÇBİR ZAMAN commit edilmez, yalnız iki oturum arasında
+  elle/cloud-okumayla taşınır.
+- Gerekçe: raporların elle iki oturum arasında taşınması yavaş ve kota
+  israfıydı; cloud oturumu repoyu doğrudan okuyabiliyor.

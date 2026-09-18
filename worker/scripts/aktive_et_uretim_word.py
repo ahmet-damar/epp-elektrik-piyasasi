@@ -92,6 +92,18 @@ def main() -> int:
             )
             if not uygun:
                 bloklanan.append((tarih_id, sebep))
+                if not args.dry_run:
+                    # 2026-09-18 (İş C): karar artık kalıcı — batch
+                    # 'mutabakat_reddedildi'ye geçer + audit_log'a yazılır
+                    # (bkz. mutabakat_uretim.mutabakat_reddini_kaydet()).
+                    mutabakat_uretim.mutabakat_reddini_kaydet(
+                        conn,
+                        batch_id=batch_id,
+                        tarih_id=tarih_id,
+                        sebep=sebep,
+                        actor_name=args.actor,
+                    )
+                    conn.commit()
                 continue
             if args.dry_run:
                 aktive_edilen.append(tarih_id)

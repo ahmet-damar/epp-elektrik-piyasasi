@@ -232,13 +232,60 @@ def api_kaynak_olustur(
         return int(row[0])
 
 
+_TERMINAL_DURUMLAR = frozenset(
+    {"succeeded", "failed", "dead_letter", "mutabakat_reddedildi"}
+)
+
+
+class BatchZatenTerminalHatasi(RuntimeError):
+    """`batch_olustur()`, (source_asset_id, parser_version, schema_version)
+    ZATEN TERMİNAL bir durumdaki (bkz. `_TERMINAL_DURUMLAR`) bir batch'e
+    denk geldiğinde fırlatır — bkz. `batch_olustur()` docstring'i."""
+
+
 def batch_olustur(
     conn: Connection, source_asset_id: int, parser_version: str, schema_version: str
 ) -> int:
     """P0-5: (source_asset_id, parser_version, schema_version) tekil; varsa mevcut
     batch_id döner. Adım 2 (dokumanlar/01 §4): 'queued' ile açılır — 'running'e
-    geçiş, worker'ın adım 3'te ATOMİK sahiplenmesiyle olur, bkz. batch_sahiplen()."""
+    geçiş, worker'ın adım 3'te ATOMİK sahiplenmesiyle olur, bkz. batch_sahiplen().
+
+    **2026-09-18 (İş A4, `Claude outputs/PROMPT_A_C_2026-09-17.md`) — TERMİNAL
+    bir batch'in ÜZERİNE SESSİZCE dönülmez:** önceden bu fonksiyon `ON
+    CONFLICT DO UPDATE SET status = ingestion_batch.status` ile var olan
+    HERHANGİ bir batch_id'yi (durumu ne olursa olsun) sessizce döndürüyordu.
+    Bugün (`source_asset_id` her zaman TAZE üretildiğinden, bkz. `kaynak_
+    asset_olustur()`) bu ÇATIŞMA yolu pratikte hiç tetiklenmiyor — ama bu,
+    `source_asset` dedup'landığında (ÖNERİLDİ, henüz UYGULANMADI, bkz.
+    `10_TEKNIK_MASTER_DOKUMAN.md` §5.30) GERÇEK bir risk hâline gelir:
+    dedup sonrası aynı dosya iki kez "yüklenmeye" çalışılırsa AYNI
+    `source_asset_id` dönebilir, ve bu fonksiyon (eski haliyle) TERMİNAL
+    (örn. `succeeded`, zaten aktive edilmiş) bir batch'in id'sini sessizce
+    geri verirdi — çağıran bunu "yeni bir batch" sanıp fact satırı
+    YAZABİLİRDİ (hiçbir INSERT batch durumunu kontrol etmez). Şimdi: var
+    olan bir eşleşme TERMİNAL bir durumdaysa (`_TERMINAL_DURUMLAR`)
+    `BatchZatenTerminalHatasi` fırlatılır — çağıran BİLİNÇLİ bir karara
+    zorlanır (yeni bir batch mı açılmalı, yoksa bu gerçekten bir hata mı).
+    TERMİNAL OLMAYAN (`queued`/`running`/`retrying`) bir eşleşme hâlâ
+    SESSİZCE aynı batch_id'yi döner — established idempotent-retry deseni
+    korunur."""
     with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT batch_id, status FROM ingestion_batch
+            WHERE source_asset_id = %s AND parser_version = %s AND schema_version = %s
+            """,
+            (source_asset_id, parser_version, schema_version),
+        )
+        mevcut = cur.fetchone()
+        if mevcut is not None and mevcut[1] in _TERMINAL_DURUMLAR:
+            raise BatchZatenTerminalHatasi(
+                f"batch_id={mevcut[0]} zaten TERMİNAL durumda ({mevcut[1]!r}) — "
+                f"(source_asset_id={source_asset_id}, parser_version={parser_version!r}, "
+                f"schema_version={schema_version!r}) için sessizce yeniden kullanılamaz. "
+                "Bu gerçekten aynı veri mi (o zaman hiçbir şey yapma) yoksa yeni bir "
+                "source_asset mi gerekiyor (revize dosya) — çağıran karar vermeli."
+            )
         cur.execute(
             """
             INSERT INTO ingestion_batch (source_asset_id, parser_version, schema_version, status)

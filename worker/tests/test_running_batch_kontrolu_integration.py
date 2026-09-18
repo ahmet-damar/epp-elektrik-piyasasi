@@ -91,6 +91,27 @@ def test_succeeded_batch_esikten_eski_olsa_bile_yakalanmaz(conn) -> None:  # typ
     assert eski_batch not in batch_idler
 
 
+def test_mutabakat_reddedildi_batch_esikten_eski_olsa_bile_yakalanmaz(conn) -> None:  # type: ignore[no-untyped-def]
+    """2026-09-18 (İş C4): YENİ terminal durum `'mutabakat_reddedildi'`
+    eklendikten SONRA bu script'in davranışı hâlâ doğru mu? Yalnız
+    `status='running'` filtrelendiği için EVET — bu durumdaki bir batch
+    (örn. artık dönüştürülmüş eski batch 732 taklidi) ne kadar eski
+    olursa olsun 'takılı' SAYILMAMALI (zaten kalıcı bir sonuca ulaşmış)."""
+    simdi = datetime(2026, 9, 17, 12, 0, tzinfo=UTC)
+    eski_batch = _batch_olustur_created_at_ile(
+        conn, "test-rbk-mutabakat-reddedildi", simdi - timedelta(hours=100)
+    )
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE ingestion_batch SET status = 'mutabakat_reddedildi' WHERE batch_id = %s",
+            (eski_batch,),
+        )
+
+    takililar = rbk.takili_running_batchleri_bul(conn, esik_saat=24, simdi=simdi)
+    batch_idler = {t.batch_id for t in takililar}
+    assert eski_batch not in batch_idler
+
+
 def test_gercek_batch_732_deseninin_kucuk_olcekli_taklidi(conn) -> None:  # type: ignore[no-untyped-def]
     """Canlıda bulunan gerçek örnek (batch_id=732, `fact_uretim_kaynak_
     geneli`/2024-02, created_at=2026-09-16 06:58:57 UTC, mutabakat

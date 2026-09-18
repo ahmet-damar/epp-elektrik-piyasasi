@@ -12,13 +12,23 @@ izole olarak sınar — çünkü `kaynak_asset_olustur()` HER ÇAĞRIDA yeni bir
 `source_asset_id` üretir (dosya hash'i AYNI olsa bile dedup YOK, bkz.
 worker/ingest.py:kaynak_asset_olustur() — sade bir INSERT, ON CONFLICT
 yok). Sonuç: UNIQUE kısıt yalnız AYNI source_asset_id'yi tekrar
-denerken devreye girer (`batch_olustur()`'ın `ON CONFLICT DO UPDATE`
-deseniyle var olan batch_id'yi döner, DUPLICATE OLUŞMAZ) — ama YENİ bir
-source_asset_id ile (her gerçek dosya yükleme denemesinde olduğu gibi)
-denendiğinde şema TAMAMEN SESSİZ kalır ve YENİ, AYRI bir batch satırı
-OLUŞTURULUR. Yani gerçek "aynı dönem tekrar yüklenemez" garantisi
-TAMAMEN uygulama katmanındaki (`word_2024.py`'nin kendi SELECT
-kontrolü) bir disiplin meselesidir — şema düzeyinde HİÇBİR koruma YOK."""
+denerken devreye girer — ama YENİ bir source_asset_id ile (her gerçek
+dosya yükleme denemesinde olduğu gibi) denendiğinde şema TAMAMEN SESSİZ
+kalır ve YENİ, AYRI bir batch satırı OLUŞTURULUR. Yani gerçek "aynı
+dönem tekrar yüklenemez" garantisi TAMAMEN uygulama katmanındaki
+(`word_2024.py`'nin kendi SELECT kontrolü) bir disiplin meselesidir —
+şema düzeyinde HİÇBİR koruma YOK.
+
+**2026-09-18 güncellemesi (İş A1'in bulgusu — canlıda 126 mükerrer
+file_hash grubu, bkz. `Claude outputs/PROMPT_A_C_2026-09-17.md`, dedup
+UYGULANMADI ama A4'ün öngördüğü risk KAPATILDI): `batch_olustur()`
+artık AYNI (source_asset_id, parser_version, schema_version) ZATEN
+TERMİNAL bir durumdaysa (`succeeded`/`failed`/`dead_letter`/
+`mutabakat_reddedildi`) `BatchZatenTerminalHatasi` fırlatır — SESSİZCE
+var olan batch_id'yi DÖNMEZ. TERMİNAL OLMAYAN (`queued`/`running`/
+`retrying`) bir eşleşme hâlâ eskisi gibi sessizce aynı batch_id'yi
+döner (established idempotent-retry deseni korunur, alttaki ilk test
+BUNU sınar)."""
 
 from __future__ import annotations
 
@@ -129,3 +139,68 @@ def test_farkli_source_asset_id_ile_ayni_donem_AYNI_PARSER_ILE_YENI_BATCH_URETIR
         assert (
             cur.fetchone()[0] == 2
         )  # İKİ batch, AYNI dönem+parser_version, şema izin verdi
+
+
+@pytest.mark.parametrize(
+    "terminal_durum", ["succeeded", "failed", "dead_letter", "mutabakat_reddedildi"]
+)
+def test_batch_olustur_terminal_durumda_sessizce_donmez_hata_firlatir(
+    conn, terminal_durum: str
+) -> None:  # type: ignore[no-untyped-def]
+    """2026-09-18 (İş A4): AYNI (source_asset_id, parser_version,
+    schema_version) ZATEN terminal bir durumdaysa `batch_olustur()`
+    artık SESSİZCE dönmüyor — `BatchZatenTerminalHatasi` fırlatıyor."""
+    source_asset_id = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="epdk_aylik_word",
+        dosya_adi="test-terminal.docx",
+        icerik=f"terminal-{terminal_durum}".encode(),
+        donem_tipi="aylik",
+        source_period="2095-03",
+    )
+    batch_id = ingest.batch_olustur(
+        conn, source_asset_id, "word-2024-uretim-geneli-v1", "1"
+    )
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE ingestion_batch SET status = %s WHERE batch_id = %s",
+            (terminal_durum, batch_id),
+        )
+
+    with pytest.raises(ingest.BatchZatenTerminalHatasi, match=str(batch_id)):
+        ingest.batch_olustur(conn, source_asset_id, "word-2024-uretim-geneli-v1", "1")
+
+
+@pytest.mark.parametrize("ara_durum", ["queued", "running", "retrying"])
+def test_batch_olustur_terminal_olmayan_durumda_sessizce_ayni_id_doner(
+    conn, ara_durum: str
+) -> None:  # type: ignore[no-untyped-def]
+    """Established idempotent-retry deseni KORUNDU: terminal OLMAYAN bir
+    ara durumda `batch_olustur()` hâlâ SESSİZCE aynı batch_id'yi döner,
+    hata FIRLATMAZ."""
+    source_asset_id = ingest.kaynak_asset_olustur(
+        conn,
+        source_type="epdk_aylik_word",
+        dosya_adi="test-ara-durum.docx",
+        icerik=f"ara-{ara_durum}".encode(),
+        donem_tipi="aylik",
+        source_period="2095-04",
+    )
+    batch_id = ingest.batch_olustur(
+        conn, source_asset_id, "word-2024-uretim-geneli-v1", "1"
+    )
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE ingestion_batch SET status = %s WHERE batch_id = %s",
+            (ara_durum, batch_id),
+        )
+
+    tekrar_id = ingest.batch_olustur(
+        conn, source_asset_id, "word-2024-uretim-geneli-v1", "1"
+    )
+    assert tekrar_id == batch_id
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT status FROM ingestion_batch WHERE batch_id = %s", (batch_id,)
+        )
+        assert cur.fetchone()[0] == ara_durum  # durum EZİLMEDİ

@@ -164,6 +164,31 @@ yansıtıldı.**
   edildi (`yesil_alt=15,0`/`sari_alt=30,0`, migration `20260916_0001`,
   canlıya uygulandı). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.29, Sürüm
   Geçmişi v1.44.
+  **2026-09-17'de bir DOĞRULAMA TURU yapıldı** (`dokumanlar/kapsam_
+  raporu_2026-09-16.md`'nin 5 maddesini ölçerek kesin sonuca bağlamak,
+  commit `8b0da0f`) — 4 madde KANITLANDI (batch 732'nin mutabakat
+  tarafından gerçekten/doğru bloklandığı, Adıyaman+Kahramanmaraş'ın
+  2023-01/02'de EPDK'nın kendi mücbir-sebep dipnotuyla gerçekten eksik
+  olduğu — deprem, 2022-07'nin zaten kayıtlı olduğu), 1 madde (kaynak_id
+  sapması) monotonik-genişleme hipotezini çürüttü ama tam kapsamda
+  belirsiz kaldı. YENİ kalıcı script: `worker/scripts/running_batch_
+  kontrolu.py`. Detay orada, bu dosyada tekrarlanmıyor (D kuralı).
+  **2026-09-18'de İş A (source_asset dedup) + İş C (mutabakat_reddedildi
+  terminal durum) yapıldı** (`Claude outputs/PROMPT_A_C_2026-09-17.md`,
+  kapanış raporu `Claude outputs/kapanis_2026-09-18_A_C.md` — BUNDAN
+  SONRA kapanış raporları sohbete değil dosyaya yazılıyor, bkz. `.github/
+  copilot-instructions.md`). İş A: canlıda 126 mükerrer `file_hash`
+  grubu ÖLÇÜLDÜ, DURULDU (kullanıcı talimatı gereği — 125'i beklenen
+  mimari, 1'i zaten temizlenmiş eski bir bug artığı), dedup migration'ı
+  UYGULANMADI, 3 seçenek Ahmet'e sunuldu. İş C TAMAMLANDI: `ingestion_
+  batch.status`'a 7. terminal durum (`mutabakat_reddedildi`) eklendi
+  (migration `20260918_0001`, yalnız disposable'da), blok yolları
+  (`aktive_et_uretim_word.py`/`backfill_uretim_excel.py`) artık status
+  SET edip `audit_log_yaz()` çağırıyor, geri dönülebilirlik uçtan uca
+  kanıtlandı. **CANLIYA HİÇBİR ŞEY UYGULANMADI** — bkz. "Açık madde"
+  ve kapanış raporundaki sıralı uygulama planı.
+  Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.30/§6.1/§14 madde 5, Sürüm
+  Geçmişi v1.45.
   (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
@@ -332,6 +357,24 @@ Aşama 3'ün "boş KPI'ları aç" hedefi artık KPI-01..07'nin TAMAMI için
 gerçekleşmiş durumda (yalnız 2026-01'den itibaren; Word yılları ADIM 4'te).
 
 ### Açık madde
+
+**GÜNCEL (2026-09-18) — en öncelikli açık maddeler bunlar, aşağıdaki
+ADIM 3/4 tarihçesi TAMAMEN kapalı, yalnız referans için duruyor:**
+1. **İş A — source_asset dedup tasarım kararı BEKLİYOR (Ahmet):** canlıda
+   126 mükerrer `file_hash` grubu bulundu (125 beklenen, 1 zaten
+   temizlenmiş eski bug) — 3 seçenek sunuldu (`Claude outputs/kapanis_
+   2026-09-18_A_C.md`), hiçbiri uygulanmadı, karar bekleniyor.
+2. **İş C — canlıya uygulama BEKLİYOR (Ahmet onayı):** migration
+   `20260918_0001` + kod değişiklikleri yalnız disposable'da, canlıya
+   HENÜZ uygulanmadı. Sıralı plan kapanış raporunda (adım adım, geri
+   alma yollarıyla) — batch 732'nin durumunun ne yapılacağı da o planda.
+3. **Madde 4'ün tam kapsamı BELİRSİZ:** `fact_uretim_kaynak_geneli`
+   kaynak_id sapmasının 15 aralığından yalnız 1'i doğrudan kaynak
+   dosyasıyla doğrulandı — isteğe bağlı, aksiyon gerektirmiyor (bilgi
+   amaçlı açık madde).
+
+---
+
 Dış denetim listesinin (A/B/C bölümleri) hiçbir maddesi açık değil.
 **Aşama 3 (boş KPI'ları açma) — ADIM 3'ün madde 1-4'ünün TAMAMI (kod +
 canlı) TAMAMLANDI, ADIM 5 (KPI bağlama, KPI-04 dahil) DE TAMAMLANDI —
@@ -609,6 +652,72 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     komut çıktıları/sayılar dahil).
   - Sonrası Faz 4 (Tahminleme) — aşağıda "Faz 4 (Tahminleme)" bölümüne
     bkz.
+
+### ✅ Kapandı — Doğrulama turu (2026-09-17) + ⏳ İş A/İş C (2026-09-18, İş C kapandı, İş A açık)
+
+**2026-09-17 — Doğrulama turu (commit `8b0da0f`):** `dokumanlar/kapsam_
+raporu_2026-09-16.md`'nin 5 maddesi SALT OKUMA + gerçek EPDK .docx
+dosyaları açılarak ölçüldü. Tam bulgu/sayılar orada ("Doğrulama Turu"
+eki) — burada yalnız özet (D kuralı, tekrar yazılmaz):
+- Madde 1 (batch 732): **KANITLANDI** — mutabakat gerçekten çalıştı,
+  doğru sebeple bloke etti; ama audit_log'da bu kararın izi YOKTU (yalnız
+  yükleme olayı kayıtlıydı), UNIQUE kısıtı yeniden yüklemeyi şema
+  seviyesinde engellemiyordu, durum makinesinde "mutabakat reddetti"
+  için terminal durum YOKTU — üçü de İş C'de kapatıldı (aşağıya bkz.).
+- Madde 2 (fact_tuketim 2023-01/02, 79/81 il) [ÖNCELİKLİ]: **KANITLANDI**
+  — eksik iller Adıyaman + Kahramanmaraş, EPDK'nın kendi dipnotu
+  (06/02/2023 depremi, Akedaş mücbir sebep bildirimi) doğruladı, parser
+  hatası DEĞİL.
+- Madde 3 (mutabakat neden yakalamadı): **KANITLANDI** — tolerans
+  boyutu sorun DEĞİL, yapısal bir kör nokta (iki karşılaştırılan değer
+  de aynı eksik kaynaktan türüyor). YENİ kardinalite kontrolü eklendi
+  (`mutabakat_ulke_geneli.il_kardinalite_kontrol_et()`), toleransa
+  dokunulmadı.
+- Madde 4 (kaynak_id sapması, 52 ay): monotonik-genişleme hipotezi
+  **ÇÜRÜTÜLDÜ**; temsili kaynak kontrolü (1/15 aralık) parser hatası
+  olmadığını gösterdi, TAM kapsamda **BELİRSİZ** kaldı.
+- Madde 5 (fact_uretim 2022-07): **KANITLANDI, KAYITLI** — zaten
+  `veri_kapsam_disi`de spesifik bir EPDK kopyala-yapıştır hatası
+  gerekçesiyle.
+- YENİ kalıcı script: `worker/scripts/running_batch_kontrolu.py`.
+
+**2026-09-18 — İş A (source_asset dedup) + İş C (mutabakat_reddedildi
+terminal durum)** (`Claude outputs/PROMPT_A_C_2026-09-17.md`, kapanış
+raporu artık DOSYADA: `Claude outputs/kapanis_2026-09-18_A_C.md` — bkz.
+YENİ çalışma kuralı, `.github/copilot-instructions.md`):
+
+- **İş A — A1'de DURDURULDU, mükerrer bulundu (kullanıcı talimatı
+  gereği A2/A3'e geçilmedi, A4 BAĞIMSIZ uygulandı):** canlıda **126
+  mükerrer `file_hash` grubu** ölçüldü. 125'i established mimarinin
+  BEKLENEN sonucu (1 fiziksel dosya → 4 farklı `parser_version` geçişi,
+  her biri kendi `source_asset` satırını açıyor). 1'i GERÇEK (aynı hash +
+  aynı parser_version) tekrar — ama bu 2026-08-31'de ZATEN belgelenip
+  temizlenmiş bir idempotency-bug artığı (batch_id=19, sıfır aktif
+  çift-satır kaldı). **Sonuç:** önerilen `UNIQUE(file_hash) WHERE
+  file_hash IS NOT NULL` tasarımı mevcut mimariyle UYUMSUZ (125
+  legitimate grubu da bloklardı) — dedup migration'ı (A2/A3) UYGULANMADI,
+  3 tasarım seçeneği Ahmet'e sunuldu (bkz. kapanış raporu). **A4
+  (dedup'tan bağımsız bir soru — bugünkü `batch_olustur()` davranışı)
+  UYGULANDI:** artık TERMİNAL bir batch'e (succeeded/failed/dead_letter/
+  mutabakat_reddedildi) denk gelirse SESSİZCE dönmüyor,
+  `BatchZatenTerminalHatasi` fırlatıyor — dedup geldiğinde gerçek hâle
+  gelecek bir riski ÖNCEDEN kapatıyor.
+- **İş C — TAMAMLANDI (kod+test+disposable, CANLIYA UYGULANMADI):**
+  `ingestion_batch.status`'a 7. terminal durum `'mutabakat_reddedildi'`
+  eklendi (migration `20260918_0001`). `mutabakat_uretim.
+  mutabakat_reddini_kaydet()` (YENİ) hem status SET eder hem
+  `audit_log_yaz()` çağırır. `aktive_et_uretim_word.py` +
+  `backfill_uretim_excel.py`'nin blok yolları TARANDI ve güncellendi
+  (`onayla.py`/`toplu_onayla_word.py` mutabakat'a hiç bakmıyor, insan
+  kararı — dokunulmadı; `job_worker.py:otomatik_onaya_uygun()` FARKLI/
+  GEÇİCİ bir kavram, BİLİNÇLİ OLARAK yeni statüye dahil edilmedi). Geri
+  dönülebilirlik (farklı `file_hash`li revize dosyayla aynı dönemin
+  yeniden aktive olabilmesi) uçtan uca kanıtlandı.
+
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.30/§6.1/§14 madde 5, Sürüm
+Geçmişi v1.45. **CANLIYA HİÇBİR ŞEY UYGULANMADI** (migration/kod yalnız
+disposable'da doğrulandı) — sıralı uygulama planı `Claude outputs/
+kapanis_2026-09-18_A_C.md`'de, Ahmet onaylayacak.
 
 ### ✅ Kapandı — İki küçük iş: KPI-11/12 kart etiketi + `kpi_esik` (KPI-12) yeniden kalibrasyon (2026-09-16, devam)
 

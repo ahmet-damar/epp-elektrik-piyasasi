@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import psycopg
 
+from worker import ingest
 from worker.db import get_database_url
 
 TOLERANS_ORAN = 0.005
@@ -162,6 +163,48 @@ def periyot_aktivasyona_uygun_mu(
             f"tarih_id={tarih_id}: {len(uyumsuzlar)} lisans_id uyumsuz (il≠kaynak toplamı)",
         )
     return True, ""
+
+
+def mutabakat_reddini_kaydet(
+    conn: psycopg.Connection,
+    *,
+    batch_id: int,
+    tarih_id: int,
+    sebep: str,
+    actor_name: str,
+) -> None:
+    """`periyot_aktivasyona_uygun_mu()` bir batch'i BLOKLADIĞINDA çağıran
+    script'ler bunu çağırmalı (2026-09-18, İş C — kapsam_raporu.md
+    "Doğrulama Turu" Madde 1b'nin bulgusu). ÖNCESİNDE bu karar yalnız
+    KONSOLA yazılıyordu, hiçbir kalıcı iz bırakmıyordu — batch süresiz
+    `running` kalırken audit_log'da hiçbir kayıt YOKTU. Artık:
+
+    1. Batch'in durumunu YENİ terminal duruma (`'mutabakat_reddedildi'`,
+       migration `20260918_0001`) SET eder — `dead_letter` (retry
+       tükendi) ile KARIŞTIRILMAZ, bu "mutabakat kural gereği reddetti"
+       anlamına gelir.
+    2. `audit_log`'a konsola basılanla AYNI içeriği yazar.
+
+    **PER-BATCH terminal, PER-DÖNEM kalıcı bir kapan DEĞİL:** aynı
+    `tarih_id` için FARKLI bir `source_asset`le (örn. EPDK'nın revize
+    ettiği bir dosya) YENİ bir batch açılıp normal aktive edilebilir —
+    bkz. `worker/tests/test_mutabakat_reddi_geri_donulebilirlik.py`."""
+    ingest.batch_durumu_guncelle(
+        conn, batch_id, "mutabakat_reddedildi", error_summary=sebep
+    )
+    ingest.audit_log_yaz(
+        conn,
+        table_name="ingestion_batch",
+        record_id=batch_id,
+        action_type="UPDATE",
+        actor_name=actor_name,
+        payload={
+            "olay": "mutabakat_reddedildi",
+            "tarih_id": tarih_id,
+            "sebep": sebep,
+            "kontrol": "mutabakat_uretim.periyot_aktivasyona_uygun_mu",
+        },
+    )
 
 
 def main() -> int:

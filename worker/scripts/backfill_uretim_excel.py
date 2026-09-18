@@ -142,6 +142,20 @@ def main() -> int:
             uygun, sebep = mutabakat_uretim.periyot_aktivasyona_uygun_mu(conn, tarih_id)
             print(f"  {tarih_id}: uygun={uygun}" + (f" ({sebep})" if sebep else ""))
             if not uygun:
+                # 2026-09-18 (İş C): karar artık kalıcı — bulunursa batch
+                # 'mutabakat_reddedildi'ye geçer + audit_log'a yazılır
+                # (bkz. mutabakat_uretim.mutabakat_reddini_kaydet()).
+                yil_r, ay_r = tarih_id // 100, tarih_id % 100
+                blok_batch_id = _batch_id_bul(conn, f"{yil_r}-{ay_r:02d}")
+                if blok_batch_id is not None:
+                    mutabakat_uretim.mutabakat_reddini_kaydet(
+                        conn,
+                        batch_id=blok_batch_id,
+                        tarih_id=tarih_id,
+                        sebep=sebep,
+                        actor_name=args.actor,
+                    )
+                    conn.commit()
                 bloklanan.append((tarih_id, sebep))
                 continue
             yil, ay = tarih_id // 100, tarih_id % 100

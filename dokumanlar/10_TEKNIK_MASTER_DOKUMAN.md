@@ -92,6 +92,7 @@ her yeni rakam için geçerlidir.
 | v1.42 | 2026-09-16 | **CANLI BACKFILL UYGULANDI (Ahmet'in onayıyla) + KPI-07 kritik bulgu/düzeltmesi** — §5.27. Projede canlıya Word üretim verisinin İLK uygulanışı: kilit ön kontrolü temiz, 120 ay yüklendi, mutabakat aktivasyondan ÖNCE çalıştırıldı (132 çift, 131 uyumlu + 1 beklenen istisna), YENİ `worker/scripts/aktive_et_uretim_word.py` ile 119/120 ay aktive edildi (202402 established mekanizmayla kendiliğinden bloklandı, istisna EKLENMEDİ). **Backfill sonrası kritik bulgu:** `kpi_07_lisanssiz_pay()` Word yılları için sessizce yanlış '%0' döndürüyordu (Lisanssız veri BOŞ değil, hiç YOK — eski `toplam==0` güvenlik ağı yakalamıyordu; 2026-09-09'un "boş DataFrame gelir" varsayımı YANLIŞ çıktı) — düzeltildi: fonksiyon artık ZORUNLU `lisanssiz_kapsam_disi` parametresi alıyor. KPI-03/06 kontrol edildi, düzeltme gerekmedi ama Word yıllarında Lisanslı-only kapsamı caption'a yazıldı | Canlı satır sayıları disposable ile BİREBİR eşleşti (1.382+101=1.483 kaynak_geneli, 9.639+942=10.581 il_geneli aktif). KPI-07 düzeltmesi SONRASI canlıda yeniden ölçüldü: 3 Word ayı `None` (doğru), 1 kontrol ayı (2026-01) hâlâ gerçek sayı (BOZULMADI). +3 test, 4 mevcut test güncellendi. Tam `worker/tests`: 354/355 geçti (tek beklenen `test_auth_integration.py`). Streamlit canlıya karşı başlatılıp çökme OLMADIĞI doğrulandı |
 | v1.43 | 2026-09-16 | **Dashboard incelemesinde bulunan 3 madde** — §5.28. (1) KPI-11/12 "Sanayi dikişi": `_il_tuketim_hava_getir()` Sanayi'yi tutarsız kapsıyordu (Word yıllarında yok, 2026'da var), canlı KPI-12 (2026-06) sahte +%92,9 gösteriyordu — ölçülüp doğrulandı (Sanayi payı canlıda tam %40,2), 1. seçenek (`fact_tuketim_ulke_geneli`'ye taşıma) il-bazlı regresyon mimarisiyle ÇAKIŞTI, 2. seçenek (her iki taraf Sanayi-hariç) uygulandı, düzeltme sonrası +%15,4'e düştü. (2) job_status id=11: 8 gündür asılıydı, araştırıldı — GERÇEK bir iş DEĞİL, erken bir test kontaminasyonu artığı (`locked_by='test-worker-1'`, batch_id=118 hiç var olmadı), dead_letter'a alındı + audit_log'a yazıldı; YAPISAL düzeltme: YENİ `gecmis_kalan_isleri_bul()` + dashboard'da görünür `st.warning()`. (3) KPI-26 açıklaması düzeltildi — "henüz backfill" YANLIŞ, gerçek neden YAPISAL/KALICI (Karar 3), dashboard'a Karar 3 referanslı ayrı kapsam notu eklendi | +2 test (Sanayi dikişi, `test_analytics_integration.py`) + 6 YENİ test (`test_analytics_pure.py`, job uyarısı). Canlıda KPI-11/12 3 örnek ayla + KPI-26 kapsamıyla doğrulandı. Tam `worker/tests` (fresh disposable): 363 test, 362 geçti. `ruff`/`mypy` temiz, `bandit` yalnız 4 önceden var olan/ilgisiz bulgu |
 | v1.44 | 2026-09-16 | **İki küçük iş: KPI-11/12 kart etiketi + `kpi_esik` (KPI-12) yeniden kalibrasyon** — §5.29. (1) Kartlara "Sanayi Hariç" etiketi + Karar 2 referanslı kapsam notu eklendi (hesaplama değişmedi, yalnız metin). (2) `kpi_esik`'in KPI-12 eşiği (yeşil≤5, sarı≤10, 2026-09-05'te seed edildi) kontrol edildi — HİÇBİR ampirik gerekçesi olmadığı bulundu (diğer KPI'ların aksine); Sanayi-dikişi düzeltmesi SONRASI canlıda ölçülen gerçek dağılım (81 il × 5 ay, n=403: medyan=19,1 p90=31,0) eski eşikle gözlemlerin ~%90'ının "kırmızı" göründüğünü gösterdi. Yeni eşik `yesil_alt=15,0`/`sari_alt=30,0`, migration `20260916_0001` ile canlıya uygulandı. KPI-11'i girdi alan başka eşik yok (kontrol edildi) | Kod değişikliği yalnız metin + config veri, hesaplama mantığı değişmedi (mevcut testler zaten pinliyor). Migration disposable'da (31/31) doğrulanıp canlıya uygulandı, canlıda `('KPI-12','v1',15.000,30.000,None,'alcelik')` teyit edildi |
+| v1.45 | 2026-09-18 | **İş A (source_asset dedup) DURDURULDU, A4 koruması UYGULANDI + İş C (mutabakat_reddedildi terminal durum) TAMAMLANDI** — §5.30/§6.1, §14 madde 5. İş A1: canlıda 126 mükerrer `file_hash` grubu ÖLÇÜLDÜ (125'i established "1 dosya × 4 parser_version" mimarisinin beklenen sonucu, 1'i 2026-08-31'de zaten temizlenmiş bir idempotency-bug artığı) — kullanıcı talimatı gereği A2/A3 dedup migration'ı UYGULANMADI, 3 tasarım seçeneği sunuldu, Ahmet karar verecek. İş A4 (bağımsız, uygulandı): `ingest.batch_olustur()` artık TERMİNAL durumdaki bir batch'e denk gelirse SESSİZCE dönmüyor, `BatchZatenTerminalHatasi` fırlatıyor (dedup sonrası gerçek hâle gelecek bir riski ÖNCEDEN kapatır). İş C: `ingestion_batch.status`'a 7. terminal durum eklendi (migration `20260918_0001`, yalnız disposable), `aktive_et_uretim_word.py`+`backfill_uretim_excel.py`'nin blok yolları artık `mutabakat_reddini_kaydet()` çağırıyor (status SET + audit_log_yaz) — önceden yalnız konsola yazılıyordu. Geri dönülebilirlik (farklı `file_hash`li revize dosyayla aynı dönemin yeniden aktive olabilmesi) uçtan uca kanıtlandı | Tam `worker/tests` (fresh disposable, 32/32 migration): 407 test, 406 geçti (tek beklenen `test_auth_integration.py`). +9 yeni test (geri dönülebilirlik +1, running_batch_kontrolu uyumu +1, batch_olustur terminal-guard +7 parametrized). `ruff`/`mypy` temiz, `bandit` (CI komutuyla) 0 bulgu. Canlıya HİÇBİR DDL/DML uygulanmadı |
 
 ---
 
@@ -253,7 +254,7 @@ kolon(ları), `ingestion_batch_id FK`, `is_active BOOLEAN`, iki kısıt
 | Tablo | Amaç |
 |---|---|
 | `source_asset` | Bir dosya/API çağrısının kimliği — `source_kind ∈ {file,api}` (P0-3): file→`file_name`+`file_hash` NOT NULL, api→`source_uri`+`request_hash` NOT NULL |
-| `ingestion_batch` | Bir işleme denemesi — `status ∈ {queued,running,succeeded,failed,retrying,dead_letter}`, `UNIQUE(source_asset_id, parser_version, schema_version)` (P0-5: aynı dosya farklı parser sürümüyle YENİDEN işlenebilir) |
+| `ingestion_batch` | Bir işleme denemesi — `status ∈ {queued,running,succeeded,failed,retrying,dead_letter,mutabakat_reddedildi}` (7. durum: migration `20260918_0001`, bkz. §5.30/§9.6), `UNIQUE(source_asset_id, parser_version, schema_version)` (P0-5: aynı dosya farklı parser sürümüyle YENİDEN işlenebilir — **2026-09-17'de düzeltildi: bu kısıt `source_asset` dedup'ı OLMADAN pratikte hiç tetiklenemiyordu, bkz. §14 madde 5**) |
 | `audit_log` | Append-only iz — INSERT/UPDATE her önemli olayda (`ingest_tamamlandi`, `batch_onaylandi`) JSONB payload ile; UPDATE/DELETE hiç kimseye GRANT edilmez |
 | `job_status` | Faz 1 asenkron kuyruk — `status ∈ {queued,running,succeeded,failed,retrying,dead_letter}`, `attempt_count`, `heartbeat_at` (bayat-heartbeat kurtarma) |
 | `veri_kapsam_disi` | "Kaynakta gerçekten yok" (parser hatası DEĞİL) kaydı — PK `(tarih_id, fact_tablosu, nitelik)`, `ingestion_batch`'ten BİLİNÇLİ BAĞIMSIZ (migration 0012, 2026-09-02) |
@@ -1371,6 +1372,66 @@ zaten onu pinliyor; yeni test gerekmedi. Detay:
 `06_canli_veri_operasyon_gunlugu.md` 2026-09-16 (devam) kaydı,
 `04_kpi_sozlesmeleri.md`.
 
+### 5.30 İş A (source_asset dedup — DURDURULDU, mükerrer bulundu) + İş C (mutabakat_reddedildi terminal durum) (2026-09-18)
+
+2026-09-17 doğrulama turunun (commit `8b0da0f`) bulgularından doğan iki
+iş — `Claude outputs/PROMPT_A_C_2026-09-17.md`, kapanış raporu `Claude
+outputs/kapanis_2026-09-18_A_C.md`.
+
+**İş A (source_asset dedup) — A1 aşamasında DURDURULDU:** canlıda SALT
+OKUMA ölçüldü — **126 `file_hash` grubu mükerrer** (aynı hash'e sahip
+birden fazla `source_asset` satırı). Derinlemesine incelendi: **125
+grup established mimarinin BEKLENEN sonucu** — TEK bir fiziksel .docx/
+xlsx dosyası 4 FARKLI `parser_version` geçişinden geçiyor (tüketim/abone,
+T4, ülke-geneli, üretim-geneli — her biri KENDİ `source_asset` satırını
+açıyor, aynı dosya içeriği/hash'iyle). **Yalnız 1 grup gerçek (aynı
+file_hash + aynı parser_version) tekrar** — ve bu da 2026-08-31 tarihli,
+ZATEN tam belgelenmiş/temizlenmiş bir idempotency-bug artığı (batch_id=
+19, `error_summary` alanında tam gerekçeli: "word_2024.py idempotency
+bug... batch_id=16 ile TAM AYNI veriyi üretti. Bu batch'in veri satırları
+silindi" — sıfır aktif çift-satır kaldı, fix zaten uygulandı). **Sonuç:**
+`UNIQUE(file_hash) WHERE file_hash IS NOT NULL` kısıtı (A2'nin önerilen
+tasarımı) MEVCUT MİMARİYLE UYUMSUZ — 125 legitimate grubu da bloklardı.
+Kullanıcı talimatı gereği ("mükerrer bulursan A2/A3'e geçme, seçenekleri
+sun, DUR") **A2/A3 (dedup migration + `kaynak_asset_olustur()` dedup
+mantığı) UYGULANMADI** — tam bulgu + 3 tasarım seçeneği
+(`UNIQUE(file_hash, parser_version)`, uygulama-katmanı ön-kontrolünü tüm
+loader'lara genelleştirme, ya da source_asset'i parser_version'dan
+BAĞIMSIZ tek satıra indiren bir refactor) kapanış raporunda, Ahmet
+karar verecek. **A4 İSE BAĞIMSIZ olarak UYGULANDI:** A4'ün sorduğu soru
+("terminal bir batch'in üzerine sessizce dönülüyor mu?") dedup'tan
+BAĞIMSIZ, `batch_olustur()`'ın BUGÜNKÜ davranışıyla ilgili bir soru —
+cevap ÖLÇÜLDÜ: `ON CONFLICT DO UPDATE SET status = ingestion_batch.
+status` zaten status'ü EZMİYORDU (no-op), ama HİÇBİR guard var olan bir
+batch'in TERMİNAL olup olmadığını kontrol etmiyordu — bugün bu yol
+pratikte tetiklenmiyor (`source_asset_id` her zaman taze) ama dedup
+geldiğinde GERÇEK bir risk olurdu. Önlem alındı: `batch_olustur()` artık
+TERMİNAL bir eşleşme bulursa `BatchZatenTerminalHatasi` fırlatır,
+TERMİNAL OLMAYAN bir eşleşmede eskisi gibi sessizce aynı id'yi döner
+(established idempotent-retry deseni korundu). +9 parametrized test.
+
+**İş C (mutabakat_reddedildi terminal durum) — TAMAMLANDI:** bkz. §6.1
+(durum makinesi detayı orada). Özet: migration `20260918_0001` (yalnız
+disposable'da uygulandı/doğrulandı, canlıya UYGULANMADI), `worker/
+scripts/mutabakat_uretim.py:mutabakat_reddini_kaydet()` (YENİ, hem
+status SET eder hem `audit_log_yaz()` çağırır), `aktive_et_uretim_word.
+py` + `backfill_uretim_excel.py`nin blok yolları bunu çağıracak şekilde
+GÜNCELLENDİ (mutabakat sonucuna göre blokla yapan TARANAN tüm yollar —
+`onayla.py`/`toplu_onayla_word.py` mutabakat'a HİÇ bakmıyor, insan
+kararı; `worker/job_worker.py:otomatik_onaya_uygun()` FARKLI bir kavram
+— per-batch red/karantina eşiği, KALICI DEĞİL, insan onayı bekleyen
+GEÇİCİ bir durum, bu yüzden BİLİNÇLİ OLARAK yeni statüye dahil
+EDİLMEDİ). Geri dönülebilirlik uçtan uca kanıtlandı (`worker/tests/
+test_mutabakat_reddi_geri_donulebilirlik.py`, PASSED) — aynı dönem
+FARKLI bir `source_asset`le (farklı `file_hash`) yeniden yüklenip normal
+aktive olabiliyor. `running_batch_kontrolu.py` yeni durumu doğru
+yoksayıyor (testle sabitlendi).
+
+**Canlıya UYGULANMADI** — yalnız disposable'da migration+kod+test
+doğrulandı, kod PR'ı hazır ama canlı DDL/DML bu turun kapsamı DIŞINDA
+(kullanıcı talimatı: "Bu turda CANLIYA YAZMA YOK"). Sıralı uygulama
+planı `Claude outputs/kapanis_2026-09-18_A_C.md`'de.
+
 ---
 
 ## 6. Ingestion Pipeline
@@ -1378,13 +1439,43 @@ zaten onu pinliyor; yeni test gerekmedi. Detay:
 ### 6.1 Batch Yaşam Döngüsü
 ```
 queued → (is_sahiplen, advisory lock) → running
-  → başarılı: succeeded (aktivasyon SONRASI) | başarısız: retrying → dead_letter | failed
+  → başarılı: succeeded (aktivasyon SONRASI)
+  → başarısız: retrying → dead_letter | failed
+  → çapraz mutabakat kalıcı olarak reddetti: mutabakat_reddedildi (7. durum, 2026-09-18)
 ```
-`ingestion_batch.status` değerleri: `queued`, `running`, `succeeded`,
-`failed`, `retrying`, `dead_letter`. Faz 0'da senkron (elle script
+`ingestion_batch.status` **7 değer** taşır (2026-09-18'den beri, migration
+`20260918_0001`): `queued`, `running`, `succeeded`, `failed`, `retrying`,
+`dead_letter`, `mutabakat_reddedildi`. Faz 0'da senkron (elle script
 çağrısı); Faz 1'de `job_status` kuyruğu üzerinden asenkron (bkz. §6.5).
 Sahiplenme `ingest.batch_sahiplen()` ile ATOMİK (advisory lock) —
 aynı batch'i iki worker aynı anda işleyemez.
+
+**Hangileri TERMİNAL (bir daha değişmesi beklenmez):** `succeeded`,
+`failed`, `dead_letter`, `mutabakat_reddedildi`. Geçici/ara durumlar:
+`queued`, `running`, `retrying`.
+
+**`mutabakat_reddedildi` — 7. durum, `dead_letter` İLE KARIŞTIRILMAZ**
+(2026-09-18, `Claude outputs/PROMPT_A_C_2026-09-17.md` İş C): `dead_
+letter` "N retry sonrası pes edildi" (`worker/ingest.py:is_basarisiz()`,
+`_MAX_DENEME`) demektir; `mutabakat_reddedildi` İSE `worker/scripts/
+mutabakat_uretim.py:periyot_aktivasyona_uygun_mu()`nün bir batch'i
+ÇAPRAZ MUTABAKAT gereği bloklaması demektir — farklı bir kök neden,
+farklı bir durum. **Boşluk (2026-09-17 doğrulama turunda bulundu, bkz.
+`dokumanlar/kapsam_raporu_2026-09-16.md` "Doğrulama Turu" Madde 1):**
+bu duruma KADAR, `aktive_et_uretim_word.py`/`backfill_uretim_excel.py`
+mutabakat reddini yalnız KONSOLA yazıyordu — batch süresiz `running`de
+kalıyordu, `audit_log`'da hiçbir iz YOKTU (gerçek örnek: batch_id=732,
+`fact_uretim_kaynak_geneli`/2024-02, Bulgu J gereği T3 hiç yüklenmediği
+için mutabakat ASLA geçemez). Artık HER İKİ script de blok anında
+`mutabakat_uretim.mutabakat_reddini_kaydet()`i çağırır — batch bu YENİ
+duruma geçer VE `audit_log`'a (konsolla AYNI içerikle) yazılır.
+**PER-BATCH terminal, PER-DÖNEM kalıcı bir kapan DEĞİL:** aynı `tarih_id`
+için FARKLI bir `source_asset`le (örn. EPDK'nın revize ettiği bir dosya,
+farklı `file_hash`) YENİ bir batch açılıp normal aktive edilebilir —
+uçtan uca kanıtlandı: `worker/tests/test_mutabakat_reddi_geri_
+donulebilirlik.py` (disposable, PASSED). `worker/scripts/running_batch_
+kontrolu.py` (yalnız `status='running'` filtreler) bu YENİ durumdaki
+batch'leri doğru şekilde "takılı" SAYMAZ — testle sabitlendi.
 
 ### 6.2 audit_log Felsefesi — Hiçbir Şeyin Üzerine Yazılmama
 `audit_log` append-only'dir (UPDATE/DELETE hiç kimseye GRANT
@@ -2240,6 +2331,32 @@ Bu doküman yazılırken bulunan, önceki notlarla gerçek kod/git arasındaki
    doğru değildi — 227'si gerçekten yerel, 3'ü (rollback-izolasyonlu,
    zararsız ama GERÇEK) canlı Supabase Auth çağrısıydı. Bu doküman
    §9.4'te bu nüansı düzeltilmiş hâliyle yansıtır.
+5. **`UNIQUE(source_asset_id, parser_version, schema_version)`in "P0
+   garantisi" olarak anlatılması — 2026-09-17'de düzeltildi:** §6
+   tablosundaki `ingestion_batch` satırı bu kısıtı örtük biçimde "aynı
+   dönem aynı parser'la iki kez yüklenemez" garantisi gibi sunuyordu.
+   Bu YANILTICIYDI: kısıt yalnız `source_asset_id` AYNI kaldığında
+   devreye girer, ama `kaynak_asset_olustur()` (worker/ingest.py) HER
+   ÇAĞRIDA (aynı dosya `file_hash`'i olsa bile) YENİ bir `source_asset_
+   id` üretiyordu — dedup YOKTU. Yani kısıt PRATİKTE hiç tetiklenemiyordu;
+   gerçek "aynı dönem tekrar yüklenemez" koruması TAMAMEN uygulama
+   katmanındaydı (`word_2024.py` gibi script'lerin kendi `SELECT ...
+   status != 'failed'` ön kontrolü) — bir DB garantisi değil, her
+   parser'ın ayrı taşıması gereken bir gelenek. Ampirik olarak da
+   doğrulandı (`worker/tests/test_batch_yeniden_yukleme_arastirma.py`,
+   2026-09-17): aynı dönem, aynı parser_version, FARKLI bir
+   `source_asset_id` ile denendiğinde şema hiçbir şeyi engellemiyor, iki
+   AYRI batch satırı oluşuyor. Canlıda ayrıca 126 `file_hash` grubunun
+   mükerrer olduğu ÖLÇÜLDÜ (2026-09-18, `Claude outputs/PROMPT_A_C_
+   2026-09-17.md` İş A1) — 125'i established "bir dosya, 4 farklı
+   parser_version geçişi" mimarisinin BEKLENEN sonucu, 1'i ise 2026-08-31
+   tarihli, ZATEN belgelenmiş/temizlenmiş bir idempotency-bug artığı
+   (batch_id=19, `error_summary`'de tam gerekçeli). Bu mükerrerlik
+   bulgusu YÜZÜNDEN dedup migration'ı (İş A2/A3/A4) bu turda
+   UYGULANMADI — kullanıcı talimatı gereği (mükerrer bulunursa dur,
+   seçenek sun) DURULDU, bkz. §5.30 ve `Claude outputs/kapanis_
+   2026-09-18_A_C.md`. §6 tablosundaki satır düzeltildi (eski metin
+   SİLİNMEDİ, bu not eklendi — tarih çapası kuralı).
 
 ---
 
