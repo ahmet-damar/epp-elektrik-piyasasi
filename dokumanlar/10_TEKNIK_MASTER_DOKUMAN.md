@@ -93,6 +93,7 @@ her yeni rakam için geçerlidir.
 | v1.43 | 2026-09-16 | **Dashboard incelemesinde bulunan 3 madde** — §5.28. (1) KPI-11/12 "Sanayi dikişi": `_il_tuketim_hava_getir()` Sanayi'yi tutarsız kapsıyordu (Word yıllarında yok, 2026'da var), canlı KPI-12 (2026-06) sahte +%92,9 gösteriyordu — ölçülüp doğrulandı (Sanayi payı canlıda tam %40,2), 1. seçenek (`fact_tuketim_ulke_geneli`'ye taşıma) il-bazlı regresyon mimarisiyle ÇAKIŞTI, 2. seçenek (her iki taraf Sanayi-hariç) uygulandı, düzeltme sonrası +%15,4'e düştü. (2) job_status id=11: 8 gündür asılıydı, araştırıldı — GERÇEK bir iş DEĞİL, erken bir test kontaminasyonu artığı (`locked_by='test-worker-1'`, batch_id=118 hiç var olmadı), dead_letter'a alındı + audit_log'a yazıldı; YAPISAL düzeltme: YENİ `gecmis_kalan_isleri_bul()` + dashboard'da görünür `st.warning()`. (3) KPI-26 açıklaması düzeltildi — "henüz backfill" YANLIŞ, gerçek neden YAPISAL/KALICI (Karar 3), dashboard'a Karar 3 referanslı ayrı kapsam notu eklendi | +2 test (Sanayi dikişi, `test_analytics_integration.py`) + 6 YENİ test (`test_analytics_pure.py`, job uyarısı). Canlıda KPI-11/12 3 örnek ayla + KPI-26 kapsamıyla doğrulandı. Tam `worker/tests` (fresh disposable): 363 test, 362 geçti. `ruff`/`mypy` temiz, `bandit` yalnız 4 önceden var olan/ilgisiz bulgu |
 | v1.44 | 2026-09-16 | **İki küçük iş: KPI-11/12 kart etiketi + `kpi_esik` (KPI-12) yeniden kalibrasyon** — §5.29. (1) Kartlara "Sanayi Hariç" etiketi + Karar 2 referanslı kapsam notu eklendi (hesaplama değişmedi, yalnız metin). (2) `kpi_esik`'in KPI-12 eşiği (yeşil≤5, sarı≤10, 2026-09-05'te seed edildi) kontrol edildi — HİÇBİR ampirik gerekçesi olmadığı bulundu (diğer KPI'ların aksine); Sanayi-dikişi düzeltmesi SONRASI canlıda ölçülen gerçek dağılım (81 il × 5 ay, n=403: medyan=19,1 p90=31,0) eski eşikle gözlemlerin ~%90'ının "kırmızı" göründüğünü gösterdi. Yeni eşik `yesil_alt=15,0`/`sari_alt=30,0`, migration `20260916_0001` ile canlıya uygulandı. KPI-11'i girdi alan başka eşik yok (kontrol edildi) | Kod değişikliği yalnız metin + config veri, hesaplama mantığı değişmedi (mevcut testler zaten pinliyor). Migration disposable'da (31/31) doğrulanıp canlıya uygulandı, canlıda `('KPI-12','v1',15.000,30.000,None,'alcelik')` teyit edildi |
 | v1.45 | 2026-09-18 | **İş A (source_asset dedup) DURDURULDU, A4 koruması UYGULANDI + İş C (mutabakat_reddedildi terminal durum) TAMAMLANDI** — §5.30/§6.1, §14 madde 5. İş A1: canlıda 126 mükerrer `file_hash` grubu ÖLÇÜLDÜ (125'i established "1 dosya × 4 parser_version" mimarisinin beklenen sonucu, 1'i 2026-08-31'de zaten temizlenmiş bir idempotency-bug artığı) — kullanıcı talimatı gereği A2/A3 dedup migration'ı UYGULANMADI, 3 tasarım seçeneği sunuldu, Ahmet karar verecek. İş A4 (bağımsız, uygulandı): `ingest.batch_olustur()` artık TERMİNAL durumdaki bir batch'e denk gelirse SESSİZCE dönmüyor, `BatchZatenTerminalHatasi` fırlatıyor (dedup sonrası gerçek hâle gelecek bir riski ÖNCEDEN kapatır). İş C: `ingestion_batch.status`'a 7. terminal durum eklendi (migration `20260918_0001`, yalnız disposable), `aktive_et_uretim_word.py`+`backfill_uretim_excel.py`'nin blok yolları artık `mutabakat_reddini_kaydet()` çağırıyor (status SET + audit_log_yaz) — önceden yalnız konsola yazılıyordu. Geri dönülebilirlik (farklı `file_hash`li revize dosyayla aynı dönemin yeniden aktive olabilmesi) uçtan uca kanıtlandı | Tam `worker/tests` (fresh disposable, 32/32 migration): 407 test, 406 geçti (tek beklenen `test_auth_integration.py`). +9 yeni test (geri dönülebilirlik +1, running_batch_kontrolu uyumu +1, batch_olustur terminal-guard +7 parametrized). `ruff`/`mypy` temiz, `bandit` (CI komutuyla) 0 bulgu. Canlıya HİÇBİR DDL/DML uygulanmadı |
+| v1.46 | 2026-09-19 | **İş C migration'ı CANLIYA UYGULANDI + İş A kararı (Seçenek 3) kayda geçti + YENİ bulgu: batch 4-8** — §5.31. Ahmet'in bu tur için verdiği canlı-yazma izniyle: taze yedek tetiklendi/doğrulandı (run 35432314325, 1.797.064 bayt), canlı durum fotoğrafı alındı, `ingestion_batch_status_check` 7 değere genişletildi (kilit kontrolü temiz, migration izleme tablosu YOK, sonrası 0 fark). **ADIM 2 beklenmedik bulgu verdi, tur DURDU:** `running_batch_kontrolu.py` batch 732 DIŞINDA **5 GERÇEK batch** (4-8, 2026-02..06 Excel, ~19 gündür running) daha buldu — kök neden batch 732'den FARKLI (`pipeline.otomatik_onaya_uygun()`'un per-batch iç mutabakatı `fact_tuketim` için False döndü, elle onay hiç verilmedi). Kullanıcı talimatı gereği ("beklenmedik → sonrakine geçme") **ADIM 3 (batch 732 geçişi) BU TURDA ÇALIŞTIRILMADI**, batch 4-8'e DOKUNULMADI — yeni, ayrı bir açık madde olarak raporlandı. **ADIM 4 (İş A kararı) kayda geçti:** Seçenek 3 (source_asset'i 1 dosya=1 satır yapma) + Şart 1 (batch 19'un error_summary'si audit_log'a taşınmadan silinmeyecek) + Şart 2 (storage_path NOT NULL tercih kuralı, min(id) değil) — UYGULANMADI, yalnız karar notu | Kod değişikliği YOK (yalnız canlı DDL + doküman). Durum fotoğrafı diff: ADIM 1 sonrası 0 fark (tüm fact tablo satır sayıları, ay bazlı aktif sayılar, ingestion_batch durum dağılımı, audit_log sayısı aynı) |
 
 ---
 
@@ -1431,6 +1432,99 @@ yoksayıyor (testle sabitlendi).
 doğrulandı, kod PR'ı hazır ama canlı DDL/DML bu turun kapsamı DIŞINDA
 (kullanıcı talimatı: "Bu turda CANLIYA YAZMA YOK"). Sıralı uygulama
 planı `Claude outputs/kapanis_2026-09-18_A_C.md`'de.
+
+### 5.31 İş C migration'ı CANLIYA UYGULANDI + İş A kararı kayda geçti + YENİ bulgu: batch 4-8 (2026-09-19)
+
+`Claude outputs/PROMPT_CANLI_C_DEVAM_2026-09-19.md` (Ahmet'in bu tur için
+verdiği canlı-yazma izniyle) — kapanış raporu `Claude outputs/kapanis_
+2026-09-19_canli_C.md`.
+
+**Ön koşullar doğrulandı:** taze `scheduled-backup` koşusu tetiklendi ve
+başarıyla tamamlandı (run `35432314325`, artifact `epp-backup-35432314325`,
+1.797.064 bayt). Canlı durum fotoğrafı alındı (`Claude outputs/canli_
+foto_oncesi_2026-09-19.txt`) — TÜM fact tabloları toplam/aktif satır
+sayıları + `fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli`'nin ay
+bazlı aktif satır sayıları + `ingestion_batch` durum dağılımı + `audit_
+log` toplam satırı.
+
+**ADIM 1 — migration canlıya uygulandı:** kilit kontrolü temiz (0
+idle-in-transaction, 0 kilit). `ingestion_batch_status_check` artık 7
+değer içeriyor (`pg_get_constraintdef` ile doğrulandı). **Bu projede
+migration'ları izleyen bir tablo YOK** — `public.migrations`/
+`supabase_migrations.schema_migrations` mevcut değil (yalnız Supabase'in
+KENDİ `auth.schema_migrations`/`storage.migrations`/`realtime.schema_
+migrations` tabloları var, bu projenin `supabase/migrations/*.sql`
+dosyalarıyla İLGİSİZ) — CI migration'ları sıfırdan glob ile uyguluyor,
+kayıt tutan bir mekanizma yok. Migration sonrası durum fotoğrafı
+yeniden alınıp diff edildi: **0 fark** (yalnız başlık etiketi farklıydı).
+
+**ADIM 2 — BEKLENMEDİK bulgu, tur burada DURDU:**
+`running_batch_kontrolu.py` canlıya karşı çalıştırıldığında beklenen
+"yalnız batch 732" YERİNE **6 batch** buldu: 732 + **4, 5, 6, 7, 8**
+(hepsi `parser_version='0.1'`, `created_at=2026-08-30 23:09`, ~465
+saat/~19 gündür `running`). Araştırıldı — bunlar **GERÇEK, TAMAMLANMIŞ
+Faz 1 iş kuyruğu batch'leri** (2026-02..2026-06 Excel ayları, `job_
+status`'ta `status='succeeded'`, gerçek fact satırları yazılmış: her
+biri `fact_tuketim`≈485, `fact_uretim`≈500-836, `fact_abone`=405 satır —
+batch 4 ayrıca `fact_serbest_tuketici`=1169). **Kök neden batch 732'den
+TAMAMEN FARKLI:** `worker/pipeline.py:otomatik_onaya_uygun()`'un
+per-batch İÇ mutabakat kontrolü (`sonuc.mutabakat`, İL toplamı ↔ kaynak
+'TÜRKİYE' satırı karşılaştırması — `mutabakat_uretim.py`'nin ÇAPRAZ
+TABLO kontrolüyle KARIŞTIRILMASIN) `fact_tuketim` için **5 ayın
+TAMAMINDA** `False` döndü (audit_log'da `'mutabakat': {'fact_tuketim':
+False}` olarak kayıtlı, 2026-08-30) — `worker/job_worker.py` bu yüzden
+OTOMATİK aktive ETMEDİ, elle `onayla.py` çağrısı BEKLİYORDU. **Kimse
+hiç çağırmadı — 19 gündür.** Bu, job_status id=11 (2026-09-16'da
+bulunup dead_letter'a alınan) ile AYNI sınıf ama FARKLI bir örnek: o
+zaman `job_status.next_retry_at` geçmişte kalmıştı, burada `job_status`
+ZATEN `succeeded` ama `ingestion_batch` elle onay bekliyor — dashboard'un
+2026-09-16'da eklenen "gecmis_kalan_isleri_bul()" uyarısı bunu
+YAKALAMAZ (o yalnız `job_status`a bakıyor, bu durumda `job_status`
+zaten `succeeded`). **YENİ, AYRI bir açık madde — bu turun kapsamı
+DIŞINDA, dokunulmadı, Ahmet'in kararı gerekiyor.**
+
+Kullanıcı talimatının kendi kuralı gereği ("bir adım beklenmedik bir şey
+verirse sonrakine geçme") **ADIM 3 (batch 732'yi `mutabakat_reddedildi`ye
+geçirme) BU TURDA ÇALIŞTIRILMADI** — `aktive_et_uretim_word.py`'nin
+sorgusu (`WHERE ib.parser_version LIKE 'word-%-uretim-geneli-v1'`)
+batch 4-8'i (parser_version='0.1') yapısal olarak HİÇ seçemeyeceği için
+ADIM 3'ün kendisi güvenli kalırdı — ama talimatın açık "DUR" kuralı
+önceliklendirildi, yeni bulgu önce raporlanmalı.
+
+**ADIM 4 — İş A kararı KAYDA GEÇTİ (uygulanmadı):** Ahmet'in kararı
+**Seçenek 3** — `source_asset`'i "1 fiziksel dosya = 1 satır" yapmak,
+batch'leri korunan satıra repoint etmek; mevcut `UNIQUE(source_asset_id,
+parser_version, schema_version)` YENİ bir kısıt icat edilmeden kendi
+başına çalışmaya başlayacak. **İki şart:**
+- **Şart 1:** batch 19'un `error_summary`'si (2026-08-31 idempotency-bug
+  olayının TEK yazılı kaydı) yok edilmeyecek — önce bu metin `audit_log`a
+  taşınacak, SONRA batch 19 silinecek (ya da o TEK grup hiç
+  birleştirilmeden bırakılabilir — zaten belgeli/temiz/sıfır aktif
+  satırlı). **Sessiz DELETE yasak.**
+- **Şart 2:** "min(source_asset_id) tut" kuralı OLDUĞU GİBİ kodlanmayacak
+  — 5 Excel grubunda en düşük ID'nin en zengin satır (storage_path dolu)
+  olması yükleme SIRASININ tesadüfü, garantili bir değişmez değil. Kural:
+  **`storage_path IS NOT NULL` olan satır tercih edilir, eşitlikte
+  min(id)** — aynı pratik sonucu verir ama SEBEBİNİ kodda taşır.
+
+**ADIM 0'ın ölçüm sonucu (kalıcı kayıt, bir daha ölçülmesin):** 126
+mükerrer `file_hash` grubu → **121 grup TÜM kolonlar (source_type/
+source_kind/source_period/donem_tipi/file_name/storage_path/source_uri/
+request_hash/uploaded_by) birebir aynı** (bilgi kaybı yok, established
+"1 dosya × 4 parser_version" mimarisi) + **5 grup** (2026-02..06 Excel)
+`file_name`+`storage_path` farklı ama min(source_asset_id) HER ZAMAN
+`storage_path` dolu olanı taşıyor (Faz 1 async orijinali) — min(id)
+tutulsa bilgi kaybı YOK. **Çakışma testi canlıda çalıştırıldı — 126
+gruptan YALNIZ 1'i çakışıyor** (hash `97932eab...`, batch 16
+`succeeded` + batch 19 `failed`, ikisi de `parser_version='word-2024-
+v1'`) — Adım 4'teki öngörü KANITLANDI, TEK istisna bu. FK: `ingestion_
+batch_source_asset_id_fkey` → `ON DELETE RESTRICT` — bir `source_asset`
+satırı silinmeden ÖNCE ona referans veren TÜM `ingestion_batch`
+satırları repoint/silinmeli (silme sırası: önce batch repoint/silme,
+sonra source_asset silme).
+
+**Kod değişikliği YOK bu turda** (yalnız canlı DDL — ADIM 1 — ve
+doküman). `worker/tests` bu turdan etkilenmedi (kod değişmedi).
 
 ---
 

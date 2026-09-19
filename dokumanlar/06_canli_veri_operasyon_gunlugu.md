@@ -2748,3 +2748,117 @@ disposable, 31/31 migration): sonuç aşağıdaki "Doğrulama" bölümünde. Kod
 değişikliği yalnız metin (dashboard.py) + config veri (migration) —
 yeni bir Python testi gerektirmedi (mevcut KPI-11/12 regresyon testleri
 zaten hesaplama mantığını pinliyor, bu turda hesaplama DEĞİŞMEDİ).
+
+## 2026-09-19 — İş C ADIM 1 migration'ı CANLIYA UYGULANDI + YENİ bulgu: batch 4-8 (~19 gündür elle onay bekliyor)
+
+Ahmet bu tur için canlı-yazma izni verdi (`Claude outputs/PROMPT_CANLI_
+C_DEVAM_2026-09-19.md`). Tam kapanış raporu: `Claude outputs/kapanis_
+2026-09-19_canli_C.md`.
+
+### Ön koşullar
+
+**Taze yedek tetiklendi ve doğrulandı:** `gh workflow run scheduled-
+backup.yml` → run `35432314325`, `workflow_dispatch`, **success**,
+artifact `epp-backup-35432314325`, **1.797.064 bayt**, `expires_at`
+2026-12-18.
+
+**Canlı durum fotoğrafı alındı** (salt okuma) →
+`Claude outputs/canli_foto_oncesi_2026-09-19.txt`:
+```
+fact_tuketim: toplam=44458 aktif=41547
+fact_uretim: toplam=56794 aktif=53345
+fact_abone: toplam=25110 aktif=22680
+fact_serbest_tuketici: toplam=9348 aktif=7009
+fact_tuketim_ulke_geneli: toplam=629 aktif=629
+fact_uretim_kaynak_geneli: toplam=1494 aktif=1483
+fact_uretim_il_geneli: toplam=10581 aktif=10581
+fact_hava_aylik: toplam=10368
+ingestion_batch: failed=1 running=6 succeeded=639 (toplam 646)
+audit_log: 1013 satır
+```
+(fact_uretim_kaynak_geneli/fact_uretim_il_geneli'nin tam ay-bazlı
+dökümü dosyanın kendisinde.)
+
+### ADIM 1 — migration canlıya uygulandı
+
+Kilit kontrolü: 0 idle-in-transaction, 0 kilit (`ingestion_batch`
+üzerinde). **Bu projede migration izleyen bir tablo YOK** —
+`public.migrations`/`supabase_migrations.schema_migrations` mevcut
+değil, yalnız Supabase'in kendi `auth`/`storage`/`realtime` şemalarının
+İLGİSİZ tabloları var; CI migration'ları `supabase/migrations/*.sql`
+glob'uyla sıfırdan uyguluyor, kayıt tutmuyor.
+
+Migration (`20260918_0001_ingestion_batch_mutabakat_reddedildi.sql`)
+uygulandı, commit edildi. Doğrulama:
+```
+YENİ CHECK kısıtı: CHECK (status = ANY (ARRAY['queued','running',
+  'succeeded','failed','retrying','dead_letter','mutabakat_reddedildi']))
+toplam ingestion_batch satırı ÖNCESİ: 646, SONRASI: 646
+```
+Durum fotoğrafı yeniden alınıp `diff` edildi: **0 fark** (yalnız dosya
+başlığındaki elle eklenen etiket satırı farklıydı, veri satırlarının
+TAMAMI birebir aynı).
+
+### ADIM 2 — BEKLENMEDİK bulgu, tur burada DURDU
+
+`worker/scripts/running_batch_kontrolu.py` canlıya karşı çalıştırıldı
+(salt okuma). Beklenen "yalnız batch 732" YERİNE **6 batch** bulundu:
+
+```
+⚠️ 6 batch 24 saatten uzun 'running' durumunda takılı:
+  batch_id=4 parser_version=0.1 created_at=2026-08-30T23:09:31 (465.4 saat)
+  batch_id=5 parser_version=0.1 created_at=2026-08-30T23:09:31 (465.4 saat)
+  batch_id=6 parser_version=0.1 created_at=2026-08-30T23:09:32 (465.4 saat)
+  batch_id=7 parser_version=0.1 created_at=2026-08-30T23:09:32 (465.4 saat)
+  batch_id=8 parser_version=0.1 created_at=2026-08-30T23:09:32 (465.4 saat)
+  batch_id=732 parser_version=word-2024-uretim-geneli-v1 created_at=2026-09-16T06:58:57 (73.6 saat)
+```
+
+**Araştırıldı — batch 4-8 GERÇEK, TAMAMLANMIŞ Faz 1 batch'leri:**
+`source_type='epdk_aylik'`, dönemler 2026-02..2026-06 (Excel), her biri
+gerçek fact satırı yazmış: `fact_tuketim`≈485-486, `fact_uretim`≈500-836,
+`fact_abone`=405 (hepsi), `fact_serbest_tuketici`=1169 (yalnız batch 4).
+`job_status` tablosunda correlation_id 4-8 → `status='succeeded'`,
+`attempt_count=1` — **asenkron İŞ kendisi başarıyla bitmiş.**
+
+**Kök neden batch 732'den TAMAMEN FARKLI:** `audit_log`'daki
+`ingest_tamamlandi` olayları `'mutabakat': {'fact_abone': True,
+'fact_tuketim': False}` gösteriyor — bu `worker/pipeline.py:
+otomatik_onaya_uygun()`'un PER-BATCH İÇ tutarlılık kontrolü
+(`sonuc.mutabakat`, workbook'un kendi il-toplamı ↔ 'TÜRKİYE' satırı
+karşılaştırması) — `worker/scripts/mutabakat_uretim.py`'nin ÇAPRAZ
+TABLO kontrolüyle KARIŞTIRILMASIN, apayrı bir mekanizma. `fact_tuketim`
+için 5 ayın TAMAMINDA `False` döndüğünden `worker/job_worker.py`
+OTOMATİK aktive ETMEDİ (`[UYARI] ... elle batch_onayla() bekleniyor`
+konsola basıldı, 2026-08-30 23:09-23:29 arası) — **elle onay hiç
+verilmedi, 19 gündür.**
+
+Bu, job_status id=11'in (2026-09-16'da bulunup dead_letter'a alınan)
+AYNI SINIFTAN ama FARKLI bir örneği: o zaman `job_status.next_retry_at`
+geçmişte kalmıştı; burada `job_status` ZATEN `succeeded`, asıl bekleyen
+`ingestion_batch`'in elle onayı — 2026-09-16'da eklenen dashboard
+uyarısı (`gecmis_kalan_isleri_bul()`) bunu YAKALAMAZ (yalnız
+`job_status`a bakıyor). **YENİ, AYRI bir açık madde — bu turda
+DOKUNULMADI, Ahmet'in kararı gerekiyor** (aktive mi edilsin, önce veri
+mi incelensin).
+
+Kullanıcı talimatının kendi kuralı gereği ("bir adım beklenmedik bir
+şey verirse sonrakine geçme") **ADIM 3 bu turda ÇALIŞTIRILMADI.**
+`aktive_et_uretim_word.py`'nin sorgusu (`WHERE ib.parser_version LIKE
+'word-%-uretim-geneli-v1'`) batch 4-8'i (parser_version='0.1') yapısal
+olarak seçemeyeceği DOĞRULANDI (kod okunarak) — yani ADIM 3'ün kendisi
+güvenli kalırdı, ama talimatın açık "DUR" kuralı önceliklendirildi.
+
+### ADIM 4 — İş A kararı kayda geçti (uygulanmadı)
+
+Ahmet'in kararı: **Seçenek 3.** Detay ve iki şart (batch 19'un
+error_summary'sinin korunması, "storage_path NOT NULL tercih" kuralı)
+`10_TEKNIK_MASTER_DOKUMAN.md` §5.31'de. ADIM 0'ın tam ölçüm sonucu
+(121 özdeş grup / 5 farklı-ama-kayıpsız grup / 1 çakışma / FK ON DELETE
+RESTRICT sırası) da orada kalıcı olarak kayıtlı — bir sonraki tur
+yeniden ölçmesin.
+
+### Doğrulama
+
+Kod değişikliği YOK bu turda (yalnız canlı DDL — ADIM 1 — ve doküman).
+`worker/tests` bu turdan etkilenmedi.

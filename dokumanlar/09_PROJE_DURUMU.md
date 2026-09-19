@@ -189,6 +189,16 @@ yansıtıldı.**
   ve kapanış raporundaki sıralı uygulama planı.
   Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.30/§6.1/§14 madde 5, Sürüm
   Geçmişi v1.45.
+  **2026-09-19'da Ahmet canlı-yazma izni verdi, İş C'nin ADIM 1'i
+  (migration, 7. durum) CANLIYA UYGULANDI** (taze yedek + durum
+  fotoğrafı doğrulanarak, sonrası 0 fark). **ADIM 2'de BEKLENMEDİK bir
+  bulgu çıktı:** batch 732 dışında **5 GERÇEK, tamamlanmış batch (4-8,
+  2026-02..06 Excel)** ~19 gündür elle onay bekliyor — kök nedeni
+  FARKLI (`otomatik_onaya_uygun()`'un iç mutabakatı), talimat gereği
+  ADIM 3 (batch 732) bu turda ÇALIŞTIRILMADI, batch 4-8'e dokunulmadı.
+  **İş A kararı (Seçenek 3) kayda geçti, henüz uygulanmadı.** Detay:
+  §5.31, Sürüm Geçmişi v1.46, `Claude outputs/kapanis_2026-09-19_
+  canli_C.md`.
   (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
@@ -358,17 +368,33 @@ gerçekleşmiş durumda (yalnız 2026-01'den itibaren; Word yılları ADIM 4'te)
 
 ### Açık madde
 
-**GÜNCEL (2026-09-18) — en öncelikli açık maddeler bunlar, aşağıdaki
+**GÜNCEL (2026-09-19) — en öncelikli açık maddeler bunlar, aşağıdaki
 ADIM 3/4 tarihçesi TAMAMEN kapalı, yalnız referans için duruyor:**
-1. **İş A — source_asset dedup tasarım kararı BEKLİYOR (Ahmet):** canlıda
-   126 mükerrer `file_hash` grubu bulundu (125 beklenen, 1 zaten
-   temizlenmiş eski bug) — 3 seçenek sunuldu (`Claude outputs/kapanis_
-   2026-09-18_A_C.md`), hiçbiri uygulanmadı, karar bekleniyor.
-2. **İş C — canlıya uygulama BEKLİYOR (Ahmet onayı):** migration
-   `20260918_0001` + kod değişiklikleri yalnız disposable'da, canlıya
-   HENÜZ uygulanmadı. Sıralı plan kapanış raporunda (adım adım, geri
-   alma yollarıyla) — batch 732'nin durumunun ne yapılacağı da o planda.
-3. **Madde 4'ün tam kapsamı BELİRSİZ:** `fact_uretim_kaynak_geneli`
+1. **YENİ (2026-09-19) — batch 4-8: 5 GERÇEK batch ~19 gündür elle onay
+   bekliyor, Ahmet'in kararı gerekiyor:** `running_batch_kontrolu.py`
+   canlıya karşı çalıştırılınca batch 732 DIŞINDA 4 gerçek fact satırlı
+   ve tamamlanmış (2026-02..06 Excel ayları, `job_status`'ta zaten
+   `succeeded`) batch buldu — `pipeline.otomatik_onaya_uygun()`'un
+   per-batch iç mutabakatı `fact_tuketim` için 5 ayın TAMAMINDA `False`
+   döndüğü için OTOMATİK aktive edilmediler, elle `onayla.py` çağrısı
+   bekliyorlar, kimse hiç çağırmadı. Kök neden batch 732'den (çapraz
+   tablo mutabakatı) TAMAMEN FARKLI — dokunulmadı, araştırma/karar
+   gerekiyor (aktive mi edilsin, veri incelensin mi — bkz. `Claude
+   outputs/kapanis_2026-09-19_canli_C.md`).
+2. **İş C — ADIM 1 CANLIYA UYGULANDI (2026-09-19), ADIM 3 (batch 732)
+   BEKLİYOR:** migration `20260918_0001` canlıda (7 durum), kod zaten
+   `main`'de. Batch 732'yi `mutabakat_reddedildi`ye geçirme adımı, madde
+   1'deki YENİ bulgu yüzünden bu turda ÇALIŞTIRILMADI (talimat: "bir
+   adım beklenmedik bir şey verirse sonrakine geçme") — güvenle
+   çalıştırılabilir (`aktive_et_uretim_word.py` batch 4-8'i yapısal
+   olarak seçemez), ama önce madde 1 netleşmeli/Ahmet onaylamalı.
+3. **İş A — source_asset dedup, KARAR VERİLDİ (Seçenek 3), UYGULANMADI:**
+   Ahmet Seçenek 3'ü (source_asset'i 1 dosya=1 satır yapma) seçti, iki
+   şartla (Şart 1: batch 19'un error_summary'si audit_log'a taşınmadan
+   silinmesin; Şart 2: "storage_path NOT NULL tercih, eşitlikte min(id)"
+   kuralı, ham min(id) değil) — bkz. `10_TEKNIK_MASTER_DOKUMAN.md` §5.31.
+   Migration henüz YAZILMADI/uygulanmadı.
+4. **Madde 4'ün tam kapsamı BELİRSİZ:** `fact_uretim_kaynak_geneli`
    kaynak_id sapmasının 15 aralığından yalnız 1'i doğrudan kaynak
    dosyasıyla doğrulandı — isteğe bağlı, aksiyon gerektirmiyor (bilgi
    amaçlı açık madde).
