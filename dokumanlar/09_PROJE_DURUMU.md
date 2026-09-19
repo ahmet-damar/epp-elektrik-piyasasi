@@ -199,6 +199,14 @@ yansıtıldı.**
   **İş A kararı (Seçenek 3) kayda geçti, henüz uygulanmadı.** Detay:
   §5.31, Sürüm Geçmişi v1.46, `Claude outputs/kapanis_2026-09-19_
   canli_C.md`.
+  **Aynı gün (devam), batch 4-8 ölçüldü — KAPANDI, aksiyon gerekmiyor**
+  (2026-02..06 gerçekten iki kez yüklenmiş, aktif veri ikinci
+  yüklemeden geliyor, batch 4-8 zararsız/ölü, kök nedeni 2026-08-31'de
+  zaten belgeliydi — EPDK şablon değişikliği + bilinçli ertelenen T7
+  formatı). **ADIM 3 (batch 732) de bu turda CANLIYA UYGULANDI:**
+  `mutabakat_reddedildi`, audit_log +1, fact tablolarında 0 fark. **İş C
+  TAMAMEN KAPANDI.** Detay: §5.32, Sürüm Geçmişi v1.47, `Claude
+  outputs/kapanis_2026-09-19_batch_4_8.md`.
   (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
@@ -368,26 +376,28 @@ gerçekleşmiş durumda (yalnız 2026-01'den itibaren; Word yılları ADIM 4'te)
 
 ### Açık madde
 
-**GÜNCEL (2026-09-19) — en öncelikli açık maddeler bunlar, aşağıdaki
-ADIM 3/4 tarihçesi TAMAMEN kapalı, yalnız referans için duruyor:**
-1. **YENİ (2026-09-19) — batch 4-8: 5 GERÇEK batch ~19 gündür elle onay
-   bekliyor, Ahmet'in kararı gerekiyor:** `running_batch_kontrolu.py`
-   canlıya karşı çalıştırılınca batch 732 DIŞINDA 4 gerçek fact satırlı
-   ve tamamlanmış (2026-02..06 Excel ayları, `job_status`'ta zaten
-   `succeeded`) batch buldu — `pipeline.otomatik_onaya_uygun()`'un
-   per-batch iç mutabakatı `fact_tuketim` için 5 ayın TAMAMINDA `False`
-   döndüğü için OTOMATİK aktive edilmediler, elle `onayla.py` çağrısı
-   bekliyorlar, kimse hiç çağırmadı. Kök neden batch 732'den (çapraz
-   tablo mutabakatı) TAMAMEN FARKLI — dokunulmadı, araştırma/karar
-   gerekiyor (aktive mi edilsin, veri incelensin mi — bkz. `Claude
-   outputs/kapanis_2026-09-19_canli_C.md`).
-2. **İş C — ADIM 1 CANLIYA UYGULANDI (2026-09-19), ADIM 3 (batch 732)
-   BEKLİYOR:** migration `20260918_0001` canlıda (7 durum), kod zaten
-   `main`'de. Batch 732'yi `mutabakat_reddedildi`ye geçirme adımı, madde
-   1'deki YENİ bulgu yüzünden bu turda ÇALIŞTIRILMADI (talimat: "bir
-   adım beklenmedik bir şey verirse sonrakine geçme") — güvenle
-   çalıştırılabilir (`aktive_et_uretim_word.py` batch 4-8'i yapısal
-   olarak seçemez), ama önce madde 1 netleşmeli/Ahmet onaylamalı.
+**GÜNCEL (2026-09-19, devam) — en öncelikli açık maddeler bunlar,
+aşağıdaki ADIM 3/4 tarihçesi TAMAMEN kapalı, yalnız referans için
+duruyor:**
+1. ~~**batch 4-8 — Ahmet'in kararı gerekiyor**~~ — **KAPANDI (2026-09-19,
+   devam), aksiyon gerekmiyor.** Ölçüldü: 2026-02..06 GERÇEKTEN iki kez
+   yüklenmiş, canlıdaki AKTİF veri İKİNCİ (düzeltilmiş parser'lı)
+   yüklemeden geliyor, batch 4-8'in TÜM satırları TÜM tablolarda
+   `is_active=false` — zararsız, ölü bir iz. Kök neden 2026-08-31'de
+   ZATEN tam belgeliydi (EPDK şablon değişikliği, T7'nin bilinçli
+   ertelenmiş formatı `otomatik_onaya_uygun()`'da yanlış-pozitif
+   üretiyor, kullanıcı `onayla.py` ile bilerek elle onayladı — audit_log
+   + ops log'da tam iz var). Bkz. `10_TEKNIK_MASTER_DOKUMAN.md` §5.32,
+   `Claude outputs/kapanis_2026-09-19_batch_4_8.md`. Yalnız T7 çoklu-ay
+   format düzeltmesi hâlâ ayrı, ertelenmiş bir teknik borç olarak kalıyor
+   (düşük öncelik, mutabakat kontrolünü etkiliyor ama fact verisini
+   etkilemiyor).
+2. ~~**İş C ADIM 3 (batch 732) bekliyor**~~ — **KAPANDI (2026-09-19,
+   devam).** Madde 1 netleştikten sonra dry-run → gerçek koşu yapıldı:
+   `batch 732.status='mutabakat_reddedildi'`, `audit_log`'a +1 satır,
+   fact tablolarında 0 fark (119+120 ayın tamamı doğrulandı).
+   `running_batch_kontrolu.py` artık yalnız batch 4-8'i buluyor. **İş C
+   TAMAMEN KAPANDI** (kod + migration + canlı uygulama).
 3. **İş A — source_asset dedup, KARAR VERİLDİ (Seçenek 3), UYGULANMADI:**
    Ahmet Seçenek 3'ü (source_asset'i 1 dosya=1 satır yapma) seçti, iki
    şartla (Şart 1: batch 19'un error_summary'si audit_log'a taşınmadan

@@ -94,6 +94,7 @@ her yeni rakam için geçerlidir.
 | v1.44 | 2026-09-16 | **İki küçük iş: KPI-11/12 kart etiketi + `kpi_esik` (KPI-12) yeniden kalibrasyon** — §5.29. (1) Kartlara "Sanayi Hariç" etiketi + Karar 2 referanslı kapsam notu eklendi (hesaplama değişmedi, yalnız metin). (2) `kpi_esik`'in KPI-12 eşiği (yeşil≤5, sarı≤10, 2026-09-05'te seed edildi) kontrol edildi — HİÇBİR ampirik gerekçesi olmadığı bulundu (diğer KPI'ların aksine); Sanayi-dikişi düzeltmesi SONRASI canlıda ölçülen gerçek dağılım (81 il × 5 ay, n=403: medyan=19,1 p90=31,0) eski eşikle gözlemlerin ~%90'ının "kırmızı" göründüğünü gösterdi. Yeni eşik `yesil_alt=15,0`/`sari_alt=30,0`, migration `20260916_0001` ile canlıya uygulandı. KPI-11'i girdi alan başka eşik yok (kontrol edildi) | Kod değişikliği yalnız metin + config veri, hesaplama mantığı değişmedi (mevcut testler zaten pinliyor). Migration disposable'da (31/31) doğrulanıp canlıya uygulandı, canlıda `('KPI-12','v1',15.000,30.000,None,'alcelik')` teyit edildi |
 | v1.45 | 2026-09-18 | **İş A (source_asset dedup) DURDURULDU, A4 koruması UYGULANDI + İş C (mutabakat_reddedildi terminal durum) TAMAMLANDI** — §5.30/§6.1, §14 madde 5. İş A1: canlıda 126 mükerrer `file_hash` grubu ÖLÇÜLDÜ (125'i established "1 dosya × 4 parser_version" mimarisinin beklenen sonucu, 1'i 2026-08-31'de zaten temizlenmiş bir idempotency-bug artığı) — kullanıcı talimatı gereği A2/A3 dedup migration'ı UYGULANMADI, 3 tasarım seçeneği sunuldu, Ahmet karar verecek. İş A4 (bağımsız, uygulandı): `ingest.batch_olustur()` artık TERMİNAL durumdaki bir batch'e denk gelirse SESSİZCE dönmüyor, `BatchZatenTerminalHatasi` fırlatıyor (dedup sonrası gerçek hâle gelecek bir riski ÖNCEDEN kapatır). İş C: `ingestion_batch.status`'a 7. terminal durum eklendi (migration `20260918_0001`, yalnız disposable), `aktive_et_uretim_word.py`+`backfill_uretim_excel.py`'nin blok yolları artık `mutabakat_reddini_kaydet()` çağırıyor (status SET + audit_log_yaz) — önceden yalnız konsola yazılıyordu. Geri dönülebilirlik (farklı `file_hash`li revize dosyayla aynı dönemin yeniden aktive olabilmesi) uçtan uca kanıtlandı | Tam `worker/tests` (fresh disposable, 32/32 migration): 407 test, 406 geçti (tek beklenen `test_auth_integration.py`). +9 yeni test (geri dönülebilirlik +1, running_batch_kontrolu uyumu +1, batch_olustur terminal-guard +7 parametrized). `ruff`/`mypy` temiz, `bandit` (CI komutuyla) 0 bulgu. Canlıya HİÇBİR DDL/DML uygulanmadı |
 | v1.46 | 2026-09-19 | **İş C migration'ı CANLIYA UYGULANDI + İş A kararı (Seçenek 3) kayda geçti + YENİ bulgu: batch 4-8** — §5.31. Ahmet'in bu tur için verdiği canlı-yazma izniyle: taze yedek tetiklendi/doğrulandı (run 35432314325, 1.797.064 bayt), canlı durum fotoğrafı alındı, `ingestion_batch_status_check` 7 değere genişletildi (kilit kontrolü temiz, migration izleme tablosu YOK, sonrası 0 fark). **ADIM 2 beklenmedik bulgu verdi, tur DURDU:** `running_batch_kontrolu.py` batch 732 DIŞINDA **5 GERÇEK batch** (4-8, 2026-02..06 Excel, ~19 gündür running) daha buldu — kök neden batch 732'den FARKLI (`pipeline.otomatik_onaya_uygun()`'un per-batch iç mutabakatı `fact_tuketim` için False döndü, elle onay hiç verilmedi). Kullanıcı talimatı gereği ("beklenmedik → sonrakine geçme") **ADIM 3 (batch 732 geçişi) BU TURDA ÇALIŞTIRILMADI**, batch 4-8'e DOKUNULMADI — yeni, ayrı bir açık madde olarak raporlandı. **ADIM 4 (İş A kararı) kayda geçti:** Seçenek 3 (source_asset'i 1 dosya=1 satır yapma) + Şart 1 (batch 19'un error_summary'si audit_log'a taşınmadan silinmeyecek) + Şart 2 (storage_path NOT NULL tercih kuralı, min(id) değil) — UYGULANMADI, yalnız karar notu | Kod değişikliği YOK (yalnız canlı DDL + doküman). Durum fotoğrafı diff: ADIM 1 sonrası 0 fark (tüm fact tablo satır sayıları, ay bazlı aktif sayılar, ingestion_batch durum dağılımı, audit_log sayısı aynı) |
+| v1.47 | 2026-09-19 | **Batch 4-8 ölçüldü — KAPALI, belgeli bir olay çıktı + ADIM 3 (batch 732) CANLIYA UYGULANDI** — §5.32. Batch 4-8 araştırması: 2026-02..06 GERÇEKTEN iki kez yüklenmiş (aynı file_hash, parser 0.1→0.3), aktif veri ikinci yüklemeden geliyor, batch 4-8 tüm tablolarda is_active=false — bu 2026-08-31'de ZATEN tam belgelenmiş bir olay (EPDK şablon değişikliği, T11/T13 düzeltildi, T7 bilinçli ertelendi → `otomatik_onaya_uygun()` sistematik yanlış-pozitif veriyor, kullanıcı `onayla.py` ile bilerek elle onayladı, audit_log'da izi var). Kod okunarak doğrulandı: `batch_onayla()` `otomatik_onaya_uygun()`'u hiç çağırmıyor — kasıtlı kaçış kapısı, bug değil. Dashboard kör noktası için tasarım notu (kod yazılmadı): `running_batch_kontrolu.py` zaten yeniden kullanılabilir. **ADIM 3 koşulu sağlandığından uygulandı:** dry-run → yalnız 202402 → gerçek koşu → batch 732 `mutabakat_reddedildi`, audit_log +1, fact tablolarında 0 fark | Kod değişikliği YOK (yalnız canlı veri: 1 status UPDATE + 1 audit_log INSERT). Durum fotoğrafı tam diff: 119+120 ayın TAMAMI değişmedi |
 
 ---
 
@@ -1525,6 +1526,58 @@ sonra source_asset silme).
 
 **Kod değişikliği YOK bu turda** (yalnız canlı DDL — ADIM 1 — ve
 doküman). `worker/tests` bu turdan etkilenmedi (kod değişmedi).
+
+### 5.32 Batch 4-8 ÖLÇÜLDÜ — KAPALI, belgeli bir olay + ADIM 3 (batch 732) canlıya uygulandı (2026-09-19, devam)
+
+`Claude outputs/PROMPT_BATCH_4_8_2026-09-19.md` — kapanış raporu
+`Claude outputs/kapanis_2026-09-19_batch_4_8.md`.
+
+**Batch 4-8 — KANITLANDI, KAPALI (yeni bir aksiyon GEREKMİYOR):**
+2026-02..06 verisi GERÇEKTEN iki kez yüklenmiş (aynı `file_hash`,
+`parser_version` 0.1→0.3) — canlıdaki AKTİF veri İKİNCİ yüklemeden
+(batch 10/12/13/14/15) geliyor, batch 4-8'in TÜM satırları TÜM
+tablolarda `is_active=false`. Bu, 2026-08-31'de **zaten tam
+belgelenmiş** bir olay (bkz. `06_canli_veri_operasyon_gunlugu.md`
+"2026-08-31 (devam 2)" ve "(kapanış)" kayıtları): EPDK Mart 2026'da
+rapor şablonunu değiştirdi, parser 3 gerçek sorun buldu (T11
+kümülatif — düzeltildi; T13 satır kayması — düzeltildi; **T7 çoklu-ay
+format — BİLİNÇLİ OLARAK ertelendi, hâlâ açık**). T7'nin bu bilinen
+sınırlaması `_mutabakat()`'ın referans aldığı ülke toplamını
+güvenilmez kılıyor, `otomatik_onaya_uygun()` bu yüzden fact_tuketim
+için sistematik yanlış-pozitif `False` üretiyor — düzeltme SONRASI
+bile. Kullanıcı bunu bilerek `worker/scripts/onayla.py` ile elle
+onayladı (`actor_name='backfill-subat-haziran-2026'`, audit_log'da
+tam kayıtlı) — `pipeline.batch_onayla()`'nın (yani `onayla.py`'nin)
+`otomatik_onaya_uygun()`'u HİÇ ÇAĞIRMADIĞI kod okunarak doğrulandı,
+bu KASITLI bir "elle onay" kaçış kapısı, bug/bypass DEĞİL. **T7 çoklu-
+ay format düzeltmesi ayrı, ertelenmiş bir açık madde olarak kalmaya
+devam ediyor** (bkz. `06_canli_veri_operasyon_gunlugu.md` "C6" bölümü
+benzeri — henüz oraya taşınmadı, bir sonraki genel doküman taramasında
+eklenebilir).
+
+**Dashboard kör noktası — TASARIM NOTU (kod YAZILMADI):**
+`gecmis_kalan_isleri_bul()` yalnız `job_status`a bakıyor; batch 4-8
+sınıfında `job_status` zaten `succeeded` olduğundan bu sınıfı
+GÖRMÜYOR. Çözüm YENİ bir sorgu GEREKTİRMİYOR — `worker/scripts/
+running_batch_kontrolu.py:takili_running_batchleri_bul()` (zaten var,
+test edilmiş, salt okuma) dashboard'un "Sistem Durumu" bölümüne AYNI
+desende (`gecmis_kalan_isleri_bul()`'ün yanına, expander dışında bir
+`st.warning()` daha) eklenerek yeniden kullanılabilir.
+
+**ADIM 3 (batch 732) canlıya uygulandı:** A1'in sonucu net olduğundan
+(batch 4-8 canlıda hiçbir aktif satır taşımıyor, `aktive_et_uretim_
+word.py`'nin sorgusu zaten yalnız `word-%-uretim-geneli-v1` batch'lerini
+görüyor) koşul sağlandı. Dry-run → yalnız 202402 etkileniyor
+doğrulandı → gerçek koşu. **Sonuç:** `batch 732.status =
+'mutabakat_reddedildi'`, `audit_log`'a TAM 1 yeni satır (audit_id=1024).
+Durum fotoğrafı diff: **fact tablolarında 0 fark** (119+120 ayın
+TAMAMI), yalnız `ingestion_batch` durum dağılımı (`running` 6→5,
+`mutabakat_reddedildi` 0→1) ve `audit_log` toplamı (1013→1014)
+değişti — TAM beklenen. `running_batch_kontrolu.py` artık yalnız
+batch 4-8'i buluyor (732 listede yok).
+
+**Kod değişikliği YOK bu turda** (yalnız canlı veri: 1 status UPDATE +
+1 audit_log INSERT).
 
 ---
 

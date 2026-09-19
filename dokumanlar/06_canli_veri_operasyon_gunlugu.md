@@ -2862,3 +2862,96 @@ yeniden ölçmesin.
 
 Kod değişikliği YOK bu turda (yalnız canlı DDL — ADIM 1 — ve doküman).
 `worker/tests` bu turdan etkilenmedi.
+
+## 2026-09-19 (devam) — Batch 4-8 ÖLÇÜLDÜ (belgeli/kapalı olay çıktı) + ADIM 3: batch 732 mutabakat_reddedildi'ye geçirildi
+
+`Claude outputs/PROMPT_BATCH_4_8_2026-09-19.md` görevi. Kapanış raporu:
+`Claude outputs/kapanis_2026-09-19_batch_4_8.md`.
+
+### Bölüm A — Batch 4-8 ölçümü (salt okuma)
+
+**A1 hipotezi (2026-02..06 iki kez yüklendi, aktif veri İKİNCİ
+yüklemeden geliyor) — KANITLANDI:**
+```
+fact_tuketim/fact_uretim/fact_abone/fact_serbest_tuketici — 202602-202606
+aktif satırların TAMAMI batch 10/12/13/14/15'e ait (batch 4-8 DEĞİL)
+batch 4-8: TÜM satırları TÜM tablolarda is_active=false (0 istisna)
+file_hash eşleşmesi: batch 4↔10, 5↔12, 6↔13, 7↔14, 8↔15 BİREBİR AYNI
+  (örn. batch 4 ve 10 ikisi de e0fb81994c83a55f...) — AYNI fiziksel
+  dosya, gerçekten İKİ KEZ (parser_version=0.1 sonra 0.3) yüklenmiş.
+```
+
+**A2 — üç şıktan hangisi: (ii) "kontrol çalıştı, yine başarısız oldu,
+ama batch elle onaylandı, izi var."** `audit_log`'da batch 10/12/13/
+14/15'in HER biri için 2 kayıt var: `ingest_tamamlandi` (`mutabakat:
+{'fact_tuketim': False}` — düzeltme SONRASI bile İKİNCİ yüklemede de
+kontrol BAŞARISIZ) + `batch_onaylandi` (`actor_name='backfill-subat-
+haziran-2026'`, 6-9 dakika sonra) — **kod okunarak** doğrulandı:
+`pipeline.batch_onayla()` (yani `onayla.py`'nin çağırdığı fonksiyon)
+`otomatik_onaya_uygun()`'u HİÇ ÇAĞIRMIYOR (yalnız `job_worker.py`'nin
+asenkron yolu çağırıyor) — bu, sistemin KENDİ tasarladığı "elle onay"
+kaçış kapısı, bir bypass/bug DEĞİL. **Tam gerekçe zaten
+BELGELİYDİ** — bu dosyanın kendi "2026-08-31 (devam 2)" ve
+"2026-08-31 (kapanış)" kayıtları: EPDK şablonu Mart 2026'da değişmiş,
+3 gerçek parser sorunu bulunup 2'si düzeltilmiş (T11 kümülatif, T13
+satır kayması), T7'nin çoklu-ay formatı İSE BİLİNÇLİ OLARAK
+ertelenmiş — bu yüzden `_mutabakat()`'ın referans aldığı T7 verisi
+Şubat'tan itibaren güvenilmez, `otomatik_onaya_uygun()`'un `False`
+sonucu BİLİNEN bir yanlış-pozitif. "Eski/bozuk-parser'lı batch'ler (1,
+4-8) hiçbir zaman aktive edilmedi, zararsız şekilde... DB'de iz olarak
+duruyor" cümlesi ZATEN 2026-08-31'de yazılmıştı — bugünkü ölçüm bunu
+BAĞIMSIZ doğruladı.
+
+**A3 (tek cümle):** T7'nin çoklu-ay format sorunu (bilinen, ertelenmiş
+gap) `_mutabakat()`'ın referans aldığı "Türkiye" toplamını Şubat
+2026'dan itibaren güvenilmez kıldığından, gerçek veri sorunu OLMADIĞI
+hâlde `fact_tuketim` için sistematik yanlış-pozitif `False` üretiyor.
+
+**A4 — dashboard kör noktası, tasarım notu (kod yazılmadı):** Sorun
+`gecmis_kalan_isleri_bul()`'un yalnız `job_status`a bakması — batch
+4-8'de `job_status` zaten `succeeded`. **Çözüm YENİ bir sorgu
+gerektirmiyor** — `worker/scripts/running_batch_kontrolu.py:takili_
+running_batchleri_bul()` (`ingestion_batch.status='running'` bazlı,
+zaten var, zaten test edilmiş, salt okuma) dashboard'un "Sistem Durumu"
+bölümüne `gecmis_kalan_isleri_bul()` ile AYNI desende (expander
+dışında/üstünde bir `st.warning()`) EKLENEBİLİR — mevcut fonksiyon
+YENİDEN KULLANILABİLİR.
+
+### Bölüm B — ADIM 3 (batch 732) koşulu SAĞLANDI, uygulandı
+
+A1'in sonucu net: batch 4-8 canlıda HİÇBİR aktif satır taşımıyor,
+`aktive_et_uretim_word.py`'nin sorgusu zaten yalnız `word-%-uretim-
+geneli-v1` batch'lerini görüyor (dry-run çıktısı da bunu doğruladı:
+"'running' durumunda 1 batch bulundu" — yalnız 732).
+
+**Durum fotoğrafı alındı:** `Claude outputs/canli_foto_oncesi_adim3_
+2026-09-19.txt`.
+
+**Dry-run:**
+```
+'running' durumunda 1 batch bulundu (word-*-uretim-geneli-v1).
+  202402 (batch_id=732): uygun=False (tarih_id=202402: 1 lisans_id uyumsuz (il≠kaynak toplamı))
+[DRY-RUN] Aktive EDİLECEK: []
+BLOKLANAN: [(202402, 'tarih_id=202402: 1 lisans_id uyumsuz (il≠kaynak toplamı)')]
+```
+Yalnız 202402 etkileniyor — gerçek koşu yapıldı, AYNI çıktı (bloklandı,
+beklenen — mutabakat hâlâ Bulgu J gereği geçmiyor).
+
+**Doğrulama:**
+```
+batch 732: status='mutabakat_reddedildi', error_summary='tarih_id=202402: 1 lisans_id uyumsuz (il≠kaynak toplamı)'
+audit_log (732 için): 1 → 2 satır (+1, TAM beklenen)
+```
+Durum fotoğrafı SONRASI ile `diff`: **fact tablolarında 0 fark**
+(119+120 ayın TAMAMI, hiçbiri değişmedi) — yalnız `ingestion_batch`
+durum dağılımı (`running`: 6→5, `mutabakat_reddedildi`: 0→1) ve
+`audit_log` toplamı (1013→1014) değişti, TAM beklenen.
+
+`running_batch_kontrolu.py` yeniden çalıştırıldı: artık YALNIZ batch
+4-8'i buluyor (5 batch), 732 artık listede YOK — beklenen.
+
+### Doğrulama (kod/test)
+
+Kod değişikliği YOK bu turda (yalnız canlı veri: 1 status UPDATE + 1
+audit_log INSERT, ADIM 3). `ruff`/`mypy` mevcut koda karşı temiz
+kaldı (değişmedi).
