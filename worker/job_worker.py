@@ -15,8 +15,11 @@ Otomatik aktivasyon eşiği (kullanıcı kararı, 2026-08-30): epdk_isi_kuyruga_
 ile kuyruğa alınan bir iş başarıyla parse+yüklendiğinde, pipeline.
 otomatik_onaya_uygun() TUTuyorsa (tüm mutabakat sonuçları False değil VE
 hiçbir tabloda red/karantina yok) worker batch_onayla()'yı OTOMATİK çağırır.
-Tutmazsa batch 'running'de bırakılır, net bir uyarı basılır (batch_id + hangi
-koşulun tutmadığı) — elle batch_onayla() çağrılması beklenir (Faz 0'daki gibi).
+Tutmazsa batch 'onay_bekliyor'a geçer (2026-09-19, migration 20260919_0001 —
+TERMİNAL DEĞİL) + audit_log'a yazılır, net bir uyarı basılır (batch_id +
+hangi koşulun tutmadığı) — elle batch_onayla() çağrılması beklenir (Faz
+0'daki gibi). `worker/scripts/running_batch_kontrolu.py:onay_bekleyen_
+batchleri_bul()` bu kuyruğu ayrı, sakin bir liste olarak raporlar.
 Amaç: temiz geçen aylar otomatik aksın, şüpheli olanlar insan gözünden kaçmasın.
 
 Hata durumunda (parse hatası, eksik tablo, DB hatası) is_basarisiz() ile
@@ -96,6 +99,26 @@ def _isi_uygula(conn: Connection, job: IsKaydi) -> None:
         )
         print(f"[OK] batch_id={batch_id} otomatik aktive edildi")
     else:
+        # 2026-09-19 — önceden bu dal yalnız konsola yazıp batch'i 'running'de
+        # bırakıyordu (gerçek örnek: batch 4-8, 19 gün fark edilmedi, bkz.
+        # Claude outputs/kapanis_2026-09-19_batch_4_8.md). Artık kalıcı bir
+        # ize sahip: batch 'onay_bekliyor'a geçer (TERMİNAL DEĞİL — insan
+        # kararı bekliyor) VE audit_log'a yazılır (migration 20260919_0001).
+        ingest.batch_durumu_guncelle(
+            conn, sonuc.batch_id, "onay_bekliyor", error_summary=sebep
+        )
+        ingest.audit_log_yaz(
+            conn,
+            table_name="ingestion_batch",
+            record_id=sonuc.batch_id,
+            action_type="UPDATE",
+            actor_name="system:job_worker",
+            payload={
+                "olay": "onay_bekliyor",
+                "sebep": sebep,
+                "kontrol": "pipeline.otomatik_onaya_uygun",
+            },
+        )
         print(
             f"[UYARI] batch_id={batch_id} OTOMATİK AKTİVE EDİLMEDİ ({sebep}) "
             "— elle batch_onayla() bekleniyor"

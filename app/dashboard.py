@@ -109,6 +109,7 @@ from data.tr_ocak2026 import TABLO2_KAYNAK, TABLO11
 from worker import analytics, ingest, kpi
 from worker.auth import GirisKilitli, giris_yap, rol_baglantisi_ac
 from worker.db import get_dashboard_database_url, resolve_database_or_fallback
+from worker.scripts import running_batch_kontrolu
 
 # Aşama 2 (2026-09-05, dokumanlar/06_adr_dashboard_teknoloji.md) — bir iş
 # günü uzunluğunda mutlak oturum süresi. `worker/auth.py:rol_baglantisi_ac()`
@@ -410,6 +411,13 @@ def _son_batchler_getir_cached(_conn: Any) -> pd.DataFrame:
 @st.cache_data(show_spinner=False, ttl=300)
 def _son_job_durumlari_getir_cached(_conn: Any) -> pd.DataFrame:
     return analytics.son_job_durumlari_getir(_conn)
+
+
+@st.cache_data(show_spinner=False, ttl=300)
+def _onay_bekleyen_batchleri_getir_cached(
+    _conn: Any,
+) -> list[running_batch_kontrolu.OnayBekleyenBatch]:
+    return running_batch_kontrolu.onay_bekleyen_batchleri_bul(_conn)
 
 
 @st.cache_data(
@@ -1132,6 +1140,25 @@ if gercek_veri_var:
             + " (bkz. aşağıdaki 'Sistem Durumu'). Faz 1 worker'ı sürekli "
             "koşan bir daemon değil — `python -m worker.job_worker` elle/"
             "cron ile çalıştırılmadıkça bu işler kuyrukta bekler."
+        )
+
+    # 2026-09-19 (Görev 1/3, batch 4-8'in bulunuşu) — `otomatik_onaya_
+    # uygun()` `False` döndüğünde batch artık `'onay_bekliyor'`a geçiyor
+    # (migration 20260919_0001) — bu, yukarıdaki uyarıdan KASITLI OLARAK
+    # AYRI: "worker çalışmıyor" bir ALARM, "onay bekleyen batch var" İSE
+    # NORMAL bir iş akışı adımı (`gecmis_kalan_isleri_bul()`'un aksine,
+    # işin KENDİSİ zaten başarıyla bitti — yalnız insan kararı bekliyor).
+    # Aynı `running_batch_kontrolu.py` fonksiyonu (Görev 1) yeniden
+    # kullanılıyor, kod kopyalanmadı.
+    _onay_bekleyenler = _onay_bekleyen_batchleri_getir_cached(db_handle)
+    if _onay_bekleyenler:
+        st.warning(
+            f"ℹ️ **{len(_onay_bekleyenler)} batch onay bekliyor** (ingest "
+            "başarıyla bitti, otomatik onay kapısı geçmedi — insan kararı "
+            "gerekiyor, bu bir hata DEĞİL). batch_id: "
+            + ", ".join(str(b.batch_id) for b in _onay_bekleyenler)
+            + " — `python -m worker.scripts.onayla --batch-id N --actor "
+            '"..."` ile onaylayın ya da inceleyin.'
         )
 
     with st.expander("🔧 Sistem Durumu (son batch'ler + iş kuyruğu)"):

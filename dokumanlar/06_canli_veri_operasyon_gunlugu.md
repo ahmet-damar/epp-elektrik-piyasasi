@@ -2955,3 +2955,62 @@ durum dağılımı (`running`: 6→5, `mutabakat_reddedildi`: 0→1) ve
 Kod değişikliği YOK bu turda (yalnız canlı veri: 1 status UPDATE + 1
 audit_log INSERT, ADIM 3). `ruff`/`mypy` mevcut koda karşı temiz
 kaldı (değişmedi).
+
+## 2026-09-19 (devam) — Batch durum makinesi kapatıldı: `onay_bekliyor`/`onaylanmadi` (8./9. durum) CANLIYA uygulandı + batch 4-8 TAMAMEN kapatıldı
+
+`Claude outputs/PROMPT_BATCH_DURUM_2026-09-19.md` — Ahmet'in canlı-yazma
+izniyle bu turda İKİ canlı yazma: CHECK migration'ı + batch 4-8'in
+statüsü. Tam kod/tasarım detayı `10_TEKNIK_MASTER_DOKUMAN.md` §5.33.
+
+**Taze yedek:** run `35434006940` (2026-09-19T09:11:18Z, `main`@`e16bbb7`),
+artifact `epp-backup-35434006940`, **1.797.536 bayt**, `conclusion=success`.
+
+**Durum fotoğrafı (öncesi):** `Claude outputs/canli_foto_oncesi_gorev2_
+2026-09-19.txt`.
+
+**ADIM/Görev 1 — CHECK migration'ı canlıya uygulandı:** kilit ön kontrolü
+temiz (0 idle-in-transaction), `20260919_0001_ingestion_batch_onay_
+bekliyor_onaylanmadi.sql` uygulandı, commit edildi. Doğrulama:
+`ingestion_batch_status_check` artık 9 değer taşıyor
+(`pg_get_constraintdef` ile teyit edildi). `ingestion_batch` satır sayısı
+647 — kontrol edildi, bu AYNI sabah çalışan bir "Scheduled Refresh"
+hava-verisi batch'inin (`batch_id=758`, `parser_version='fetch-weather-1'`)
+beklenen sonucu, migration'ın YAN ETKİSİ DEĞİL (öncesi fotoğrafta ZATEN
+647 vardı).
+
+**Görev 2 — batch 4-8 CANLIDA kapatıldı:** eşleştirme `4→10, 5→12, 6→13,
+7→14, 8→15` (aynı `file_hash`, bkz. yukarıdaki "Bölüm A"). Her biri
+`status='onaylanmadi'`ya geçirildi, `error_summary`'de yerine geçen
+batch_id + EPDK şablon-değişikliği gerekçesi + doküman referansları,
+1 `audit_log` satırı/batch (toplam 5,
+`payload={"olay":"onaylanmadi","sebep":...,"yerine_gecen_batch_id":...}`,
+`actor_name="manual-cli:dashboard-review-2026-09-19-batch-durum"`).
+**Fact satırlarına DOKUNULMADI** (açık kısıt — "veri hiç silinmez"
+ilkesi).
+
+**Doğrulama:**
+```
+5 batch güncellendi (4,5,6,7,8 → 'onaylanmadi')
+audit_log (4-8 için): +5 satır (TAM beklenen)
+```
+Durum fotoğrafı SONRASI ile `diff`: **fact tablolarında 0 fark** (tüm
+tablolar, TÜM aylar) — yalnız `ingestion_batch` durum dağılımı
+(`running`: 5→0, `onaylanmadi`: 0→5) ve `audit_log` toplamı
+(1014→1019, +5) değişti, TAM beklenen.
+
+`running_batch_kontrolu.py` yeniden çalıştırıldı — **asıl başarı
+ölçütü:**
+```
+Hiçbir batch 24 saatten uzun 'running' kalmamış.
+```
+(çıkış kodu 0, batch 4-8 DAHİL hiçbir şey listede yok — hem "takılı"
+hem "onay bekliyor" listesi boş.)
+
+### Doğrulama (kod/test)
+
+`worker/job_worker.py`, `worker/scripts/running_batch_kontrolu.py`,
+`worker/ingest.py` (`_TERMINAL_DURUMLAR`'a `onaylanmadi` eklendi),
+`app/dashboard.py` değişti + 2 test dosyası güncellendi/genişletildi.
+Tam `worker/tests` (fresh disposable, 33/33 migration): 409 test, 408
+geçti (tek beklenen `test_auth_integration.py`). `ruff`/`mypy` temiz,
+`bandit` (CI komutuyla) 0 bulgu (severity-level medium).

@@ -379,16 +379,22 @@ gerçekleşmiş durumda (yalnız 2026-01'den itibaren; Word yılları ADIM 4'te)
 **GÜNCEL (2026-09-19, devam) — en öncelikli açık maddeler bunlar,
 aşağıdaki ADIM 3/4 tarihçesi TAMAMEN kapalı, yalnız referans için
 duruyor:**
-1. ~~**batch 4-8 — Ahmet'in kararı gerekiyor**~~ — **KAPANDI (2026-09-19,
-   devam), aksiyon gerekmiyor.** Ölçüldü: 2026-02..06 GERÇEKTEN iki kez
-   yüklenmiş, canlıdaki AKTİF veri İKİNCİ (düzeltilmiş parser'lı)
-   yüklemeden geliyor, batch 4-8'in TÜM satırları TÜM tablolarda
-   `is_active=false` — zararsız, ölü bir iz. Kök neden 2026-08-31'de
-   ZATEN tam belgeliydi (EPDK şablon değişikliği, T7'nin bilinçli
-   ertelenmiş formatı `otomatik_onaya_uygun()`'da yanlış-pozitif
-   üretiyor, kullanıcı `onayla.py` ile bilerek elle onayladı — audit_log
-   + ops log'da tam iz var). Bkz. `10_TEKNIK_MASTER_DOKUMAN.md` §5.32,
-   `Claude outputs/kapanis_2026-09-19_batch_4_8.md`. Yalnız T7 çoklu-ay
+1. ~~**batch 4-8 — Ahmet'in kararı gerekiyor**~~ — **TAMAMEN KAPANDI
+   (2026-09-19, batch durum makinesi turu), hem VERİ hem DURUM düzeyinde.**
+   Ölçüldü: 2026-02..06 GERÇEKTEN iki kez yüklenmiş, canlıdaki AKTİF veri
+   İKİNCİ (düzeltilmiş parser'lı) yüklemeden geliyor, batch 4-8'in TÜM
+   satırları TÜM tablolarda `is_active=false` — zararsız, ölü bir iz. Kök
+   neden 2026-08-31'de ZATEN tam belgeliydi (EPDK şablon değişikliği, T7'nin
+   bilinçli ertelenmiş formatı `otomatik_onaya_uygun()`'da yanlış-pozitif
+   üretiyor, kullanıcı `onayla.py` ile bilerek elle onayladı — audit_log +
+   ops log'da tam iz var). **Bu turda CANLIDA `ingestion_batch.status`
+   `'onaylanmadi'`ya (YENİ 9. terminal durum) geçirildi** (5 batch, her
+   birinde yerine geçen batch_id + gerekçe `error_summary`'de, 1
+   `audit_log` satırı/batch) — `running_batch_kontrolu.py` artık batch 4-8'i
+   de DAHİL hiçbir şey bulmuyor, TAMAMEN temiz. Fact satırlarına
+   DOKUNULMADI (0 fark). Bkz. `10_TEKNIK_MASTER_DOKUMAN.md` §5.32/§5.33,
+   `Claude outputs/kapanis_2026-09-19_batch_4_8.md` +
+   `Claude outputs/kapanis_2026-09-19_batch_durum.md`. Yalnız T7 çoklu-ay
    format düzeltmesi hâlâ ayrı, ertelenmiş bir teknik borç olarak kalıyor
    (düşük öncelik, mutabakat kontrolünü etkiliyor ama fact verisini
    etkilemiyor).
@@ -408,6 +414,27 @@ duruyor:**
    kaynak_id sapmasının 15 aralığından yalnız 1'i doğrudan kaynak
    dosyasıyla doğrulandı — isteğe bağlı, aksiyon gerektirmiyor (bilgi
    amaçlı açık madde).
+5. **YENİ (2026-09-19, batch durum makinesi turu — Görev 4) — yazılı
+   `parser_version` bump disiplini YOK, İş A Seçenek 3'ün ÖN KOŞULU:**
+   Ölçüldü: batch 4-8→10-15 geçişinde ikinci (aktif, düzeltilmiş) yükleme
+   `parser_version`'ı **`'0.1'`'den `'0.3'`'e bump edilmiş** (KANITLANDI —
+   canlı veriden doğrudan okundu). Ama repoda (`dokumanlar/`, `.github/
+   copilot-instructions.md`) "parser davranışı değişince `parser_version`
+   bump edilir" diye YAZILI bir kural YOK — yalnız geçmiş `parser_version`
+   değerlerinin tanımlayıcı kaydı var, hiçbir yerde ZORUNLU bir disiplin
+   olarak yazılmamış (bu turda bump'ın kendisi ŞANSA/insan alışkanlığına
+   bağlıydı, kurala değil). **Öneri (UYGULANMADI, yalnız öneri):**
+   `.github/copilot-instructions.md`'ye (kod yazma kuralları bölümüne) tek
+   satırlık bir madde: "Bir parser fonksiyonunun çıktısını etkileyen HER
+   davranış değişikliğinde `parser_version` ARTIRILIR — aynı `parser_
+   version` iki farklı çıktı üretemez (P0-5'in `UNIQUE(source_asset_id,
+   parser_version, schema_version)` varsayımı buna dayanıyor)." **Neden
+   İş A Seçenek 3'ün ön koşulu:** Seçenek 3, "1 fiziksel dosya = 1
+   `source_asset` satırı" mimarisine geçtiğinde, `parser_version` ARTIK
+   TEK ayırt edici kolon olacak (bugünkü gibi `source_asset_id` DEĞİL) —
+   bu kural yazılı olmadan dedup sonrası bir parser düzeltmesi SESSİZCE
+   aynı `parser_version`'la tekrar yüklenirse, `BatchZatenTerminalHatasi`
+   (İş A4, bkz. yukarı) devreye girip düzeltmeyi YANLIŞLIKLA reddedebilir.
 
 ---
 
@@ -688,6 +715,32 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     komut çıktıları/sayılar dahil).
   - Sonrası Faz 4 (Tahminleme) — aşağıda "Faz 4 (Tahminleme)" bölümüne
     bkz.
+
+### ✅ Kapandı — Batch durum makinesinin kapatılması: `onay_bekliyor`/`onaylanmadi` + batch 4-8 CANLIDA kapatıldı (2026-09-19, batch durum turu)
+
+`Claude outputs/PROMPT_BATCH_DURUM_2026-09-19.md`, kapanış raporu
+`Claude outputs/kapanis_2026-09-19_batch_durum.md`. Tam detay
+`10_TEKNIK_MASTER_DOKUMAN.md` §5.33.
+
+Önceki turda (bkz. aşağıdaki "İş C" kaydı) bulunan İKİNCİ, KARDEŞ boşluk
+kapatıldı: `pipeline.otomatik_onaya_uygun()` `False` döndüğünde
+`job_worker.py` batch'i artık kalıcı bir duruma geçiriyor
+(`'onay_bekliyor'`, TERMİNAL DEĞİL) + `audit_log`'a yazıyor — önceden
+yalnız konsola yazıp `running`de bırakıyordu (gerçek örnek: batch 4-8, 19
+gün fark edilmedi). Önerilen tasarıma (`onay_bekliyor`+`yerine_gecildi`)
+gerekçeli KISMİ itiraz edildi: `dead_letter` reuse REDDEDİLDİ (job_status
+coupling invariant'ı bozardı), durum sayısı 9'da kaldı ama dar
+`yerine_gecildi` yerine genel `onaylanmadi` seçildi. CANLIDA: migration
+`20260919_0001` uygulandı, batch 4-8 → `onaylanmadi` (5 audit_log satırı,
+fact satırlarına DOKUNULMADI, 0 fark), dashboard'a `onay_bekliyor` uyarısı
+eklendi. **Asıl başarı ölçütü sağlandı:** `running_batch_kontrolu.py`
+artık TAMAMEN temiz (0 takılı, 0 onay bekleyen). Ayrıca (Görev 4, salt
+okuma): `parser_version` bump disiplini için yazılı kural YOK bulgusu —
+İş A Seçenek 3'ün ön koşulu olarak açık madde 5'e işlendi (yukarı bkz.).
+
+Doğrulama: Tam `worker/tests` (fresh disposable, 33/33 migration): 409
+test, 408 geçti (tek beklenen `test_auth_integration.py`). `ruff`/`mypy`
+temiz, `bandit` 0 bulgu.
 
 ### ✅ Kapandı — Doğrulama turu (2026-09-17) + ⏳ İş A/İş C (2026-09-18, İş C kapandı, İş A açık)
 

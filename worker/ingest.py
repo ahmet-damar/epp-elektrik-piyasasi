@@ -233,7 +233,13 @@ def api_kaynak_olustur(
 
 
 _TERMINAL_DURUMLAR = frozenset(
-    {"succeeded", "failed", "dead_letter", "mutabakat_reddedildi"}
+    {
+        "succeeded",
+        "failed",
+        "dead_letter",
+        "mutabakat_reddedildi",
+        "onaylanmadi",  # 2026-09-19, migration 20260919_0001 — 'onay_bekliyor' TERMİNAL DEĞİL, bilerek dışarıda
+    }
 )
 
 

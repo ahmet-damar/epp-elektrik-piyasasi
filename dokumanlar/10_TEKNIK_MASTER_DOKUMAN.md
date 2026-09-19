@@ -95,6 +95,7 @@ her yeni rakam için geçerlidir.
 | v1.45 | 2026-09-18 | **İş A (source_asset dedup) DURDURULDU, A4 koruması UYGULANDI + İş C (mutabakat_reddedildi terminal durum) TAMAMLANDI** — §5.30/§6.1, §14 madde 5. İş A1: canlıda 126 mükerrer `file_hash` grubu ÖLÇÜLDÜ (125'i established "1 dosya × 4 parser_version" mimarisinin beklenen sonucu, 1'i 2026-08-31'de zaten temizlenmiş bir idempotency-bug artığı) — kullanıcı talimatı gereği A2/A3 dedup migration'ı UYGULANMADI, 3 tasarım seçeneği sunuldu, Ahmet karar verecek. İş A4 (bağımsız, uygulandı): `ingest.batch_olustur()` artık TERMİNAL durumdaki bir batch'e denk gelirse SESSİZCE dönmüyor, `BatchZatenTerminalHatasi` fırlatıyor (dedup sonrası gerçek hâle gelecek bir riski ÖNCEDEN kapatır). İş C: `ingestion_batch.status`'a 7. terminal durum eklendi (migration `20260918_0001`, yalnız disposable), `aktive_et_uretim_word.py`+`backfill_uretim_excel.py`'nin blok yolları artık `mutabakat_reddini_kaydet()` çağırıyor (status SET + audit_log_yaz) — önceden yalnız konsola yazılıyordu. Geri dönülebilirlik (farklı `file_hash`li revize dosyayla aynı dönemin yeniden aktive olabilmesi) uçtan uca kanıtlandı | Tam `worker/tests` (fresh disposable, 32/32 migration): 407 test, 406 geçti (tek beklenen `test_auth_integration.py`). +9 yeni test (geri dönülebilirlik +1, running_batch_kontrolu uyumu +1, batch_olustur terminal-guard +7 parametrized). `ruff`/`mypy` temiz, `bandit` (CI komutuyla) 0 bulgu. Canlıya HİÇBİR DDL/DML uygulanmadı |
 | v1.46 | 2026-09-19 | **İş C migration'ı CANLIYA UYGULANDI + İş A kararı (Seçenek 3) kayda geçti + YENİ bulgu: batch 4-8** — §5.31. Ahmet'in bu tur için verdiği canlı-yazma izniyle: taze yedek tetiklendi/doğrulandı (run 35432314325, 1.797.064 bayt), canlı durum fotoğrafı alındı, `ingestion_batch_status_check` 7 değere genişletildi (kilit kontrolü temiz, migration izleme tablosu YOK, sonrası 0 fark). **ADIM 2 beklenmedik bulgu verdi, tur DURDU:** `running_batch_kontrolu.py` batch 732 DIŞINDA **5 GERÇEK batch** (4-8, 2026-02..06 Excel, ~19 gündür running) daha buldu — kök neden batch 732'den FARKLI (`pipeline.otomatik_onaya_uygun()`'un per-batch iç mutabakatı `fact_tuketim` için False döndü, elle onay hiç verilmedi). Kullanıcı talimatı gereği ("beklenmedik → sonrakine geçme") **ADIM 3 (batch 732 geçişi) BU TURDA ÇALIŞTIRILMADI**, batch 4-8'e DOKUNULMADI — yeni, ayrı bir açık madde olarak raporlandı. **ADIM 4 (İş A kararı) kayda geçti:** Seçenek 3 (source_asset'i 1 dosya=1 satır yapma) + Şart 1 (batch 19'un error_summary'si audit_log'a taşınmadan silinmeyecek) + Şart 2 (storage_path NOT NULL tercih kuralı, min(id) değil) — UYGULANMADI, yalnız karar notu | Kod değişikliği YOK (yalnız canlı DDL + doküman). Durum fotoğrafı diff: ADIM 1 sonrası 0 fark (tüm fact tablo satır sayıları, ay bazlı aktif sayılar, ingestion_batch durum dağılımı, audit_log sayısı aynı) |
 | v1.47 | 2026-09-19 | **Batch 4-8 ölçüldü — KAPALI, belgeli bir olay çıktı + ADIM 3 (batch 732) CANLIYA UYGULANDI** — §5.32. Batch 4-8 araştırması: 2026-02..06 GERÇEKTEN iki kez yüklenmiş (aynı file_hash, parser 0.1→0.3), aktif veri ikinci yüklemeden geliyor, batch 4-8 tüm tablolarda is_active=false — bu 2026-08-31'de ZATEN tam belgelenmiş bir olay (EPDK şablon değişikliği, T11/T13 düzeltildi, T7 bilinçli ertelendi → `otomatik_onaya_uygun()` sistematik yanlış-pozitif veriyor, kullanıcı `onayla.py` ile bilerek elle onayladı, audit_log'da izi var). Kod okunarak doğrulandı: `batch_onayla()` `otomatik_onaya_uygun()`'u hiç çağırmıyor — kasıtlı kaçış kapısı, bug değil. Dashboard kör noktası için tasarım notu (kod yazılmadı): `running_batch_kontrolu.py` zaten yeniden kullanılabilir. **ADIM 3 koşulu sağlandığından uygulandı:** dry-run → yalnız 202402 → gerçek koşu → batch 732 `mutabakat_reddedildi`, audit_log +1, fact tablolarında 0 fark | Kod değişikliği YOK (yalnız canlı veri: 1 status UPDATE + 1 audit_log INSERT). Durum fotoğrafı tam diff: 119+120 ayın TAMAMI değişmedi |
+| v1.48 | 2026-09-19 | **Batch durum makinesi KAPATILDI: `onay_bekliyor`/`onaylanmadi` (8./9. durum) + batch 4-8 CANLIDA kapatıldı + dashboard uyarısı** — §5.33. Görev 1: önerilen tasarıma (`onay_bekliyor`+`yerine_gecildi`) gerekçeli KISMİ itiraz — `dead_letter` reuse alternatifi (job_status coupling invariant'ı nedeniyle) REDDEDİLDİ, durum sayısı 9'da kaldı ama dar `yerine_gecildi` yerine genel `onaylanmadi` seçildi. Migration `20260919_0001`, `job_worker.py:_isi_uygula()`'nın False dalı artık `onay_bekliyor`+audit_log yazıyor, `running_batch_kontrolu.py`'ye AYRI `onay_bekleyen_batchleri_bul()`, `ingest.py:_TERMINAL_DURUMLAR`'a `onaylanmadi` eklendi, regresyon testi (conftest guard deseniyle AYNI) eski/yeni davranışı aynı testte kanıtlıyor. Görev 2 (CANLI): batch 4-8 → `onaylanmadi` (yerine geçen batch_id + gerekçe `error_summary`'de), 5 audit_log satırı, **fact satırlarına DOKUNULMADI**, durum fotoğrafı 0 fark. **Asıl başarı ölçütü sağlandı:** `running_batch_kontrolu.py` artık TAMAMEN temiz. Görev 3: dashboard'a `onay_bekliyor` uyarısı (kod tekrarsız). Görev 4 (salt okuma): ikinci yüklemenin `parser_version`'ı 0.1→0.3 bump edilmiş KANITLANDI; yazılı bump-disiplini kuralı YOK, İş A Seçenek 3'ün ön koşulu olarak `09_PROJE_DURUMU.md`'ye açık madde işlendi | Tam `worker/tests` (fresh disposable, 33/33 migration): 409 test, 408 geçti (tek beklenen `test_auth_integration.py`). `ruff`/`mypy` temiz, `bandit` (CI komutuyla) 0 bulgu. Canlıya migration + batch 4-8 durum değişikliği UYGULANDI, fact satırlarına DOKUNULMADI (0 fark) |
 
 ---
 
@@ -256,7 +257,7 @@ kolon(ları), `ingestion_batch_id FK`, `is_active BOOLEAN`, iki kısıt
 | Tablo | Amaç |
 |---|---|
 | `source_asset` | Bir dosya/API çağrısının kimliği — `source_kind ∈ {file,api}` (P0-3): file→`file_name`+`file_hash` NOT NULL, api→`source_uri`+`request_hash` NOT NULL |
-| `ingestion_batch` | Bir işleme denemesi — `status ∈ {queued,running,succeeded,failed,retrying,dead_letter,mutabakat_reddedildi}` (7. durum: migration `20260918_0001`, bkz. §5.30/§9.6), `UNIQUE(source_asset_id, parser_version, schema_version)` (P0-5: aynı dosya farklı parser sürümüyle YENİDEN işlenebilir — **2026-09-17'de düzeltildi: bu kısıt `source_asset` dedup'ı OLMADAN pratikte hiç tetiklenemiyordu, bkz. §14 madde 5**) |
+| `ingestion_batch` | Bir işleme denemesi — `status ∈ {queued,running,succeeded,failed,retrying,dead_letter,mutabakat_reddedildi,onay_bekliyor,onaylanmadi}` (9 değer: migration `20260918_0001` + `20260919_0001`, bkz. §6.1/§5.33), `UNIQUE(source_asset_id, parser_version, schema_version)` (P0-5: aynı dosya farklı parser sürümüyle YENİDEN işlenebilir — **2026-09-17'de düzeltildi: bu kısıt `source_asset` dedup'ı OLMADAN pratikte hiç tetiklenemiyordu, bkz. §14 madde 5**) |
 | `audit_log` | Append-only iz — INSERT/UPDATE her önemli olayda (`ingest_tamamlandi`, `batch_onaylandi`) JSONB payload ile; UPDATE/DELETE hiç kimseye GRANT edilmez |
 | `job_status` | Faz 1 asenkron kuyruk — `status ∈ {queued,running,succeeded,failed,retrying,dead_letter}`, `attempt_count`, `heartbeat_at` (bayat-heartbeat kurtarma) |
 | `veri_kapsam_disi` | "Kaynakta gerçekten yok" (parser hatası DEĞİL) kaydı — PK `(tarih_id, fact_tablosu, nitelik)`, `ingestion_batch`'ten BİLİNÇLİ BAĞIMSIZ (migration 0012, 2026-09-02) |
@@ -1581,6 +1582,94 @@ batch 4-8'i buluyor (732 listede yok).
 
 ---
 
+### 5.33 Batch durum makinesinin kapatılması — `onay_bekliyor`/`onaylanmadi` (8./9. durum) + batch 4-8 CANLIDA kapatıldı (2026-09-19, devam)
+
+`Claude outputs/PROMPT_BATCH_DURUM_2026-09-19.md` — Ahmet'in canlı-yazma
+izniyle bu turda İKİ canlı yazma yapıldı (CHECK migration'ı + batch 4-8'in
+statüsü).
+
+**Görev 1 — tasarıma itiraz + uygulama.** Önerilen tasarım (`onay_bekliyor`
++ `yerine_gecildi`) **KISMEN kabul edildi, gerekçeli değişiklikle
+uygulandı:** durum sayısı 9'da (önerilenle AYNI) tutuldu, ama `dead_letter`
+reuse alternatifi (durum sayısını 8'e indirirdi) ÖNCE denendi ve REDDEDİLDİ
+— kod grep'i (`worker/ingest.py` ~935, `worker/job_worker.py` ~127)
+`dead_letter`in `job_status`da da hata/tükenme anlamına geldiği bir
+DEĞİŞMEZ'e (invariant) bağlı olduğunu gösterdi; batch 4-8'in `job_status`ı
+ZATEN `succeeded` (iş kendisi başarılıydı, yalnız aktivasyon reddedildi) —
+`dead_letter` reuse'u YANLIŞ bir anlatı üretirdi. Bunun yerine dar
+`yerine_gecildi` adı yerine daha genel **`onaylanmadi`** seçildi (her
+red/değiştirme senaryosunu kapsar, yalnız "başka batch'le değiştirilme"yi
+değil). **Uygulandı:**
+- Migration `20260919_0001_ingestion_batch_onay_bekliyor_onaylanmadi.sql`
+  — CHECK 7→9 değere genişletildi.
+- `worker/job_worker.py:_isi_uygula()` — `otomatik_onaya_uygun()==False`
+  dalı artık yalnız konsola yazmıyor: `ingest.batch_durumu_guncelle(...,
+  "onay_bekliyor", error_summary=sebep)` + `ingest.audit_log_yaz(...,
+  payload={"olay": "onay_bekliyor", ...})`.
+- `worker/scripts/running_batch_kontrolu.py` — YENİ `onay_bekleyen_
+  batchleri_bul()` (`OnayBekleyenBatch` dataclass), `takili_running_
+  batchleri_bul()`'dan KASITLI AYRI (biri alarm, biri sakin inceleme
+  kuyruğu). `main()` ikisini de basar, çıkış kodu yalnız "takılı"
+  listesinden gelir.
+- `worker/ingest.py:_TERMINAL_DURUMLAR` — `'onaylanmadi'` eklendi
+  (`'onay_bekliyor'` BİLEREK eklenmedi, terminal değil) — `batch_
+  olustur()`'un terminal-guard'ı (İş A4, §5.30) artık bu durumu da
+  doğru tanıyor.
+- Testler: `test_job_worker_integration.py`'nin şüpheli-batch testi
+  GÜNCELLENDİ (ESKİ hâli `status=='running'` bekliyordu — bu, batch
+  4-8'in 19 gün fark edilmeden beklediği HATALI davranışı BİLMEDEN
+  pinliyormuş; şimdi `onay_bekliyor` + audit_log kaydını doğruluyor).
+  `test_running_batch_kontrolu_integration.py`'ye REGRESYON deseninde
+  (conftest guard ile AYNI desen) 2 yeni test: biri `onay_bekleyen_
+  batchleri_bul()`'u doğrudan test eder, diğeri ESKİ davranışı (`status=
+  'running'` bırakılsaydı "takılı" sayılırdı) BİLEREK yeniden üretip
+  sonra YENİ davranışla (`onay_bekliyor`) düzeldiğini AYNI testte
+  gösterir.
+
+**Görev 2 — CANLI: batch 4-8 kapatıldı.** Ön koşullar: taze yedek +
+durum fotoğrafı (`Claude outputs/canli_foto_oncesi_gorev2_2026-09-19.txt`).
+Batch 4→10, 5→12, 6→13, 7→14, 8→15 eşleştirmesiyle (aynı `file_hash`,
+bkz. §5.32) her biri `status='onaylanmadi'`ya geçirildi, `error_summary`
+yerine geçen batch_id + EPDK şablon-değişikliği gerekçesini + doküman
+referanslarını içeriyor, 1 `audit_log` satırı/batch (toplam 5,
+`payload={"olay":"onaylanmadi","sebep":...,"yerine_gecen_batch_id":...}`).
+**FACT SATIRLARINA DOKUNULMADI** (açık kısıt) — durum fotoğrafı tam diff
+TÜM tablolarda/aylarda **0 fark** gösterdi, yalnız `ingestion_batch` durum
+dağılımı (`running` 5→0, `onaylanmadi` 0→5) ve `audit_log` toplamı (+5)
+değişti. **Asıl başarı ölçütü (görevin kendi tanımıyla) sağlandı:**
+`running_batch_kontrolu.py` artık **tamamen temiz** — "Hiçbir batch 24
+saatten uzun 'running' kalmamış." (batch 4-8 DAHİL hiçbir şey listede
+yok, çıkış kodu 0).
+
+**Görev 3 — dashboard uyarısı.** `app/dashboard.py`, "Sistem Durumu"
+bölümüne `onay_bekleyen_batchleri_getir_cached()` (TTL 300s) ile
+beslenen YENİ bir `st.warning()` eklendi — kod tekrarı yok, `Görev 1`'in
+`onay_bekleyen_batchleri_bul()`'unu doğrudan kullanıyor (established
+`gecmis_kalan_isleri_bul()` deseniyle AYNI). Ayrı bir dashboard testi
+YAZILMADI — established precedent (`gecmis_kalan_isleri_bul()` de
+dashboard'da kullanılıyor ama testi `test_analytics_pure.py`'de, projede
+Streamlit UI test altyapısı yok) izlendi; kapsam zaten `onay_bekleyen_
+batchleri_bul()`'un kendi testinden geliyor.
+
+**Görev 4 — `parser_version` disiplini (SALT OKUMA, kod/migration
+YAZILMADI).** Ölçüldü: ikinci (aktif) 2026-02..06 yüklemesinin `parser_
+version`'ı `'0.1'`'den **`'0.3'`'e bump edilmiş** (KANITLANDI). Repoda
+"parser davranışı değişince `parser_version` bump edilir" diye YAZILI
+bir kural YOK (`dokumanlar/`, `.github/copilot-instructions.md` tarandı
+— yalnız geçmiş değerlerin tanımlayıcı kaydı var). Öneri (uygulanmadı):
+`.github/copilot-instructions.md`'ye tek satırlık zorunlu kural —
+İş A Seçenek 3'ün (§5.31) ön koşulu olarak `09_PROJE_DURUMU.md`'ye açık
+madde 5 olarak işlendi (bkz. orada gerekçe: dedup sonrası `parser_
+version` TEK ayırt edici kolon olacağından).
+
+**Doğrulama:** Tam `worker/tests` (fresh disposable, 33/33 migration
+uygulandı): 409 test, 408 geçti (tek beklenen `test_auth_integration.py`
+— disposable'da aktif veri olmadığından her zaman böyle). `ruff`/`mypy`
+temiz, `bandit` (CI komutuyla) 0 bulgu (severity-level medium). Kapanış
+raporu: `Claude outputs/kapanis_2026-09-19_batch_durum.md`.
+
+---
+
 ## 6. Ingestion Pipeline
 
 ### 6.1 Batch Yaşam Döngüsü
@@ -1589,17 +1678,44 @@ queued → (is_sahiplen, advisory lock) → running
   → başarılı: succeeded (aktivasyon SONRASI)
   → başarısız: retrying → dead_letter | failed
   → çapraz mutabakat kalıcı olarak reddetti: mutabakat_reddedildi (7. durum, 2026-09-18)
+  → per-batch iç mutabakat tutmadı, insan kararı bekliyor: onay_bekliyor (8. durum, TERMİNAL DEĞİL, 2026-09-19)
+      → elle onaylandı: succeeded (pipeline.batch_onayla())
+      → elle reddedildi: onaylanmadi (9. durum, TERMİNAL, 2026-09-19)
 ```
-`ingestion_batch.status` **7 değer** taşır (2026-09-18'den beri, migration
-`20260918_0001`): `queued`, `running`, `succeeded`, `failed`, `retrying`,
-`dead_letter`, `mutabakat_reddedildi`. Faz 0'da senkron (elle script
-çağrısı); Faz 1'de `job_status` kuyruğu üzerinden asenkron (bkz. §6.5).
-Sahiplenme `ingest.batch_sahiplen()` ile ATOMİK (advisory lock) —
-aynı batch'i iki worker aynı anda işleyemez.
+`ingestion_batch.status` **9 değer** taşır (2026-09-19'dan beri, migration
+`20260919_0001`, önceki genişletme `20260918_0001`): `queued`, `running`,
+`succeeded`, `failed`, `retrying`, `dead_letter`, `mutabakat_reddedildi`,
+`onay_bekliyor`, `onaylanmadi`. Faz 0'da senkron (elle script çağrısı);
+Faz 1'de `job_status` kuyruğu üzerinden asenkron (bkz. §6.5). Sahiplenme
+`ingest.batch_sahiplen()` ile ATOMİK (advisory lock) — aynı batch'i iki
+worker aynı anda işleyemez.
 
 **Hangileri TERMİNAL (bir daha değişmesi beklenmez):** `succeeded`,
-`failed`, `dead_letter`, `mutabakat_reddedildi`. Geçici/ara durumlar:
-`queued`, `running`, `retrying`.
+`failed`, `dead_letter`, `mutabakat_reddedildi`, `onaylanmadi`
+(`worker/ingest.py:_TERMINAL_DURUMLAR`). Geçici/ara durumlar: `queued`,
+`running`, `retrying`, **`onay_bekliyor`** (BİLEREK terminal değil —
+insan kararı bekleyen bir ara durum, `succeeded` ya da `onaylanmadi`'ya
+geçebilir; bkz. §5.33).
+
+**Dokuz durumun tek cümlelik anlamı:**
+- `queued` — kuyrukta, henüz sahiplenilmedi.
+- `running` — bir worker işliyor (Faz 0'da: yükleme bitti, aktivasyon
+  AYRI bir adım, kısa süreliğine BEKLENEN ara durum).
+- `succeeded` — başarıyla işlendi VE aktive edildi.
+- `failed` — Faz 0 senkron yolda kalıcı hata.
+- `retrying` — Faz 1 asenkron yolda geçici hata, üstel geri çekilme
+  bekliyor.
+- `dead_letter` — Faz 1'de `_MAX_DENEME` aşıldı, `job_status` da
+  senkronize `dead_letter`.
+- `mutabakat_reddedildi` — `mutabakat_uretim.periyot_aktivasyona_
+  uygun_mu()`nün ÇAPRAZ (periyot bazlı) mutabakatı kalıcı reddetti
+  (7. durum, 2026-09-18).
+- `onay_bekliyor` — `pipeline.otomatik_onaya_uygun()`'un PER-BATCH İÇ
+  mutabakatı `False` döndü, insan kararı bekliyor (8. durum, TERMİNAL
+  DEĞİL, 2026-09-19).
+- `onaylanmadi` — insan `onay_bekliyor`'u (ya da eşdeğer bir durumu)
+  elle reddetti/başka bir batch'le değiştirdi, `error_summary`'de
+  gerekçe + varsa yerine geçen batch_id (9. durum, TERMİNAL, 2026-09-19).
 
 **`mutabakat_reddedildi` — 7. durum, `dead_letter` İLE KARIŞTIRILMAZ**
 (2026-09-18, `Claude outputs/PROMPT_A_C_2026-09-17.md` İş C): `dead_

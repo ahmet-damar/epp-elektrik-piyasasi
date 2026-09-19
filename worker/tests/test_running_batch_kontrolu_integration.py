@@ -132,3 +132,61 @@ def test_gercek_batch_732_deseninin_kucuk_olcekli_taklidi(conn) -> None:  # type
     )
     takililar = rbk.takili_running_batchleri_bul(conn, simdi=simdi)
     assert taklit_batch in {t.batch_id for t in takililar}
+
+
+def test_onay_bekleyen_batchleri_bul_bulur(conn) -> None:  # type: ignore[no-untyped-def]
+    """2026-09-19 (Görev 1): `status='onay_bekliyor'` olan bir batch
+    `onay_bekleyen_batchleri_bul()` tarafından bulunmalı, `sebep`
+    (error_summary) doğru taşınmalı."""
+    simdi = datetime(2026, 9, 19, 12, 0, tzinfo=UTC)
+    batch_id = _batch_olustur_created_at_ile(
+        conn, "test-rbk-onay-bekliyor", simdi - timedelta(days=3)
+    )
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE ingestion_batch SET status='onay_bekliyor', error_summary=%s WHERE batch_id=%s",
+            ("mutabakat uyuşmadı: fact_tuketim (test)", batch_id),
+        )
+
+    bekleyenler = rbk.onay_bekleyen_batchleri_bul(conn, simdi=simdi)
+    bulunan = next((b for b in bekleyenler if b.batch_id == batch_id), None)
+    assert bulunan is not None
+    assert bulunan.sebep == "mutabakat uyuşmadı: fact_tuketim (test)"
+    assert bulunan.kac_gundur_bekliyor == pytest.approx(3.0, abs=0.01)
+
+
+def test_onay_bekliyor_durumundaki_batch_takili_running_listesinde_GORUNMEZ(
+    conn,
+) -> None:  # type: ignore[no-untyped-def]
+    """2026-09-19 (Görev 1) — REGRESYON: batch 4-8'in ESKİ (hatalı) hâli
+    `status='running'` olarak kalıp `takili_running_batchleri_bul()`
+    tarafından "takılı" sayılıyordu (doğru bir alarm, ama YANLIŞ
+    KATEGORİDE — bu bir 'bozulma' değil, normal bir 'inceleme kuyruğu'
+    öğesiydi). ESKİ davranışı burada BİLEREK yeniden üretip (`status=
+    'running'` bırakarak) YAKALANDIĞINI, sonra YENİ davranışı (`status=
+    'onay_bekliyor'`) uygulayıp DÜZELDİĞİNİ aynı testte gösterir —
+    conftest guard'ın eski/yeni karşılaştırma desseniyle aynı."""
+    simdi = datetime(2026, 9, 19, 12, 0, tzinfo=UTC)
+    batch_id = _batch_olustur_created_at_ile(
+        conn, "test-rbk-eski-vs-yeni", simdi - timedelta(hours=48)
+    )
+
+    # --- ESKİ (hatalı) davranış: status='running' bırakılsaydı ne olurdu? ---
+    takililar_eski = rbk.takili_running_batchleri_bul(conn, simdi=simdi)
+    assert batch_id in {
+        t.batch_id for t in takililar_eski
+    }  # yakalanırdı (BEKLENEN sorun)
+
+    # --- YENİ (doğru) davranış: job_worker.py artık 'onay_bekliyor' set ediyor ---
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE ingestion_batch SET status='onay_bekliyor' WHERE batch_id=%s",
+            (batch_id,),
+        )
+    takililar_yeni = rbk.takili_running_batchleri_bul(conn, simdi=simdi)
+    assert batch_id not in {
+        t.batch_id for t in takililar_yeni
+    }  # artık YANLIŞ alarm YOK
+
+    bekleyenler = rbk.onay_bekleyen_batchleri_bul(conn, simdi=simdi)
+    assert batch_id in {b.batch_id for b in bekleyenler}  # ama doğru listede GÖRÜNÜYOR

@@ -16,14 +16,22 @@ kalır — `job_status.next_retry_at`in geçmişte kalması deseniyle AYNI
 sınıf sessiz-bekleme riski (bkz. `worker/analytics.py:gecmis_kalan_
 isleri_bul()`, 2026-09-16).
 
-**Madde 1d'nin bulgusu (bu script'in VAR OLMA nedeni):**
-`ingestion_batch.status` durum makinesinde ('queued','running',
-'succeeded','failed','retrying','dead_letter') "mutabakat tarafından
-kalıcı olarak reddedildi" için AYRI bir TERMİNAL durum YOK — bir batch
-süresiz `running` kalabilir, tıpkı batch 732 gibi (bkz. kapsam raporu
-"Doğrulama Turu" eki, Madde 1). Bu script o şema boşluğunu KAPATMIYOR
-(yeni bir durum/migration bu turun kapsamı DIŞINDA, yalnız ÖNERİLDİ) —
-yalnız problemi GÖRÜNÜR kılıyor.
+**Madde 1d'nin bulgusu — KAPANDI (2026-09-18, migration 20260918_0001):**
+`ingestion_batch.status`a "mutabakat tarafından kalıcı olarak reddedildi"
+için `mutabakat_reddedildi` terminal durumu eklendi (bkz. `worker/
+scripts/mutabakat_uretim.py:mutabakat_reddini_kaydet()`).
+
+**2026-09-19'da bulunan İKİNCİ, KARDEŞ boşluk (migration 20260919_0001
+ile kapandı):** `otomatik_onaya_uygun()` (per-batch İÇ mutabakat,
+`worker/pipeline.py`) `False` döndüğünde `worker/job_worker.py` batch'i
+AYNI ŞEKİLDE hiçbir kalıcı duruma geçirmiyordu — konsola uyarı basıp
+`running`de bırakıyordu (gerçek örnek: batch 4-8, 2026-02..06 Excel, 19
+gün fark edilmedi, bkz. `Claude outputs/kapanis_2026-09-19_batch_4_8.md`).
+Artık `job_worker.py` bu durumda batch'i `'onay_bekliyor'`a (TERMİNAL
+DEĞİL) geçirir + `audit_log`'a yazar — bu script'in `takili_running_
+batchleri_bul()`'u (yalnız `status='running'` filtreler) bu sınıfı ARTIK
+YANLIŞLIKLA "takılı" SAYMAZ; ayrı, sakin bir `onay_bekleyen_batchleri_
+bul()` bu kuyruğu raporlar.
 
 **MUTLAK KISIT — SALT OKUMA:** yalnız SELECT, hiçbir yazma YOK."""
 
@@ -42,6 +50,7 @@ from psycopg import Connection
 from worker.db import get_database_url
 
 VARSAYILAN_ESIK_SAAT = 24.0
+VARSAYILAN_ONAY_ESIK_GUN = 0.0
 
 
 @dataclass(frozen=True)
@@ -53,6 +62,15 @@ class TakiliBatch:
     kac_saattir_calisiyor: float
 
 
+@dataclass(frozen=True)
+class OnayBekleyenBatch:
+    batch_id: int
+    parser_version: str
+    created_at: datetime
+    kac_gundur_bekliyor: float
+    sebep: str | None
+
+
 def takili_running_batchleri_bul(
     conn: Connection,
     *,
@@ -61,7 +79,10 @@ def takili_running_batchleri_bul(
 ) -> list[TakiliBatch]:
     """`status='running'` VE `created_at`'i şu andan (`simdi`, testlerde
     sabitlenebilir) `esik_saat`den daha eskiye giden TÜM batch'leri döner
-    — en eski önce sıralı. Boş liste = hiçbir batch eşiği aşmıyor."""
+    — en eski önce sıralı. Boş liste = hiçbir batch eşiği aşmıyor.
+    `'onay_bekliyor'`/`'mutabakat_reddedildi'` durumundaki batch'ler
+    `status='running'` FİLTRESİNE hiç girmediğinden buradan doğal olarak
+    HARİÇTİR — ayrı, kasıtlı bir durum geçişleri var artık."""
     if simdi is None:
         simdi = datetime.now(tz=UTC)
     sinir = simdi - timedelta(hours=esik_saat)
@@ -88,6 +109,47 @@ def takili_running_batchleri_bul(
     ]
 
 
+def onay_bekleyen_batchleri_bul(
+    conn: Connection,
+    *,
+    esik_gun: float = VARSAYILAN_ONAY_ESIK_GUN,
+    simdi: datetime | None = None,
+) -> list[OnayBekleyenBatch]:
+    """`status='onay_bekliyor'` olan TÜM batch'leri döner (varsayılan eşik
+    0 gün — hepsini listeler). `takili_running_batchleri_bul()`'un
+    "bir şey BOZULMUŞ olabilir" alarmından KASITLI OLARAK AYRI — bu,
+    normal/beklenen bir iş akışı adımı olan sakin bir "inceleme kuyruğu"
+    listesidir (2026-08-31'in Ocak/Şubat-Haziran yüklemelerinin HEMEN
+    HEPSİ bu yoldan geçti, bkz. `06_canli_veri_operasyon_gunlugu.md`).
+    `kac_gundur_bekliyor` `created_at`'ten hesaplanır (ingest tamamlanma
+    anıyla pratikte aynı zaman damgası — ayrı bir `updated_at` kolonu
+    yok)."""
+    if simdi is None:
+        simdi = datetime.now(tz=UTC)
+    sinir = simdi - timedelta(days=esik_gun)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT batch_id, parser_version, created_at, error_summary
+            FROM ingestion_batch
+            WHERE status = 'onay_bekliyor' AND created_at < %s
+            ORDER BY created_at
+            """,
+            (sinir,),
+        )
+        rows = cur.fetchall()
+    return [
+        OnayBekleyenBatch(
+            batch_id=row[0],
+            parser_version=row[1],
+            created_at=row[2],
+            kac_gundur_bekliyor=(simdi - row[2]).total_seconds() / 86400,
+            sebep=row[3],
+        )
+        for row in rows
+    ]
+
+
 def main() -> int:
     database_url = get_database_url()
     if not database_url:
@@ -97,25 +159,40 @@ def main() -> int:
     with psycopg.connect(database_url, prepare_threshold=None) as conn:
         conn.read_only = True
         takililar = takili_running_batchleri_bul(conn)
+        onay_bekleyenler = onay_bekleyen_batchleri_bul(conn)
         conn.rollback()
+
+    cikis_kodu = 0
 
     if not takililar:
         print(
             f"Hiçbir batch {VARSAYILAN_ESIK_SAAT:.0f} saatten uzun 'running' kalmamış."
         )
-        return 0
-
-    print(
-        f"⚠️ {len(takililar)} batch {VARSAYILAN_ESIK_SAAT:.0f} saatten uzun "
-        "'running' durumunda takılı:"
-    )
-    for t in takililar:
+    else:
+        cikis_kodu = 1
         print(
-            f"  batch_id={t.batch_id} parser_version={t.parser_version} "
-            f"created_at={t.created_at.isoformat()} "
-            f"({t.kac_saattir_calisiyor:.1f} saattir çalışıyor)"
+            f"⚠️ {len(takililar)} batch {VARSAYILAN_ESIK_SAAT:.0f} saatten uzun "
+            "'running' durumunda takılı:"
         )
-    return 1
+        for t in takililar:
+            print(
+                f"  batch_id={t.batch_id} parser_version={t.parser_version} "
+                f"created_at={t.created_at.isoformat()} "
+                f"({t.kac_saattir_calisiyor:.1f} saattir çalışıyor)"
+            )
+
+    if onay_bekleyenler:
+        print(
+            f"\nℹ️ {len(onay_bekleyenler)} batch 'onay_bekliyor' (insan kararı "
+            "bekleniyor, ALARM DEĞİL — inceleme kuyruğu):"
+        )
+        for b in onay_bekleyenler:
+            print(
+                f"  batch_id={b.batch_id} parser_version={b.parser_version} "
+                f"({b.kac_gundur_bekliyor:.1f} gündür) sebep={b.sebep}"
+            )
+
+    return cikis_kodu
 
 
 if __name__ == "__main__":

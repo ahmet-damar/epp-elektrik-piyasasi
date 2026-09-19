@@ -110,7 +110,16 @@ def test_job_worker_supheli_batch_otomatik_aktive_etmez(conn, tmp_path) -> None:
     var (bkz. test_parser._sentetik_workbook yorumu) - dogrula_serbest_tuketici
     bunu reddeder (red>0). otomatik_onaya_uygun() bu yüzden False döner;
     worker job'ı BAŞARILI sayar (parse/yükleme kendisi başarılı) ama batch'i
-    aktive ETMEZ, 'running'de bırakır."""
+    aktive ETMEZ.
+
+    **2026-09-19 (Görev 1) — bu testin ESKİ hâli `status == 'running'`
+    bekliyordu:** bu, tam olarak batch 4-8'in 19 gün fark edilmeden
+    sessizce beklediği DAVRANIŞIN KENDİSİYDİ (bkz. `Claude outputs/
+    kapanis_2026-09-19_batch_4_8.md`) — bu test o hatalı davranışı
+    ZATEN pinliyordu, farkında olmadan. Artık DOĞRU davranışı pinliyor:
+    `'onay_bekliyor'` (TERMİNAL DEĞİL, ama artık `takili_running_
+    batchleri_bul()`'un "running" filtresine hiç girmediğinden yanlışlıkla
+    "takılı" sayılmaz) + `audit_log`'a bir kayıt."""
     icerik = _wb_bytes(_sentetik_workbook())
     kuyruk = _kuyruga_al(conn, icerik, "job-worker-supheli", tmp_path)
     conn.commit()
@@ -123,16 +132,27 @@ def test_job_worker_supheli_batch_otomatik_aktive_etmez(conn, tmp_path) -> None:
         assert cur.fetchone() == ("succeeded",)  # iş kendisi başarılı
 
         cur.execute(
-            "SELECT status FROM ingestion_batch WHERE batch_id = %s",
+            "SELECT status, error_summary FROM ingestion_batch WHERE batch_id = %s",
             (kuyruk.batch_id,),
         )
-        assert cur.fetchone() == ("running",)  # ama aktive edilmedi
+        durum, sebep = cur.fetchone()
+        assert durum == "onay_bekliyor"  # ESKİ (hatalı) beklenti: 'running'
+        assert sebep  # otomatik_onaya_uygun()'un sebep metni error_summary'ye yazıldı
 
         cur.execute(
             "SELECT count(*) FROM fact_serbest_tuketici WHERE ingestion_batch_id = %s AND is_active",
             (kuyruk.batch_id,),
         )
         assert cur.fetchone()[0] == 0
+
+        cur.execute(
+            "SELECT count(*), array_agg(payload->>'olay') FROM audit_log "
+            "WHERE table_name='ingestion_batch' AND record_id=%s AND action_type='UPDATE'",
+            (kuyruk.batch_id,),
+        )
+        adet, olaylar = cur.fetchone()
+        assert adet == 1
+        assert olaylar == ["onay_bekliyor"]
 
 
 def test_job_worker_eksik_tablo_retrying_yolu(conn, tmp_path) -> None:  # type: ignore[no-untyped-def]
