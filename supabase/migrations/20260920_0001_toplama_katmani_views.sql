@@ -54,50 +54,68 @@ CREATE INDEX IF NOT EXISTS idx_fact_uretim_il_geneli_tarih_active
 CREATE OR REPLACE VIEW vw_toplama_tuketim_aylik
   WITH (security_invoker = true) AS
 SELECT
-  t.tarih_id, d.yil, d.ay, d.ceyrek,
-  t.grup_id, g.grup_adi,
+  t.tarih_id,
+  d.yil,
+  d.ay,
+  d.ceyrek,
+  t.grup_id,
+  g.grup_adi,
   SUM(t.tuketim_mwh) AS tuketim_mwh,
   COUNT(DISTINCT t.il_kodu) AS il_sayisi
-FROM fact_tuketim t
-JOIN dim_tarih d ON d.tarih_id = t.tarih_id
-JOIN dim_tuketici_grubu g ON g.grup_id = t.grup_id
+FROM fact_tuketim AS t
+INNER JOIN dim_tarih AS d ON t.tarih_id = d.tarih_id
+INNER JOIN dim_tuketici_grubu AS g ON t.grup_id = g.grup_id
 WHERE t.is_active
 GROUP BY t.tarih_id, d.yil, d.ay, d.ceyrek, t.grup_id, g.grup_adi;
 
 CREATE OR REPLACE VIEW vw_toplama_tuketim_ulke_geneli_aylik
   WITH (security_invoker = true) AS
 SELECT
-  u.tarih_id, d.yil, d.ay, d.ceyrek,
-  u.grup_id, g.grup_adi,
+  u.tarih_id,
+  d.yil,
+  d.ay,
+  d.ceyrek,
+  u.grup_id,
+  g.grup_adi,
   u.tuketim_mwh
-FROM fact_tuketim_ulke_geneli u
-JOIN dim_tarih d ON d.tarih_id = u.tarih_id
-JOIN dim_tuketici_grubu g ON g.grup_id = u.grup_id
+FROM fact_tuketim_ulke_geneli AS u
+INNER JOIN dim_tarih AS d ON u.tarih_id = d.tarih_id
+INNER JOIN dim_tuketici_grubu AS g ON u.grup_id = g.grup_id
 WHERE u.is_active;
 
 CREATE OR REPLACE VIEW vw_toplama_uretim_kaynak_aylik
   WITH (security_invoker = true) AS
 SELECT
-  k.tarih_id, d.yil, d.ay, d.ceyrek,
-  k.kaynak_id, dk.kaynak_adi, dk.yenilenebilir_mi,
-  k.lisans_id, dl.tur AS lisans_turu,
+  k.tarih_id,
+  d.yil,
+  d.ay,
+  d.ceyrek,
+  k.kaynak_id,
+  dk.kaynak_adi,
+  dk.yenilenebilir_mi,
+  k.lisans_id,
+  dl.tur AS lisans_turu,
   k.uretim_mwh
-FROM fact_uretim_kaynak_geneli k
-JOIN dim_tarih d ON d.tarih_id = k.tarih_id
-JOIN dim_kaynak dk ON dk.kaynak_id = k.kaynak_id
-JOIN dim_lisans dl ON dl.lisans_id = k.lisans_id
+FROM fact_uretim_kaynak_geneli AS k
+INNER JOIN dim_tarih AS d ON k.tarih_id = d.tarih_id
+INNER JOIN dim_kaynak AS dk ON k.kaynak_id = dk.kaynak_id
+INNER JOIN dim_lisans AS dl ON k.lisans_id = dl.lisans_id
 WHERE k.is_active;
 
 CREATE OR REPLACE VIEW vw_toplama_uretim_il_aylik
   WITH (security_invoker = true) AS
 SELECT
-  i.tarih_id, d.yil, d.ay, d.ceyrek,
-  i.lisans_id, dl.tur AS lisans_turu,
+  i.tarih_id,
+  d.yil,
+  d.ay,
+  d.ceyrek,
+  i.lisans_id,
+  dl.tur AS lisans_turu,
   SUM(i.uretim_mwh) AS uretim_mwh,
   COUNT(DISTINCT i.il_kodu) AS il_sayisi
-FROM fact_uretim_il_geneli i
-JOIN dim_tarih d ON d.tarih_id = i.tarih_id
-JOIN dim_lisans dl ON dl.lisans_id = i.lisans_id
+FROM fact_uretim_il_geneli AS i
+INNER JOIN dim_tarih AS d ON i.tarih_id = d.tarih_id
+INNER JOIN dim_lisans AS dl ON i.lisans_id = dl.lisans_id
 WHERE i.is_active
 GROUP BY i.tarih_id, d.yil, d.ay, d.ceyrek, i.lisans_id, dl.tur;
 
