@@ -96,6 +96,7 @@ her yeni rakam için geçerlidir.
 | v1.46 | 2026-09-19 | **İş C migration'ı CANLIYA UYGULANDI + İş A kararı (Seçenek 3) kayda geçti + YENİ bulgu: batch 4-8** — §5.31. Ahmet'in bu tur için verdiği canlı-yazma izniyle: taze yedek tetiklendi/doğrulandı (run 35432314325, 1.797.064 bayt), canlı durum fotoğrafı alındı, `ingestion_batch_status_check` 7 değere genişletildi (kilit kontrolü temiz, migration izleme tablosu YOK, sonrası 0 fark). **ADIM 2 beklenmedik bulgu verdi, tur DURDU:** `running_batch_kontrolu.py` batch 732 DIŞINDA **5 GERÇEK batch** (4-8, 2026-02..06 Excel, ~19 gündür running) daha buldu — kök neden batch 732'den FARKLI (`pipeline.otomatik_onaya_uygun()`'un per-batch iç mutabakatı `fact_tuketim` için False döndü, elle onay hiç verilmedi). Kullanıcı talimatı gereği ("beklenmedik → sonrakine geçme") **ADIM 3 (batch 732 geçişi) BU TURDA ÇALIŞTIRILMADI**, batch 4-8'e DOKUNULMADI — yeni, ayrı bir açık madde olarak raporlandı. **ADIM 4 (İş A kararı) kayda geçti:** Seçenek 3 (source_asset'i 1 dosya=1 satır yapma) + Şart 1 (batch 19'un error_summary'si audit_log'a taşınmadan silinmeyecek) + Şart 2 (storage_path NOT NULL tercih kuralı, min(id) değil) — UYGULANMADI, yalnız karar notu | Kod değişikliği YOK (yalnız canlı DDL + doküman). Durum fotoğrafı diff: ADIM 1 sonrası 0 fark (tüm fact tablo satır sayıları, ay bazlı aktif sayılar, ingestion_batch durum dağılımı, audit_log sayısı aynı) |
 | v1.47 | 2026-09-19 | **Batch 4-8 ölçüldü — KAPALI, belgeli bir olay çıktı + ADIM 3 (batch 732) CANLIYA UYGULANDI** — §5.32. Batch 4-8 araştırması: 2026-02..06 GERÇEKTEN iki kez yüklenmiş (aynı file_hash, parser 0.1→0.3), aktif veri ikinci yüklemeden geliyor, batch 4-8 tüm tablolarda is_active=false — bu 2026-08-31'de ZATEN tam belgelenmiş bir olay (EPDK şablon değişikliği, T11/T13 düzeltildi, T7 bilinçli ertelendi → `otomatik_onaya_uygun()` sistematik yanlış-pozitif veriyor, kullanıcı `onayla.py` ile bilerek elle onayladı, audit_log'da izi var). Kod okunarak doğrulandı: `batch_onayla()` `otomatik_onaya_uygun()`'u hiç çağırmıyor — kasıtlı kaçış kapısı, bug değil. Dashboard kör noktası için tasarım notu (kod yazılmadı): `running_batch_kontrolu.py` zaten yeniden kullanılabilir. **ADIM 3 koşulu sağlandığından uygulandı:** dry-run → yalnız 202402 → gerçek koşu → batch 732 `mutabakat_reddedildi`, audit_log +1, fact tablolarında 0 fark | Kod değişikliği YOK (yalnız canlı veri: 1 status UPDATE + 1 audit_log INSERT). Durum fotoğrafı tam diff: 119+120 ayın TAMAMI değişmedi |
 | v1.48 | 2026-09-19 | **Batch durum makinesi KAPATILDI: `onay_bekliyor`/`onaylanmadi` (8./9. durum) + batch 4-8 CANLIDA kapatıldı + dashboard uyarısı** — §5.33. Görev 1: önerilen tasarıma (`onay_bekliyor`+`yerine_gecildi`) gerekçeli KISMİ itiraz — `dead_letter` reuse alternatifi (job_status coupling invariant'ı nedeniyle) REDDEDİLDİ, durum sayısı 9'da kaldı ama dar `yerine_gecildi` yerine genel `onaylanmadi` seçildi. Migration `20260919_0001`, `job_worker.py:_isi_uygula()`'nın False dalı artık `onay_bekliyor`+audit_log yazıyor, `running_batch_kontrolu.py`'ye AYRI `onay_bekleyen_batchleri_bul()`, `ingest.py:_TERMINAL_DURUMLAR`'a `onaylanmadi` eklendi, regresyon testi (conftest guard deseniyle AYNI) eski/yeni davranışı aynı testte kanıtlıyor. Görev 2 (CANLI): batch 4-8 → `onaylanmadi` (yerine geçen batch_id + gerekçe `error_summary`'de), 5 audit_log satırı, **fact satırlarına DOKUNULMADI**, durum fotoğrafı 0 fark. **Asıl başarı ölçütü sağlandı:** `running_batch_kontrolu.py` artık TAMAMEN temiz. Görev 3: dashboard'a `onay_bekliyor` uyarısı (kod tekrarsız). Görev 4 (salt okuma): ikinci yüklemenin `parser_version`'ı 0.1→0.3 bump edilmiş KANITLANDI; yazılı bump-disiplini kuralı YOK, İş A Seçenek 3'ün ön koşulu olarak `09_PROJE_DURUMU.md`'ye açık madde işlendi | Tam `worker/tests` (fresh disposable, 33/33 migration): 409 test, 408 geçti (tek beklenen `test_auth_integration.py`). `ruff`/`mypy` temiz, `bandit` (CI komutuyla) 0 bulgu. Canlıya migration + batch 4-8 durum değişikliği UYGULANDI, fact satırlarına DOKUNULMADI (0 fark) |
+| v1.49 | 2026-09-20 | **Toplama katmanı (agregasyon) — veri katmanı TAMAMLANDI, UI YOK** — §15/§5.34. `fact_tuketim`/`fact_tuketim_ulke_geneli`/`fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli` için grain(ay/çeyrek/yıl)+aralık parametreli, kapsam bayrağı (`beklenen`/`mevcut_donem_sayisi`/`tam_mi`) döndüren `worker/toplama.py` + migration `20260920_0001` (4 `vw_toplama_*` view, `security_invoker=true`, MATERIALIZED DEĞİL). Kapsam sinyali TABLOYA göre bilinçli ayrışıyor: kırılım-düzeyi (tuketim, EPDK her ay tüm grupları basar) vs tablo-düzeyi (uretim_kaynak, "kaynak satırı yok" ≠ "veri yok"). ORAN KURALI (önce topla sonra oranla) somut sayısal örnekle test edildi (%51,28 doğru vs %53,33 yanlış ortalama — GERÇEKTEN farklı). R12 (kayan 12 ay, RANGE pencere) + kümülatif kolon tuzağı (view kolonu hiç seçmiyor) + 2025→2026 dikiş bayrağı da uygulandı. Ölçüm: en pahalı sorgu ~830ms (asıl yürütme ~130ms, kalanı tek seferlik Postgres JIT) — materialize etmeye GEREK YOK | Tam `worker/tests` (fresh disposable, 34/34 migration): 426 test, 425 geçti (tek beklenen `test_auth_integration.py`). +17 yeni test (10 entegrasyon: madde 2/4/5/6/7'nin HER biri kanıtlandı, 7 pure). `ruff`/`mypy` temiz, `bandit` 0 bulgu (2 yeni B608 nosec eklendi, gerekçeli — tümü whitelist'ten). CANLIYA HİÇBİR ŞEY UYGULANMADI — performans ölçümü de disposable'da yapıldı (PROMPT'un izin verdiği canlı salt-okuma ölçümü seçeneği KULLANILMADI, disposable'daki gerçekçi hacim yeterli görüldü) |
 
 ---
 
@@ -1670,6 +1671,44 @@ raporu: `Claude outputs/kapanis_2026-09-19_batch_durum.md`.
 
 ---
 
+### 5.34 Toplama katmanı (agregasyon) — veri katmanı (2026-09-20)
+
+`Claude outputs/PROMPT_TOPLAMA_KATMANI_2026-09-19.md` Bölüm 2 — tam
+sözleşme/tasarım detayı §15'te, burada yalnız turun ÖZETİ. Amaç:
+dashboard bugün TEK AY üzerinden çalışıyor, çeyreklik/yıllık/uzun-dönem
+grafik için bir agregasyon katmanı gerekiyordu. **Bu turda YALNIZ VERİ
+KATMANI + TESTLER — UI YOK** (ayrı tur, ikisi birlikte incelenemez).
+
+Migration `20260920_0001_toplama_katmani_views.sql`: 4 index (`tarih_id
+WHERE is_active`) + 4 `vw_toplama_*` view (is_active filtresi + dim_*
+join'i + il_kodu üzerinden ülke geneline toplama, `security_invoker=
+true` — RLS'in view sahibi yerine ÇAĞIRANIN rolüyle değerlendirilmesi
+için ZORUNLU, aksi hâlde `current_app_role()` politikaları view
+üzerinden sessizce atlanırdı). `worker/toplama.py` (YENİ, ~550 satır):
+7 fonksiyon (bkz. §15.9), grain/aralık'ı SQL'de (generate_series
+takvimi + Postgres pencere fonksiyonları) işler — Python yalnız
+whitelist'ten (asla kullanıcı girdisinden) SQL metni kurar.
+
+**Tasarım kararlarının TAMAMI uygulandı, itiraz YOK** — PROMPT'un
+verdiği 9 karar (çözünürlük/aralık ayrımı, R12, takvim çeyreği, ORAN
+KURALI, KAPSAM BAYRAĞI, kümülatif tuzağı, kaynak-yok/veri-yok ayrımı,
+2025→2026 dikişi, SQL'de hesaplama) doğrudan makul ve iç tutarlıydı; tek
+BAĞIMSIZ mühendislik kararı kapsam bayrağının `kirilim_bazinda_kapsam`
+ayrımıydı (madde 5'in 2016-12 Tarımsal örneği ile madde 7'nin Motorin
+örneğini UZLAŞTIRMAK için gerekliydi — PROMPT ikisini de istiyordu ama
+aralarındaki AYRIMI açıkça yazmamıştı, bkz. §15.4).
+
+**Doğrulama:** Tam `worker/tests` (fresh disposable, 34/34 migration):
+426 test, 425 geçti (tek beklenen `test_auth_integration.py`). +17 yeni
+test — madde 2/4/5/6/7'nin HER biri gerçek canlı boşluk desenini taklit
+eden en az bir testle KANITLANDI (`test_toplama_integration.py`) + 7
+pure test (`test_toplama_pure.py`). `ruff`/`mypy` temiz, `bandit` 0
+bulgu. Performans: disposable'da gerçekçi hacimle (81 il × 4 grup × 120
+ay) ölçüldü, en pahalı sorgu ~830ms (JIT hariç ~130ms) — MATERIALIZE
+ETMEYE GEREK YOK. **CANLIYA HİÇBİR ŞEY UYGULANMADI.**
+
+---
+
 ## 6. Ingestion Pipeline
 
 ### 6.1 Batch Yaşam Döngüsü
@@ -2620,6 +2659,143 @@ Bu doküman yazılırken bulunan, önceki notlarla gerçek kod/git arasındaki
    seçenek sun) DURULDU, bkz. §5.30 ve `Claude outputs/kapanis_
    2026-09-18_A_C.md`. §6 tablosundaki satır düzeltildi (eski metin
    SİLİNMEDİ, bu not eklendi — tarih çapası kuralı).
+
+---
+
+## 15. Toplama Katmanı (Agregasyon) Sözleşmesi
+
+`Claude outputs/PROMPT_TOPLAMA_KATMANI_2026-09-19.md`, 2026-09-19/20
+(bkz. §5.34). Kapsam: `fact_tuketim`, `fact_tuketim_ulke_geneli`,
+`fact_uretim_kaynak_geneli`, `fact_uretim_il_geneli` — `fact_hava_aylik`
+ve KPI'lar DIŞARIDA (önce temel toplama doğru olsun). Kod: `worker/
+toplama.py` + migration `20260920_0001_toplama_katmani_views.sql`
+(4 `vw_toplama_*` view). **YALNIZ VERİ KATMANI — UI YOK** (ayrı tur).
+
+### 15.1 Çözünürlük (grain) ve aralık (range) — BAĞIMSIZ iki parametre
+
+`Grain = "ay" | "ceyrek" | "yil"` ile `(baslangic_tarih_id, bitis_
+tarih_id)` her zaman AYRI verilir — "10 yıllık aylık" gibi en çok
+kullanılacak kombinasyon böyle üretilir. Ek olarak **R12** (kayan 12
+aylık toplam, `r12_getir()`) — mevsimselliği siler, her ay yeni nokta
+üretir, "trend görünümünün asıl aracı".
+
+### 15.2 Çeyrek = TAKVİM çeyreği
+
+Q1=Ocak-Mart, Q2=Nisan-Haziran, Q3=Temmuz-Eylül, Q4=Ekim-Aralık —
+`dim_tarih.ceyrek` ile ZATEN aynı tanım (`worker/ingest.py:tarih_
+bilesenleri()`, `((ay-1)//3)+1`). Mali yıl/başka bir tanım DEĞİL.
+
+### 15.3 ORAN KURALI — önce topla, sonra oranla
+
+**Asla oranların ortalaması alınmaz.** Örnek (`uretim_yenilenebilir_
+payi_getir()`): çeyreklik yenilenebilir payı = (3 ayın yenilenebilir
+TOPLAMI) / (3 ayın TOPLAM üretimi) — 3 ayın kendi yüzdesinin ortalaması
+DEĞİL. Fark küçük olabilir ve gözle yakalanmaz (`worker/tests/
+test_toplama_integration.py::test_oran_kurali_toplayip_sonra_oranla_
+dogru`da somut bir sayısal örnekle KANITLANDI: doğru=%51,28, yanlış
+ortalama=%53,33 — GERÇEKTEN farklı). Toplanabilir: MWh, adet.
+Toplanamaz: pay (%), kişi başı değerler, `sistem_parametre`/`kpi_esik`
+gibi konfigürasyon sabitleri.
+
+### 15.4 KAPSAM BAYRAĞI — `beklenen_donem_sayisi`/`mevcut_donem_sayisi`/`tam_mi`
+
+Her toplam satırı bu üç alanı taşır. Eksik dönemde toplam SESSİZCE
+düşük DÖNMEZ — `tam_mi=False` açıkça işaretlenir ("sahte KPI üretilmez"
+kuralının dönem seviyesindeki karşılığı). `mevcut_donem_sayisi`'nin
+neye dayandığı TABLOYA göre BİLİNÇLİ OLARAK değişir
+(`worker/toplama.py:_kapsam_ve_deger_df()`'in `kirilim_bazinda_kapsam`
+parametresi):
+
+- **KIRILIM düzeyi** (`fact_tuketim`, `fact_tuketim_ulke_geneli` —
+  `kirilim_bazinda_kapsam=True`): EPDK HER ay TÜM tüketici gruplarını
+  basar — bir grubun belirli bir ayda YOKLUĞU (gerçek örnek: 2016-12
+  Tarımsal) KALICI bir veri kaybıdır. Her kırılım değeri (grup) için
+  AYRI hesaplanır — takvim × kırılım-anahtarı çarpımının HANGİ
+  hücrelerinin dolu olduğu (`EXISTS` alt sorgusu) sayılır.
+- **TABLO düzeyi** (`fact_uretim_kaynak_geneli`, `fact_uretim_il_geneli`
+  — `kirilim_bazinda_kapsam=False`): bir kaynağın (örn. Motorin/Nafta)
+  belirli bir ayda EPDK'nın kendi tablosunda hiç listelenmemesi "o ay o
+  kaynaktan üretim olmadı" demektir, "veri eksik" değil (bkz. §15.5) —
+  `mevcut_donem_sayisi` yalnız TABLONUN o ay HERHANGİ bir aktif satırı
+  var mı sinyaline bakar (gerçek örnek: 202402, `fact_uretim_il_geneli`
+  o ay hiç yüklenmedi — T3 hiç yüklenmediği için, bkz. §5.7/Bulgu J).
+
+**İl kardinalitesi** (yalnız il kırılımlı iki tablo — `fact_tuketim`,
+`fact_uretim_il_geneli`): `il_sayisi_min` (bucket'taki en düşük aylık
+`COUNT(DISTINCT il_kodu)`) `BEKLENEN_IL_SAYISI` (81)'den azsa `tam_mi`
+de `False` olur — bir ulusal toplamın 79/81 il'den türetilmiş olması
+(gerçek örnek: 2023-01/02, deprem — Adıyaman+Kahramanmaraş eksik)
+SESSİZCE düşük bir toplam anlamına gelir, görünür olmalı.
+
+### 15.5 "Kaynak satırı yok" ≠ "veri yok"
+
+2026-09-16/17 doğrulama turunda kanıtlandı (bkz. §5.32): EPDK bazı
+kaynakları (Motorin/Nafta gibi) bazı aylarda kendi tablosunda hiç
+listelemiyor. Katman bunu iki ayrı sinyalle ayırt eder:
+- ay yüklü + kaynak satırı yok → `SUM` doğal olarak 0 katkı verir
+  (satır hiç yok, toplamı etkilemez), `mevcut_donem_sayisi` DÜŞMEZ.
+- ay hiç yüklü değil → `mevcut_donem_sayisi` düşer, `tam_mi=False`.
+
+Fact tablosuna hiçbir zaman 0 YAZILMAZ — bu ayrım YALNIZ toplama
+katmanında (SQL sorgu zamanında) yapılır.
+
+### 15.6 KÜMÜLATİF KOLON TUZAĞI
+
+`fact_tuketim_ulke_geneli.kumulatif_tuketim_mwh` (bkz. migration
+`20260908_0002`, §6.4 emsali) **hiçbir zaman toplanmaz** —
+`vw_toplama_tuketim_ulke_geneli_aylik` yalnız `tuketim_mwh` (zaten
+de-kümülatif) expose eder, kümülatif kolon view'de HİÇ SEÇİLMEZ. Bu
+YAPISAL bir önlem — yanlışlıkla toplansa sonuç 3-6 kat şişer ama makul
+bir büyüklükte kalır (gözle yakalanmaz, bu yüzden test şart —
+`test_kumulatif_kolon_asla_toplanmaz`).
+
+### 15.7 2025→2026 dikişi
+
+`donem_araligi_dikis_iceriyor_mu(baslangic, bitis)` (salt aritmetik,
+DB'ye gitmez) — Sanayi (Karar 2) ve Lisanssız 2026'dan itibaren seriye
+giriyor, Word yıllarında (≤2025) hiç yok. Bir aralık HER İKİ tarafı da
+(`<=202512` VE `>=202601`) kapsıyorsa `True` — UI (ayrı tur) bunu
+etiketlemek için kullanacak, bu turda yalnız sinyal üretiliyor.
+
+### 15.8 Nerede hesaplanır, neden view (materialized değil)
+
+**SQL'de** — `worker/toplama.py` yalnız grain'e göre SABİT şablonlardan
+(tablo/view adları `_TABLO_KAYIT` whitelist'inden, hiçbir zaman ham
+kullanıcı girdisi) parametreli SQL metni kurar; SUM/COUNT/pencere
+fonksiyonları Postgres'te çalışır. RLS veritabanında yaşıyor (81 il ×
+126 ay × grup kırılımını Streamlit'e çekip pandas'ta toplamak hem yavaş
+hem rol mantığını uygulama katmanına sızdırırdı).
+
+**DÜZ VIEW, MATERIALIZED DEĞİL** — gerekçe: `is_active` aktivasyonuyla
+refresh bağımlılığı doğar, bu de-kümülatif işinde yaşanan hatanın
+(migration `20260908_0002`) TEKRARI olurdu. Her view `WITH (security_
+invoker = true)` ile tanımlı — aksi halde RLS, view SAHİBİNİN (genelde
+BYPASSRLS'li `postgres`) yetkisiyle değerlendirilir, `current_app_role()`
+tabanlı politikalar view üzerinden SESSİZCE atlanmış olurdu.
+
+**Ölçüm (2026-09-20, disposable, gerçekçi hacim — 81 il × 4 grup × 120
+ay = 38.880 satır):** en pahalı sorgu `tuketim_toplama_getir(grain=
+'ay', 10 yıl, KIRILIM-düzeyi kapsam)` ≈ 830ms — ama bunun ~715ms'i
+Postgres'in TEK SEFERLİK JIT derleme maliyeti (`EXPLAIN ANALYZE`'ın
+kendi raporu), gerçek yürütme ~130ms. R12 (108 nokta) 33ms. Materialize
+etmeye GEREK YOK — düz view + index yeterli (kullanıcı kararının
+öngördüğü gibi).
+
+### 15.9 Fonksiyon envanteri (`worker/toplama.py`)
+
+| Fonksiyon | Tablo | Kırılım | Kapsam türü |
+|---|---|---|---|
+| `tuketim_toplama_getir()` | `fact_tuketim` | grup_id (il toplanmış) | kırılım-düzeyi + il kardinalitesi |
+| `tuketim_ulke_geneli_toplama_getir()` | `fact_tuketim_ulke_geneli` | grup_id | kırılım-düzeyi |
+| `uretim_kaynak_toplama_getir()` | `fact_uretim_kaynak_geneli` | kaynak_id × lisans_id | tablo-düzeyi |
+| `uretim_il_toplama_getir()` | `fact_uretim_il_geneli` | lisans_id (il toplanmış) | tablo-düzeyi + il kardinalitesi |
+| `uretim_yenilenebilir_payi_getir()` | `fact_uretim_kaynak_geneli` | — (oran) | tablo-düzeyi |
+| `r12_getir()` | 4 tablonun TÜMÜ (`TabloAdi`) | — (tek seri, toplam) | tablo-düzeyi |
+| `donem_araligi_dikis_iceriyor_mu()` | — | — | salt aritmetik |
+
+Testler: `worker/tests/test_toplama_integration.py` (10, DB'li — madde
+2/4/5/6/7'nin HER biri en az bir testle KANITLANDI) + `test_toplama_
+pure.py` (7, DB'siz — madde 3/8 + girdi doğrulama).
 
 ---
 

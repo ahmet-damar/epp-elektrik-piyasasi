@@ -357,6 +357,23 @@ sorgulandı:
 **Bu bölümü önce oku — bir sonraki oturum yalnız bunu okuyup kaldığı
 yerden devam edebilmeli.**
 
+**GÜNCEL (2026-09-19/20, gün sonu) — en üst özet, aşağıdaki eski
+tarihli özetlerin YERİNE geçer:**
+- **Veri bütünlüğü arkı KAPANDI:** İş C (`mutabakat_reddedildi`)
+  canlıda tam uygulandı; batch durum makinesi artık 9 değerde
+  (`onay_bekliyor`/`onaylanmadi` dahil), batch 4-8 canlıda kapatıldı,
+  `running_batch_kontrolu.py` TAMAMEN temiz (bkz. `10_TEKNIK_MASTER_
+  DOKUMAN.md` §5.33, `Claude outputs/kapanis_2026-09-19_batch_durum.md`).
+- **Açık madde:** İş A / Seçenek 3 dedup — TANIMLI (Şart 1 + Şart 2,
+  bkz. §5.31 ve aşağıdaki "Açık madde" madde 3), ERTELENDİ, migration
+  henüz yazılmadı. Ön koşulu olan `parser_version` bump disiplini
+  yazılı kural hâline getirilmeli (madde 5).
+- **Toplama katmanı (agregasyon) — veri katmanı TAMAMLANDI**
+  (`Claude outputs/kapanis_2026-09-19_toplama_katmani.md`, §15/§5.34):
+  4 view + `worker/toplama.py` (7 fonksiyon) + 17 test, CANLIYA HİÇBİR
+  ŞEY UYGULANMADI. **Sıradaki iş: UI** (dashboard'a çeyreklik/yıllık/R12
+  grafik entegrasyonu) — AYRI bir tur, henüz başlanmadı.
+
 ### Bugün/bu gece (2026-09-07/08/09) ne kapandı — tek satır özet
 13-dokümanlık dış denetimin **tamamı** kapandı (2026-09-07/08, Aşama 0/1/2
 + D kuralı). 2026-09-08 içinde Aşama 3 ADIM 1-2 + ADIM 3 madde 1 kapandı
@@ -715,6 +732,29 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     komut çıktıları/sayılar dahil).
   - Sonrası Faz 4 (Tahminleme) — aşağıda "Faz 4 (Tahminleme)" bölümüne
     bkz.
+
+### ✅ Kapandı — Toplama katmanı (agregasyon), veri katmanı (2026-09-20)
+
+`Claude outputs/PROMPT_TOPLAMA_KATMANI_2026-09-19.md` Bölüm 2, kapanış
+raporu `Claude outputs/kapanis_2026-09-19_toplama_katmani.md`. Tam
+detay `10_TEKNIK_MASTER_DOKUMAN.md` §15 (sözleşme) / §5.34 (özet).
+
+Dashboard'un tek-ay sınırını aşıp çeyreklik/yıllık/uzun-dönem grafik
+üretebilmesi için agregasyon katmanı — **yalnız veri katmanı, UI AYRI
+bir tur.** 4 `vw_toplama_*` view (migration `20260920_0001`,
+`security_invoker=true`, MATERIALIZED DEĞİL) + `worker/toplama.py` (7
+fonksiyon: 4 tablo toplama + R12 + yenilenebilir oranı + dikiş bayrağı).
+PROMPT'un 9 tasarım kararının TAMAMI uygulandı (itiraz yok); kapsam
+bayrağının "kırılım-düzeyi mi tablo-düzeyi mi" ayrımı (2016-12 Tarımsal
+vs Motorin/Nafta örneklerini uzlaştırmak için) BAĞIMSIZ bir mühendislik
+kararıydı. Ölçüm: en pahalı sorgu (disposable, gerçekçi hacim) ~830ms
+(JIT hariç ~130ms) — materialize etmeye GEREK YOK.
+
+Doğrulama: tam `worker/tests` (fresh disposable, 34/34 migration): 426
+test, 425 geçti (tek beklenen `test_auth_integration.py`). +17 yeni
+test, madde 2/4/5/6/7'nin HER biri en az bir testle KANITLANDI.
+`ruff`/`mypy` temiz, `bandit` 0 bulgu. **CANLIYA HİÇBİR ŞEY
+UYGULANMADI.**
 
 ### ✅ Kapandı — Batch durum makinesinin kapatılması: `onay_bekliyor`/`onaylanmadi` + batch 4-8 CANLIDA kapatıldı (2026-09-19, batch durum turu)
 
