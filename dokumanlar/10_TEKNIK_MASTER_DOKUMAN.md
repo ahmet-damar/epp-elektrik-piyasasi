@@ -2925,6 +2925,204 @@ yok) — Ahmet'in kendi tarayıcısında bakması gerekiyor.
 
 ---
 
+## 16. Otomatik Kontrollerin Güvenilirliği — "Ateşlediği Gösterilmeden Tamamlanmaz"
+
+`Claude outputs/PROMPT_KONTROL_DENETIMI_2026-09-20.md` (2026-09-20) —
+projede AYNI arıza tekrar tekrar çıktı: **yazılmış ama hiç çalışmayan
+bir kontrol**, "başarılı" görünen bir CI/pre-commit/DB kısıtı aslında
+hiçbir şeyi engellemiyor. Beşi de TESADÜFEN bulundu:
+
+1. `scheduled-backup.yml` — pg_dump sürüm uyuşmazlığı + symlink (elle
+   tetiklenince ortaya çıktı, 2026-09-08).
+2. `UNIQUE(source_asset_id, parser_version, schema_version)` —
+   `source_asset_id` her çağrıda yeni üretildiğinden hiç tetiklenemedi
+   (İş A araştırması, bkz. §5.30/§5.31, Ahmet'in Seçenek 3 kararı
+   ERTELENDİ hâlâ).
+3. `sqlfluff` pre-commit hook'u — `files` deseni yanlış yolu
+   hedefliyordu (§5.35).
+4. Scheduled Refresh'in hava verisi adımı — aylarca `if: false` ile
+   KAPALIYDI, `PROD_DATABASE_URL` secret'i hiç tanımlı değildi (C3,
+   2026-09-07 denetimi — `scheduled-refresh.yml`'in kendi modül notu).
+5. **Bu turda bulunan İKİ YENİ vaka** (aşağıya bkz.): `.pre-commit-
+   config.yaml`'ın HİÇBİR YERDE çağrılmaması, `validate_rls_static.py`'nin
+   3 dosyalık DONMUŞ (2026-08-19 tarihli) listesi.
+
+**Kural (kalıcı, `.github/copilot-instructions.md`'ye de eklendi):**
+Yeni bir otomatik kontrol (workflow adımı, pre-commit hook, DB kısıtı,
+doğrulama script'i, kapı fonksiyonu) eklendiğinde, **kasıtlı bozuk bir
+örnekle gerçekten ateşlediği gösterilmeden** tamamlanmış sayılmaz.
+`worker/tests/test_conftest_guard.py` (2026-09-09) bu disiplinin ZATEN
+var olan, taklit edilecek ALTIN STANDART örneği — canlı-DB guard'ını
+izole bir sahte projede, eski (buggy) davranışı BİLEREK yeniden üreterek
+test eder.
+
+### 16.1 Envanter (2026-09-20 denetimi)
+
+| Kontrol | Yer | Neyi engellemesi bekleniyor | Durum |
+|---|---|---|---|
+| `ci.yml`: ruff/mypy/pytest/compileall | CI `worker` job | Lint/tip/test hatası | KANITLI ATEŞLER (her push'ta fiilen çalışıyor, PR'lar bunlarla kırmızı olmuş) |
+| `ci.yml`: migration glob = dosya sayısı | CI `integration` job | Yeni migration'ın CI'da test edilmeden atlanması | SINANMAMIŞ (2026-09-07'de asimetri riski fark edilip eklendi, gerçek bir mismatch'le hiç sınanmadı) |
+| `ci.yml`: `validate_rls_static.py` | CI `worker`+`integration` job | RLS/GRANT yapılandırma hatası | **ATEŞLEYEMEZ (bu turda KANITLANDI, bkz. 16.2)** |
+| `ci.yml`: `validate_role_access.py` | CI `integration` job | anon/viewer gerçek RLS/GRANT davranışı | KANITLI ATEŞLER (gerçek `SET ROLE` + sorgu, dinamik — ama yalnız `veri_kapsam_disi` tablosu) |
+| `ci.yml`: `worker/dogrula.py` | CI `worker` job | Hesaplanan toplamların EPDK resmi toplamlarıyla uyuşmaması | KANITLI ATEŞLER (her koşuda gerçek sayısal karşılaştırma yapıyor) |
+| `sqlfluff` (CI `sql` job) | CI, ayrı job | SQL stil/kalite | KANITLI ATEŞLER (bu turda + önceki turda gerçek ihlalleri yakaladı) |
+| `security.yml`: gitleaks/pip-audit/npm-audit/Trivy/bandit/license-check | CI, ayrı workflow | Sır sızıntısı, güvenlik açığı, lisans ihlali | SINANMAMIŞ (hiçbiri kasıtlı bozuk örnekle sınanmadı — hepsi 3. parti standart araçlar, düşük öncelik) |
+| `deploy.yml`: migrate/deploy-ssh/smoke | CD | Canlıya migration/deploy | **ATEŞLEYEMEZ, ama BİLİNÇLİ/DOKÜMANTE** — `build-push` job'ı `if: false` (Dockerfile yok), `needs` zinciri yüzünden TÜMÜ her push'ta skip ediliyor. Bu turda YENİ bulunmadı, zaten yorumda açık. |
+| `scheduled-backup.yml` | Haftalık cron | Yedeksiz kalma | KANITLI ATEŞLER (gerçek koşularda gerçek dump üretti, örn. run 35434006940, 1.797.536 bayt) |
+| `scheduled-refresh.yml` | Günlük cron | Hava verisinin güncellenmemesi | KANITLI ATEŞLER (kendi geçmişinde bir kez ateşleyemez durumdaydı, C3'te düzeltildi — bkz. yukarı madde 4) |
+| `.pre-commit-config.yaml` (TÜM 8 hook grubu) | Yerel git hook | Commit ÖNCESİ hijyen/lint/sır/SQL/Dockerfile/commit-msg | **ATEŞLEYEMEZ (bu turda KANITLANDI, bkz. 16.2)** |
+| `worker/tests/conftest.py` canlı-DB guard | pytest | Test paketinin canlı Supabase'e karşı çalışması | KANITLI ATEŞLER (`test_conftest_guard.py`, 3 senaryo, İKİ gerçek geçmiş delinme belgeli) |
+| `ingestion_batch_status_check` (CHECK) | DB | Geçersiz `status` değeri | SINANMAMIŞ (Postgres-native, muhtemelen sağlam, ama hiç kasıtlı geçersiz değerle sınanmadı) |
+| `UNIQUE(source_asset_id, parser_version, schema_version)` (P0-5) | DB | Aynı dosyanın aynı parser'la iki kez işlenmesi | **ATEŞLEYEMEZ (önceden bulundu, bkz. §5.30/İş A)** — `source_asset_id` her çağrıda taze üretildiğinden pratikte hiç tetiklenemiyor, Seçenek 3 (Ahmet onayladı) ERTELENDİ |
+| `otomatik_onaya_uygun()` | `worker/pipeline.py`, `job_worker.py` çağırır | Per-batch iç mutabakat tutmazsa otomatik aktivasyonu engelleme | KANITLI ATEŞLER (gerçek olay: batch 4-8, §5.32) |
+| `periyot_aktivasyona_uygun_mu()` | `worker/scripts/mutabakat_uretim.py` | Çapraz (periyot) mutabakat tutmazsa aktivasyonu engelleme | KANITLI ATEŞLER (gerçek olay: batch 732, §5.31/§5.32) |
+| `batch_olustur()` terminal guard (`BatchZatenTerminalHatasi`) | `worker/ingest.py` | Terminal durumdaki bir batch'in üzerine sessizce yazılması | KANITLI ATEŞLER (7 parametrized test, §5.30) |
+| `vw_toplama_*` view'lerinin `security_invoker=true` | migration `20260920_0001` | RLS'in view sahibi yerine çağıranın rolüyle değerlendirilmesi | **KISMEN KANITLANDI, bkz. 16.2** — ayarın kendisi doğru pratik ama BU projenin rol tasarımında (her rol view+tablo grant'ini birebir taşıyor) somut/ölçülebilir bir fark YARATMIYOR |
+| `mutabakat_ulke_geneli.py`, `tutarlilik_ulke_geneli_kumulatif.py` | `worker/scripts/` | Ülke geneli mutabakatsızlık/kümülatif tutarsızlık | OTOMATİK DEĞİL — hiçbir workflow/pipeline bunları çağırmıyor, yalnız ELLE çalıştırılan tanı araçları (kapsam dışı, "kontrol" değil "araç") |
+
+### 16.2 Bu turda gerçekten sınanan 3 kontrol
+
+**Neden bu 3'ü:** "ucuz ve kesin olandan başla" talimatı gereği önce
+desen/yol eşleşmesi türü (en sık arızalanan sınıf, bkz. vaka 3) tarandı;
+üçüncüsü (`security_invoker`) bu OTURUMDA yazılmış, kendi güvenlik
+iddiamı sınamadan bırakmak tam da bu turun önlemeye çalıştığı hatanın
+kendisi olurdu.
+
+1. **`validate_rls_static.py` — ATEŞLEYEMEZ, KANITLANDI.**
+   `SCHEMA_PATHS` sabit listesi yalnız 3 dosyayı okuyor: `db/schema.sql`,
+   migration `20260819_0002`, `20260819_0003` — hepsi 2026-08-19 tarihli.
+   O tarihten beri eklenen 30+ migration (fact_tuketim_ulke_geneli,
+   fact_uretim_kaynak/il_geneli, `vw_toplama_*` view'leri dahil) bu
+   script tarafından HİÇ okunmuyor. **Sınama:** `20260920_0001_toplama_
+   katmani_views.sql`'in sonuna `GRANT ALL ON vw_toplama_tuketim_aylik
+   TO anon;` eklendi (script'in kendi mantığının AÇIKÇA yasakladığı bir
+   ihlal — "anon must not be granted privileges"). `python worker/
+   validate_rls_static.py` yine de **"RLS static validation passed"**
+   bastı, exit code 0. Değişiklik hemen `git checkout --` ile geri alındı.
+   **Düzeltme (uygulanmadı, öneri):** `SCHEMA_PATHS`'i `sorted(glob(
+   "supabase/migrations/*.sql"))` ile DİNAMİK hale getirmek — ayrı bir
+   tur, bu script'in tüm regex/token varsayımlarının 30+ dosyaya karşı
+   hâlâ doğru davranacağının AYRICA doğrulanmasını gerektirir (kapsam
+   dışı tutuldu, kota sınırlı).
+
+2. **`.pre-commit-config.yaml` (8 hook grubunun TÜMÜ) — ATEŞLEYEMEZ,
+   KANITLANDI.** `.git/hooks/pre-commit` dosyası YOK (yalnız git'in
+   varsayılan `.sample` şablonları var — hiç aktive edilmemiş).
+   `pre-commit` CLI'ın kendisi bu ortamda kurulu bile değil, `requirements-
+   dev.txt`'de de YOK (ruff/mypy/pytest/sqlfluff/bandit'in aksine).
+   Hiçbir CI job'ı `pre-commit run` çağırmıyor (`grep -rn "pre-commit"
+   .github/workflows/` — 0 sonuç). README'nin kendisi kurulumu ELLE bir
+   adım olarak tarif ediyor (`pipx install pre-commit && pre-commit
+   install`) ama bunun GERÇEKTEN yapıldığını doğrulayan hiçbir mekanizma
+   yok. Sonuç: eslint/prettier/hadolint/commitizen/gitleaks-via-precommit
+   dahil TÜM 8 hook grubu, konfigürasyonda var olsalar da, bu projenin
+   gerçek iş akışında (Claude Code oturumları dahil, `git commit` doğrudan
+   Bash ile çağrılıyor) SIFIR koruma sağlıyor — sqlfluff/ruff/mypy'nin
+   CI'da AYRICA (pre-commit'ten bağımsız) çalıştırılması tek gerçek
+   güvence. **Düzeltme (uygulanmadı, öneri, AYRI bir tur gerektirir):**
+   `ci.yml`'e `pre-commit run --all-files` çalıştıran yeni bir job
+   eklemek — bu hem yerel kuruluma bağımlılığı ortadan kaldırır hem
+   gitleaks/prettier/commitizen gibi CI'da ŞU AN hiç karşılığı olmayan
+   hook'lara gerçek bir güvence kazandırır.
+
+3. **`vw_toplama_*` view'lerinin `security_invoker=true`'su — KISMEN
+   KANITLANDI.** Disposable'da `postgres` rolünün (view sahibi)
+   `rolbypassrls=true` VE `rolsuper=true` olduğu doğrulandı — teoride
+   `security_invoker=false` olsaydı RLS view SAHİBİ ÜZERİNDEN tamamen
+   atlanabilirdi (migration'ın kendi gerekçesi DOĞRU). **Ama sınama
+   (`ALTER VIEW vw_toplama_tuketim_ulke_geneli_aylik SET (security_
+   invoker=false)`, 'viewer' rolüyle sorgu, sonra GERİ ALINDI) hiçbir
+   GÖZLENEBİLİR fark ÜRETMEDİ** — nedeni ölçüldü: (a) view'in kendi
+   `WHERE is_active` filtresi RLS'ten TAMAMEN BAĞIMSIZ, kodun içinde
+   sabit; (b) `viewer`/`data_operator`/`admin` rollerinin HER BİRİ hem
+   view'de hem ALTINDAKİ TABLODA birebir aynı GRANT'a sahip (established
+   desen) — yani owner-bypass'ın açığa çıkaracağı "fazladan erişim"
+   BU projede pratikte yok, çünkü zaten meşru erişimi olan bir rol
+   test ediliyor. **Sonuç: `security_invoker=true` genel ilke olarak
+   DOĞRU ve KORUNMALI (rol tasarımı ileride değişirse — örn. view+tablo
+   grant'leri ayrışırsa — o zaman fark yaratır), ama BU somut senaryoda
+   ÖLÇÜLEBİLİR bir güvenlik açığı KAPATMADIĞI da KANITLANDI.** Bu, 3
+   şıktan hiçbirine tam uymuyor — literal ifadeyle "iddia doğru ama bu
+   turdaki test onu AYIRT EDEMEDİ", rapora böyle yazıldı ("muhtemelen"
+   yazılmadı).
+
+### 16.3 Dördüncü vaka (bu denetim turunun İÇİNDEN çıktı): test paketinin kendisi durum sızdırıyordu
+
+`Claude outputs/PROMPT_TEST_IZOLASYON_2026-09-20.md` (2026-09-20, akşam)
+— 16.2'deki `test_dashboard_integration.py` teşhisi sırasında disposable
+kirlendi, art arda iki tam-paket koşusu FARKLI testlerde patladı
+(`test_is_kuyruk_atomik_sahiplenme`'nin önceki koşudan kalma `job_id`
+ile `assert 2 == 1` vermesi gibi). **Bu da tam olarak 16.1'in aradığı
+sınıf: "başarılı" görünen bir kalite kapısının aslında koşullara bağımlı
+olması.** Kritik sonuç: **kendisi durum sızdıran bir paket, üretim
+kodundaki durum sızıntılarını (batch 4-8'in 19 gün `running`'de kalması
+tam olarak buydu) yapısal olarak GÖREMEZ.**
+
+**İdempotentlik ölçümü (fresh disposable, aynı DB'de arka arkaya 2
+koşu, rebuild YOK):**
+
+- **Koşu 1 (fresh):** `426 passed, 3 deselected in 27.27s`
+- **Koşu 2 (AYNI DB, rebuild yok, düzeltme ÖNCESİ):** 3 test bozuldu —
+  `test_ingest_integration.py::test_is_kuyruk_atomik_sahiplenme`
+  (`assert 7 == 9`), `test_ingest_integration.py::test_is_sahiplen_
+  bayat_heartbeat_geri_alir` (`assert 2 == 1`), `test_job_worker_
+  integration.py::test_job_worker_temiz_batch_otomatik_aktive_eder`
+  (`assert islenen == 1` → `2`).
+- **Kök neden (KANITLANDI):** `test_job_worker_eksik_tablo_retrying_
+  yolu` bir job'ı KASITLI `status='retrying'` bırakıyor (gerçek
+  `conn.commit()` gerektiren senaryo, rollback edilemez) — bu KALICI
+  satır, ikinci koşuda `next_retry_at`'i geçmişte kaldığından yeniden
+  sahiplenilebilir hâle geliyor, `job_status` SIRASINI kaydırıyor
+  (Postgres SEQUENCE'ları transaction-dışı — rollback onları GERİ
+  ALMAZ), `test_ingest_integration.py`'nin "kuyrukta başka iş yok"
+  varsayan testlerini BOZUYOR.
+- **Düzeltme (tercih sırasına uygun — rollback mümkün değildi, fixture
+  teardown uygulandı):** `worker/tests/test_job_worker_integration.py`'nin
+  `conn` fixture'ına, `_TEST_SOURCE_PERIOD` (sentinel `"2099-12"`)'a
+  bağlı HER ŞEYİ (fact tabloları → `ingestion_batch` → `job_status` →
+  `source_asset` → `dim_tarih`, FK sırasına göre) silen bir teardown
+  eklendi. `test_ingest_integration.py`'nin kendisi DEĞİŞTİRİLMEDİ —
+  onun "mutlak" varsayımı ("kuyrukta başka iş yok") aslında DOĞRU bir
+  invaryant, yalnız leak kaynağı temizlenince kendiliğinden tutarlı
+  hâle geldi (göreli sayıma çevirmeye GEREK KALMADI).
+- **Koşu 1 (fix sonrası, fresh):** `426 passed, 3 deselected in 27.27s`
+- **Koşu 2 (fix sonrası, AYNI DB, rebuild yok):** `426 passed, 3
+  deselected in 27.18s` — **Koşu 1 ile BİREBİR AYNI** (test sayısı,
+  geçen/kalan/deselect sayısı hepsi eşit). İdempotentlik KANITLANDI.
+
+**Kalıcı kural** (`.github/copilot-instructions.md`'ye de eklendi): test
+paketi idempotent olmalı — aynı DB üzerinde arka arkaya iki kez
+çalıştırıldığında aynı sonucu vermeli, bir test yazdığı veriyi
+temizlemekle yükümlü, "fresh disposable'da yeşil" tek başına yeterli
+kanıt değil.
+
+**CI'ya öneri (UYGULANMADI, yalnız öneri — maliyet/değer tartısı):**
+`ci.yml`'in `integration` job'ına, mevcut migration+testler bittikten
+SONRA, AYNI Postgres container'ı üzerinde `worker/tests`'i BİR KEZ DAHA
+çalıştıran bir adım eklenebilir (rebuild YOK). **Maliyet:** entegrasyon
+job'ının süresini KABACA İKİYE KATLAR (bugün ~1-2 dakikalık test kısmı
+için), GitHub Actions dakika bütçesini tüketir; yalnız CI'da otomatik
+bir yakalama sağlar, PR yazarının kendi makinesinde bunu ELLE yapması
+gerekmez. **Değer:** bu turun kendisi TAM OLARAK bu sınıfta 3 gerçek
+regresyon buldu (kod DEĞİL, TEST kodu regresyonu, ama üretim kodundaki
+gerçek sızıntıları — batch 4-8 gibi — yakalama KAPASİTESİNİ doğrudan
+etkiliyor). **Tavsiye:** DEĞERİ maliyetinden yüksek — özellikle yeni bir
+"gerçek commit gerektiren" test dosyası eklendiğinde bu kontrol OLMADAN
+aynı sınıf hata tekrar SESSİZCE birikebilir. Uygulama AYRI bir tur.
+
+**Ayrıca (16.2'nin `test_dashboard_integration.py` bulgusunun devamı):**
+o testin orijinal başarısızlığının GERÇEK kök nedeni bu turda bulundu —
+DB kirliliğiyle İLGİSİZ çıktı. `app/dashboard.py`'nin `donemler_getir()`
+(fact_tuketim'de en az bir aktif satır arar) boş dönerse script `st.stop()`
+ile HEMEN durur; testin fixture'ı hiç `fact_tuketim` satırı eklemiyordu,
+bu yüzden FRESH disposable'da (fact_tuketim boşken) test HER ZAMAN
+"onay bekliyor" uyarısına hiç ulaşmadan yanlış nedenle başarısız
+oluyordu — `st.cache_data`'nın process-geneli kalıcılığı hipotezi
+denenip ÇÜRÜTÜLDÜ, gerçek düzeltme fixture'a bir `fact_tuketim` satırı
+eklemekti (bkz. testin kendi modül notu).
+
+---
+
 ## Ek A: Kaynak Dosya Envanteri
 
 | Kategori | Sayı | Detay |

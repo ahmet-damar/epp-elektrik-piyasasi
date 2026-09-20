@@ -84,3 +84,33 @@ Açıklamalar Türkçe; kod/kolon adları İngilizce snake_case.
   elle/cloud-okumayla taşınır.
 - Gerekçe: raporların elle iki oturum arasında taşınması yavaş ve kota
   israfıydı; cloud oturumu repoyu doğrudan okuyabiliyor.
+
+## Otomatik Kontroller — "Ateşlediği Gösterilmeden Tamamlanmaz" Kuralı (2026-09-20'den beri kalıcı kural)
+Yeni bir otomatik kontrol (workflow adımı, pre-commit hook, DB kısıtı,
+doğrulama script'i, kapı fonksiyonu) eklendiğinde, **kasıtlı bozuk bir
+örnekle gerçekten ateşlediği gösterilmeden** tamamlanmış sayılmaz.
+Gerekçe: bu projede aynı arıza tekrar tekrar çıktı — `scheduled-
+backup.yml`'in pg_dump sürüm uyuşmazlığı, `UNIQUE(source_asset_id,
+parser_version,schema_version)`'ın hiç tetiklenememesi, `sqlfluff`
+pre-commit hook'unun `files` deseni eşleşmediği için hiç ateşlememesi,
+`.pre-commit-config.yaml`'ın hiçbir yerde çağrılmaması,
+`validate_rls_static.py`'nin 3 dosyalık donmuş listesi VE test paketinin
+kendisinin durum sızdırması (aşağıdaki madde) — hiçbiri "bu kontrol
+gerçekten çalışıyor mu?" diye SORULDUĞU için bulunmadı, hepsi tesadüfen
+(bkz. `Claude outputs/kapanis_2026-09-20_kontrol_denetimi.md`,
+`Claude outputs/kapanis_2026-09-20_test_izolasyon.md`, tam envanterler).
+
+## Test Paketi İdempotentliği (2026-09-20'den beri kalıcı kural)
+Test paketi idempotent olmalıdır: aynı veritabanı üzerinde arka arkaya
+iki kez çalıştırıldığında aynı sonucu vermelidir. Bir test yazdığı
+veriyi temizlemekle yükümlüdür. "Fresh disposable'da yeşil" TEK BAŞINA
+yeterli kanıt değildir — yeşilliğin koşullara değil doğruluğa
+dayandığını göstermez. Gerekçe: `job_worker` testlerinin commit edip
+temizlememesi, `test_is_kuyruk_atomik_sahiplenme`'nin önceki koşudan
+kalma `job_id` ile sessizce yanlış geçmesine/kalmasına yol açtı —
+**kendisi durum sızdıran bir paket, üretim kodundaki durum sızıntılarını
+(örn. batch 4-8'in 19 gün `running`'de kalması) yapısal olarak
+GÖREMEZ** (bkz. `Claude outputs/kapanis_2026-09-20_test_izolasyon.md`).
+CI'ya paketi aynı DB'de iki kez çalıştıran bir doğrulama adımı ÖNERİLDİ
+(maliyet/değer tartışması `10_TEKNIK_MASTER_DOKUMAN.md` §16.3'te),
+henüz UYGULANMADI.

@@ -357,30 +357,44 @@ sorgulandı:
 **Bu bölümü önce oku — bir sonraki oturum yalnız bunu okuyup kaldığı
 yerden devam edebilmeli.**
 
-**GÜNCEL (2026-09-19/20, gün sonu) — en üst özet, aşağıdaki eski
-tarihli özetlerin YERİNE geçer:**
+**GÜNCEL (2026-09-20, gece) — en üst özet, aşağıdaki eski tarihli
+özetlerin YERİNE geçer:**
 - **Veri bütünlüğü arkı KAPANDI:** İş C (`mutabakat_reddedildi`)
   canlıda tam uygulandı; batch durum makinesi artık 9 değerde
   (`onay_bekliyor`/`onaylanmadi` dahil), batch 4-8 canlıda kapatıldı,
   `running_batch_kontrolu.py` TAMAMEN temiz (bkz. `10_TEKNIK_MASTER_
   DOKUMAN.md` §5.33, `Claude outputs/kapanis_2026-09-19_batch_durum.md`).
-- **Açık madde:** İş A / Seçenek 3 dedup — TANIMLI (Şart 1 + Şart 2,
-  bkz. §5.31 ve aşağıdaki "Açık madde" madde 3), ERTELENDİ, migration
-  henüz yazılmadı. Ön koşulu olan `parser_version` bump disiplini
-  yazılı kural hâline getirilmeli (madde 5).
-- **Toplama katmanı (agregasyon) — veri katmanı TAMAMLANDI**
-  (`Claude outputs/kapanis_2026-09-19_toplama_katmani.md`, §15/§5.34):
-  4 view + `worker/toplama.py` (7 fonksiyon) + 17 test, CANLIYA HİÇBİR
-  ŞEY UYGULANMADI.
-- **Zaman Serisi UI TAMAMLANDI** (2026-09-20,
-  `Claude outputs/kapanis_2026-09-20_ui_zaman_serisi.md`, §15.10/§5.35):
-  dashboard'a "📈 Zaman Serisi" bölümü eklendi (mevcut sayfa BOZULMADI),
-  Altair ile çoklu-seri grafik, eksik-dönem işaretleme, dikiş etiketi.
-  Ayrıca: v1.49'un "tek seferlik JIT" iddiası ÇÜRÜTÜLDÜ, `worker/
-  toplama.py`'ye `SET LOCAL jit=off` eklendi (8× hızlanma); sqlfluff
-  pre-commit hook'unun SESSİZCE hiç çalışmadığı bulundu, düzeltildi.
-  **Sıradaki iş: HARİTA** (il bazlı görselleştirme) — AYRI bir tur,
-  henüz başlanmadı.
+- **Toplama katmanı + Zaman Serisi UI TAMAMLANDI** (commit `7ac2cc9`,
+  `a65b2b7`, `6e5b079` — `Claude outputs/kapanis_2026-09-19_toplama_
+  katmani.md` + `kapanis_2026-09-20_ui_zaman_serisi.md`, §15/§5.34/§5.35):
+  4 view + `worker/toplama.py` (8 fonksiyon) + dashboard'a "📈 Zaman
+  Serisi" bölümü (mevcut sayfa BOZULMADI) — Altair ile çoklu-seri
+  grafik, eksik-dönem işaretleme, dikiş etiketi.
+- **JIT bulgusu:** v1.49'un "tek seferlik JIT" iddiası ÖLÇÜLÜP
+  ÇÜRÜTÜLDÜ (amortisman YOK, her koşuda tekrarlanıyor) — karar: `worker/
+  toplama.py`'nin TÜM sorgularına `SET LOCAL jit = off` eklendi (8×
+  hızlanma, disposable'da ~830ms→~100ms).
+- **"Hiç çalışmayan kontrol" denetimi + test idempotentliği KAPANDI**
+  (§16, §16.3): sqlfluff pre-commit + `.pre-commit-config.yaml`'ın hiç
+  çağrılmaması + `validate_rls_static.py`'nin donmuş dosya listesi
+  bulundu (ATEŞLEYEMEZ, düzeltme ÖNERİLDİ, uygulanmadı — ayrı tur
+  gerektiriyor); test paketinin KENDİSİ durum sızdırıyordu (`job_worker`
+  testleri), teşhis edilip düzeltildi — paket artık İKİ ardışık koşuda
+  (rebuild olmadan) BİREBİR aynı sonucu veriyor (idempotent). Kalıcı
+  kurallar `.github/copilot-instructions.md`'ye eklendi.
+- **Açık maddeler:**
+  1. **İş A / Seçenek 3 dedup** — TANIMLI (Şart 1: batch 19'un
+     error_summary'si audit_log'a taşınmadan silinmesin; Şart 2:
+     storage_path NOT NULL tercih kuralı), ERTELENDİ, migration henüz
+     yazılmadı. Ön koşulu: `parser_version` bump disiplininin yazılı
+     kural hâline getirilmesi.
+  2. **Harita turu** — Ahmet'ten karar bekleniyor: GeoJSON kaynağı
+     (hangi il sınırı dosyası), TÜİK il nüfusu (kişi başı normalizasyon
+     için mi), ve varsayılan ölçü (hangi KPI/metrik haritada gösterilecek).
+     Bu kararlar gelmeden harita turu BAŞLAYAMAZ.
+  3. **`validate_rls_static.py`'nin dinamik hale getirilmesi** ve
+     **CI'ya paketi 2 kez çalıştıran bir idempotentlik kontrolü**
+     eklenmesi — ikisi de ÖNERİLDİ, uygulanmadı, ayrı birer tur.
 
 ### Bugün/bu gece (2026-09-07/08/09) ne kapandı — tek satır özet
 13-dokümanlık dış denetimin **tamamı** kapandı (2026-09-07/08, Aşama 0/1/2
@@ -740,6 +754,76 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     komut çıktıları/sayılar dahil).
   - Sonrası Faz 4 (Tahminleme) — aşağıda "Faz 4 (Tahminleme)" bölümüne
     bkz.
+
+### ✅ Kapandı — Test izolasyonu: paket idempotent hâle getirildi (2026-09-20, gece)
+
+`Claude outputs/PROMPT_TEST_IZOLASYON_2026-09-20.md`, kapanış raporu
+`Claude outputs/kapanis_2026-09-20_test_izolasyon.md`. Tam detay
+`10_TEKNIK_MASTER_DOKUMAN.md` §16.3.
+
+Önceki turun teşhisi sırasında disposable kirlendi, art arda iki
+tam-paket koşusu FARKLI testlerde patladı — **projenin dördüncü
+"yazılmış ama ateşleyemez kontrol" vakası**: kalite kapısı "fresh
+disposable'da yeşil" diyordu ama yeşillik koşullara bağlıydı, doğruluğa
+değil. Ölçüldü: ikinci koşuda TAM OLARAK 3 test bozuluyordu
+(`test_is_kuyruk_atomik_sahiplenme`, `test_is_sahiplen_bayat_heartbeat_
+geri_alir`, `test_job_worker_temiz_batch_otomatik_aktive_eder`). Kök
+neden KANITLANDI: `test_job_worker_eksik_tablo_retrying_yolu` bir job'ı
+kasıtlı `'retrying'` bırakıyor (gerçek commit gerektiriyor, rollback
+edilemiyor), bu kalıcı satır ikinci koşuda `job_status` SIRASINI
+kaydırıyordu (Postgres sequence'ları transaction-dışı). Düzeltme:
+`test_job_worker_integration.py`'nin `conn` fixture'ına, o dosyanın
+sentinel periyoduna bağlı HER ŞEYİ temizleyen bir teardown eklendi.
+**Kanıt:** düzeltme sonrası iki ardışık koşu (aynı DB, rebuild yok)
+BİREBİR aynı sonucu verdi (`426 passed, 3 deselected` — iki kez).
+
+Ayrıca `test_onay_bekleyen_batch_uyarisi_gorunur`'un (önceki turdan
+kalan açık madde) GERÇEK kök nedeni bulundu — DB kirliliğiyle İLGİSİZ:
+`app/dashboard.py:donemler_getir()` boş dönerse script `st.stop()` ile
+hemen duruyordu, testin fixture'ı hiç `fact_tuketim` satırı eklemiyordu.
+Düzeltildi, artık fresh disposable'da güvenilir şekilde geçiyor.
+
+**Kalıcı kural eklendi** (`.github/copilot-instructions.md` + §16.3):
+test paketi idempotent olmalı. CI'ya paketi 2 kez çalıştıran bir
+doğrulama adımı ÖNERİLDİ (maliyet/değer tartışıldı), UYGULANMADI.
+
+**CANLIYA HİÇBİR ŞEY UYGULANMADI.**
+
+### ✅ Kapandı — "Hiç çalışmayan kontrol" taraması (2026-09-20, akşam)
+
+`Claude outputs/PROMPT_KONTROL_DENETIMI_2026-09-20.md`, kapanış raporu
+`Claude outputs/kapanis_2026-09-20_kontrol_denetimi.md`. Tam detay
+`10_TEKNIK_MASTER_DOKUMAN.md` §16.
+
+Projede AYNI arıza (yazılmış ama hiç çalışmayan kontrol) 3 kez tesadüfen
+bulunmuştu — tam envanter çıkarıldı (workflow'lar, pre-commit, DB
+kısıtları, kapı fonksiyonları), her biri KANITLI ATEŞLER / SINANMAMIŞ /
+ATEŞLEYEMEZ diye işaretlendi. **2 YENİ ATEŞLEYEMEZ vaka bulundu, ikisi
+de kasıtlı bozuk örnekle KANITLANDI:**
+1. **`.pre-commit-config.yaml`'ın TÜMÜ (8 hook grubu)** — `.git/hooks/
+   pre-commit` hiç kurulmamış, `pre-commit` CLI kurulu değil, hiçbir CI
+   job'ı çağırmıyor. Konfigürasyon var ama SIFIR koruma sağlıyor.
+2. **`worker/validate_rls_static.py`** — `SCHEMA_PATHS` 2026-08-19
+   tarihli 3 dosyaya DONMUŞ, o tarihten sonraki 30+ migration'ı hiç
+   okumuyor. `GRANT ALL ... TO anon` gibi açık bir ihlal bile
+   `20260920_0001`'e eklenince script yine "passed" bastı.
+
+Ayrıca `vw_toplama_*` view'lerinin `security_invoker=true` iddiası
+sınandı — ilke DOĞRU (view sahibi BYPASSRLS'li) ama BU projenin rol
+tasarımında (view+tablo grant'i her zaman birebir) ölçülebilir bir fark
+YARATMADIĞI da kanıtlandı — "kısmen doğrulandı" olarak raporlandı.
+
+**Kalıcı kural eklendi:** yeni bir otomatik kontrol, kasıtlı bozuk bir
+örnekle ateşlediği gösterilmeden tamamlanmış sayılmaz
+(`.github/copilot-instructions.md` + §16).
+
+**Küçük borç kapatıldı:** "onay bekleyen batch" dashboard uyarısının
+`AppTest` tabanlı testi yazıldı (`worker/tests/test_dashboard_
+integration.py`) — 2 tur önce "Streamlit test altyapısı yok" gerekçesiyle
+atlanmıştı, artık geçersiz.
+
+**CANLIYA HİÇBİR ŞEY UYGULANMADI** (sınamalar disposable'da, deneme
+sonrası geri alındı).
 
 ### ✅ Kapandı — JIT düzeltmesi + sqlfluff pre-commit + Zaman Serisi UI (2026-09-20, devam)
 

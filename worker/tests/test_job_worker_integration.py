@@ -25,12 +25,76 @@ pytestmark = pytest.mark.skipif(
     reason="DATABASE_URL tanımlı değil (yalnız CI 'integration' job'ında çalışır)",
 )
 
+# `_sentetik_workbook()`'un dokunabileceği TÜM fact tabloları — hangi
+# tablonun gerçekte dolduğu teste göre değişir, temizlik hepsini kapsar
+# (fazlası zararsız, DELETE eşleşmeyeni no-op geçer).
+_TEMIZLENECEK_FACT_TABLOLARI = (
+    "fact_tuketim",
+    "fact_uretim",
+    "fact_abone",
+    "fact_serbest_tuketici",
+    "fact_tuketim_ulke_geneli",
+    "fact_uretim_kaynak_geneli",
+    "fact_uretim_il_geneli",
+)
+
 
 @pytest.fixture
 def conn():  # type: ignore[no-untyped-def]
     with psycopg.connect(DATABASE_URL) as connection:
         yield connection
         connection.rollback()
+        # `Claude outputs/PROMPT_TEST_IZOLASYON_2026-09-20.md` — bu dosyanın
+        # testleri (modül notu: job_worker'ın gerçek dünya doğruluğu için
+        # ara adımlarda conn.commit() ÇAĞIRMAK ZORUNDA) `rollback()` ile HİÇ
+        # temizlenmiyordu. Özellikle `test_job_worker_eksik_tablo_retrying_
+        # yolu` bir job'ı KASITLI OLARAK `status='retrying'` bırakıyor — bu
+        # KALICI satır, aynı DB üzerinde İKİNCİ bir pytest koşusunda
+        # `next_retry_at`'i geçmişte kaldığından yeniden sahiplenilebilir
+        # hâle geliyor ve `worker/tests/test_ingest_integration.py`'nin
+        # "kuyrukta başka iş yok" varsayan testlerini (`test_is_kuyruk_
+        # atomik_sahiplenme` vb.) BOZUYORDU (job_status SIRASI kayıyor —
+        # bkz. kapanış raporu, ikinci koşuda gerçekten ölçüldü). Düzeltme:
+        # bu SENTINEL periyoda (`_TEST_SOURCE_PERIOD`) bağlı HER ŞEY
+        # (fact satırları → ingestion_batch → job_status → source_asset →
+        # dim_tarih, FK sırasına göre) burada elle silinir.
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                SELECT ib.batch_id
+                FROM ingestion_batch ib
+                JOIN source_asset sa ON sa.source_asset_id = ib.source_asset_id
+                WHERE sa.source_period = %s
+                """,
+                (_TEST_SOURCE_PERIOD,),
+            )
+            batch_idler = [row[0] for row in cur.fetchall()]
+            if batch_idler:
+                cur.execute(
+                    "DELETE FROM audit_log WHERE table_name = 'ingestion_batch' AND record_id = ANY(%s)",
+                    (batch_idler,),
+                )
+                for tablo in _TEMIZLENECEK_FACT_TABLOLARI:
+                    # nosec B608 - tablo adı YALNIZ _TEMIZLENECEK_FACT_TABLOLARI
+                    # sabit whitelist'inden, kullanıcı girdisi değil.
+                    cur.execute(
+                        f"DELETE FROM {tablo} WHERE ingestion_batch_id = ANY(%s)",  # nosec B608
+                        (batch_idler,),
+                    )
+                cur.execute(
+                    "DELETE FROM job_status WHERE correlation_id = ANY(%s)",
+                    ([str(b) for b in batch_idler],),
+                )
+                cur.execute(
+                    "DELETE FROM ingestion_batch WHERE batch_id = ANY(%s)",
+                    (batch_idler,),
+                )
+            cur.execute(
+                "DELETE FROM source_asset WHERE source_period = %s",
+                (_TEST_SOURCE_PERIOD,),
+            )
+            cur.execute("DELETE FROM dim_tarih WHERE tarih_id = %s", (_TEST_TARIH_ID,))
+        connection.commit()
 
 
 def _wb_bytes(wb: openpyxl.Workbook) -> bytes:
