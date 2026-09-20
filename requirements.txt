@@ -1,4 +1,9 @@
 streamlit>=1.40
+# altair: Streamlit'in KENDİ bağımlılığı olarak zaten kuruluydu (YENİ bir
+# bağımlılık EKLENMEDİ) — app/dashboard.py artık doğrudan import ettiği
+# için (Zaman Serisi bölümü, 2026-09-20) burada da AÇIKÇA pinlendi, aksi
+# hâlde streamlit ileride kendi bağımlılığını değiştirirse sessizce kırılır.
+altair>=5,<7
 pandas>=2.0
 numpy>=1.26
 openpyxl>=3.1

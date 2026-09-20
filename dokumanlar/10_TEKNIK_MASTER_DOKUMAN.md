@@ -96,7 +96,8 @@ her yeni rakam için geçerlidir.
 | v1.46 | 2026-09-19 | **İş C migration'ı CANLIYA UYGULANDI + İş A kararı (Seçenek 3) kayda geçti + YENİ bulgu: batch 4-8** — §5.31. Ahmet'in bu tur için verdiği canlı-yazma izniyle: taze yedek tetiklendi/doğrulandı (run 35432314325, 1.797.064 bayt), canlı durum fotoğrafı alındı, `ingestion_batch_status_check` 7 değere genişletildi (kilit kontrolü temiz, migration izleme tablosu YOK, sonrası 0 fark). **ADIM 2 beklenmedik bulgu verdi, tur DURDU:** `running_batch_kontrolu.py` batch 732 DIŞINDA **5 GERÇEK batch** (4-8, 2026-02..06 Excel, ~19 gündür running) daha buldu — kök neden batch 732'den FARKLI (`pipeline.otomatik_onaya_uygun()`'un per-batch iç mutabakatı `fact_tuketim` için False döndü, elle onay hiç verilmedi). Kullanıcı talimatı gereği ("beklenmedik → sonrakine geçme") **ADIM 3 (batch 732 geçişi) BU TURDA ÇALIŞTIRILMADI**, batch 4-8'e DOKUNULMADI — yeni, ayrı bir açık madde olarak raporlandı. **ADIM 4 (İş A kararı) kayda geçti:** Seçenek 3 (source_asset'i 1 dosya=1 satır yapma) + Şart 1 (batch 19'un error_summary'si audit_log'a taşınmadan silinmeyecek) + Şart 2 (storage_path NOT NULL tercih kuralı, min(id) değil) — UYGULANMADI, yalnız karar notu | Kod değişikliği YOK (yalnız canlı DDL + doküman). Durum fotoğrafı diff: ADIM 1 sonrası 0 fark (tüm fact tablo satır sayıları, ay bazlı aktif sayılar, ingestion_batch durum dağılımı, audit_log sayısı aynı) |
 | v1.47 | 2026-09-19 | **Batch 4-8 ölçüldü — KAPALI, belgeli bir olay çıktı + ADIM 3 (batch 732) CANLIYA UYGULANDI** — §5.32. Batch 4-8 araştırması: 2026-02..06 GERÇEKTEN iki kez yüklenmiş (aynı file_hash, parser 0.1→0.3), aktif veri ikinci yüklemeden geliyor, batch 4-8 tüm tablolarda is_active=false — bu 2026-08-31'de ZATEN tam belgelenmiş bir olay (EPDK şablon değişikliği, T11/T13 düzeltildi, T7 bilinçli ertelendi → `otomatik_onaya_uygun()` sistematik yanlış-pozitif veriyor, kullanıcı `onayla.py` ile bilerek elle onayladı, audit_log'da izi var). Kod okunarak doğrulandı: `batch_onayla()` `otomatik_onaya_uygun()`'u hiç çağırmıyor — kasıtlı kaçış kapısı, bug değil. Dashboard kör noktası için tasarım notu (kod yazılmadı): `running_batch_kontrolu.py` zaten yeniden kullanılabilir. **ADIM 3 koşulu sağlandığından uygulandı:** dry-run → yalnız 202402 → gerçek koşu → batch 732 `mutabakat_reddedildi`, audit_log +1, fact tablolarında 0 fark | Kod değişikliği YOK (yalnız canlı veri: 1 status UPDATE + 1 audit_log INSERT). Durum fotoğrafı tam diff: 119+120 ayın TAMAMI değişmedi |
 | v1.48 | 2026-09-19 | **Batch durum makinesi KAPATILDI: `onay_bekliyor`/`onaylanmadi` (8./9. durum) + batch 4-8 CANLIDA kapatıldı + dashboard uyarısı** — §5.33. Görev 1: önerilen tasarıma (`onay_bekliyor`+`yerine_gecildi`) gerekçeli KISMİ itiraz — `dead_letter` reuse alternatifi (job_status coupling invariant'ı nedeniyle) REDDEDİLDİ, durum sayısı 9'da kaldı ama dar `yerine_gecildi` yerine genel `onaylanmadi` seçildi. Migration `20260919_0001`, `job_worker.py:_isi_uygula()`'nın False dalı artık `onay_bekliyor`+audit_log yazıyor, `running_batch_kontrolu.py`'ye AYRI `onay_bekleyen_batchleri_bul()`, `ingest.py:_TERMINAL_DURUMLAR`'a `onaylanmadi` eklendi, regresyon testi (conftest guard deseniyle AYNI) eski/yeni davranışı aynı testte kanıtlıyor. Görev 2 (CANLI): batch 4-8 → `onaylanmadi` (yerine geçen batch_id + gerekçe `error_summary`'de), 5 audit_log satırı, **fact satırlarına DOKUNULMADI**, durum fotoğrafı 0 fark. **Asıl başarı ölçütü sağlandı:** `running_batch_kontrolu.py` artık TAMAMEN temiz. Görev 3: dashboard'a `onay_bekliyor` uyarısı (kod tekrarsız). Görev 4 (salt okuma): ikinci yüklemenin `parser_version`'ı 0.1→0.3 bump edilmiş KANITLANDI; yazılı bump-disiplini kuralı YOK, İş A Seçenek 3'ün ön koşulu olarak `09_PROJE_DURUMU.md`'ye açık madde işlendi | Tam `worker/tests` (fresh disposable, 33/33 migration): 409 test, 408 geçti (tek beklenen `test_auth_integration.py`). `ruff`/`mypy` temiz, `bandit` (CI komutuyla) 0 bulgu. Canlıya migration + batch 4-8 durum değişikliği UYGULANDI, fact satırlarına DOKUNULMADI (0 fark) |
-| v1.49 | 2026-09-20 | **Toplama katmanı (agregasyon) — veri katmanı TAMAMLANDI, UI YOK** — §15/§5.34. `fact_tuketim`/`fact_tuketim_ulke_geneli`/`fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli` için grain(ay/çeyrek/yıl)+aralık parametreli, kapsam bayrağı (`beklenen`/`mevcut_donem_sayisi`/`tam_mi`) döndüren `worker/toplama.py` + migration `20260920_0001` (4 `vw_toplama_*` view, `security_invoker=true`, MATERIALIZED DEĞİL). Kapsam sinyali TABLOYA göre bilinçli ayrışıyor: kırılım-düzeyi (tuketim, EPDK her ay tüm grupları basar) vs tablo-düzeyi (uretim_kaynak, "kaynak satırı yok" ≠ "veri yok"). ORAN KURALI (önce topla sonra oranla) somut sayısal örnekle test edildi (%51,28 doğru vs %53,33 yanlış ortalama — GERÇEKTEN farklı). R12 (kayan 12 ay, RANGE pencere) + kümülatif kolon tuzağı (view kolonu hiç seçmiyor) + 2025→2026 dikiş bayrağı da uygulandı. Ölçüm: en pahalı sorgu ~830ms (asıl yürütme ~130ms, kalanı tek seferlik Postgres JIT) — materialize etmeye GEREK YOK | Tam `worker/tests` (fresh disposable, 34/34 migration): 426 test, 425 geçti (tek beklenen `test_auth_integration.py`). +17 yeni test (10 entegrasyon: madde 2/4/5/6/7'nin HER biri kanıtlandı, 7 pure). `ruff`/`mypy` temiz, `bandit` 0 bulgu (2 yeni B608 nosec eklendi, gerekçeli — tümü whitelist'ten). CANLIYA HİÇBİR ŞEY UYGULANMADI — performans ölçümü de disposable'da yapıldı (PROMPT'un izin verdiği canlı salt-okuma ölçümü seçeneği KULLANILMADI, disposable'daki gerçekçi hacim yeterli görüldü) |
+| v1.49 | 2026-09-20 | **Toplama katmanı (agregasyon) — veri katmanı TAMAMLANDI, UI YOK** — §15/§5.34. `fact_tuketim`/`fact_tuketim_ulke_geneli`/`fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli` için grain(ay/çeyrek/yıl)+aralık parametreli, kapsam bayrağı (`beklenen`/`mevcut_donem_sayisi`/`tam_mi`) döndüren `worker/toplama.py` + migration `20260920_0001` (4 `vw_toplama_*` view, `security_invoker=true`, MATERIALIZED DEĞİL). Kapsam sinyali TABLOYA göre bilinçli ayrışıyor: kırılım-düzeyi (tuketim, EPDK her ay tüm grupları basar) vs tablo-düzeyi (uretim_kaynak, "kaynak satırı yok" ≠ "veri yok"). ORAN KURALI (önce topla sonra oranla) somut sayısal örnekle test edildi (%51,28 doğru vs %53,33 yanlış ortalama — GERÇEKTEN farklı). R12 (kayan 12 ay, RANGE pencere) + kümülatif kolon tuzağı (view kolonu hiç seçmiyor) + 2025→2026 dikiş bayrağı da uygulandı. Ölçüm: en pahalı sorgu ~830ms (asıl yürütme ~130ms, kalanı tek seferlik Postgres JIT) — materialize etmeye GEREK YOK **[⚠️ 2026-09-20 (v1.50) DÜZELTME: "tek seferlik JIT" iddiası ÖLÇÜLÜP ÇÜRÜTÜLDÜ — JIT amortismana UĞRAMIYOR, her koşuda tekrarlanıyor, bkz. §15.8/§5.35]** | Tam `worker/tests` (fresh disposable, 34/34 migration): 426 test, 425 geçti (tek beklenen `test_auth_integration.py`). +17 yeni test (10 entegrasyon: madde 2/4/5/6/7'nin HER biri kanıtlandı, 7 pure). `ruff`/`mypy` temiz, `bandit` 0 bulgu (2 yeni B608 nosec eklendi, gerekçeli — tümü whitelist'ten). CANLIYA HİÇBİR ŞEY UYGULANMADI — performans ölçümü de disposable'da yapıldı (PROMPT'un izin verdiği canlı salt-okuma ölçümü seçeneği KULLANILMADI, disposable'daki gerçekçi hacim yeterli görüldü) |
+| v1.50 | 2026-09-20 | **JIT iddiası ÖLÇÜLDÜ/ÇÜRÜTÜLDÜ + sqlfluff pre-commit düzeltildi + Zaman Serisi UI eklendi** — §15.8/§15.10/§5.35. Bölüm 1: v1.49'un "~715ms tek seferlik JIT" iddiası 5 ayrı bağlantıda ölçülüp ÇÜRÜTÜLDÜ (disposable: her koşu TUTARLI ~805-1280ms JIT açık / ~102ms kapalı — 8× fark HER SEFERİNDE; canlıda da aynı yön). `worker/toplama.py`'ye `SET LOCAL jit = off` eklendi, düzeltme sonrası TUTARLI ~95-108ms. Bölüm 2: `.pre-commit-config.yaml`'daki sqlfluff hook'u ZATEN VARDI ama `files` deseni bu reponun gerçek yoluyla (`supabase/migrations/`) hiç eşleşmiyordu (v1.49'un ilk push'ının CI'de yakalanma kök nedeni) — düzeltildi. Bölüm 3: dashboard'a "📈 Zaman Serisi" bölümü eklendi (mevcut sayfa BOZULMADI) — Altair KANITLANDI mevcut (YENİ bağımlılık yok), çözünürlük+aralık BAĞIMSIZ kontrol, R12 açma/kapama, eksik-dönem görsel işaretleme (kırmızı üçgen+tooltip+metin uyarısı), 2025→2026 dikiş etiketi. `AppTest` ile HEADLESS doğrulanırken 2 gerçek bug bulunup düzeltildi (namedtuple indeksleme + aralık sınırının TEK tabloya sabitlenmesi — YENİ `veri_seti_tarih_araligi_getir()` ile çözüldü) | Tam `worker/tests` (fresh disposable, 34/34 migration): 428 test, 427 geçti (tek beklenen `test_auth_integration.py`). +2 yeni test. `ruff`/`mypy`/`bandit`/`sqlfluff` temiz. CANLIYA YAZMA YOK — yalnız Bölüm 1'in salt-okuma performans ölçümü canlıda çalıştırıldı |
 
 ---
 
@@ -1709,6 +1710,43 @@ ETMEYE GEREK YOK. **CANLIYA HİÇBİR ŞEY UYGULANMADI.**
 
 ---
 
+### 5.35 JIT düzeltmesi + sqlfluff pre-commit + Zaman Serisi UI (2026-09-20, devam)
+
+`Claude outputs/PROMPT_UI_ZAMAN_SERISI_2026-09-20.md` — üç bölüm.
+
+**Bölüm 1 (performans):** §5.34'ün "~715ms tek seferlik JIT" iddiası
+5 AYRI bağlantıda ölçülüp ÇÜRÜTÜLDÜ (disposable: her koşu TUTARLI
+~805-1280ms, JIT kapalıyken TUTARLI ~102ms — 8× fark HER SEFERİNDE;
+canlıda da aynı yön). `worker/toplama.py`'ye `SET LOCAL jit = off`
+eklendi (`_jit_kapat()`), düzeltme sonrası disposable'da 5 koşu TUTARLI
+~95-108ms. Tam detay §15.8.
+
+**Bölüm 2 (sqlfluff pre-commit):** `.pre-commit-config.yaml`'da
+sqlfluff hook'u ZATEN VARDI ama `files: ^(db|migrations)/.*\.sql$`
+deseni bu repodaki GERÇEK yolla (`supabase/migrations/`) hiç
+eşleşmiyordu — hook SESSİZCE hiç çalışmıyordu (§5.34'te ilk push'ın CI'de
+yakalanmasının kök nedeni). Desen CI'nin kullandığı 3 dizine
+(`db|supabase/migrations|supabase/ci-only`) genişletildi.
+
+**Bölüm 3 (Zaman Serisi UI):** Tam detay §15.10. Altair KANITLANDI
+mevcut (6.2.2, streamlit'in bağımlılığı, YENİ bağımlılık YOK, yalnız
+`requirements.txt`'ye pinlendi). Dashboard'a "📈 Zaman Serisi" bölümü
+eklendi (mevcut sayfa BOZULMADI) — çözünürlük+aralık BAĞIMSIZ, R12
+açma/kapama, eksik-dönem görsel işaretleme (kırmızı üçgen + tooltip +
+metin uyarısı), 2025→2026 dikiş etiketi. `AppTest` ile HEADLESS uçtan
+uca doğrulanırken 2 GERÇEK bug bulunup düzeltildi: namedtuple string-
+indeksleme hatası VE aralık sınırının TEK bir tabloya (fact_tuketim,
+canlıda dar) sabitlenmiş olması — `worker/toplama.py:veri_seti_tarih_
+araligi_getir()` (YENİ) ile çözüldü, testle kanıtlandı.
+
+**Doğrulama:** Tam `worker/tests` (fresh disposable, 34/34 migration):
+428 test, 427 geçti (tek beklenen `test_auth_integration.py`). +2 yeni
+test (`veri_seti_tarih_araligi_getir()`). `ruff`/`mypy`/`bandit`/
+`sqlfluff` temiz. **CANLIYA YAZMA YOK** — yalnız Bölüm 1'in salt-okuma
+performans ölçümü canlıda çalıştırıldı.
+
+---
+
 ## 6. Ingestion Pipeline
 
 ### 6.1 Batch Yaşam Döngüsü
@@ -2775,11 +2813,26 @@ tabanlı politikalar view üzerinden SESSİZCE atlanmış olurdu.
 
 **Ölçüm (2026-09-20, disposable, gerçekçi hacim — 81 il × 4 grup × 120
 ay = 38.880 satır):** en pahalı sorgu `tuketim_toplama_getir(grain=
-'ay', 10 yıl, KIRILIM-düzeyi kapsam)` ≈ 830ms — ama bunun ~715ms'i
-Postgres'in TEK SEFERLİK JIT derleme maliyeti (`EXPLAIN ANALYZE`'ın
-kendi raporu), gerçek yürütme ~130ms. R12 (108 nokta) 33ms. Materialize
-etmeye GEREK YOK — düz view + index yeterli (kullanıcı kararının
-öngördüğü gibi).
+'ay', 10 yıl, KIRILIM-düzeyi kapsam)` ≈ 830ms. Materialize etmeye GEREK
+YOK — düz view + index yeterli (kullanıcı kararının öngördüğü gibi).
+
+**⚠️ 2026-09-20 (`Claude outputs/PROMPT_UI_ZAMAN_SERISI_2026-09-20.md`
+Bölüm 1) DÜZELTME — bir önceki turun "~715ms'i TEK SEFERLİK JIT derleme
+maliyeti" iddiası ÖLÇÜLDÜ, ÇÜRÜTÜLDÜ:** aynı sorgu 5 AYRI bağlantıda
+çalıştırıldı — JIT açıkken (varsayılan) HER koşu TUTARLI ~805-1280ms,
+amortisman YOK (Postgres JIT-derlenmiş kodu backend'ler/sorgular arasında
+CACHE'lemiyor — kendi belgelediği davranış). `SET jit=off` ile aynı 5
+koşu TUTARLI ~102ms — **8× fark her seferinde tekrarlanıyor.** Canlıda
+(salt okuma, gerçek veri, `fact_tuketim`) da AYNI yön doğrulandı: JIT
+açık ~265-310ms, kapalı ~195-210ms (network+pgbouncer baskın olduğundan
+oran küçük ama yön AYNI). **Karar:** `worker/toplama.py`'nin TÜM
+sorgularına `SET LOCAL jit = off` eklendi (`_jit_kapat()`, yalnız o
+transaction'da — sunucu genelinde DEĞİL). `jit_above_cost` eşiğini
+yükseltmek yerine bu tercih edildi çünkü disposable'ın plan maliyetine
+göre bir "sihirli sayı" seçmek canlıdaki gerçek hacimde farklı
+davranabilirdi; `SET LOCAL` her ortamda AYNI, ÖLÇÜLMÜŞ davranışı garanti
+eder. Düzeltme SONRASI ölçüm: disposable'da 5 koşu TUTARLI ~95-108ms
+(8× iyileşme, sabit kaldı).
 
 ### 15.9 Fonksiyon envanteri (`worker/toplama.py`)
 
@@ -2792,10 +2845,83 @@ etmeye GEREK YOK — düz view + index yeterli (kullanıcı kararının
 | `uretim_yenilenebilir_payi_getir()` | `fact_uretim_kaynak_geneli` | — (oran) | tablo-düzeyi |
 | `r12_getir()` | 4 tablonun TÜMÜ (`TabloAdi`) | — (tek seri, toplam) | tablo-düzeyi |
 | `donem_araligi_dikis_iceriyor_mu()` | — | — | salt aritmetik |
+| `veri_seti_tarih_araligi_getir()` | 4 tablonun TÜMÜ (`TabloAdi`) | — (min/max tarih_id) | — (UI aralık seçicisi için) |
 
-Testler: `worker/tests/test_toplama_integration.py` (10, DB'li — madde
-2/4/5/6/7'nin HER biri en az bir testle KANITLANDI) + `test_toplama_
-pure.py` (7, DB'siz — madde 3/8 + girdi doğrulama).
+Testler: `worker/tests/test_toplama_integration.py` (12, DB'li — madde
+2/4/5/6/7'nin HER biri en az bir testle KANITLANDI + tabloya göre
+DEĞİŞEN aralık) + `test_toplama_pure.py` (7, DB'siz — madde 3/8 + girdi
+doğrulama).
+
+### 15.10 Zaman Serisi UI (`app/dashboard.py`, 2026-09-20)
+
+`Claude outputs/PROMPT_UI_ZAMAN_SERISI_2026-09-20.md` Bölüm 3 — toplama
+katmanını dashboard'a bağlayan AYRI bir bölüm ("📈 Zaman Serisi —
+Çeyreklik / Yıllık / Uzun Dönem"), bugünkü tek-ay KPI kartlarının
+YANINA eklendi, onları BOZMADI. **HARİTA bu turda YOK.**
+
+**Grafik kütüphanesi: Altair, KANITLANDI mevcut.** `import altair`
+denendi, sürüm 6.2.2 (Streamlit'in kendi bağımlılığı olarak zaten
+kuruluydu) — YENİ bağımlılık eklenmedi, yalnız `requirements.txt`'ye
+açıkça pinlendi (artık `app/dashboard.py` DOĞRUDAN import ediyor,
+streamlit'in dolaylı bağımlılığına sessizce güvenmek yerine).
+
+**Kontroller — İKİ AYRI EKSEN:** "Veri seti" (4 seçenek) + "Çözünürlük"
+(Ay/Çeyrek/Yıl) + "Aralık" (Son 12 ay/Son 3 yıl/Tümü/Özel) — TEK açılır
+listeye birleştirilmedi.
+
+**⚠️ Turun asıl bulgusu — aralık sınırı TABLOYA göre değişmeli:** ilk
+tasarım tüm veri setleri için `worker/analytics.py:donemler_getir()`'in
+(yalnız `fact_tuketim`) tarih aralığını kullanıyordu — canlıda
+`fact_tuketim` yalnız 2026-01'den başladığından (Excel dönemi), diğer 3
+veri setinin (2016'dan başlayan) 'Tümü'/'Özel' aralığı SESSİZCE 2026'ya
+daralırdı. Fark edilip `worker/toplama.py:veri_seti_tarih_araligi_getir()`
+eklendi (bkz. §15.9) — UI artık SEÇİLİ veri setinin KENDİ aralığını
+kullanıyor. `worker/tests/test_toplama_integration.py::test_veri_seti_
+tarih_araligi_getir_tabloya_gore_degisir` gerçek verilerle (dar
+2025-2026 vs geniş 2016+) bunu KANITLADI.
+
+**Eksik dönem işaretlemesi (PROMPT'un "en kritik maddesi"):** `tam_mi`
+kolonuna göre İKİ katman — tam noktalar dolu daire, eksik noktalar
+KIRMIZI ters üçgen (büyük, filled) — çizgi HER İKİ nokta türünü de
+birleştirir (süreklilik korunur). Ayrıca (renk körlüğüne karşı, tek
+başına renge güvenilmez): tooltip'te "X/Y dönem mevcut" notu VE
+grafiğin ALTINDA açık bir `st.warning()` metin listesi ("2016 (Tarımsal:
+11/12 dönem)" gibi). Gerçek smoke-test verisiyle (2016-12 Tarımsal
+benzeri kasıtlı boşluk) uçtan uca doğrulandı — bkz. kapanış raporu.
+**Not:** "ay" grain'inde TAMAMEN yüklenmemiş bir ay zaten hiç NOKTA
+üretmez (çizgide doğal bir boşluk) — kapsam bayrağı yalnız çeyrek/yıl
+gibi AGREGE bucket'larda "kısmi veri tam gibi görünür" riskini kapatır
+(bkz. §15.4'ün "ay yüklü + kırılım yok" ile "ay hiç yüklü değil"
+ayrımı).
+
+**Dikiş etiketi:** `toplama.donem_araligi_dikis_iceriyor_mu()` True
+dönerse grafikte turuncu kesikli dikey çizgi (`mark_rule`) + üzerinde
+"⚠ 2025→2026 dikişi..." metni (`mark_text`), ARTI grafiğin altında
+açıklayıcı bir `st.caption()`.
+
+**R12:** ayrı bir açma/kapama (`st.checkbox`) ile AYRI bir alt grafik
+olarak gösteriliyor (ana grain-seçimli grafikle KARIŞTIRILMADI — R12
+tanımı gereği hep AYLIK, farklı bir grain'le üst üste bindirmek yanıltıcı
+olurdu). Kendi eksik-nokta işaretlemesi var.
+
+**Önbellek:** `st.cache_data(ttl=1800)` — diğer İÇERİK sorgularıyla
+(`_yillik_*_cached` vb.) AYNI TTL, established desen korundu (Bölüm 1'in
+düzeltmesi sonrası ~100ms'lik gecikme zaten önemsiz, cache asıl amacı
+Streamlit'in her widget etkileşiminde SKRİPTİ BAŞTAN çalıştırmasından
+doğan tekrarlı DB round-trip'ini önlemek). Bağlantı: mevcut `db_handle`
+(`DATABASE_URL_DASHBOARD` yolu, rol/RLS davranışı DEĞİŞMEDİ).
+
+**Doğrulama (Streamlit test altyapısı repoda yok, ama):** `streamlit.
+testing.v1.AppTest` ile HEADLESS uçtan uca çalıştırıldı (gerçekçi
+smoke-veri: 2016-12 Tarımsal benzeri kırılım eksikliği, 202502 tam-ay
+eksikliği, Motorin'in bazı aylarda hiç listelenmemesi, 2025→2026
+dikişi) — 4 veri seti × birden fazla grain/aralık kombinasyonu
+denendi, TÜMÜNDE 0 exception. Bu süreçte 2 GERÇEK bug bulunup
+düzeltildi: (1) `r[zs_secim['kirilim']]` (pandas `itertuples()`
+namedtuple'ında string anahtarla indeksleme TypeError verir —
+`getattr()`'a çevrildi), (2) yukarıdaki aralık-tabloya-göre-değişmeli
+bulgusu. Ekran görüntüsü bu ortamda ALINAMADI (tarayıcı otomasyonu
+yok) — Ahmet'in kendi tarayıcısında bakması gerekiyor.
 
 ---
 

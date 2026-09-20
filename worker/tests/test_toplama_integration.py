@@ -322,3 +322,36 @@ def test_r12_eksik_ay_varsa_tam_mi_false(conn) -> None:  # type: ignore[no-untyp
     assert satir["deger_r12"] == pytest.approx(110.0)
     assert satir["mevcut_donem_sayisi"] == 11
     assert bool(satir["tam_mi"]) is False
+
+
+# --- UI turu (2026-09-20): veri_seti_tarih_araligi_getir() ---
+
+
+def test_veri_seti_tarih_araligi_getir_tabloya_gore_degisir(conn) -> None:  # type: ignore[no-untyped-def]
+    """UI'nin aralık seçicisi (Son 12 ay/Son 3 yıl/Tümü/Özel) SEÇİLİ veri
+    setine göre doğru sınırlanmalı — `fact_tuketim` (dar, yalnız 2025) ile
+    `fact_tuketim_ulke_geneli` (geniş, 2016 dahil) AYNI anda farklı
+    aralık dönmeli, `donemler_getir()`'in (yalnız fact_tuketim) TEK
+    sabitine indirgenmemeli."""
+    b1 = _batch_ac(conn, "2025-01", "aralik-dar")
+    _tuketim_ekle(conn, 202501, "Mesken", 10.0, b1)
+    b2 = _batch_ac(conn, "2016-01", "aralik-genis")
+    _tuketim_ulke_geneli_ekle(conn, 201601, "Mesken", 10.0, b2)
+    _tuketim_ulke_geneli_ekle(conn, 202506, "Mesken", 10.0, b2)
+
+    dar = toplama.veri_seti_tarih_araligi_getir(conn, "tuketim")
+    genis = toplama.veri_seti_tarih_araligi_getir(conn, "tuketim_ulke_geneli")
+    assert dar is not None
+    assert genis is not None
+    # Sınır eşitliği DEĞİL (paylaşılan CI DB'sinde başka testlerin -
+    # örn. test_job_worker_integration.py - COMMIT edip rollback ETMEDİĞİ
+    # sentinel satırlar olabilir, bkz. o dosyanın modül notu) - asıl
+    # KANIT: dar ASLA 2016'ya gitmiyor, geniş GERÇEKTEN gidiyor.
+    assert dar[0] <= 202501 <= dar[1]
+    assert dar[0] > 201601
+    assert genis[0] <= 201601
+    assert genis[1] >= 202506
+
+
+def test_veri_seti_tarih_araligi_getir_bos_tabloda_none(conn) -> None:  # type: ignore[no-untyped-def]
+    assert toplama.veri_seti_tarih_araligi_getir(conn, "uretim_il_geneli") is None

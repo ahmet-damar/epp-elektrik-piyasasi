@@ -64,12 +64,18 @@ repos:
         files: \.(ts|tsx|js|jsx|json|css|md|yaml|yml)$
 
   # 6) SQL (migration) — Postgres
+  # 2026-09-20: `files` deseni ESKİDEN `^(db|migrations)/.*\.sql$` idi —
+  # bu repodaki gerçek yol (`supabase/migrations/`, `supabase/ci-only/`)
+  # hiç eşleşmiyordu, hook SESSİZCE hiç çalışmıyordu (CI'nin kullandığı
+  # `python -m sqlfluff lint db supabase/migrations supabase/ci-only
+  # --dialect postgres` komutuyla AYNI 3 dizine genişletildi — bkz.
+  # `Claude outputs/kapanis_2026-09-20_ui_zaman_serisi.md`).
   - repo: https://github.com/sqlfluff/sqlfluff
     rev: 3.3.0
     hooks:
       - id: sqlfluff-lint
         args: ["--dialect", "postgres"]
-        files: ^(db|migrations)/.*\.sql$
+        files: ^(db|supabase/migrations|supabase/ci-only)/.*\.sql$
 
   # 7) Dockerfile
   - repo: https://github.com/hadolint/hadolint

@@ -56,7 +56,7 @@ view'leri — is_active filtresi + dim_* join'i + gerekliyse il_kodu
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import pandas as pd
 
@@ -162,6 +162,26 @@ def donem_araligi_dikis_iceriyor_mu(
 # UI) 'Lisanslı' filtresiyle SESSİZCE 0 satır bulur — analytics.py'nin
 # ZATEN çözdüğü tuzağın birebir tekrarı olurdu.
 _LISANS_GORUNUM = {"Lisansli": "Lisanslı", "Lisanssiz": "Lisanssız"}
+
+
+def _jit_kapat(cur: Any) -> None:
+    """**2026-09-20 (`Claude outputs/PROMPT_UI_ZAMAN_SERISI_2026-09-20.md`
+    Bölüm 1) — ÖLÇÜLDÜ, ÇÜRÜTÜLDÜ:** önceki turun kapanış raporu ~715ms'lik
+    JIT derleme maliyetini "tek seferlik" sayıp göz ardı etmişti. 5 AYRI
+    bağlantıda ölçüldüğünde (disposable): JIT açıkken TUTARLI ~805-1280ms,
+    `SET jit=off` ile TUTARLI ~102ms — 8× fark HER koşuda tekrarlanıyor,
+    amortisman YOK (Postgres JIT'i backend/sorgu arasında CACHE'lemiyor,
+    dokümantasyonun kendi söylediği gibi). Canlıda da (salt okuma, gerçek
+    veri) aynı yön doğrulandı: JIT açık ~265-310ms, kapalı ~195-210ms
+    (network+pgbouncer baskın olduğundan oran daha küçük ama YÖN AYNI).
+    Bu ölçek/şekildeki analitik sorgularda (küçük tablo, orta karmaşıklıkta
+    agregasyon) JIT'in kendi belgelediği "az kazanç, olası kayıp" senaryosu
+    — `SET LOCAL jit = off` (yalnız bu transaction'da, sunucu genelinde
+    DEĞİL) tercih edildi: `jit_above_cost` eşiğini yükseltmek disposable'ın
+    plan maliyetine göre "sihirli sayı" olurdu, canlıdaki gerçek veri
+    hacminde farklı davranabilirdi — `SET LOCAL` her ortamda AYNI, ölçülmüş
+    davranışı garanti eder."""
+    cur.execute("SET LOCAL jit = off")
 
 
 def _numerik_ve_bool(df: pd.DataFrame) -> None:
@@ -306,6 +326,7 @@ def _kapsam_ve_deger_df(
             ORDER BY d.donem_anahtari, {breakdown_sql}
         """  # nosec B608
     with conn.cursor() as cur:
+        _jit_kapat(cur)
         cur.execute(
             sorgu,
             {
@@ -471,6 +492,7 @@ def uretim_yenilenebilir_payi_getir(
         ORDER BY d.donem_anahtari
     """  # nosec B608 - donem_view/donem_takvim YALNIZ _DONEM_ANAHTARI_*'ten (grain Literal'ine göre sabit), kullanıcı girdisi değil
     with conn.cursor() as cur:
+        _jit_kapat(cur)
         cur.execute(
             sorgu,
             {
@@ -552,6 +574,7 @@ def r12_getir(
         ORDER BY k.tarih_id
     """  # nosec B608 - tablo_adi/view_adi YALNIZ _TABLO_KAYIT whitelist'inden
     with conn.cursor() as cur:
+        _jit_kapat(cur)
         cur.execute(
             sorgu,
             {
@@ -570,3 +593,33 @@ def r12_getir(
     df["deger_r12"] = pd.to_numeric(df["deger_r12"], errors="coerce")
     df["tam_mi"] = df["tam_mi"].astype(bool)
     return df
+
+
+def veri_seti_tarih_araligi_getir(
+    conn: Connection, tablo: TabloAdi
+) -> tuple[int, int] | None:
+    """**2026-09-20 (UI turu) — UI'nin aralık seçicisini (Son 12 ay/Son 3
+    yıl/Tümü/Özel) DOĞRU sınırlarla doldurabilmesi için:** `tablo`nun
+    `is_active` satırlarının kapsadığı `(min_tarih_id, max_tarih_id)` —
+    hiç aktif satır yoksa `None`.
+
+    **Tabloya göre KÖKTEN farklıdır, TEK bir sabit kullanılamaz:**
+    `worker/analytics.py:donemler_getir()` yalnız `fact_tuketim`'e bakar
+    ve canlıda `fact_tuketim` yalnız 2026-01'den başlar (Excel dönemi) —
+    ama `fact_tuketim_ulke_geneli`/`fact_uretim_kaynak_geneli`/`fact_
+    uretim_il_geneli` 2016'dan başlar (Word yılları da dahil). UI bu
+    fonksiyonu SEÇİLİ veri setine göre çağırmalı — aksi hâlde 3/4 veri
+    setinin 'Tümü'/'Özel' aralığı SESSİZCE 2026'ya daralır, kullanıcı
+    10 yıllık geçmişe hiç erişemez."""
+    if tablo not in _TABLO_KAYIT:
+        raise ValueError(
+            f"Bilinmeyen tablo: {tablo!r} (beklenen: {tuple(_TABLO_KAYIT)})"
+        )
+    tablo_adi, _, _ = _TABLO_KAYIT[tablo]
+    sorgu = f"SELECT MIN(tarih_id), MAX(tarih_id) FROM {tablo_adi} WHERE is_active"  # nosec B608 - tablo_adi YALNIZ _TABLO_KAYIT whitelist'inden
+    with conn.cursor() as cur:
+        cur.execute(sorgu)
+        row = cur.fetchone()
+    if row is None or row[0] is None:
+        return None
+    return int(row[0]), int(row[1])

@@ -371,8 +371,16 @@ tarihli özetlerin YERİNE geçer:**
 - **Toplama katmanı (agregasyon) — veri katmanı TAMAMLANDI**
   (`Claude outputs/kapanis_2026-09-19_toplama_katmani.md`, §15/§5.34):
   4 view + `worker/toplama.py` (7 fonksiyon) + 17 test, CANLIYA HİÇBİR
-  ŞEY UYGULANMADI. **Sıradaki iş: UI** (dashboard'a çeyreklik/yıllık/R12
-  grafik entegrasyonu) — AYRI bir tur, henüz başlanmadı.
+  ŞEY UYGULANMADI.
+- **Zaman Serisi UI TAMAMLANDI** (2026-09-20,
+  `Claude outputs/kapanis_2026-09-20_ui_zaman_serisi.md`, §15.10/§5.35):
+  dashboard'a "📈 Zaman Serisi" bölümü eklendi (mevcut sayfa BOZULMADI),
+  Altair ile çoklu-seri grafik, eksik-dönem işaretleme, dikiş etiketi.
+  Ayrıca: v1.49'un "tek seferlik JIT" iddiası ÇÜRÜTÜLDÜ, `worker/
+  toplama.py`'ye `SET LOCAL jit=off` eklendi (8× hızlanma); sqlfluff
+  pre-commit hook'unun SESSİZCE hiç çalışmadığı bulundu, düzeltildi.
+  **Sıradaki iş: HARİTA** (il bazlı görselleştirme) — AYRI bir tur,
+  henüz başlanmadı.
 
 ### Bugün/bu gece (2026-09-07/08/09) ne kapandı — tek satır özet
 13-dokümanlık dış denetimin **tamamı** kapandı (2026-09-07/08, Aşama 0/1/2
@@ -732,6 +740,39 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     komut çıktıları/sayılar dahil).
   - Sonrası Faz 4 (Tahminleme) — aşağıda "Faz 4 (Tahminleme)" bölümüne
     bkz.
+
+### ✅ Kapandı — JIT düzeltmesi + sqlfluff pre-commit + Zaman Serisi UI (2026-09-20, devam)
+
+`Claude outputs/PROMPT_UI_ZAMAN_SERISI_2026-09-20.md`, kapanış raporu
+`Claude outputs/kapanis_2026-09-20_ui_zaman_serisi.md`. Tam detay
+`10_TEKNIK_MASTER_DOKUMAN.md` §15.8/§15.10/§5.35.
+
+**Bölüm 1 — performans iddiası sınandı, ÇÜRÜTÜLDÜ:** önceki turun
+"~715ms tek seferlik JIT derleme maliyeti" iddiası 5 AYRI bağlantıda
+ölçüldü — JIT açıkken TUTARLI ~805-1280ms, `SET jit=off` ile TUTARLI
+~102ms, 8× fark HER koşuda tekrarlanıyor (amortisman YOK). Canlıda da
+(salt okuma) aynı yön doğrulandı. `worker/toplama.py`'ye `SET LOCAL
+jit = off` eklendi, sonuç ~95-108ms'e düştü.
+
+**Bölüm 2 — sqlfluff pre-commit:** hook zaten VARDI ama `files` deseni
+bu repodaki gerçek yolla hiç eşleşmiyordu (önceki turun ilk push'ının
+CI'de yakalanma kök nedeni) — düzeltildi, artık yerelde de çalışıyor.
+
+**Bölüm 3 — Zaman Serisi UI:** dashboard'a yeni bir bölüm eklendi,
+mevcut sayfa BOZULMADI. Altair KANITLANDI mevcut (streamlit'in kendi
+bağımlılığı, YENİ bağımlılık YOK). Çözünürlük+aralık BAĞIMSIZ kontrol,
+R12 açma/kapama, eksik-dönem görsel işaretleme, 2025→2026 dikiş
+etiketi. `AppTest` (Streamlit'in resmi headless test aracı) ile uçtan
+uca doğrulanırken 2 GERÇEK bug bulunup düzeltildi: namedtuple string-
+indeksleme hatası VE aralık sınırının canlıda dar olan `fact_tuketim`'e
+sabitlenmiş olması (YENİ `worker/toplama.py:veri_seti_tarih_araligi_
+getir()` ile çözüldü, testle kanıtlandı). Ekran görüntüsü bu ortamda
+ALINAMADI (tarayıcı otomasyonu yok).
+
+Doğrulama: tam `worker/tests` (fresh disposable, 34/34 migration): 428
+test, 427 geçti (tek beklenen `test_auth_integration.py`).
+`ruff`/`mypy`/`bandit`/`sqlfluff` temiz. **CANLIYA YAZMA YOK** (yalnız
+Bölüm 1'in salt-okuma ölçümü canlıda çalıştırıldı).
 
 ### ✅ Kapandı — Toplama katmanı (agregasyon), veri katmanı (2026-09-20)
 

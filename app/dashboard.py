@@ -97,8 +97,9 @@ import math
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -106,7 +107,7 @@ import streamlit as st
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from data.tr_ocak2026 import TABLO2_KAYNAK, TABLO11
-from worker import analytics, ingest, kpi
+from worker import analytics, ingest, kpi, toplama
 from worker.auth import GirisKilitli, giris_yap, rol_baglantisi_ac
 from worker.db import get_dashboard_database_url, resolve_database_or_fallback
 from worker.scripts import running_batch_kontrolu
@@ -465,6 +466,66 @@ def _kpi_esikleri_getir_cached(_conn: Any) -> dict[str, dict[str, float | str]]:
     return analytics.kpi_esikleri_getir(_conn)
 
 
+# --- Toplama katmanı (Zaman Serisi bölümü, 2026-09-20) ---
+# ttl=1800: diğer İÇERİK sorgularıyla (üstteki _yillik_*_cached vb.) AYNI —
+# fact_* tabloları yalnız yeni batch aktive edildiğinde değişir, "az önce
+# ne oldu" türü operasyonel bir taze'lik gerekmiyor (ttl=300 olan _son_
+# batchler_getir_cached'in AKSİNE). `Claude outputs/PROMPT_UI_ZAMAN_SERISI_
+# 2026-09-20.md` Bölüm 1'in ölçtüğü ~830ms (JIT açık) / ~100ms (worker/
+# toplama.py'nin kendi `SET LOCAL jit=off`'u sonrası) gecikme, Streamlit'in
+# HER widget etkileşiminde SKRİPTİ BAŞTAN çalıştırdığı gerçeğiyle birlikte
+# düşünülünce cache olmadan da tolere edilebilirdi — ama tekrarlanan DB
+# round-trip'ini önlemek için established desen korundu.
+@st.cache_data(show_spinner="Zaman serisi yükleniyor...", ttl=1800)
+def _toplama_tuketim_cached(
+    _conn: Any, grain: toplama.Grain, baslangic_tarih_id: int, bitis_tarih_id: int
+) -> pd.DataFrame:
+    return toplama.tuketim_toplama_getir(
+        _conn, grain, baslangic_tarih_id, bitis_tarih_id
+    )
+
+
+@st.cache_data(show_spinner="Zaman serisi yükleniyor...", ttl=1800)
+def _toplama_tuketim_ulke_geneli_cached(
+    _conn: Any, grain: toplama.Grain, baslangic_tarih_id: int, bitis_tarih_id: int
+) -> pd.DataFrame:
+    return toplama.tuketim_ulke_geneli_toplama_getir(
+        _conn, grain, baslangic_tarih_id, bitis_tarih_id
+    )
+
+
+@st.cache_data(show_spinner="Zaman serisi yükleniyor...", ttl=1800)
+def _toplama_uretim_kaynak_cached(
+    _conn: Any, grain: toplama.Grain, baslangic_tarih_id: int, bitis_tarih_id: int
+) -> pd.DataFrame:
+    return toplama.uretim_kaynak_toplama_getir(
+        _conn, grain, baslangic_tarih_id, bitis_tarih_id
+    )
+
+
+@st.cache_data(show_spinner="Zaman serisi yükleniyor...", ttl=1800)
+def _toplama_uretim_il_cached(
+    _conn: Any, grain: toplama.Grain, baslangic_tarih_id: int, bitis_tarih_id: int
+) -> pd.DataFrame:
+    return toplama.uretim_il_toplama_getir(
+        _conn, grain, baslangic_tarih_id, bitis_tarih_id
+    )
+
+
+@st.cache_data(show_spinner="R12 hesaplanıyor...", ttl=1800)
+def _toplama_r12_cached(
+    _conn: Any, tablo: toplama.TabloAdi, baslangic_tarih_id: int, bitis_tarih_id: int
+) -> pd.DataFrame:
+    return toplama.r12_getir(_conn, tablo, baslangic_tarih_id, bitis_tarih_id)
+
+
+@st.cache_data(show_spinner=False, ttl=1800)
+def _toplama_tarih_araligi_cached(
+    _conn: Any, tablo: toplama.TabloAdi
+) -> tuple[int, int] | None:
+    return toplama.veri_seti_tarih_araligi_getir(_conn, tablo)
+
+
 _RENK_EMOJI = {"yesil": "🟢", "sari": "🟡", "kirmizi": "🔴"}
 
 
@@ -482,6 +543,117 @@ def _trafik_isigi(
         deger, float(esik["yesil_alt"]), float(esik["sari_alt"]), str(esik["yon"])
     )
     return f"{_RENK_EMOJI.get(renk, '')} " if renk else ""
+
+
+# --- Zaman Serisi bölümü — salt UI yardımcıları (DB'ye gitmez) ---
+
+
+def _zs_ay_kaydir(tarih_id: int, delta: int) -> int:
+    """`worker/toplama.py:_ay_ekle()` ile AYNI mantık — UI katmanı worker'ın
+    private fonksiyonuna bağımlı OLMAMALI, bilerek küçük bir kopya."""
+    yil, ay = divmod(tarih_id, 100)
+    toplam_ay_indeksi = yil * 12 + (ay - 1) + delta
+    yeni_yil, yeni_ay_indeksi = divmod(toplam_ay_indeksi, 12)
+    return yeni_yil * 100 + (yeni_ay_indeksi + 1)
+
+
+def _zs_donem_etiketi(donem_anahtari: int, grain: toplama.Grain) -> str:
+    """`donem_anahtari`yı (grain'e göre tarih_id/yıl*10+çeyrek/yıl) okunabilir
+    bir eksen etiketine çevirir: '2024-03' / '2024-Q1' / '2024'."""
+    if grain == "ay":
+        yil, ay = divmod(donem_anahtari, 100)
+        return f"{yil}-{ay:02d}"
+    if grain == "ceyrek":
+        yil, ceyrek = divmod(donem_anahtari, 10)
+        return f"{yil}-Q{ceyrek}"
+    return str(donem_anahtari)
+
+
+def _zs_grafik_ciz(
+    df: pd.DataFrame, kirilim_kolonu: str, baslik_y: str, dikis_etiketi: str | None
+) -> alt.Chart:
+    """Ortak Altair çizim mantığı — 4 veri setinin (tüketim/tüketim ülke
+    geneli/üretim kaynak/üretim il) TÜMÜ için kullanılır.
+
+    **Eksik dönem işaretlemesi (PROMPT'un 'en kritik maddesi'):** `tam_mi`
+    kolonuna göre İKİ AYRI katman — tam olan noktalar dolu daire, EKSİK
+    olanlar KIRMIZI, dolu OLMAYAN (açık) üçgen + normalden büyük boyut.
+    Çizgi HER İKİ nokta türünü de birleştirir (süreklilik korunur, bir nokta
+    "yokmuş" gibi GÖRÜNMEZ) ama eksik nokta görsel olarak ANINDA fark
+    edilir — tooltip'te de 'X/Y ay mevcut' notu var (renk körlüğüne karşı
+    tek başına renge güvenilmez, şekil + tooltip + ayrıca alttaki caption).
+    """
+    df = df.copy()
+    df["kapsam_notu"] = df.apply(
+        lambda r: (
+            f"{int(r['mevcut_donem_sayisi'])}/{int(r['beklenen_donem_sayisi'])} dönem mevcut"
+        ),
+        axis=1,
+    )
+    df_tam = df[df["tam_mi"]]
+    df_eksik = df[~df["tam_mi"]]
+
+    ortak_tooltip = [
+        alt.Tooltip("donem_etiketi:O", title="Dönem"),
+        alt.Tooltip(f"{kirilim_kolonu}:N", title="Kırılım"),
+        alt.Tooltip("deger:Q", title=baslik_y, format=",.0f"),
+        alt.Tooltip("kapsam_notu:N", title="Kapsam"),
+    ]
+
+    cizgi = (
+        alt.Chart(df)
+        .mark_line()
+        .encode(
+            x=alt.X("donem_etiketi:O", title="Dönem", sort=None),
+            y=alt.Y("deger:Q", title=baslik_y),
+            color=alt.Color(f"{kirilim_kolonu}:N", title="Kırılım"),
+        )
+    )
+    noktalar_tam = (
+        alt.Chart(df_tam)
+        .mark_circle(size=55)
+        .encode(
+            x=alt.X("donem_etiketi:O", sort=None),
+            y="deger:Q",
+            color=f"{kirilim_kolonu}:N",
+            tooltip=ortak_tooltip,
+        )
+    )
+    katmanlar = [cizgi, noktalar_tam]
+    if not df_eksik.empty:
+        noktalar_eksik = (
+            alt.Chart(df_eksik)
+            .mark_point(shape="triangle-down", size=160, filled=True, color="#d62728")
+            .encode(
+                x=alt.X("donem_etiketi:O", sort=None),
+                y="deger:Q",
+                tooltip=ortak_tooltip,
+            )
+        )
+        katmanlar.append(noktalar_eksik)
+
+    if dikis_etiketi is not None and dikis_etiketi in df["donem_etiketi"].values:
+        dikis_df = pd.DataFrame({"donem_etiketi": [dikis_etiketi]})
+        dikis_kural = (
+            alt.Chart(dikis_df)
+            .mark_rule(strokeDash=[4, 4], color="#ff7f0e", strokeWidth=2)
+            .encode(x=alt.X("donem_etiketi:O", sort=None))
+        )
+        dikis_metin = (
+            alt.Chart(dikis_df)
+            .mark_text(
+                text="⚠ 2025→2026 dikişi (Sanayi + Lisanssız seriye giriyor)",
+                angle=0,
+                dy=-10,
+                align="left",
+                color="#ff7f0e",
+                fontSize=11,
+            )
+            .encode(x=alt.X("donem_etiketi:O", sort=None), y=alt.value(10))
+        )
+        katmanlar.extend([dikis_kural, dikis_metin])
+
+    return alt.layer(*katmanlar).resolve_scale(color="independent").interactive()
 
 
 @st.cache_data
@@ -1110,6 +1282,228 @@ if not serbest.empty:
     )
     with st.expander("📋 Serbest tüketici ham veriyi göster"):
         st.dataframe(serbest, width="stretch")
+
+# ---------------- ZAMAN SERİSİ (toplama katmanı, 2026-09-20) ----------------
+# `Claude outputs/PROMPT_UI_ZAMAN_SERISI_2026-09-20.md` — bugünkü tek-ay
+# KPI kartlarının YANINA eklenen AYRI bir bölüm (mevcut sayfa BOZULMADI).
+# Yalnız gerçek DB modunda anlamlı (statik yedekte toplama katmanı view'leri
+# yok). HARİTA bu turda YOK — ayrı tur.
+if gercek_veri_var:
+    st.divider()
+    st.subheader("📈 Zaman Serisi — Çeyreklik / Yıllık / Uzun Dönem")
+    st.caption(
+        "Toplama katmanı (`worker/toplama.py`) — çözünürlük ve aralık "
+        "BAĞIMSIZ iki kontrol (10_TEKNIK_MASTER_DOKUMAN.md §15). İl/kaynak "
+        "kırılımı ülke geneline toplanmış; il haritası AYRI bir tur."
+    )
+
+    _ZS_VERI_SETLERI: dict[str, dict[str, str]] = {
+        "Tüketim (il×grup, Sanayi hariç)": {
+            "fonksiyon": "tuketim",
+            "kirilim": "grup_adi",
+            "birim": "Tüketim (MWh)",
+            "r12_tablo": "tuketim",
+        },
+        "Tüketim (ülke geneli, Sanayi dahil)": {
+            "fonksiyon": "tuketim_ulke_geneli",
+            "kirilim": "grup_adi",
+            "birim": "Tüketim (MWh)",
+            "r12_tablo": "tuketim_ulke_geneli",
+        },
+        "Üretim (kaynak bazlı)": {
+            "fonksiyon": "uretim_kaynak",
+            "kirilim": "kaynak_adi",
+            "birim": "Üretim (MWh)",
+            "r12_tablo": "uretim_kaynak_geneli",
+        },
+        "Üretim (il toplamı, lisans bazlı)": {
+            "fonksiyon": "uretim_il",
+            "kirilim": "lisans_turu",
+            "birim": "Üretim (MWh)",
+            "r12_tablo": "uretim_il_geneli",
+        },
+    }
+
+    zs_c1, zs_c2 = st.columns(2)
+    with zs_c1:
+        zs_veri_seti_adi = st.selectbox(
+            "Veri seti", list(_ZS_VERI_SETLERI.keys()), key="zs_veri_seti"
+        )
+    with zs_c2:
+        # Çözünürlük VE aralık BAĞIMSIZ iki kontrol — PROMPT'un açık kararı,
+        # tek bir açılır liste ("10 yıllık aylık" gibi kombinasyonları
+        # üretemezdi).
+        zs_grain_etiket = st.selectbox(
+            "Çözünürlük", ["Ay", "Çeyrek", "Yıl"], key="zs_grain"
+        )
+    _ZS_GRAIN_ESLEME: dict[str, toplama.Grain] = {
+        "Ay": "ay",
+        "Çeyrek": "ceyrek",
+        "Yıl": "yil",
+    }
+    zs_grain = _ZS_GRAIN_ESLEME[zs_grain_etiket]
+
+    zs_secim = _ZS_VERI_SETLERI[zs_veri_seti_adi]
+    # 2026-09-20 — SEÇİLİ veri setine göre sınır (`donemler`, yalnız
+    # fact_tuketim'e bakar ve canlıda fact_tuketim yalnız 2026-01'den
+    # başlar — diğer 3 veri seti 2016'dan başlar, TEK bir sabitle
+    # sınırlanırsa 'Tümü'/'Özel' SESSİZCE 2026'ya daralırdı, bkz.
+    # worker/toplama.py:veri_seti_tarih_araligi_getir() docstring'i).
+    zs_tablo_anahtari = cast("toplama.TabloAdi", zs_secim["r12_tablo"])
+    zs_araligi = _toplama_tarih_araligi_cached(db_handle, zs_tablo_anahtari)
+
+    zs_c3, zs_c4, zs_c5 = st.columns([1.3, 1, 1])
+    with zs_c3:
+        zs_aralik_etiket = st.selectbox(
+            "Aralık", ["Son 12 ay", "Son 3 yıl", "Tümü", "Özel"], key="zs_aralik"
+        )
+
+    if zs_araligi is None:
+        st.info(f"'{zs_veri_seti_adi}' için hiç veri yok.")
+        zs_baslangic = zs_bitis = None
+    else:
+        en_eski_tarih_id, en_yeni_tarih_id = zs_araligi
+        if zs_aralik_etiket == "Son 12 ay":
+            zs_baslangic = max(_zs_ay_kaydir(en_yeni_tarih_id, -11), en_eski_tarih_id)
+            zs_bitis = en_yeni_tarih_id
+        elif zs_aralik_etiket == "Son 3 yıl":
+            zs_baslangic = max(_zs_ay_kaydir(en_yeni_tarih_id, -35), en_eski_tarih_id)
+            zs_bitis = en_yeni_tarih_id
+        elif zs_aralik_etiket == "Tümü":
+            zs_baslangic = en_eski_tarih_id
+            zs_bitis = en_yeni_tarih_id
+        else:
+            # Özel seçiciler: SEÇİLİ veri setinin tam takvimi (min..maks
+            # arası HER ay) — bazı ayların gerçekte yüklü olmaması sorun
+            # DEĞİL, toplama katmanı zaten bunu kapsam bayrağıyla ele alıyor.
+            zs_takvim = []
+            zs_gezici = en_eski_tarih_id
+            while zs_gezici <= en_yeni_tarih_id:
+                zs_takvim.append(zs_gezici)
+                zs_gezici = _zs_ay_kaydir(zs_gezici, 1)
+            zs_takvim_etiketli = [_zs_donem_etiketi(t, "ay") for t in zs_takvim]
+            with zs_c4:
+                zs_baslangic_idx = st.selectbox(
+                    "Başlangıç",
+                    range(len(zs_takvim)),
+                    index=0,
+                    format_func=lambda i: zs_takvim_etiketli[i],
+                    key="zs_ozel_baslangic",
+                )
+            with zs_c5:
+                zs_bitis_idx = st.selectbox(
+                    "Bitiş",
+                    range(len(zs_takvim)),
+                    index=len(zs_takvim) - 1,
+                    format_func=lambda i: zs_takvim_etiketli[i],
+                    key="zs_ozel_bitis",
+                )
+            zs_baslangic = zs_takvim[zs_baslangic_idx]
+            zs_bitis = zs_takvim[zs_bitis_idx]
+            if zs_baslangic > zs_bitis:
+                zs_baslangic, zs_bitis = zs_bitis, zs_baslangic
+
+    zs_r12_goster = st.checkbox(
+        "R12 (kayan 12 aylık toplam) — mevsimselliği siler, kesintisiz trend",
+        key="zs_r12",
+    )
+
+    zs_getir_fonksiyonlari = {
+        "tuketim": _toplama_tuketim_cached,
+        "tuketim_ulke_geneli": _toplama_tuketim_ulke_geneli_cached,
+        "uretim_kaynak": _toplama_uretim_kaynak_cached,
+        "uretim_il": _toplama_uretim_il_cached,
+    }
+    zs_df = (
+        zs_getir_fonksiyonlari[zs_secim["fonksiyon"]](
+            db_handle, zs_grain, zs_baslangic, zs_bitis
+        )
+        if zs_baslangic is not None and zs_bitis is not None
+        else pd.DataFrame()
+    )
+
+    if zs_df.empty:
+        st.info("Seçili aralık/veri setinde hiç veri yok.")
+    else:
+        # zs_df boş DEĞİLSE zs_baslangic/zs_bitis zaten int (yukarıdaki
+        # koşul bunu garanti eder) — mypy için açık daraltma.
+        assert zs_baslangic is not None and zs_bitis is not None
+        zs_df = zs_df.rename(columns={"deger": "deger"})
+        zs_df["donem_etiketi"] = zs_df["donem_anahtari"].apply(
+            lambda x: _zs_donem_etiketi(int(x), zs_grain)
+        )
+        zs_dikis_var = toplama.donem_araligi_dikis_iceriyor_mu(zs_baslangic, zs_bitis)
+        zs_dikis_etiketi = _zs_donem_etiketi(202601, zs_grain) if zs_dikis_var else None
+
+        zs_chart = _zs_grafik_ciz(
+            zs_df, zs_secim["kirilim"], zs_secim["birim"], zs_dikis_etiketi
+        )
+        st.altair_chart(zs_chart, width="stretch")
+
+        # Eksik dönem listesi — renk/şekle EK olarak, açık metin (erişilebilirlik +
+        # "sahte KPI üretilmez" kuralının burada da uygulanması: kullanıcı grafiğe
+        # bakmadan da hangi noktaların eksik olduğunu bilebilmeli).
+        zs_eksikler = zs_df.loc[~zs_df["tam_mi"]]
+        if not zs_eksikler.empty:
+            zs_kirilim_kolonu = zs_secim["kirilim"]
+            zs_eksik_liste = ", ".join(
+                f"{r.donem_etiketi} ({getattr(r, zs_kirilim_kolonu)}: "
+                f"{int(r.mevcut_donem_sayisi)}/{int(r.beklenen_donem_sayisi)} dönem)"
+                for r in zs_eksikler.itertuples()
+            )
+            st.warning(f"⚠️ Eksik kapsamlı dönemler (üçgen işaretli): {zs_eksik_liste}")
+        if zs_dikis_var:
+            st.caption(
+                "⚠ Seçili aralık 2025→2026 sınırını kapsıyor: 2026'dan itibaren "
+                "Sanayi (Karar 2) ve Lisanssız seriye giriyor, Word yıllarında "
+                "(≤2025) yoktu — sınırdaki basamak veri hatası DEĞİL, yapısal."
+            )
+
+        if zs_r12_goster:
+            zs_r12_tablo = cast("toplama.TabloAdi", zs_secim["r12_tablo"])
+            zs_r12_df = _toplama_r12_cached(
+                db_handle, zs_r12_tablo, zs_baslangic, zs_bitis
+            )
+            if zs_r12_df.empty:
+                st.info("R12 için yeterli veri yok (en az 1 ay gerekir).")
+            else:
+                zs_r12_df = zs_r12_df.copy()
+                zs_r12_df["donem_etiketi"] = zs_r12_df["tarih_id"].apply(
+                    lambda x: _zs_donem_etiketi(int(x), "ay")
+                )
+                zs_r12_df["kirilim_sabit"] = "R12 (tüm kırılımların toplamı)"
+                st.caption(
+                    "**R12** — her ay, o ay VE önceki 11 ayın toplamı (12 tam "
+                    "ay yoksa ⚠ üçgenle işaretlenir, ay grain'inde çizilir)."
+                )
+                zs_r12_chart = (
+                    alt.Chart(zs_r12_df[zs_r12_df["tam_mi"]])
+                    .mark_line(point=True, color="#2ca02c")
+                    .encode(
+                        x=alt.X("donem_etiketi:O", title="Ay", sort=None),
+                        y=alt.Y("deger_r12:Q", title=f"R12 {zs_secim['birim']}"),
+                        tooltip=[
+                            alt.Tooltip("donem_etiketi:O", title="Ay"),
+                            alt.Tooltip("deger_r12:Q", title="R12", format=",.0f"),
+                        ],
+                    )
+                )
+                zs_r12_eksik = zs_r12_df[~zs_r12_df["tam_mi"]]
+                if not zs_r12_eksik.empty:
+                    zs_r12_chart = zs_r12_chart + alt.Chart(zs_r12_eksik).mark_point(
+                        shape="triangle-down", size=160, filled=True, color="#d62728"
+                    ).encode(
+                        x=alt.X("donem_etiketi:O", sort=None),
+                        y="deger_r12:Q",
+                        tooltip=[
+                            alt.Tooltip("donem_etiketi:O", title="Ay"),
+                            alt.Tooltip("deger_r12:Q", title="R12", format=",.0f"),
+                            alt.Tooltip(
+                                "mevcut_donem_sayisi:Q", title="Mevcut ay (/12)"
+                            ),
+                        ],
+                    )
+                st.altair_chart(zs_r12_chart.interactive(), width="stretch")
 
 # ---------------- VERİ TABLOSU ----------------
 with st.expander("📋 Ham veriyi göster"):
