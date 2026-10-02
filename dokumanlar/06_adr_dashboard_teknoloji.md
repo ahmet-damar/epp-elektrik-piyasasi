@@ -7,6 +7,7 @@
 **Tarih:** 2026-08-30 · **Durum:** Kabul edildi
 
 ## Bağlam
+
 dokumanlar/01_kavramsal_tasarim.md §3 (Mimari), sunum katmanını
 "Next.js + TypeScript (app/)" olarak tanımlıyordu. Ancak proje halihazırda
 çalışan bir `app/dashboard.py` (Streamlit) ile ilerliyordu ve Faz 2
@@ -15,12 +16,14 @@ mevcut Streamlit paneli büyütüldü. Bu ADR, dokümanla gerçek durum
 arasındaki bu farkı ve gerekçesini kayıt altına alır.
 
 ## Karar
+
 Faz 2'de sunum katmanı **Streamlit** (`app/dashboard.py`) olarak kalır ve
 gerçek `worker/analytics.py` sorgularıyla büyütülür. **Next.js + TypeScript'e
 geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
 **"Son Faz" (LinkedIn yayını)** öncesine bilinçli olarak ertelendi.
 
 ## Gerekçe
+
 - **Hız:** Faz 0/1'de kurulan worker/ katmanı (parser, kpi, ingest, pipeline,
   job_worker) zaten Python. Streamlit aynı süreçte, ek bir API katmanı
   (FastAPI + REST/GraphQL sözleşmesi) veya ayrı bir frontend build zinciri
@@ -37,6 +40,7 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   erken yatırımdan kaçınır.
 
 ## Sonuçlar
+
 - `app/dashboard.py` büyümeye devam eder; DB bağlıysa `worker/analytics.py`
   üzerinden gerçek sorgu, yoksa `data/tr_ocak2026.py` statik yedek.
 - `worker/` katmanı framework-agnostik kalmalı (Streamlit'e bağımlı kod
@@ -58,7 +62,7 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   geçtiği Supabase transaction-mode connection pooler'ıyla (Supavisor)
   UYUMSUZ olabilir: canlı Supabase'e karşı `postgres` kullanıcısıyla (bu
   rollerin GERÇEK üyesi olduğu `pg_auth_members`'la doğrulandı) `SET ROLE
-  viewer` denendi, "permission denied to set role" ile reddedildi —
+viewer` denendi, "permission denied to set role" ile reddedildi —
   transaction-mode pooler'ların SET ROLE gibi session-durumu değiştiren
   komutları (bağlantı havuzda paylaşıldığından, bir istemcinin rol
   değişikliği başka bir istemciye sızmasın diye) kısıtlaması bilinen bir
@@ -70,25 +74,25 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   desteklediği, `db-role-claim-key` mekanizmasıyla) geçilmeli, ya da
   connection pooling'i bypass eden DOĞRUDAN (session-mode) bir bağlantı
   kullanılmalı. Detay/tekrar üretme adımları: `dokumanlar/
-  06_canli_veri_operasyon_gunlugu.md` (2026-09-02, "auth schema USAGE"
+06_canli_veri_operasyon_gunlugu.md` (2026-09-02, "auth schema USAGE"
   bölümü).
 - **RLS notu, KESİN KÖK NEDEN bulundu (2026-09-05, yalnız TEST — kod/şema
   değişikliği YAPILMADI):** Yukarıdaki "transaction-mode pooler kısıtlıyor"
   hipotezi **YANLIŞ ÇIKTI** — session-mode bir bağlantıyla (aynı Supavisor
   pooler host'u, port 5432, transaction-mode'un 6543'ünden farklı; bkz.
   `.env`'deki `DATABASE_URL_DIRECT`) `postgres` kullanıcısıyla `SET ROLE
-  viewer` **AYNI hatayla** ("permission denied to set role") reddedildi —
+viewer` **AYNI hatayla** ("permission denied to set role") reddedildi —
   yani sorun pooler modu DEĞİL, aşağıdaki gerçek neden:
 
   **Gerçek kök neden — PostgreSQL 17'nin (canlı DB'nin sürümü, `SHOW
-  server_version` ile doğrulandı) ayrık `SET` yetkisi:** `pg_auth_members`
+server_version` ile doğrulandı) ayrık `SET` yetkisi:** `pg_auth_members`
   (PG16+'da üç ayrı sütun taşıyor: `admin_option`, `inherit_option`,
   `set_option`) sorgulandığında, `postgres`'in `viewer`/`data_operator`/
   `admin`'e üyeliği **`admin_option=true` ama `inherit_option=false` VE
   `set_option=false`** — buna karşılık `authenticated`/`service_role`
   üyelikleri **`inherit_option=true` VE `set_option=true`** (Supabase'in
   kendi yönettiği roller, farklı grantlanmış). `SET ROLE`/`SET SESSION
-  AUTHORIZATION` PG16+'da AÇIKÇA `set_option=true` gerektirir — üyelik
+AUTHORIZATION` PG16+'da AÇIKÇA `set_option=true` gerektirir — üyelik
   (`pg_has_role(...,'MEMBER')`) VARLIĞI tek başına YETMİYOR. Bu proje
   `20260819_0002_rls_roles.sql`'de `viewer`/`data_operator`/`admin`
   rollerini muhtemelen düz `GRANT role TO grantee;` (varsayılan `SET`
@@ -99,13 +103,13 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   **JWT/`current_app_role()` mekanizmasının KENDİSİ ÇALIŞIYOR** (bu kısım
   test edildi ve BAŞARILI): `auth.jwt()`'nin gerçek tanımı sorgulandı
   (varsayılmadı) — `coalesce(current_setting('request.jwt.claim',true),
-  current_setting('request.jwt.claims',true))::jsonb` okuyor. Aynı
+current_setting('request.jwt.claims',true))::jsonb` okuyor. Aynı
   session'da `SET request.jwt.claims = '{"app_metadata":{"role":
-  "viewer"}}';` çalıştırılıp `SELECT public.current_app_role();` çağrıldı
+"viewer"}}';` çalıştırılıp `SELECT public.current_app_role();` çağrıldı
   — **`'viewer'` DÖNDÜ, doğru çalıştı.**
 
   **Yapısal ek bulgu:** RLS politikaları `FOR SELECT TO viewer USING
-  (current_app_role()='viewer' AND ...)` şeklinde **ÇİFT kapılı** — hem
+(current_app_role()='viewer' AND ...)` şeklinde **ÇİFT kapılı** — hem
   PostgreSQL'in FİZİKSEL rol hedeflemesi (`TO viewer`, oturumun GERÇEKTEN
   `viewer` rolüne geçmiş/onu miras almış olmasını gerektirir) HEM
   `current_app_role()`'ün (JWT claim okuyan) doğru değeri döndürmesi
@@ -141,8 +145,8 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   **2) BAĞIMSIZ bulgu — Migration `20260819_0017`:** `SET ROLE` çalışır
   hale gelince YENİ bir hata çıktı: `SELECT ... FROM fact_tuketim`
   "permission denied for table". Kök neden: `20260819_0003_fix_grants.
-  sql`'in `REVOKE ALL PRIVILEGES ON ALL TABLES ... FROM viewer,
-  data_operator, admin;` satırı, `0002_rls_roles.sql`'in bu üç role
+sql`'in `REVOKE ALL PRIVILEGES ON ALL TABLES ... FROM viewer,
+data_operator, admin;` satırı, `0002_rls_roles.sql`'in bu üç role
   verdiği TÜM tablo grant'larını (dim_*, fact_tuketim, fact_uretim,
   fact_abone, fact_serbest_tuketici, fact_hava_aylik, source_asset,
   ingestion_batch, audit_log) 2026-08-19'dan beri SİLMİŞ — yalnız
@@ -156,7 +160,7 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   `20260819_0018`:** 0017'den sonra bu kez `current_app_role()` içindeki
   `auth.jwt()` çağrısı "permission denied for schema auth" ile
   reddedildi — `20260819_0015`'in `GRANT USAGE ON SCHEMA auth TO viewer,
-  data_operator, admin;` ifadesi canlı Supabase'de HİÇ etkili olmamış
+data_operator, admin;` ifadesi canlı Supabase'de HİÇ etkili olmamış
   (hatasız çalışıyor GÖRÜNÜYOR ama `has_schema_privilege(...)` işlem
   İÇİNDE bile false dönüyor). Kök neden: `auth` şeması `supabase_admin`'e
   ait; `postgres` üzerinde USAGE var ama **WITH GRANT OPTION YOK**
@@ -166,7 +170,7 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   DOĞRUDAN erişim vermek YERİNE**, zaten `postgres` sahipliğindeki
   `public.current_app_role()`'ü **`SECURITY DEFINER`** yapmak (0018):
   fonksiyon artık ÇAĞIRANIN değil SAHİBİNİN (`postgres`, kendi `auth.
-  jwt()` erişimi VAR) yetkisiyle çalışıyor — çağıranın `auth` şema
+jwt()` erişimi VAR) yetkisiyle çalışıyor — çağıranın `auth` şema
   erişimine hiç ihtiyaç kalmıyor. Güvenlik notu: fonksiyon yalnız
   çağıranın KENDİ oturumunun JWT'sini okuyup filtrelenmiş bir rol string'i
   döndürüyor, ek bir yetki yükseltmesi YAPMIYOR.
@@ -184,7 +188,7 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   ATLIYORLARDI. Kaynak: `pg_policy`'de, HİÇBİR migration dosyasında
   olmayan 14 politika — her fact/source tablosunda (`fact_tuketim`,
   `fact_abone`, `fact_uretim`, `fact_serbest_tuketici`, `fact_hava_
-  aylik`, `source_asset`, `ingestion_batch`) `admin_<tablo>_manage` ve
+aylik`, `source_asset`, `ingestion_batch`) `admin_<tablo>_manage` ve
   `data_operator_<tablo>_manage` adında, **`USING (true)` — KOŞULSUZ**
   politikalar.
 
@@ -194,7 +198,7 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   isimlerin `db/schema.sql`'in EN İLK taslağında (commit `453a2d4`,
   "Agent host session aa19b6d3-a4a3-4226-9d42-acb526deab0b - turn 1",
   2026-08-19 00:53) BİREBİR olduğu bulundu. `git merge-base --is-ancestor
-  453a2d4 HEAD` **false** döndü — yani bu commit (ve aynı oturumun turn
+453a2d4 HEAD` **false** döndü — yani bu commit (ve aynı oturumun turn
   2/turn 3'ü) `main` dalının atası DEĞİL: aynı erken oturumun SONRAKİ
   adımında (turn 3, commit `5f7b173`) BU politikalar ÇOKTAN daha güvenli,
   `current_app_role()`-tabanlı isimlerle (`admin_fact_tuketim_all` vb.)
@@ -205,7 +209,7 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   DB'ye uygulanmış, `main`'e hiç girmeden terk edilmiş. En olası açıklama:
   ilk taslak (turn 1) aynı erken oturumda doğrudan canlı Supabase'e
   uygulanmış; `main`'deki güvenli sürüm (AYNI dosya adı `0002_rls_roles.
-  sql`, FARKLI/daha dar içerik) sonradan AYRICA uygulanınca yeni
+sql`, FARKLI/daha dar içerik) sonradan AYRICA uygulanınca yeni
   politikalar EKLENDİ ama eskiler hiç `DROP` edilmedi (migration'lar
   yalnız `CREATE POLICY` yapar, adı farklı eski politikaları otomatik
   temizlemez) — iki nesil politika CANLIDA YAN YANA kaldı.
@@ -220,9 +224,9 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
 
   **Kaldırma:** `20260819_0019_drop_undocumented_bypass_policies.sql` —
   14 politikanın HER BİRİ için AYRI, AÇIK `DROP POLICY IF EXISTS <ad> ON
-  <tablo>;` satırı (wildcard/dinamik silme yok). Canlı Supabase'e
+<tablo>;` satırı (wildcard/dinamik silme yok). Canlı Supabase'e
   uygulandı, doğrulandı: `SELECT count(*) FROM pg_policies WHERE
-  policyname LIKE '%_manage'` → **0**.
+policyname LIKE '%_manage'` → **0**.
 
   **Uçtan uca YENİDEN doğrulama (canlı, `app_dashboard_service` ile,
   kaldırma SONRASI):**
@@ -238,7 +242,7 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
     veri operatörü yükler/günceller, `viewer` gibi taramaz).
 
   **`app/dashboard.py`'de `st.session_state`'e geçiş:** `@st.cache_
-  resource` (parametresiz, TÜM kullanıcılar arasında TEK paylaşımlı
+resource` (parametresiz, TÜM kullanıcılar arasında TEK paylaşımlı
   bağlantı) kaldırıldı — her Streamlit oturumu artık KENDİ bağlantısını
   açıyor (`st.session_state`).
 
@@ -246,16 +250,16 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   hesabı.** Panel artık uçtan uca kimlik doğrulamalı — mekanizma:
 
   1. **`worker/auth.py`** (framework-agnostik, ADR-7 ilkesi): `giris_yap
-     (email, sifre)` Supabase Auth'a (`sign_in_with_password`) karşı
+(email, sifre)` Supabase Auth'a (`sign_in_with_password`) karşı
      doğrular, başarılı oturumun GERÇEK JWT'sini çözüp `app_metadata.
-     role`'ü okur (rol bilinen üçlüden [viewer/data_operator/admin]
+role`'ü okur (rol bilinen üçlüden [viewer/data_operator/admin]
      biri DEĞİLSE erişim reddedilir, sessizce `viewer` VARSAYILMAZ).
      `rol_baglantisi_ac(jwt_claims_json, rol)` `DATABASE_URL_DASHBOARD`
      (`app_dashboard_service`) ile YENİ bir bağlantı açar, `request.
-     jwt.claims`'i gerçek JWT ile set eder, `SET ROLE <rol>` yapar —
+jwt.claims`'i gerçek JWT ile set eder, `SET ROLE <rol>` yapar —
      `rol` HER ZAMAN whitelist'e karşı doğrulanır (whitelist dışıysa
      `SET ROLE`'e hiç ulaşmadan `ValueError`; ayrıca `psycopg.sql.
-     Identifier`/`Literal` kullanılır, ham string birleştirme YOK).
+Identifier`/`Literal` kullanılır, ham string birleştirme YOK).
   2. **`app/dashboard.py`:** `DATABASE_URL_DASHBOARD` yapılandırılmışsa
      panel HER ZAMAN bir giriş ekranı (`st.form`, e-posta+şifre) gösterir
      — eski, girişsiz `DATABASE_URL` yolu ARTIK KULLANILMAZ (yoksa giriş
@@ -267,7 +271,7 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
      `session_state`'i temizler, `st.rerun()`).
   3. **Ahmet'in hesabı** — Supabase Admin API (`auth.admin.create_user()`,
      GERÇEK `service_role` key ile — `.env`'deki `SUPABASE_SERVICE_ROLE_
-     KEY` başlangıçta yanlışlıkla anon key'in kopyasıydı, Ahmet'in
+KEY` başlangıçta yanlışlıkla anon key'in kopyasıydı, Ahmet'in
      dashboard'dan aldığı gerçek değerle düzeltildi) ile oluşturuldu:
      `a.damar61@windowslive.com`, `app_metadata.role="admin"`,
      `email_confirm=true`, rastgele üretilmiş güçlü bir şifre (yalnız
@@ -298,7 +302,7 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
      "şifre sıfırlama" akışı henüz yok, ilk girişte Supabase dashboard'dan
      elle bir yeni şifre atanabilir (**Reset password**).
   4. Kod değişikliği/deploy GEREKMEZ — `worker/auth.py` `app_metadata.
-     role`'ü DİNAMİK okur, yeni kullanıcı bir sonraki girişinde otomatik
+role`'ü DİNAMİK okur, yeni kullanıcı bir sonraki girişinde otomatik
      çalışır.
 
 - **Aşama 2 — departman ölçeği sertleştirme, UYGULANDI (2026-09-05):**
@@ -344,6 +348,7 @@ geçiş iptal edilmedi** — `dokumanlar/01_kavramsal_tasarim.md` §7'deki
   bir bilgi mesajı var) bu turun kapsamı DIŞINDA bırakıldı.
 
 ## Değerlendirilen Alternatifler
+
 - **Next.js + TypeScript (şimdi):** Reddedildi — Faz 2 kapsamına göre erken;
   worker/ ile arasına bir API katmanı (FastAPI) kurmayı da gerektirirdi,
   bu da ayrı bir ADR/iş kalemi olurdu.

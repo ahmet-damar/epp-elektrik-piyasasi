@@ -3,11 +3,27 @@ from __future__ import annotations
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SCHEMA_PATHS = [
-    ROOT / "db" / "schema.sql",
-    ROOT / "supabase" / "migrations" / "20260819_0002_rls_roles.sql",
-    ROOT / "supabase" / "migrations" / "20260819_0003_fix_grants.sql",
-]
+
+
+def _schema_paths() -> list[Path]:
+    """**2026-09-20 (`Claude outputs/PROMPT_RLS_GERCEGI_2026-09-20.md`) —
+    DÜZELTME:** önceden bu liste 3 SABİT dosyaya (`db/schema.sql` +
+    yalnız 2 erken migration, 2026-08-19 tarihli) donmuştu. O tarihten
+    sonra eklenen HER migration (30+ dosya — `fact_uretim_kaynak_geneli`/
+    `fact_uretim_il_geneli` DAHİL) bu doğrulayıcı tarafından HİÇ
+    okunmuyordu; canlıda gerçekten RLS'siz bir tablo/politika eklenmiş
+    olsaydı bu script yine de "RLS static validation passed" basardı
+    (kasıtlı bozuk bir migration'la KANITLANDI, bkz. kapanış raporu).
+
+    Artık `supabase/migrations/*.sql`'in TAMAMI (sıralı) dinamik olarak
+    taranıyor — elle bakımı gereken sabit bir liste YOK. `db/schema.sql`
+    (elle bakımlı bir "anlık görüntü" — artık gereksiz ama zararsız)
+    geriye dönük uyumluluk için taramada kalıyor."""
+    migrations = sorted((ROOT / "supabase" / "migrations").glob("*.sql"))
+    return [ROOT / "db" / "schema.sql", *migrations]
+
+
+SCHEMA_PATHS = _schema_paths()
 
 
 def read_text(path: Path) -> str:
@@ -154,13 +170,6 @@ def main() -> int:
             )
 
     # Audit log must not have UPDATE/DELETE/TRUNCATE granted to anyone
-    if any(
-        keyword in combined and "audit_log" in combined
-        for keyword in ("GRANT", "UPDATE", "DELETE", "TRUNCATE")
-    ):
-        # more precise check below
-        pass
-    # explicit checks
     if "GRANT" in combined:
         for line in combined.splitlines():
             if "audit_log" in line.upper() or "audit_log" in line:
@@ -189,13 +198,44 @@ def main() -> int:
     if "user_metadata" in combined:
         raise AssertionError("user_metadata must not be used as the role source")
 
-    if (
-        "DELETE" in combined
-        and "audit_log" in combined
-        and "DROP POLICY IF EXISTS" not in combined
-    ):
-        # This static guard is intentionally permissive; actual delete protection is in the policy block.
-        pass
+    # **2026-09-20 — YENİ, GENEL kural (Görev 2 madde 2'nin asıl açığı):**
+    # önceki tüm kontroller ÖZEL durumları (anon grant'i, admin/authenticated
+    # DELETE eşleşmesi, vb.) yakalıyordu ama HİÇBİRİ "her public tablonun
+    # RLS'i açık VE en az 1 politikası var" diye GENEL bir invaryant
+    # DOĞRULAMIYORDU — bu proje P0 kuralı "istisnasız tüm public tablolarda
+    # zorunlu" diyor, "bazı durumlarda" değil. Kasıtlı bozuk bir migration'la
+    # (RLS'siz, politikasız, HİÇBİR grant'i olmayan bir tablo) KANITLANDI:
+    # yukarıdaki kontrollerin HİÇBİRİ bunu YAKALAMIYORDU (bkz. kapanış
+    # raporu) — bu döngü o boşluğu kapatır. İstisna listesi YOK (bilerek —
+    # bir istisna listesi kendisi "elle bakımlı sabit liste" anti-desenine
+    # geri düşerdi).
+    tablo_adlari = sorted(
+        set(
+            re.findall(
+                r"CREATE TABLE IF NOT EXISTS (\w+)", combined, flags=re.IGNORECASE
+            )
+        )
+    )
+    for tablo in tablo_adlari:
+        if not re.search(
+            rf"ALTER TABLE {re.escape(tablo)} ENABLE ROW LEVEL SECURITY",
+            combined,
+            flags=re.IGNORECASE,
+        ):
+            raise AssertionError(
+                f"table {tablo!r} has no 'ENABLE ROW LEVEL SECURITY' anywhere "
+                "in the scanned migrations — RLS is mandatory for every "
+                "public table, no exceptions"
+            )
+        if not re.search(
+            rf"CREATE POLICY \S+ ON {re.escape(tablo)}\b", combined, flags=re.IGNORECASE
+        ):
+            raise AssertionError(
+                f"table {tablo!r} has RLS enabled but no CREATE POLICY found "
+                "anywhere in the scanned migrations — RLS-enabled-but-no-"
+                "policy silently blocks ALL access for everyone but the "
+                "owner, which is its own (fail-closed, but still wrong) bug"
+            )
 
     print("RLS static validation passed")
     return 0

@@ -8,7 +8,9 @@ Kaynak: Ek F. EPDK dosyalarının parser için kolon/tablo haritası.
 NOT: v0.1 — Faz 0'da gerçek 2016+ dosyalarla doğrulanacak.
 
 ## Çapa (Anchor) Tabanlı Okuma
+
 Parser SABİT hücreye güvenmez; değişmez etiketleri arar:
+
 - Tablo: 'Tablo 1', 'Tablo 7 - Faturalanan', 'Tablo 13'
 - Sütun: 'İLLER', 'Kaynak Türü', 'Tüketici Grubu', 'Miktar', 'Sayı'
 - Satır: 'TÜRKİYE', 'Genel Toplam', 'TOPLAM'
@@ -22,19 +24,19 @@ tablolar bir fact tablosuyla aynı grain'i paylaşsa da GERÇEKTEN parse
 edilmez (kaynakta o kesişim yok ya da başka bir tabloyla redundant). Yazan
 tablo sayısı tam **5**'tir: T1/T4/T10/T11/T13.
 
-| Tablo | İçerik | Hedef | Durum |
-|-------|--------|-------|-------|
-| T1 | Lisanslı kurulu güç (il×kaynak) | fact_uretim | Parse edilir, **YAZAR** |
-| T2/T3 | Lisanslı üretim (kaynak/il) | fact_uretim | Parse edilmez — il×kaynak kesişimi kaynakta yok |
-| T4 | Lisanssız kurulu güç | fact_uretim | Parse edilir, **YAZAR** |
-| T5/T6 | Lisanssız üretim (kaynak/il) | fact_uretim | Parse edilmez — T2/T3 ile aynı sebep |
-| T7 | Faturalanan tüketim (tür, ülke geneli) | fact_tuketim | Parse edilir ama **YAZMAZ** — yalnız mutabakat |
-| T8 | Faturalanan tüketim (il) | fact_tuketim | **Parse edilmez — T11 ile redundant** (bkz. T12 notu) |
-| T9 | Tüketici sayısı (tür, ülke geneli) | fact_abone | Parse edilir ama **YAZMAZ** — yalnız mutabakat |
-| T10 | Tüketici sayısı (il) | fact_abone | Parse edilir, **YAZAR** |
-| **T11** | **Tüketim (iletim/dağıtım!)** | **fact_tuketim.baglanti** | Parse edilir, **YAZAR** (+ kendi Genel Toplam satırı → `fact_tuketim_ulke_geneli`) |
-| T12 | Tüketim (dağıtım şirketi) | parse edilmiyor | **Parse edilmez — T11 ile redundant** (bkz. not) |
-| T13 | Serbest tüketici (il×tur×grup) | fact_serbest_tuketici | Parse edilir, **YAZAR** — bkz. not
+| Tablo   | İçerik                                 | Hedef                     | Durum                                                                              |
+| ------- | -------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------- |
+| T1      | Lisanslı kurulu güç (il×kaynak)        | fact_uretim               | Parse edilir, **YAZAR**                                                            |
+| T2/T3   | Lisanslı üretim (kaynak/il)            | fact_uretim               | Parse edilmez — il×kaynak kesişimi kaynakta yok                                    |
+| T4      | Lisanssız kurulu güç                   | fact_uretim               | Parse edilir, **YAZAR**                                                            |
+| T5/T6   | Lisanssız üretim (kaynak/il)           | fact_uretim               | Parse edilmez — T2/T3 ile aynı sebep                                               |
+| T7      | Faturalanan tüketim (tür, ülke geneli) | fact_tuketim              | Parse edilir ama **YAZMAZ** — yalnız mutabakat                                     |
+| T8      | Faturalanan tüketim (il)               | fact_tuketim              | **Parse edilmez — T11 ile redundant** (bkz. T12 notu)                              |
+| T9      | Tüketici sayısı (tür, ülke geneli)     | fact_abone                | Parse edilir ama **YAZMAZ** — yalnız mutabakat                                     |
+| T10     | Tüketici sayısı (il)                   | fact_abone                | Parse edilir, **YAZAR**                                                            |
+| **T11** | **Tüketim (iletim/dağıtım!)**          | **fact_tuketim.baglanti** | Parse edilir, **YAZAR** (+ kendi Genel Toplam satırı → `fact_tuketim_ulke_geneli`) |
+| T12     | Tüketim (dağıtım şirketi)              | parse edilmiyor           | **Parse edilmez — T11 ile redundant** (bkz. not)                                   |
+| T13     | Serbest tüketici (il×tur×grup)         | fact_serbest_tuketici     | Parse edilir, **YAZAR** — bkz. not                                                 |
 
 **P0-2 KRİTİK:** Tablo 11, 'Sanayi-İLETİM' ve 'Sanayi-DAĞITIM' sütunlarını
 içeren TEK tablodur → fact_tuketim.baglanti'yi besler. Diğer tüketim
@@ -73,31 +75,33 @@ satırı var. Toplam tuketim_mwh T7/T11/T12 ile, toplam tuketici_sayisi
 T9/T10 ile birebir eşleşiyor (çapraz doğrulandı).
 
 ## Tüketici Grubu Eşleme
-| Kaynak etiket | grup_adi | grup_id |
-|---------------|----------|---------|
-| Mesken | Mesken | 1 |
-| Sanayi / Sanayi-DAĞITIM / Sanayi-İLETİM | Sanayi | 2 |
-| Tarımsal Faaliyetler | Tarımsal | 3 |
-| Aydınlatma | Aydınlatma | 4 |
-| Kamu ve Özel Hizmetler | Kamu ve Özel Hizmetler | 5 |
-**NOT:** Sanayi'nin İLETİM/DAĞITIM kırılımı grup DEĞİL, baglanti alanıdır.
+
+| Kaynak etiket                                                              | grup_adi               | grup_id |
+| -------------------------------------------------------------------------- | ---------------------- | ------- |
+| Mesken                                                                     | Mesken                 | 1       |
+| Sanayi / Sanayi-DAĞITIM / Sanayi-İLETİM                                    | Sanayi                 | 2       |
+| Tarımsal Faaliyetler                                                       | Tarımsal               | 3       |
+| Aydınlatma                                                                 | Aydınlatma             | 4       |
+| Kamu ve Özel Hizmetler                                                     | Kamu ve Özel Hizmetler | 5       |
+| **NOT:** Sanayi'nin İLETİM/DAĞITIM kırılımı grup DEĞİL, baglanti alanıdır. |
 
 ## Kaynak Türü Eşleme
-| Kaynak etiket | Normalize | Yenilenebilir |
-|---------------|-----------|---------------|
-| Akarsu/Barajlı/Hidrolik | Hidrolik | Evet |
-| Rüzgar | Rüzgar | Evet |
-| Güneş | Güneş | Evet |
-| Jeotermal | Jeotermal | Evet |
-| Biyokütle | Biyokütle | Evet |
-| Doğal Gaz/LNG | Doğal Gaz | Hayır |
-| İthal Kömür | İthal Kömür | Hayır |
-| Linyit | Linyit | Hayır |
-| Taş Kömürü | Taş Kömürü | Hayır |
-| Asfaltit | Asfaltit | Hayır |
-| Fuel Oil | Fuel Oil | Hayır |
-| Motorin | Motorin | Hayır |
-| Nafta | Nafta | Hayır |
+
+| Kaynak etiket           | Normalize   | Yenilenebilir |
+| ----------------------- | ----------- | ------------- |
+| Akarsu/Barajlı/Hidrolik | Hidrolik    | Evet          |
+| Rüzgar                  | Rüzgar      | Evet          |
+| Güneş                   | Güneş       | Evet          |
+| Jeotermal               | Jeotermal   | Evet          |
+| Biyokütle               | Biyokütle   | Evet          |
+| Doğal Gaz/LNG           | Doğal Gaz   | Hayır         |
+| İthal Kömür             | İthal Kömür | Hayır         |
+| Linyit                  | Linyit      | Hayır         |
+| Taş Kömürü              | Taş Kömürü  | Hayır         |
+| Asfaltit                | Asfaltit    | Hayır         |
+| Fuel Oil                | Fuel Oil    | Hayır         |
+| Motorin                 | Motorin     | Hayır         |
+| Nafta                   | Nafta       | Hayır         |
 
 **NOT (2026-08-30, gerçek dosyayla doğrulandı):** Motorin ve Nafta, parser'ın
 (`worker/parser.py` KAYNAK_ESLEME) zaten tanıdığı ama `dim_kaynak` seed'inde
@@ -106,6 +110,7 @@ T1'inde (kurulu güç) her ikisi de sütun olarak mevcut. Migration
 20260819_0007 ile eklendi.
 
 ## Birim / Tip Kuralları
+
 - Kurulu güç: MWe, numeric(14,3), ≥0
 - Üretim/tüketim: MWh, numeric(16,3), ≥0
 - Abone: integer, ≥0
@@ -113,10 +118,12 @@ T1'inde (kurulu güç) her ikisi de sütun olarak mevcut. Migration
 - Boş hücre = NULL (0 değil)
 
 ## Yıllık Rapor (FR-15)
+
 - tarih_id = yil*100 (202500); ay=0; donem_tipi='yillik'
 - Yıllık toplamda otoriter (OD-4); aylık ile sapma → KPI-28 uyarısı
 
 ## Doğrulama
+
 - 13 tablo mevcut mu; eksikse batch reddi
 - İl toplamı ↔ 'TÜRKİYE' ±%0,5
 - İl adları ≥%99 dim_il'e eşlenmeli; eşleşmeyen karantina
@@ -125,13 +132,14 @@ T1'inde (kurulu güç) her ikisi de sütun olarak mevcut. Migration
 **Word yılları — üretim (T2/T3/T5/T6 eşdeğeri) kararları (2026-09-09,
 Aşama 3/ADIM 3, `dokumanlar/12_word_uretim_envanteri.md`'deki araştırmaya
 dayanır):**
+
 - **Karar (Bulgu C):** Word kaynağında Lisanssız üretim için gerçek bir
   il×kaynak JOINT tablo VAR (2016-2023 doğrulandı, Excel'de YOK) —
   **BİLİNÇLİ OLARAK KULLANILMIYOR**. Gerekçe: 2016-2023 (zengin, il×kaynak)
   ile 2024+ (yalnız marjinal) arasında tanım/grain farkı, Word-Excel
   sınırında davranış değiştiren bir KPI üretir — projenin "tek seride tek
   tanım" ilkesine (bkz. §5.5 T7/T11 dikişi kararı) aykırı. `fact_uretim.
-  uretim_mwh` da bu yüzden Word yılları için AYRICA doldurulmuyor (aynı
+uretim_mwh` da bu yüzden Word yılları için AYRICA doldurulmuyor (aynı
   sınır sorunu — 2016-2023 dolu/2024+ NULL bir kolon kırılganlık yaratır).
   **İleride il×kaynak kırılımlı bir üretim KPI'sı tanımlanırsa bu bulgu
   yeniden değerlendirilebilir** — bkz. envanterdeki tam detay.
@@ -139,9 +147,9 @@ dayanır):**
   Excel'in "Brüt Lisanssız Üretim Miktarı" tanımıyla eşleşen bir kaynak bu
   iki yılda YOK (yalnız dar bir "İhtiyaç fazlası satın alınan enerji
   miktarı" alt-kümesi var, 2018'den itibaren Brüt kolonu VAR). `veri_
-  kapsam_disi`'ye migration `20260909_0002` ile genişletilen whitelist
+kapsam_disi`'ye migration `20260909_0002` ile genişletilen whitelist
   üzerinden 48 satır eklendi (`fact_uretim_kaynak_geneli`/`fact_uretim_
-  il_geneli` × 2016-01..2017-12, `nitelik='lisans_durumu=Lisanssız'`,
+il_geneli` × 2016-01..2017-12, `nitelik='lisans_durumu=Lisanssız'`,
   `karar_referansi='Karar 4 (2026-09-09, Bulgu D)'`) — canlıda uygulandı.
   Lisanslı üretim ETKİLENMEZ.
 - **Karar (Bulgu L, 2026-09-13 — SAYIYLA ÖLÇÜLDÜ, başlığa bakıp
@@ -155,11 +163,11 @@ dayanır):**
   DEĞİŞİKLİĞİ değil, başlığın tablonun HER ZAMAN gerçekte ölçtüğü şeye
   SONRADAN uydurulması). Bulgu D'nin ilkesiyle BİREBİR tutarlı: **T6 (il
   bazında Lisanssız) var olduğu her yıl KAPSAM DIŞI** — `fact_uretim_
-  il_geneli`'nin Lisanssız kolonu artık TÜM Word yılları (2016-2025) için
+il_geneli`'nin Lisanssız kolonu artık TÜM Word yılları (2016-2025) için
   kapsam dışı, istisnasız. T5 (kaynak, Brüt, 2018'den itibaren sağlam)
   bu karardan etkilenmez ama karşı tarafı olmadığından (2016-2017/2023-
   2025 ile AYNI simetri ilkesi) yüklenmiyor. Detay: `12_word_uretim_
-  envanteri.md` Bulgu L.
+envanteri.md` Bulgu L.
 
 **Faz 0 orkestrasyon notu (2026-08-30, worker/pipeline.py):** Yukarıdaki kural
 tam 13 tabloyu ima ediyor, ancak fact tablosuna gerçekten YAZAN yalnız 5

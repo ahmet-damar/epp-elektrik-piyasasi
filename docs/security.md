@@ -5,6 +5,7 @@
 Uygulama rolleri yalnızca `auth.jwt() -> 'app_metadata' ->> 'role'` claim'inden okunur.
 
 Geçerli roller:
+
 - viewer
 - data_operator
 - admin
@@ -14,6 +15,7 @@ Kullanıcı tarafı `user_metadata.role` değeri asla güvenilir yetki kaynağı
 ## Güvenilir atama akışı
 
 Rol atamasının yapılması gereken yerler:
+
 - Supabase Auth admin işlemleri
 - güvenli backend servisleri
 - kontrol edilmiş admin panel akışı

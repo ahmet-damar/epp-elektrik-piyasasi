@@ -95,14 +95,14 @@ stratejinin kendisini (yakından uzağa genişletme) GEÇERSİZ KILMIYOR — yal
 
 ## Bulgu 3 — Tablo eşleştirmesi (Mart 2024 üzerinden doğrulandı)
 
-| Excel karşılığı | Word tablosu (gerçek başlık) | Durum |
-|---|---|---|
-| **T11 (fact_tuketim)** | "Tablo 2.6 ... Faturalanan Elektrik Tüketiminin İl ve Tüketici Türü Bazında Dağılımı (MWh)" — İl×[Aydınlatma/Kamu ve Özel Hizmetler Sektörü ile Diğer/Mesken/**Sanayi**/Tarımsal Faaliyetler/Genel Toplam/Pay], TEK ay, wide format, 83 satır (81 il + başlık + Genel Toplam) | **VAR, ama eksik grain** — Sanayi-DAĞITIM/Sanayi-İLETİM ayrımı YOK, tek "Sanayi" sütunu. |
-| **T10 (fact_abone)** | "Tablo 5.2 ... Tüketici Sayısının İl ve Tüketici Türü Bazında Dağılımının Dönemler Arası Karşılaştırılması" — 489 satır, UZUN format (İl Adı, Tüketici Türü, [yıl-1] Miktar+Pay, [yıl] Miktar+Pay, Değişim%) | **VAR, yapısal olarak uygun** — il×grup grain'i doğru, format Excel'den farklı (dönemler-arası-karşılaştırmalı, uzun) ama tek dönemin değeri çıkarılabilir. |
-| **T9 (mutabakat)** | "Tablo 2.5 ... Tüketici Sayısının Dağıtım Bölgesi Bazında..." | Farklı kırılım (21 dağıtım şirketi ünvanı, İL DEĞİL) — doğrudan mutabakat için kullanılamaz, T9'un doğrudan karşılığı yok. |
-| **T13 (fact_serbest_tuketici)** | **YOK.** Tüm paragraflar "serbest" için tarandı — yalnız "serbest ÜRETİM şirketleri" (T1/T4 bağlamında, farklı kavram) geçiyor. "Serbest Tüketici" tablosu bu rapor türünde hiç bulunmuyor. | **Kaynak yok.** |
-| T1 (fact_uretim, Lisanslı) | "Lisanslı ... İl Bazında Dağılımı" (il-ONLY, kaynak yok) ve "Lisanslı ... Kaynak Bazında Dağılımı" (kaynak-ONLY, ülke geneli, il yok) AYRI tablolar | **Kaynak yok** — il×kaynak birleşik tablo YOK, bkz. Bulgu 5. |
-| T4 (fact_uretim, Lisanssız) | "Lisanssız Elektrik Kurulu Gücünün İllere ve Kaynaklara Göre Dağılımı (MW)" | **VAR** — il×kaynak grain'i doğru, bkz. Bulgu 5. |
+| Excel karşılığı                 | Word tablosu (gerçek başlık)                                                                                                                                                                                                                                                  | Durum                                                                                                                                                       |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **T11 (fact_tuketim)**          | "Tablo 2.6 ... Faturalanan Elektrik Tüketiminin İl ve Tüketici Türü Bazında Dağılımı (MWh)" — İl×[Aydınlatma/Kamu ve Özel Hizmetler Sektörü ile Diğer/Mesken/**Sanayi**/Tarımsal Faaliyetler/Genel Toplam/Pay], TEK ay, wide format, 83 satır (81 il + başlık + Genel Toplam) | **VAR, ama eksik grain** — Sanayi-DAĞITIM/Sanayi-İLETİM ayrımı YOK, tek "Sanayi" sütunu.                                                                    |
+| **T10 (fact_abone)**            | "Tablo 5.2 ... Tüketici Sayısının İl ve Tüketici Türü Bazında Dağılımının Dönemler Arası Karşılaştırılması" — 489 satır, UZUN format (İl Adı, Tüketici Türü, [yıl-1] Miktar+Pay, [yıl] Miktar+Pay, Değişim%)                                                                  | **VAR, yapısal olarak uygun** — il×grup grain'i doğru, format Excel'den farklı (dönemler-arası-karşılaştırmalı, uzun) ama tek dönemin değeri çıkarılabilir. |
+| **T9 (mutabakat)**              | "Tablo 2.5 ... Tüketici Sayısının Dağıtım Bölgesi Bazında..."                                                                                                                                                                                                                 | Farklı kırılım (21 dağıtım şirketi ünvanı, İL DEĞİL) — doğrudan mutabakat için kullanılamaz, T9'un doğrudan karşılığı yok.                                  |
+| **T13 (fact_serbest_tuketici)** | **YOK.** Tüm paragraflar "serbest" için tarandı — yalnız "serbest ÜRETİM şirketleri" (T1/T4 bağlamında, farklı kavram) geçiyor. "Serbest Tüketici" tablosu bu rapor türünde hiç bulunmuyor.                                                                                   | **Kaynak yok.**                                                                                                                                             |
+| T1 (fact_uretim, Lisanslı)      | "Lisanslı ... İl Bazında Dağılımı" (il-ONLY, kaynak yok) ve "Lisanslı ... Kaynak Bazında Dağılımı" (kaynak-ONLY, ülke geneli, il yok) AYRI tablolar                                                                                                                           | **Kaynak yok** — il×kaynak birleşik tablo YOK, bkz. Bulgu 5.                                                                                                |
+| T4 (fact_uretim, Lisanssız)     | "Lisanssız Elektrik Kurulu Gücünün İllere ve Kaynaklara Göre Dağılımı (MW)"                                                                                                                                                                                                   | **VAR** — il×kaynak grain'i doğru, bkz. Bulgu 5.                                                                                                            |
 
 Ek olarak Word raporu, T11'in HEM aylık (Tablo 2.6) HEM kümülatif/dönemler-
 arası-karşılaştırmalı (Tablo 2.7, "Ocak-Mart 2024...") halini AYRI tablolar
@@ -247,9 +247,10 @@ alanı, `fact_tuketim`'in doğal anahtarının zorunlu parçası) hiç vermiyor.
 **Değerlendirilen ama REDDEDİLEN seçenek:** şemaya üçüncü bir `baglanti`
 değeri eklemek (örn. `'bilinmiyor'` veya `'toplam'`) — bu hem `db/schema.sql`
 CHECK kısıtını hem `worker/kpi.py`'deki P0-2 KPI hesaplarını (Sanayi-Dağıtım
-+ Sanayi-İletim toplamına dayanan mantık) değiştirir, yeni bir üçüncü-durum
-riski yaratır (KPI kodunun her yerinde "iki değer mi üç değer mi" varsayımı
-gözden geçirilmeli).
+
+- Sanayi-İletim toplamına dayanan mantık) değiştirir, yeni bir üçüncü-durum
+  riski yaratır (KPI kodunun her yerinde "iki değer mi üç değer mi" varsayımı
+  gözden geçirilmeli).
 
 **Karar: en basit yol seçildi** — bu dönemlerde **Sanayi grubu da T13 gibi
 "kaynakta yok" kapsamına alınır, yüklenmez**. Mesken, Tarımsal, Aydınlatma,
@@ -275,15 +276,15 @@ buraya sabitlenmiştir.
 
 ## Kapsam Tahmini
 
-| Kalem | Süre |
-|---|---|
-| Tek-seferlik aktarım script'inin ortak çekirdeği (`worker/scripts/` altında — tablo bulma yardımcı fonksiyonu, `ingest.py`/`pipeline.py` primitiflerine bağlanma) | 0,5-1 gün |
-| **Her yıl için AYRI, açık eşleme tarifi** (2023, 2024, 2025 — üçü de kendi sütun/tablo haritasıyla, "genel algılama motoru" değil) | ~0,5 gün/yıl × 3 yıl ≈ 1,5 gün |
+| Kalem                                                                                                                                                                      | Süre                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Tek-seferlik aktarım script'inin ortak çekirdeği (`worker/scripts/` altında — tablo bulma yardımcı fonksiyonu, `ingest.py`/`pipeline.py` primitiflerine bağlanma)          | 0,5-1 gün                                                                             |
+| **Her yıl için AYRI, açık eşleme tarifi** (2023, 2024, 2025 — üçü de kendi sütun/tablo haritasıyla, "genel algılama motoru" değil)                                         | ~0,5 gün/yıl × 3 yıl ≈ 1,5 gün                                                        |
 | T4 (Lisanssız kurulu güç) desteği (her yılın kendi tarifine eklenir — **T1/Lisanslı kapsam dışı, Karar 3**, satır-sayısı yerine Genel Toplam tutarlılığı ile doğrulanacak) | +0,5-1 gün (2023/2024/2025 için, 79-81 il değişkenliği nedeniyle biraz daha temkinli) |
-| `baglanti`/T13/T1 "kaynakta yok" işaretleme mekanizması + pipeline entegrasyonu (Karar 1, 2 & 3) | +0,5-1 gün |
-| Testler — **2023/2024/2025 AYRI AYRI**, tek seferde değil | +1 gün |
-| Dokümantasyon (yıl bazlı kolon haritaları) | +0,5 gün |
-| **Toplam** | **3-5 gün** (T13 VE T1 tam kapsam dışı, yalnız T4 dahil) |
+| `baglanti`/T13/T1 "kaynakta yok" işaretleme mekanizması + pipeline entegrasyonu (Karar 1, 2 & 3)                                                                           | +0,5-1 gün                                                                            |
+| Testler — **2023/2024/2025 AYRI AYRI**, tek seferde değil                                                                                                                  | +1 gün                                                                                |
+| Dokümantasyon (yıl bazlı kolon haritaları)                                                                                                                                 | +0,5 gün                                                                              |
+| **Toplam**                                                                                                                                                                 | **3-5 gün** (T13 VE T1 tam kapsam dışı, yalnız T4 dahil)                              |
 
 Not: "yıl bazlı ayrı tarif" yaklaşımı toplam süreyi tek bir genel motor
 yazmaya göre azaltmayabilir (üç tarif yazmak, bir motor yazmaktan az farklı
@@ -320,13 +321,14 @@ Bkz. `06_canli_veri_operasyon_gunlugu.md` ("2026-09-02 — 2023 Word
 raporları yüklendi") — tam sonuç orada. Özet: `worker/scripts/word_2023.py`
 yazıldı (`word_ortak.py` çekirdeğini yeniden kullanarak). **2023 tek bir
 şablon değil** — Ocak-Nisan ve Mayıs-Aralık arasında tablo numaralandırması
-+ grup etiketleri farklı (yıl içi EPDK şablon geçişi); 3 yeni sürpriz sınıfı
-(grup etiketi kısaltmaları, dipnot yıldızlı il adları, inceltme-işaretli
-eski il yazımı) `word_2023.py`'ye özel çözüldü, `worker/parser.py`'a
-dokunulmadı. 12/12 ay yüklendi ve **aktif** — 4'ü otomatik (temiz), 8'i
-kullanıcı tarafından tek tek incelenip onaylandı (3'ü — Kahramanmaraş/
-Batman/Şanlıurfa, 6 Şubat 2023 deprem bölgesi — özellikle aritmetik
-doğrulamadan geçirildi).
+
+- grup etiketleri farklı (yıl içi EPDK şablon geçişi); 3 yeni sürpriz sınıfı
+  (grup etiketi kısaltmaları, dipnot yıldızlı il adları, inceltme-işaretli
+  eski il yazımı) `word_2023.py`'ye özel çözüldü, `worker/parser.py`'a
+  dokunulmadı. 12/12 ay yüklendi ve **aktif** — 4'ü otomatik (temiz), 8'i
+  kullanıcı tarafından tek tek incelenip onaylandı (3'ü — Kahramanmaraş/
+  Batman/Şanlıurfa, 6 Şubat 2023 deprem bölgesi — özellikle aritmetik
+  doğrulamadan geçirildi).
 
 **2023 + 2024 artık ikisi de tamamen aktif ve tutarlı** (T13/T1-T4 hariç,
 Karar 1 gereği hâlâ kapsam dışı).
@@ -375,6 +377,7 @@ hesaplanamıyor.
 ## Yarından devam
 
 **Tamamlananlar (referans için, sırayla):**
+
 - ~~T1/T4 (kurulu güç) için YENİ bir teşhis turu~~ **YAPILDI (2026-09-02,
   Bulgu 5 + Karar 3)** — sonuç: **T1 (Lisanslı) kaynakta YOK**, **T4
   (Lisanssız) VAR**.
@@ -388,10 +391,10 @@ hesaplanamıyor.
   MW) sonrası 36/36 batch (53-88) `python -m worker.scripts.onayla` ile
   aktive edildi, 36 `[OK]`/0 `[UYARI]`. 2026-09-03'te DB'den tekrar
   doğrulandı: 36/36 batch `succeeded`, 36/36 ay `fact_uretim.is_active=
-  true`, eksik/çelişki yok (bkz. `06_canli_veri_operasyon_gunlugu.md`).
+true`, eksik/çelişki yok (bkz. `06_canli_veri_operasyon_gunlugu.md`).
 - ~~KPI-26'nın T4-only ile de tam güvenilir olmayabileceği~~ **ELE ALINDI
   (2026-09-02)** — `worker/analytics.py:
-  yillik_yenilenebilir_kurulu_guc_serisi_getir()` artık yalnız Lisanslı
+yillik_yenilenebilir_kurulu_guc_serisi_getir()` artık yalnız Lisanslı
   verisi OLAN yılları seriye alıyor (Word'ün Lisanssız-only yılları
   otomatik "veri yok" sayılıyor, sahte CAGR üretilmiyor) — gerekçe ve
   kod: aynı fonksiyonun docstring'i + `04_kpi_sozlesmeleri.md`.
@@ -404,11 +407,11 @@ hesaplanamıyor.
   mekanizmayı kurdu), sıradaki adım bu tabloyu dashboard'a bağlamak.
 - ~~KPI-25'in Sanayi-dahil/hariç + tam-yıl/kısmi-yıl karışıklığı için bir
   karar~~ **YAPILDI (2026-09-03)** — `worker/analytics.py:
-  yillik_tuketim_serisi_getir()` artık KPI-26'daki AYNI disiplinle yalnız
+yillik_tuketim_serisi_getir()` artık KPI-26'daki AYNI disiplinle yalnız
   Sanayi'yi İÇEREN yılları seriye alıyor (bugün itibarıyla yalnız 2026,
   bu yüzden KPI-25 None/'hesaplanamaz' dönüyor, sahte -2,2% ÜRETİLMİYOR).
   AYRICA yeni bir metrik eklendi — `yillik_tuketim_sanayi_haric_serisi_
-  getir()` (KPI-27, Sanayi'yi TÜM yıllardan çıkarıp yalnız TAM yılları
+getir()` (KPI-27, Sanayi'yi TÜM yıllardan çıkarıp yalnız TAM yılları
   karşılaştırır, KPI-25'İN YERİNE GEÇMEZ) — canlı veride 2023→2025 için
   +%6,9 hesaplanıyordu (bu dosyanın kaydettiği 2026-09-03 anına ÖZGÜ bir
   rakamdı, seri o zaman yalnız 3 nokta içeriyordu; **güncel değer ve
@@ -417,6 +420,7 @@ hesaplanamıyor.
   fonksiyonların docstring'i + `04_kpi_sozlesmeleri.md`.
 
 **Açık kalanlar (yeniden numaralandı):**
+
 1. `word_2023.py`/`word_2024.py`/`word_2025.py`'nin regresyon testlerini
    yaz (şu an yalnız script-içi assertion'lara — 81 il, beklenen satır
    sayısı, Genel Toplam tutarlılığı — güveniliyor, dedike pytest testi

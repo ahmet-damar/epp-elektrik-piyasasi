@@ -4,6 +4,7 @@ Bu depoda kod üretirken aşağıdaki kurallara ve `dokumanlar/` klasöründeki
 Markdown dokümanlara UYULMALIDIR. Çelişki olursa `dokumanlar/` esastır.
 
 ## 📚 Referans Dokümanlar (ÖNCE OKU)
+
 **Tek giriş noktası:** `dokumanlar/10_TEKNIK_MASTER_DOKUMAN.md` — Faz 0'dan
 bugüne mimari, veri modeli, parser, pipeline, KPI, güvenlik, CI/CD ve
 kronolojik geçmişin gerçek koda/git'e karşı doğrulanmış tek dosyası.
@@ -14,6 +15,7 @@ yazılır; başka bir dosyaya (HISTORICAL/olay günlüğü) bir rakam/durum
 yazılıyorsa MUTLAKA tarihe çapalanmalıdır ("2026-09-03 itibarıyla +%6,9"
 gibi, yalnız "+%6,9" değil) — bkz. master dokümandaki "Doküman Yönetim
 Kuralı" bölümü.
+
 - `dokumanlar/01_kavramsal_tasarim.md` — proje amacı, mimari, fazlar
 - `dokumanlar/02_srs_ozet.md` — KRİTİK P0 kuralları (asla ihlal etme)
 - `dokumanlar/03_veri_modeli.md` — tablolar, DDL, ilişkiler
@@ -23,10 +25,12 @@ Kuralı" bölümü.
 - `dokumanlar/09_PROJE_DURUMU.md` — GÜNCEL, canlı DB'ye karşı doğrulanmış durum
 
 ## Proje Özeti
+
 EPP: EPDK aylık+yıllık sektör raporu verilerini (Excel/Word) PostgreSQL'e
 yükleyen, Open-Meteo ile zenginleştiren, KPI üreten açık kaynak platform.
 
 ## Teknoloji (yalnız açık kaynak)
+
 - Sunum: **Streamlit** (`app/dashboard.py`, Faz 2) — Next.js+TS "Son Faz"'a
   ertelendi, henüz yazılmadı; `app/` altında Next.js kodu YOK.
 - Worker: Python 3.12, **framework-agnostik** (`worker/`) — FastAPI
@@ -35,44 +39,50 @@ yükleyen, Open-Meteo ile zenginleştiren, KPI üreten açık kaynak platform.
 - Parser: pandas, openpyxl, python-docx ; Hava: Open-Meteo ; Test: pytest
 
 ## KESİN MİMARİ KURALLARI (ASLA İHLAL ETME)
+
 1. **P0-2 fact_tuketim grain:** doğal anahtar (il_kodu, tarih_id, grup_id, baglanti).
    baglanti ∈ {iletim, dagitim} NOT NULL. İKİ AYRI kısıt:
    - Aktif index (batch_id YOK): UNIQUE ... (il_kodu,tarih_id,grup_id,baglanti) WHERE is_active
    - Batch tekilliği (batch_id VAR): UNIQUE (...,baglanti,ingestion_batch_id)
-   Aktif index'e ASLA batch_id ekleme.
+     Aktif index'e ASLA batch_id ekleme.
 2. **P0-3 source_asset:** source_kind file|api; api'de file yok (source_uri+request_hash).
 3. **P0-5 ingestion_batch:** UNIQUE(source_asset_id, parser_version, schema_version)
    — **2026-09-17'de düzeltildi:** `source_asset` dedup'lanmadığı için bu kısıt
    pratikte hiç tetiklenmiyordu; gerçek koruma her loader'ın kendi ön-kontrolünde
-   (bkz. `10_TEKNIK_MASTER_DOKUMAN.md` §14 madde 5). `status`'a 2026-09-18'de
-   7. bir terminal durum eklendi: `mutabakat_reddedildi` (bkz. §6.1).
+   (bkz. `10_TEKNIK_MASTER_DOKUMAN.md` §14 madde 5). `status`'a 2026-09-18'de 7. bir terminal durum eklendi: `mutabakat_reddedildi` (bkz. §6.1).
 4. **P0-4 aktivasyon:** eski pasifleme = yeni aktifleme, aynı doğal-anahtar kapsamı, tek transaction.
 5. **P0-6 KPI:** Faz 0 production = KPI-01..10,13,23,24. KPI-11/12 yalnız altyapı; β/γ Faz 3.
 6. **OD-1/OD-2:** hdd_baz=18, cdd_baz=22 sistem_parametre'den. Hava normu 10y sabit, tüketim 5y rolling.
 7. **il referansı:** il_kodu (plaka, dim_il.il_kodu'ya FK) — 'il_id' DEĞİL.
 
 ## Kodlama Standartları
+
 - Python: Ruff (lint+format), mypy tip ipuçları.
 - SQL: PostgreSQL; snake_case; Türkçe karaktersiz kolon.
 - Parametreli sorgu (string birleştirme YASAK). Sırlar env'de.
 - Commit: Conventional Commits (feat:, fix:, test:...).
 
 ## Veri Kalite (parser)
+
 - Negatif değer → REDDET; bilinmeyen il/grup/kaynak → KARANTİNA + uyarı.
 - İl toplamı ↔ 'TÜRKİYE' ±%0,5. Boş hücre = NULL (0 değil).
 
 ## Golden Dataset
+
 worker/tests/golden/ — input CSV + expected/kpi_expected.json.
 Testler ±%0,5 tolerans. P0-2 testi: Sanayi iletim(150000)+dağıtım(90000)=6 satır, duplicate DEĞİL.
 
 ## Dizin
+
 app/ (web) · worker/ (parsers,kpi,jobs,tests) · db/ (schema.sql) ·
 migrations/ · data/ (git'e girmez) · dokumanlar/ (md — kod DEĞİL)
 
 ## Yanıt Dili
+
 Açıklamalar Türkçe; kod/kolon adları İngilizce snake_case.
 
 ## Çalışma Akışı — Prompt/Kapanış Dosyaları (2026-09-18'den beri kalıcı kural)
+
 - **Görev girişi:** `Claude outputs/PROMPT_*.md` — kullanıcı bir görevi bu
   dosyaya yazıp "oku ve uygula" der.
 - **Kapanış çıktısı:** her turun kapanış raporu SOHBETE DEĞİL, DOSYAYA
@@ -86,6 +96,7 @@ Açıklamalar Türkçe; kod/kolon adları İngilizce snake_case.
   israfıydı; cloud oturumu repoyu doğrudan okuyabiliyor.
 
 ## Otomatik Kontroller — "Ateşlediği Gösterilmeden Tamamlanmaz" Kuralı (2026-09-20'den beri kalıcı kural)
+
 Yeni bir otomatik kontrol (workflow adımı, pre-commit hook, DB kısıtı,
 doğrulama script'i, kapı fonksiyonu) eklendiğinde, **kasıtlı bozuk bir
 örnekle gerçekten ateşlediği gösterilmeden** tamamlanmış sayılmaz.
@@ -101,6 +112,7 @@ gerçekten çalışıyor mu?" diye SORULDUĞU için bulunmadı, hepsi tesadüfen
 `Claude outputs/kapanis_2026-09-20_test_izolasyon.md`, tam envanterler).
 
 ## Test Paketi İdempotentliği (2026-09-20'den beri kalıcı kural)
+
 Test paketi idempotent olmalıdır: aynı veritabanı üzerinde arka arkaya
 iki kez çalıştırıldığında aynı sonucu vermelidir. Bir test yazdığı
 veriyi temizlemekle yükümlüdür. "Fresh disposable'da yeşil" TEK BAŞINA

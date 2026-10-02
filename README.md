@@ -4,6 +4,7 @@ Bağlı belge: EPP_SRS_Teknik-Gereksinim_v1.5 (Bölüm 13)
 Tüm araçlar ücretsiz ve açık kaynak. Geliştirme: VS Code + GitHub.
 
 ## Dosya Yerleşimi (repo köküne)
+
 ```
 epp/
 ├─ .pre-commit-config.yaml     # commit-öncesi yerel kontroller
@@ -23,6 +24,7 @@ epp/
 ```
 
 ## Yerel Kurulum
+
 ```bash
 pipx install pre-commit
 pre-commit install
@@ -31,9 +33,11 @@ pre-commit run --all-files
 ```
 
 ## Panel Nasıl Çalıştırılır + Giriş (Faz B, 2026-09-05)
+
 ```bash
 streamlit run app/dashboard.py
 ```
+
 `.env`'de `DATABASE_URL_DASHBOARD` yapılandırılmışsa (canlı Supabase
 kurulumunda böyledir) panel **e-posta/şifre girişi ister** — Supabase
 Auth hesabınla giriş yaparsın, rolün (`app_metadata.role` — `viewer`/
@@ -48,19 +52,22 @@ API'sinden tek bir çağrı — adımlar `dokumanlar/06_adr_dashboard_
 teknoloji.md`'de yazılı.
 
 ## GitHub Ayarları
+
 - Branch protection (main): PR + "Quality Gate" required check + signed commits
 - Code security: Secret scanning + Push protection, Dependabot, Trivy (fs+deps)
   (CodeQL/code-scanning devre dışı — GitHub Advanced Security Free plan private repo'da yok)
 
 ## Gerekli Secrets
-| Secret | Kullanım |
-|--------|----------|
-| PROD_DATABASE_URL | migration + zamanlı işler |
-| DEPLOY_HOST/USER/SSH_KEY | self-host SSH deploy |
-| PROD_URL | smoke testi |
-| COOLIFY_WEBHOOK_URL | (opsiyonel) Coolify deploy |
+
+| Secret                   | Kullanım                   |
+| ------------------------ | -------------------------- |
+| PROD_DATABASE_URL        | migration + zamanlı işler  |
+| DEPLOY_HOST/USER/SSH_KEY | self-host SSH deploy       |
+| PROD_URL                 | smoke testi                |
+| COOLIFY_WEBHOOK_URL      | (opsiyonel) Coolify deploy |
 
 ## CI'da Supabase Rol Bootstrap (2026-09-02)
+
 Gerçek Supabase Postgres, `supabase start` (Supabase CLI) tarafından proje
 migration'ları çalışmadan ÖNCE otomatik kurulan üç yönetilen rolle gelir:
 `anon`, `authenticated`, `service_role`. CI'ın `postgres:16` servisi bunlara
@@ -80,6 +87,7 @@ davranışını canlı test eder — `anon` tablo seviyesinde reddedilmeli,
 uygulamaz (orada zaten var).
 
 ## ⚠️ Canlı Supabase'e Karşı Test Çalıştırma Kuralı (2026-09-03)
+
 **Tam pytest paketi (`py -m pytest` argümansız/`-v` ile TÜMÜ) ASLA canlı
 Supabase'e karşı çalıştırılmaz.** Yalnız CI'ın izole, her çalıştırmada
 sıfırdan kurulan `postgres:16` konteynerinde (`integration` job) tam paket
@@ -101,10 +109,12 @@ pooler.supabase) işaret ediyorsa `pytest`'i başlamadan durdurur —
 istisna kaçış kapısı: `ALLOW_DESTRUCTIVE_TESTS=true`.
 
 ## Kalite Kapıları (SRS §13.9)
+
 G-1 birim+golden · G-2 kapsam≥85% · G-3 entegrasyon · G-4 güvenlik
 G-5 RLS/lisans · G-6 model MAPE · G-7 lint+tip
 
 ## v1.5 Uyumu
+
 - CI'daki golden testi P0-2'yi doğrular (Sanayi iletim+dağıtım ayrı satır).
 - scheduled-refresh, hava verisini source_kind='api' olarak yazar (P0-3).
 - deploy tamamen açık kaynak/self-host (ADR-5); GHCR ücretsiz.

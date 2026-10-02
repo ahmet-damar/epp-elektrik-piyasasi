@@ -9,31 +9,36 @@ Kaynak: SRS Böl. 5 + Ek C (Veri Sözlüğü). Kod üretiminde ESAS ALINIR.
 ## Boyut Tabloları
 
 ### dim_tarih
-| Kolon | Tip | Zorunlu | Açıklama |
-|-------|-----|---------|----------|
-| tarih_id | int | PK | YYYYMM (202601) / YYYY00 yıllık (202500) |
-| yil, ay, ceyrek | smallint | NN | ay=0 yıllık kayıtta |
-| ay_adi, yil_ay | text | — | türetilmiş |
-| donem_tipi | text | NN | 'aylik' \| 'yillik' |
+
+| Kolon           | Tip      | Zorunlu | Açıklama                                 |
+| --------------- | -------- | ------- | ---------------------------------------- |
+| tarih_id        | int      | PK      | YYYYMM (202601) / YYYY00 yıllık (202500) |
+| yil, ay, ceyrek | smallint | NN      | ay=0 yıllık kayıtta                      |
+| ay_adi, yil_ay  | text     | —       | türetilmiş                               |
+| donem_tipi      | text     | NN      | 'aylik' \| 'yillik'                      |
 
 ### dim_il
+
 | il_kodu | int PK | plaka (1-81) |
 | il_adi | text NN | normalize |
 | bolge, dagitim_bolgesi | text | — |
 
 ### dim_kaynak
+
 | kaynak_id | int PK |
 | kaynak_adi | text NN | Hidrolik/Rüzgar/Güneş... |
 | yenilenebilir_mi | boolean NN |
 | grup | text | Yenilenebilir/Fosil |
 
 ### dim_tuketici_grubu / dim_lisans
+
 - grup_id PK, grup_adi (Mesken/Sanayi/Tarımsal/Aydınlatma/Kamu ve Özel Hizmetler)
 - lisans_id PK, tur (Lisanslı/Lisanssız)
 
 ## Kaynak & Batch Tabloları
 
 ### source_asset (P0-3)
+
 ```sql
 CREATE TABLE source_asset (
   source_asset_id BIGSERIAL PRIMARY KEY,
@@ -49,6 +54,7 @@ CREATE TABLE source_asset (
 ```
 
 ### ingestion_batch (P0-5)
+
 ```sql
 CREATE TABLE ingestion_batch (
   batch_id BIGSERIAL PRIMARY KEY,
@@ -65,6 +71,7 @@ CREATE TABLE ingestion_batch (
 ## Fact Tabloları
 
 ### fact_tuketim (P0-2 — KRİTİK)
+
 ```sql
 CREATE TABLE fact_tuketim (
   id BIGSERIAL PRIMARY KEY,
@@ -86,22 +93,24 @@ CREATE UNIQUE INDEX uq_fact_tuketim_active
 ```
 
 ### Diğer fact (aynı desen: batch_id + is_active + iki kısıt)
+
 - **fact_uretim:** NK (il_kodu, tarih_id, kaynak_id, lisans_id); kurulu_guc_mw, uretim_mwh
 - **fact_abone:** NK (il_kodu, tarih_id, grup_id); abone_sayisi
 - **fact_serbest_tuketici:** NK (il_kodu, tarih_id, tur, grup_id); tuketim_mwh, tuketici_sayisi
   (tur: gerçek T13 değerleri — 'Serbest Tuketici' / 'ST Olma Hakki Bulunmayan
   Aboneler' / 'ST Olma Hakkini Kullanmayan Aboneler', 2026-08-30 doğrulandı)
 - **fact_hava_aylik:** UNIQUE(il_kodu, tarih_id); t_ort, hdd, cdd, radyasyon, ruzgar
-  + **fact_hava_aylik_log:** old_data/new_data JSONB (tüm ölçüm snapshot)
-  **Faz 3'te kuruldu (2026-08-30, migration 20260819_0009):** diğer fact
-  tablolarından FARKLI sürümleme modeli — batch-versiyonlama/is_active YOK,
-  worker/jobs/fetch_weather.py doğrudan UPSERT eder (UNIQUE(il_kodu,tarih_id)
-  tekilliği), her değişiklik fact_hava_aylik_log'a append-only JSONB olarak
-  yazılır. HDD/CDD **il merkezi** koordinatından (dim_il.lat/lon, migration
-  20260819_0008) hesaplanır — il geneli ağırlıklı ortalama DEĞİL, tek bir
-  temsili nokta (il merkezi/şehir merkezi).
+  - **fact_hava_aylik_log:** old_data/new_data JSONB (tüm ölçüm snapshot)
+    **Faz 3'te kuruldu (2026-08-30, migration 20260819_0009):** diğer fact
+    tablolarından FARKLI sürümleme modeli — batch-versiyonlama/is_active YOK,
+    worker/jobs/fetch_weather.py doğrudan UPSERT eder (UNIQUE(il_kodu,tarih_id)
+    tekilliği), her değişiklik fact_hava_aylik_log'a append-only JSONB olarak
+    yazılır. HDD/CDD **il merkezi** koordinatından (dim_il.lat/lon, migration
+    20260819_0008) hesaplanır — il geneli ağırlıklı ortalama DEĞİL, tek bir
+    temsili nokta (il merkezi/şehir merkezi).
 
 ### fact_tuketim_ulke_geneli (2026-09-05, migration 20260905_0002)
+
 ```sql
 CREATE TABLE fact_tuketim_ulke_geneli (
   id BIGSERIAL PRIMARY KEY,
@@ -116,6 +125,7 @@ CREATE TABLE fact_tuketim_ulke_geneli (
 CREATE UNIQUE INDEX uq_fact_tuketim_ulke_geneli_active
   ON fact_tuketim_ulke_geneli (tarih_id, grup_id) WHERE is_active;
 ```
+
 fact_tuketim'den GRAIN'i FARKLI: `il_kodu`/`baglanti` YOK — yalnız
 `tarih_id × grup_id`. Kaynak: EPDK Word T11 (il×grup) tablosunun KENDİ
 "Genel Toplam" satırı (`worker/scripts/word_ortak.py:genel_toplam_
@@ -138,6 +148,7 @@ dahil) okundu, satır toplamı tablonun kendi "Genel Toplam" kolonuyla
 %0,1 tolerans içinde tutarlı — sıfır istisna.
 
 ## İşlem & Config Tabloları
+
 - **job_status:** correlation_id, status CHECK(queued/running/succeeded/failed/retrying/dead_letter),
   attempt_count, locked_by, heartbeat_at, next_retry_at
   **Faz 1'de kullanımda (2026-08-30):** worker/job_worker.py'nin harici broker'sız
@@ -154,7 +165,7 @@ dahil) okundu, satır toplamı tablonun kendi "Genel Toplam" kolonuyla
   dokumanlar/06_canli_veri_operasyon_gunlugu.md) — artık worker/pipeline.py
   iki noktada otomatik yazıyor:**
   - `_isle_govde()` (parse+doğrula+yükle) tamamlandığında: `table_name=
-    'ingestion_batch'`, `record_id`=batch_id, `action_type='INSERT'`,
+'ingestion_batch'`, `record_id`=batch_id, `action_type='INSERT'`,
     `actor_name`=epdk_aylik_isle()'ın `uploaded_by`'ı (yoksa
     `"system:epdk_aylik_isle"`) / worker/job_worker.py için
     `"system:job_worker"`. `payload` şekli:
@@ -162,12 +173,18 @@ dahil) okundu, satır toplamı tablonun kendi "Genel Toplam" kolonuyla
     {
       "olay": "ingest_tamamlandi",
       "tarih_id": 202601,
-      "mutabakat": {"fact_tuketim": true, "fact_abone": true},
+      "mutabakat": { "fact_tuketim": true, "fact_abone": true },
       "tablolar": {
         "fact_tuketim": {
-          "toplam": 486, "red": 1, "karantina": 0, "yuklenen": 485, "atlanan": 0,
-          "red_satirlari": [ /* dogrula_*()'nin red DataFrame'i, TAM detay */ ],
-          "karantina_ornekleri": [ /* karantina DataFrame'inin İLK 20 satırı - TAM döküm değil, büyük olabilir */ ]
+          "toplam": 486,
+          "red": 1,
+          "karantina": 0,
+          "yuklenen": 485,
+          "atlanan": 0,
+          "red_satirlari": [/* dogrula_*()'nin red DataFrame'i, TAM detay */],
+          "karantina_ornekleri": [
+            /* karantina DataFrame'inin İLK 20 satırı - TAM döküm değil, büyük olabilir */
+          ]
         }
       }
     }
@@ -199,6 +216,7 @@ dahil) okundu, satır toplamı tablonun kendi "Genel Toplam" kolonuyla
   için panel artık sessiz boşluk yerine açıklayıcı bilgi kutusu gösterir.
 
 ## İlişki Özeti
+
 - dim_tarih 1→N tüm fact · dim_il 1→N tüm fact
 - dim_kaynak 1→N fact_uretim · dim_lisans 1→N fact_uretim
 - dim_tuketici_grubu 1→N fact_tuketim, fact_abone

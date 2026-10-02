@@ -7,29 +7,32 @@
 Kaynak: Ek B. Her KPI: formül + grain + kenar durum. Faz 0 production KPI'ları.
 
 ## Ortak Kurallar
+
 - Yalnız `is_active=true` kayıtlar üzerinden hesaplanır.
 - Sıfıra bölme: payda 0/NULL ise sonuç NULL + uyarı.
 - Yuvarlama: oranlar 1 ondalık (%); kabul toleransı ±%0,5.
 - Baz sıcaklıklar `sistem_parametre`'den okunur (koda gömme).
 
 ## Üretim & Kapasite
-| KPI | Formül | Kenar durum |
-|-----|--------|-------------|
-| KPI-01 Toplam kurulu güç (MW) | Σ kurulu_guc_mw | yoksa 0 |
-| KPI-02 Toplam üretim (MWh) | Σ uretim_mwh (lisanslı) | yoksa 0 |
-| KPI-03 Yenilenebilir pay (%) | Σ uretim(yen) / Σ uretim ×100 | payda 0→NULL |
-| KPI-04 Kaynak payı (%) | Σ uretim(kaynak)/Σ uretim ×100 | payda 0→NULL |
-| KPI-05 Kapasite faktörü (%) | uretim/(kurulu×saat)×100 | kurulu 0→NULL |
-| KPI-06 HHI | Σ pay² ; pay=kaynak/toplam ; **ölçek 0–1** | payda 0→NULL |
-| KPI-07 Lisanssız pay (%) | Σ uretim(lisanssız)/Σ uretim ×100 | payda 0→NULL |
+
+| KPI                           | Formül                                     | Kenar durum   |
+| ----------------------------- | ------------------------------------------ | ------------- |
+| KPI-01 Toplam kurulu güç (MW) | Σ kurulu_guc_mw                            | yoksa 0       |
+| KPI-02 Toplam üretim (MWh)    | Σ uretim_mwh (lisanslı)                    | yoksa 0       |
+| KPI-03 Yenilenebilir pay (%)  | Σ uretim(yen) / Σ uretim ×100              | payda 0→NULL  |
+| KPI-04 Kaynak payı (%)        | Σ uretim(kaynak)/Σ uretim ×100             | payda 0→NULL  |
+| KPI-05 Kapasite faktörü (%)   | uretim/(kurulu×saat)×100                   | kurulu 0→NULL |
+| KPI-06 HHI                    | Σ pay² ; pay=kaynak/toplam ; **ölçek 0–1** | payda 0→NULL  |
+| KPI-07 Lisanssız pay (%)      | Σ uretim(lisanssız)/Σ uretim ×100          | payda 0→NULL  |
 
 ## Tüketim
-| KPI | Formül | Kenar durum |
-|-----|--------|-------------|
-| KPI-08 Toplam tüketim (MWh) | Σ tuketim_mwh (tüm baglanti) | yoksa 0 |
-| KPI-09 Grup payı (%) | Σ tuketim(grup)/Σ tuketim ×100 | payda 0→NULL |
-| KPI-10 Abone başı tüketim (MWh) | Σ tuketim/Σ abone | abone 0→NULL |
-| KPI-13 YoY (%) | (t − t_12ay_önce)/t_12ay ×100 | geçen yıl yoksa VEYA grup kümesi uyuşmuyorsa 'hesaplanamaz' (aşağıya bkz.) |
+
+| KPI                             | Formül                         | Kenar durum                                                                |
+| ------------------------------- | ------------------------------ | -------------------------------------------------------------------------- |
+| KPI-08 Toplam tüketim (MWh)     | Σ tuketim_mwh (tüm baglanti)   | yoksa 0                                                                    |
+| KPI-09 Grup payı (%)            | Σ tuketim(grup)/Σ tuketim ×100 | payda 0→NULL                                                               |
+| KPI-10 Abone başı tüketim (MWh) | Σ tuketim/Σ abone              | abone 0→NULL                                                               |
+| KPI-13 YoY (%)                  | (t − t_12ay_önce)/t_12ay ×100  | geçen yıl yoksa VEYA grup kümesi uyuşmuyorsa 'hesaplanamaz' (aşağıya bkz.) |
 
 **Kaynak (2026-09-08, Aşama 3/ADIM 2'de `fact_tuketim_ulke_geneli`'ye
 taşındı):** `t`/`t_12ay_önce` artık **ülke geneli, il kırılımsız**
@@ -55,12 +58,14 @@ dönem-karşılaştırması, yıllık seri değil) uyarlanmış hâli — aynı
 "sahte değer üretmeme" ilkesi (bkz. worker/kpi.py modül notu).
 
 ## Hava Türetimleri (Faz 0)
-| KPI | Formül |
-|-----|--------|
+
+| KPI        | Formül                                  |
+| ---------- | --------------------------------------- |
 | KPI-23 HDD | Σ_gün max(0, 18 − t_gün) ; aylık toplam |
 | KPI-24 CDD | Σ_gün max(0, t_gün − 22) ; aylık toplam |
 
 ## Hava Normalizasyonu (Faz 3'te production, 2026-08-30)
+
 - **KPI-11** arındırılmış tüketim = gerçek − β·(HDD−HDD_norm) − γ·(CDD−CDD_norm)
   - β/γ: geçmiş (tuketim_mwh, hdd, cdd) gözlemleri üzerinde OLS (min 12 ay);
     yetersizse 'hesaplanamaz' — bkz. worker/kpi.py `beta_gamma_tahmin_et`.
@@ -76,7 +81,7 @@ dönem-karşılaştırması, yıllık seri değil) uyarlanmış hâli — aynı
 - **"Sanayi dikişi" bulgusu ve düzeltmesi (2026-09-16, dashboard
   incelemesi):** canlıda KPI-12 (Türkiye Geneli, 2026-06) sahte bir
   +%92,9 gösteriyordu. Kök neden ÖLÇÜLEREK doğrulandı: `worker/
-  analytics.py:_il_tuketim_hava_getir()` (KPI-11/12'nin TEK veri kaynağı)
+analytics.py:_il_tuketim_hava_getir()` (KPI-11/12'nin TEK veri kaynağı)
   "tüm grup"u topluyordu — Word yıllarında (2016-2025) `fact_tuketim`
   Sanayi grubunu HİÇ İÇERMEZ (Karar 2, yapısal), 2026 Excel aylarında
   İÇERİR (2026-06: toplam 24.098.073 MWh, Sanayi 9.682.351 MWh = %40,2;
@@ -84,16 +89,16 @@ dönem-karşılaştırması, yıllık seri değil) uyarlanmış hâli — aynı
   VE 5-yıllık norm penceresi bu yüzden (Sanayi'siz) o anki ayla
   (Sanayi'li) FARKLI kapsamlarda karşılaştırılıyordu. **Tercih sırasının
   1. seçeneği (KPI-13/25'teki gibi `fact_tuketim_ulke_geneli`'ye taşıma)
-  ÇAKIŞTI** — KPI-11/12 il-bazlı β/γ regresyonu kullanır, `fact_tuketim_
-  ulke_geneli` il kırılımı TAŞIMAZ. **Karar: 2. seçenek — HER İKİ taraf
-  da (norm penceresi VE hedef dönem) Sanayi-HARİÇ yapıldı**, established
-  Karar 2 ilkesiyle tutarlı; `tuketim_getir()` (KPI-08/09/P0-2'nin
-  kaynağı) bu değişiklikten ETKİLENMEDİ. Düzeltme SONRASI 2026-06 için
-  KPI-12 +%15,4'e düştü (makul mertebe). Regresyon testleri: `worker/
-  tests/test_analytics_integration.py::test_il_tuketim_hava_getir_
-  sanayi_haric_tutulur` (doğru yolu pinler) + `test_kpi_11_12_hesapla_
-  sanayi_dikisi_karisik_donemde_sahte_sapma_uretmez` (yanlış yolun
-  SONUCUNU da hesaplayıp AYRICA belgeler).
+     ÇAKIŞTI** — KPI-11/12 il-bazlı β/γ regresyonu kullanır, `fact_tuketim_
+ulke_geneli` il kırılımı TAŞIMAZ. **Karar: 2. seçenek — HER İKİ taraf
+     da (norm penceresi VE hedef dönem) Sanayi-HARİÇ yapıldı**, established
+     Karar 2 ilkesiyle tutarlı; `tuketim_getir()` (KPI-08/09/P0-2'nin
+     kaynağı) bu değişiklikten ETKİLENMEDİ. Düzeltme SONRASI 2026-06 için
+     KPI-12 +%15,4'e düştü (makul mertebe). Regresyon testleri: `worker/
+tests/test_analytics_integration.py::test_il_tuketim_hava_getir_
+sanayi_haric_tutulur` (doğru yolu pinler) + `test_kpi_11_12_hesapla_
+sanayi_dikisi_karisik_donemde_sahte_sapma_uretmez` (yanlış yolun
+     SONUCUNU da hesaplayıp AYRICA belgeler).
 - **Dashboard kart etiketi/kapsam notu (2026-09-16, devam):** Sanayi
   dikişi düzeltmesi SONRASI kartlar hâlâ yalnız "Arındırılmış Tüketim
   (KPI-11)" diyordu — Sanayi DAHİL KPI-08 ile yan yana kafa karıştırıcı.
@@ -109,18 +114,20 @@ dönem-karşılaştırması, yıllık seri değil) uyarlanmış hâli — aynı
   işaretleniyordu. Yeni eşik: **yeşil_alt=15,0, sari_alt=30,0**
   (medyan/p90'a yakın, KPI-13/25/27'nin izlediği ampirik-persentil
   yöntemiyle). Migration: `20260916_0001_kpi_esik_kpi12_yeniden_
-  kalibrasyon.sql`, canlıya uygulandı. KPI-11'i girdi alan başka bir
+kalibrasyon.sql`, canlıya uygulandı. KPI-11'i girdi alan başka bir
   eşik YOK (kontrol edildi — `kpi_esik`'teki diğer satırlar bağımsız
   kaynaklardan besleniyor), bu yüzden KPI-11 için ayrı bir değişiklik
   gerekmedi. Detay: `06_canli_veri_operasyon_gunlugu.md` 2026-09-16
   (devam) kaydı.
 
 ## CAGR (Yıllık — n = son_yıl − ilk_yıl)
+
 Kaynak: EPP_SRS_Teknik-Gereksinim_v1.5.docx Tablo 26 (Ek B'de bu ikisi hiç
 tanımlı değildi — Downloads/1/ altındaki kaynak .docx dosyaları taranarak
 2026-08-30'da doğrulandı, bkz. ADR notu worker/kpi.py `kpi_cagr` docstring'i).
 Jenerik formül: (son/ilk)^(1/n) − 1 ; **n = yıl farkı** (2021→2025 ⇒ n=4,
 "gözlem−1" ile aynı YALNIZCA yıllar ardışıksa).
+
 - **KPI-25** CAGR — tüketim (%), RESMİ "toplam tüketim" tanımı: ilk/son =
   yıl bazında toplam tuketim_mwh, **YALNIZ `fact_tuketim_ulke_geneli`**'nden
   (aylar TOPLANIR, akış/flow metriği; bkz. worker/analytics.py
@@ -191,11 +198,11 @@ Jenerik formül: (son/ilk)^(1/n) − 1 ; **n = yıl farkı** (2021→2025 ⇒ n=
   `lisanssiz_kapsam_disi: bool` parametresi alıyor — `True` geçildiğinde
   veri ne olursa olsun `None` ('hesaplanamaz') döner. `app/dashboard.py`
   bu bayrağı `analytics.kapsam_disi_getir()`'in DÖNDÜRDÜĞÜ `veri_kapsam_
-  disi` satırlarından (`fact_tablosu` kaynak/il_geneli,
+disi` satırlarından (`fact_tablosu` kaynak/il_geneli,
   `nitelik='lisans_durumu=Lisanssız'`) HER ZAMAN hesaplayıp geçiriyor —
   sessizce atlanamaz (zorunlu parametre). Test: `worker/tests/test_golden.
-  py:test_kpi_07_kapsam_disi_bayragi_lisansli_only_veride_hesaplanamaz_
-  dondurur` (doğru yol) + `..._yanlis_gecilirse_sessizce_sifir_uretir`
+py:test_kpi_07_kapsam_disi_bayragi_lisansli_only_veride_hesaplanamaz_
+dondurur` (doğru yol) + `..._yanlis_gecilirse_sessizce_sifir_uretir`
   (yanlış yolun SONUCUNU belgeler, fonksiyonun kendisini DEĞİL — parametre
   artık atlanamaz olduğundan).
   **KPI-03/06 (yenilenebilir payı/HHI) — AYRI bir durum, DÜZELTME
