@@ -2,8 +2,9 @@
 set -euo pipefail
 CID=epp-pg-disposable
 
+docker network create epp-net > /dev/null 2>&1 || true
 docker rm -f "$CID" > /dev/null 2>&1 || true
-docker run -d --name "$CID" -p 127.0.0.1:15433:5432 -e POSTGRES_PASSWORD=postgres postgres:17 > /dev/null
+docker run -d --name "$CID" --network epp-net -p 127.0.0.1:15433:5432 -e POSTGRES_PASSWORD=postgres postgres:17 > /dev/null
 until docker exec "$CID" pg_isready -U postgres > /dev/null 2>&1; do sleep 1; done
 
 docker exec -i "$CID" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/ci-only/01_roles_bootstrap.sql
