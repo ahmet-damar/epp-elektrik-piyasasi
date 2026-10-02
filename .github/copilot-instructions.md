@@ -126,3 +126,22 @@ GÖREMEZ** (bkz. `Claude outputs/kapanis_2026-09-20_test_izolasyon.md`).
 CI'ya paketi aynı DB'de iki kez çalıştıran bir doğrulama adımı ÖNERİLDİ
 (maliyet/değer tartışması `10_TEKNIK_MASTER_DOKUMAN.md` §16.3'te),
 henüz UYGULANMADI.
+
+## Payda Dinamik Olmalı (2026-09-20'den beri kalıcı kural)
+
+Bir "tamlık/kapsama" kontrolü (`"19/19 tablo doğrulandı"` gibi) yalnız
+paydası (listenin KENDİSİ) de dinamik türetilmişse anlamlıdır. Payda
+elle bakımlı, sabit bir liste/dosya ise, kodbase büyüdükçe listeye
+eklenmeyi UNUTMAK kontrolü sessizce körleştirir — "19/19" her zaman
+%100 gösterir ama hiçbir şey KANITLAMAZ. Gerekçe: `validate_rls_static.py`
+`SCHEMA_PATHS`'i 3 sabit dosyaya (ikisi 2026-08-19 tarihli) dondurmuştu;
+sonradan eklenen 30+ migration (`fact_uretim_kaynak_geneli`/
+`fact_uretim_il_geneli` dahil) hiç taranmıyordu, script yine de "RLS
+static validation passed" basıyordu (bkz.
+`Claude outputs/kapanis_2026-09-20_rls_gercegi.md`,
+`Claude outputs/kapanis_2026-10-02_rls_devam.md`). **Uygulama:** yeni
+bir tamlık kontrolü yazarken payda `glob`/DB katalog sorgusu/migration
+listesi gibi KOD ÇALIŞTIĞI ANDA türetilsin, elle güncellenen bir sabit
+liste OLMASIN — istisna: kasıtlı, tarihsel bir whitelist (örn.
+`dogrula.py:RESMİ` sözlüğü) ya da enjeksiyon savunması amaçlı sabit bir
+izin listesi bu kuralın kapsamı DIŞINDADIR (amaç "her şeyi say" değil).

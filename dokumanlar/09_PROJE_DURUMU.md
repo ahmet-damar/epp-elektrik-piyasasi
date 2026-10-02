@@ -280,9 +280,29 @@ table dim_tarih` ve ardından sessiz sıfır-satır sonuçları olarak ortaya
 - `20260904_0004` — bu 3 tabloda da bulunan AYNI policy'siz-RLS deseni
   `DISABLE`.
 
-Doğrulandı (bu turda yeniden sorgulandı): `public` şemasındaki 18
-tablonun hiçbiri artık ne grant'sız ne RLS-açık-policy'siz. Detay:
-`dokumanlar/06_canli_veri_operasyon_gunlugu.md`, 2026-09-04 girdisi.
+Doğrulandı (2026-09-04'te sorgulandı, o tarihte 18 tablo vardı): `public`
+şemasındaki tabloların hiçbiri ne grant'sız ne RLS-açık-policy'siz.
+
+## RLS gerçeği — canlıda İKİ KEZ, bağımsız olarak doğrulandı (2026-10-02 itibarıyla)
+
+**Tarih çapası:** 2026-10-02 itibarıyla canlı Supabase'de `public`
+şemasında **21 tablo** var (2026-09-04'teki 18'den artış — ara dönemde
+`fact_tuketim_ulke_geneli`, `fact_uretim_kaynak_geneli`,
+`fact_uretim_il_geneli` eklendi). Salt-okuma (`conn.read_only = True`)
+ile bu 21 tablonun **TAMAMI** RLS açık + en az 1 policy'e sahip —
+**RLS'siz veya politikasız hiçbir tablo YOK.** Bu ölçüm 2026-09-20 ve
+2026-10-02'de İKİ AYRI oturumda BAĞIMSIZ olarak çalıştırıldı, ikisi de
+BİREBİR aynı sonucu verdi (detay: `10_TEKNIK_MASTER_DOKUMAN.md` §16.4/
+§16.5, `Claude outputs/kapanis_2026-10-02_rls_devam.md`).
+
+`worker/validate_rls_static.py` (statik, DB bağımsız doğrulayıcı) daha
+önce yalnız 3 sabit dosyayı tarıyordu, 30+ migration'ı hiç GÖRMÜYORDU
+(fark tam 2 tablo: `fact_uretim_kaynak_geneli`, `fact_uretim_il_geneli`
+— şans eseri ikisi de doğru RLS'e sahipti, doğrulama eseri değil). Bu
+turda **dinamik** hale getirildi (`supabase/migrations/*.sql`'in
+TAMAMI taranıyor, sabit liste YOK) + her tablo için GENEL bir
+"RLS açık VE en az 1 policy var" kontrolü eklendi — kasıtlı bozuk
+örneklerle (RLS'siz tablo, politikasız tablo) ateşlediği KANITLANDI.
 
 ## Test durumu (2026-09-07'de temiz bir kabukta yeniden doğrulandı)
 
