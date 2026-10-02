@@ -324,6 +324,24 @@ temmuz_canli.md`. **Temmuz'u canlıya yüklemek artık yalnız Ahmet'in
 kendi elleriyle çalıştırmasıyla ya da Claude Code ayarlarına açık bir
 Bash izin kuralı eklemesiyle mümkün.**
 
+## Aylık yükleme artık TEK KOMUT — `worker/scripts/aylik_yukle.py` (2026-10-03)
+
+**Tarih çapası: 2026-10-03 itibarıyla canlı veri HÂLÂ 2026-06'da
+duruyor** (canlıya hiç yazılmadı, Görev 2 salt-okuma teşhisti). Elle
+6 adımlık Temmuz süreci kalıcı bir operatöre dönüştürüldü: `python -m
+worker.scripts.aylik_yukle --ay <YYYYMM> [--uygula --negatif-red-esigi
+N --elle-onay "<gerekçe>"]` — üç batch zincirini ay-ay sırayla işler,
+varsayılan `--dry-run` hiçbir şey yazmaz (gerçek transaction + rollback).
+Disposable'da gerçek Ocak-Temmuz dosyalarıyla uçtan uca kanıtlandı; bu
+süreçte "Turkish I problem" (NİSAN/EKİM dosya-keşfi) ve "zaten işlenmiş
+ama çözülmemiş" sessiz geçiş riski gibi iki gerçek hata bulunup
+düzeltildi. Ayrıca önceki turun `backfill.py` bağlantı hatasının kök
+nedeni teşhis edildi: `.env`'in CRLF satır sonlarının bash `source` ile
+okunması gizli bir `\r` karakteri ekliyordu — `aylik_yukle.py` yalnız
+Python'ın `load_dotenv()`'ini kullandığından bu sınıf hatadan bağımsız.
+Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §16.7, `Claude outputs/
+kapanis_2026-10-02_aylik_yukleme_scripti.md`.
+
 ## Test durumu (2026-09-07'de temiz bir kabukta yeniden doğrulandı)
 
 ```
