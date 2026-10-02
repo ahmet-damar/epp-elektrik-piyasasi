@@ -51,7 +51,10 @@ Durma kuralları (her biri `DurdurmaHatasi` fırlatır, exit code 1):
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
+import os
 import sys
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -70,6 +73,9 @@ _REPO = "ahmet-damar/epp-elektrik-piyasasi"
 _YEDEK_WORKFLOW = "scheduled-backup.yml"
 _VARSAYILAN_YEDEK_MAX_YAS_SAAT = 24
 _API_ZAMAN_ASIMI_SN = 15
+_DB_BAGLANTI_ZAMAN_ASIMI_SN = 15
+_DB_SORGU_ZAMAN_ASIMI_MS = 60_000
+_GENEL_ISLEM_ZAMAN_ASIMI_SN = 600
 _URETIM_PARSER_VERSION = "excel-uretim-geneli-v1"
 _ULKE_GENELI_PARSER_VERSION = "excel-ulke-geneli-v1"
 
@@ -155,6 +161,28 @@ def kaynak_dosya_bul(dizin: Path, yil: int, ay_adi: str) -> Path:
             f"edilmedi, elle seç gerekiyor): {[str(p) for p in eslesenler]}"
         )
     return eslesenler[0]
+
+
+def baglan(database_url: str) -> psycopg.Connection:
+    """`psycopg.connect()`'e `connect_timeout` + oturum düzeyinde
+    `statement_timeout` ekler (2026-10-03, `Claude outputs/
+    PROMPT_KAPANIS_TEMMUZ_2026-10-02.md` Bölüm 2 — önceki turda canlı
+    bağlantı SÜRESİZ sessizce asılı kaldı, elle sonlandırılması gerekti;
+    hata vermeyen bir bekleme, hiç ateşlemeyen bir kontrolden farksız).
+    Süre dolarsa `DurdurmaHatasi` ile AÇIK ve okunur bir mesaj verir —
+    sessizce asılı kalmaz."""
+    try:
+        return psycopg.connect(
+            database_url,
+            prepare_threshold=None,
+            connect_timeout=_DB_BAGLANTI_ZAMAN_ASIMI_SN,
+            options=f"-c statement_timeout={_DB_SORGU_ZAMAN_ASIMI_MS}",
+        )
+    except psycopg.OperationalError as e:
+        raise DurdurmaHatasi(
+            f"canlıya bağlanılamadı, {_DB_BAGLANTI_ZAMAN_ASIMI_SN} saniye "
+            f"sonra zaman aşımı (veya başka bir bağlantı hatası): {e}"
+        ) from e
 
 
 def son_basarili_yedek_yasi() -> timedelta | None:
@@ -687,6 +715,108 @@ def calistir(
     return sonuclar, farklar
 
 
+def _baglan_ve_calistir(
+    database_url: str,
+    *,
+    yol: Path,
+    tarih_id: int,
+    source_period: str,
+    parser_version_override: str | None,
+    uygula: bool,
+    negatif_red_esigi: int,
+    elle_onay: str | None,
+    actor: str,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    with baglan(database_url) as conn:
+        if parser_version_override:
+            parser_version = parser_version_override
+            print(f"[PARSER_VERSION] elle verildi: {parser_version}")
+        else:
+            onceki = onceki_ay_parser_version(conn, tarih_id)
+            parser_version = onceki or "0.1"
+            if onceki:
+                print(f"[PARSER_VERSION] önceki aydan devralındı: {parser_version}")
+            else:
+                print(
+                    f"[PARSER_VERSION] önceki ay bulunamadı, varsayılan: {parser_version}"
+                )
+
+        if not uygula:
+            print(
+                "\n=== DRY-RUN — gerçek transaction'da işlenip sonunda ROLLBACK edilecek ==="
+            )
+
+        return calistir(
+            conn,
+            yol=yol,
+            tarih_id=tarih_id,
+            source_period=source_period,
+            parser_version=parser_version,
+            uygula=uygula,
+            negatif_red_esigi=negatif_red_esigi,
+            elle_onay=elle_onay,
+            actor=actor,
+        )
+
+
+def _zaman_asimiyla_calistir(
+    database_url: str,
+    *,
+    yol: Path,
+    tarih_id: int,
+    source_period: str,
+    parser_version_override: str | None,
+    uygula: bool,
+    negatif_red_esigi: int,
+    elle_onay: str | None,
+    actor: str,
+    _cik: Callable[[int], None] = os._exit,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """`_baglan_ve_calistir()`'i AYRI bir thread'de, TOPLAM bir duvar-saati
+    sınırıyla çalıştırır (2026-10-03 — `connect_timeout` yalnız İLK bağlantı
+    kurulumunu sınırlar; bağlantı kurulduktan SONRA tek bir satır bile
+    ilerlemeden GERÇEKTEN asılı kalan bir ağ sorunu [canlıda ÖLÇÜLEREK
+    bulundu — `statement_timeout` sunucu tarafında bile GÖNDERDİĞİM değeri
+    almıyordu, ayrı bir ortam karakteristiği] bu şekilde yakalanamaz).
+
+    Süre dolarsa thread TERK EDİLİR — engellenmiş bir soket çağrısı
+    Python'dan "nazikçe" kesilemez. **Bu yüzden `with ThreadPoolExecutor()`
+    KULLANILMAZ:** context manager çıkışı `shutdown(wait=True)` çağırır,
+    yani asılı kalan thread'i SONSUZA kadar bekler — tam da önlemeye
+    çalıştığımız "sessizce asılı kalma" riskini context manager'ın kendisi
+    yeniden yaratır (ilk yazımda bu BULUNDU, gerçek bir testte 3600s
+    uyuyan bir thread'le kanıtlandı). Onun yerine süre dolunca `_cik()`
+    (varsayılan `os._exit`) ÇAĞRILIR — normal Python kapanışı (ki
+    kalan non-daemon thread'leri bekler) ATLANIR, süreç GERÇEKTEN hemen
+    sonlanır. `_cik` parametresi SALT testler için enjekte edilebilir
+    (gerçek `os._exit` test sürecini de öldürür)."""
+    havuz = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    gelecek = havuz.submit(
+        _baglan_ve_calistir,
+        database_url,
+        yol=yol,
+        tarih_id=tarih_id,
+        source_period=source_period,
+        parser_version_override=parser_version_override,
+        uygula=uygula,
+        negatif_red_esigi=negatif_red_esigi,
+        elle_onay=elle_onay,
+        actor=actor,
+    )
+    try:
+        sonuc = gelecek.result(timeout=_GENEL_ISLEM_ZAMAN_ASIMI_SN)
+    except concurrent.futures.TimeoutError:
+        print(
+            f"\n[DURDU] işlem {_GENEL_ISLEM_ZAMAN_ASIMI_SN} saniye içinde "
+            "bitmedi (bağlantı kuruldu ama sonraki bir adımda asılı kaldı — "
+            "ağ sorunu olabilir). Script SESSİZCE beklemiyor, çıkıyor."
+        )
+        _cik(1)
+        raise DurdurmaHatasi("_cik() gerçek os._exit() değilse buraya düşülür")
+    havuz.shutdown(wait=False)
+    return sonuc
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -756,37 +886,17 @@ def main() -> int:
         if not database_url:
             raise DurdurmaHatasi("DATABASE_URL tanımlı değil")
 
-        # prepare_threshold=None: bkz. worker/db.py:get_db_connection() — pooler uyumu.
-        with psycopg.connect(database_url, prepare_threshold=None) as conn:
-            if args.parser_version:
-                parser_version = args.parser_version
-                print(f"[PARSER_VERSION] elle verildi: {parser_version}")
-            else:
-                onceki = onceki_ay_parser_version(conn, args.ay)
-                parser_version = onceki or "0.1"
-                if onceki:
-                    print(f"[PARSER_VERSION] önceki aydan devralındı: {parser_version}")
-                else:
-                    print(
-                        f"[PARSER_VERSION] önceki ay bulunamadı, varsayılan: {parser_version}"
-                    )
-
-            if not args.uygula:
-                print(
-                    "\n=== DRY-RUN — gerçek transaction'da işlenip sonunda ROLLBACK edilecek ==="
-                )
-
-            sonuclar, farklar = calistir(
-                conn,
-                yol=yol,
-                tarih_id=args.ay,
-                source_period=source_period,
-                parser_version=parser_version,
-                uygula=args.uygula,
-                negatif_red_esigi=args.negatif_red_esigi,
-                elle_onay=args.elle_onay,
-                actor=args.actor,
-            )
+        sonuclar, farklar = _zaman_asimiyla_calistir(
+            database_url,
+            yol=yol,
+            tarih_id=args.ay,
+            source_period=source_period,
+            parser_version_override=args.parser_version,
+            uygula=args.uygula,
+            negatif_red_esigi=args.negatif_red_esigi,
+            elle_onay=args.elle_onay,
+            actor=args.actor,
+        )
 
         print(
             f"\n=== {'UYGULANDI' if args.uygula else 'DRY-RUN SONUCU (hiçbir şey yazılmadı)'} ==="

@@ -417,8 +417,50 @@ geneli.py`), kalan 39 ay (2016-12 hariç 4/5 grupla) aktive edildi →
 **Bu bölümü önce oku — bir sonraki oturum yalnız bunu okuyup kaldığı
 yerden devam edebilmeli.**
 
-**GÜNCEL (2026-09-20, gece) — en üst özet, aşağıdaki eski tarihli
-özetlerin YERİNE geçer:**
+**GÜNCEL (2026-10-03, gece) — en üst özet, aşağıdaki eski
+tarihli özetlerin YERİNE geçer:**
+
+- **`worker/scripts/aylik_yukle.py` artık `connect_timeout` +
+  duvar-saati zaman aşımı ile KANITLANDI, Temmuz 2026 CANLIYA HÂLÂ
+  YÜKLENMEDİ (son adım elle kalıyor).** Önceki turun "DB bağlantısında
+  `connect_timeout` yok, süreç sessizce bekledi, elle sonlandırıldı"
+  bulgusuna karşı düzeltme yapıldı: `baglan()` artık `connect_timeout=
+15` ile bağlanıyor (kör IP'ye bağlanma denemesiyle test edildi, ~15sn
+  içinde net hata veriyor — KANITLANDI); bağlantı SONRASI tek bir satır
+  ilerlemeden asılı kalma riski için `_zaman_asimiyla_calistir()` eklendi
+  (ayrı thread + 600sn duvar-saati sınırı + süre dolunca `os._exit(1)` —
+  ilk yazımda `with ThreadPoolExecutor()` kullanımının `shutdown(wait=
+True)` ile SONSUZA kadar beklediği bulundu ve düzeltildi, gerçek bir
+  testle KANITLANDI). `statement_timeout`'un connection-string
+  `options=`'ı üzerinden Supabase'in pooler'ı tarafından güvenilir
+  şekilde UYGULANMADIĞI ÖLÇÜLDÜ (`SHOW statement_timeout` → `2min`,
+  gönderilen `60000ms` değil) — bu yüzden gerçek koruma katmanı
+  `statement_timeout` değil, ayrı thread+duvar-saati mekanizmasıdır.
+  **Önceki iki "asılı kalma" aslında asılı kalma DEĞİLDİ:** kök neden
+  `worker/ingest.py`'nin satır-satır INSERT + her satır için ayrı
+  `dim_grup_id_bul()` SELECT deseni — canlıdaki gerçek ağ gecikmesiyle
+  birlikte çok-dakikalık çalışma süresi NORMAL (ÇÜRÜTÜLDÜ: hang değil,
+  yavaşlık). Bu, sabırla `until`-döngüsüyle beklenen ÜÇÜNCÜ denemede
+  (connect_timeout + düzeltilmiş duvar-saati mekanizmasıyla) KANITLANDI:
+  süreç başarıyla tamamlandı, canlıda gerçek negatif-red sayısı **3**
+  olarak ÖLÇÜLDÜ (disposable ile tam eşleşiyor). Dry-run rollback
+  yaptığı için canlı bu turda da HİÇ DEĞİŞMEDİ (salt-okuma ile
+  doğrulandı: `fact_tuketim` 202607 = 0 satır).
+- **`--uygula` denemesi bu turda da Claude Code'un araç-seviyesi
+  güvenlik sınıflandırıcısı tarafından `[Production Deploy]` nedeniyle
+  ENGELLENDİ** (sohbet içi açık izin + tam test kapsamı + ölçülmüş eşik
+  olsa bile) — standart talimat gereği bu engel başka bir araç/kodlama/
+  oturumla aşılmaya ÇALIŞILMADI. **Gerçek canlı yükleme hâlâ Ahmet'in
+  kendisinin çalıştırması gereken tek adım:**
+  `python -m worker.scripts.aylik_yukle --ay 202607 --uygula
+--negatif-red-esigi 3 --elle-onay "<gerekçe>"` (devcontainer içinde).
+  Tam rapor: `Claude outputs/kapanis_2026-10-03_temmuz_canli.md`.
+- **Açık maddeler (değişmedi):** Türkçe-I taraması (il/kaynak adı
+  eşleşmelerinde de aynı sınıf hata olabilir, `aylik_yukle.py`'nin
+  dosya-keşfinde zaten bulunup düzeltildi), harita turu (Ahmet'ten karar
+  bekleniyor), İş A/Seçenek 3 dedup (ertelendi, Faz 4).
+
+**GÜNCEL (2026-09-20, gece) — eski özet, güncel durum için yukarıya bak:**
 
 - **Veri bütünlüğü arkı KAPANDI:** İş C (`mutabakat_reddedildi`)
   canlıda tam uygulandı; batch durum makinesi artık 9 değerde

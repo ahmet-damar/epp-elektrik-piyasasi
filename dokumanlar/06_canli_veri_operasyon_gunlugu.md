@@ -3259,3 +3259,94 @@ yolu, ama `--klasor` ile override edilebiliyor — açıkça bozuk DEĞİL,
 düzeltilmedi (öneri: ortam değişkenine çevrilebilir). 4× word_2016-
 2019.py'de artık geçersiz bir Miniconda ortam notu (yorum, kod değil).
 Yeni bir düzeltme gerektiren dosya bulunmadı.
+
+## 2026-10-03 — `aylik_yukle.py`'ye `connect_timeout` + duvar-saati zaman aşımı, ÜÇÜNCÜ canlı deneme: gerçek negatif-red=3 ÖLÇÜLDÜ, `--uygula` YİNE engellendi
+
+**Önceki turun bulgusu:** `python -m worker.scripts.aylik_yukle --ay
+202607` (dry-run) canlıya karşı çalıştırıldı, `baglan()`'da
+`connect_timeout` tanımlı olmadığı için süreç net bir hata vermeden
+beklemeye devam etti, elle sonlandırılması gerekti (bkz. `Claude
+outputs/PROMPT_KAPANIS_TEMMUZ_2026-10-02.md` Bölüm 1).
+
+**Yapılan düzeltme:**
+
+1. `baglan(database_url)` eklendi — `psycopg.connect(..., connect_
+timeout=15, options="-c statement_timeout=60000")`, `psycopg.
+OperationalError`'ı yakalayıp `DurdurmaHatasi` olarak net bir mesajla
+   yeniden fırlatıyor. **Test:** kör IP'ye (`10.255.255.1`) bağlanma
+   denemesi — `DurdurmaHatasi` "zaman aşımı" mesajıyla ~15-16sn içinde
+   fırlıyor (KANITLANDI, `test_baglan_zaman_asimi_sessizce_asili_
+kalmaz`).
+2. **`statement_timeout` ölçüldü, GÜVENİLİR DEĞİL:** canlıda `SHOW
+statement_timeout` çalıştırıldığında gönderilen `60000ms` (1dk)
+   değil `2min` döndü — Supabase'in pooler'ı (PgBouncer) connection-
+   string `options=` üzerinden gelen bu ayarı kendi varsayılanıyla
+   eziyor (ÇÜRÜTÜLDÜ: istemci tarafından istenen değer honored değil).
+   Bu yüzden bağlantı KURULDUKTAN SONRA tek satır ilerlemeden asılı
+   kalma riskine karşı `statement_timeout`'a güvenilmedi, ayrı bir
+   mekanizma kuruldu (madde 3).
+3. `_zaman_asimiyla_calistir()` eklendi: `_baglan_ve_calistir()`'i ayrı
+   bir `ThreadPoolExecutor(max_workers=1)` thread'inde çalıştırıp
+   `future.result(timeout=600)` ile sınırlıyor; süre dolarsa `_cik()`
+   (varsayılan `os._exit(1)`) çağrılıyor. **Yazım sırasında bulunan
+   gerçek bug:** `with ThreadPoolExecutor()` kullanılırsa `__exit__`'in
+   çağırdığı `shutdown(wait=True)` terk edilmiş thread'i SONSUZA kadar
+   bekliyor — önlemeye çalışılan "sessizce asılı kalma" riskini
+   context manager'ın kendisi yeniden yaratıyor. Bir testte 3600s uyuyan
+   sahte bir görevle KANITLANDI, context-manager KULLANILMAYARAK
+   düzeltildi (`havuz.shutdown(wait=False)`). **Test:** `_cik`
+   enjekte edilip (gerçek `os._exit` test sürecini de öldürdüğü için)
+   5sn'lik sahte-asılı bir görevle `_GENEL_ISLEM_ZAMAN_ASIMI_SN=1`
+   altında `DurdurmaHatasi` fırlaması + <10sn içinde dönmesi + `_cik`'in
+   çağrılması doğrulandı (KANITLANDI, `test_zaman_asimiyla_calistir_
+baglanti_sonrasi_asili_kalirsa_da_durur`).
+
+**ÜÇÜNCÜ canlı deneme (düzeltmeler sonrası, dry-run):**
+`python -m worker.scripts.aylik_yukle --ay 202607` canlıya karşı
+yeniden çalıştırıldı. Bu kez sabırla `until grep -q 'EXIT=' ...; do
+sleep 10; done` ile tek bir bounded Bash çağrısı içinde beklendi
+(önceki iki "asılı kalma" izleniminin ikisi de erken/sabırsız kontrole
+dayandığı fark edildi — bkz. "Önemli öz-düzeltme" altında). Süreç
+BAŞARIYLA tamamlandı, hiçbir zaman aşımı tetiklenmedi:
+
+- Ana zincir, üretim zinciri, ülke-geneli zincir üçü de işlendi.
+- **Gerçek canlı negatif-red sayısı: 3** — disposable'daki Temmuz
+  doğrulamasıyla (`Claude outputs/kapanis_2026-10-02_temmuz_yukleme.md`)
+  TAM EŞLEŞİYOR (KANITLANDI, önceden varsayılan "2" rakamı değil).
+- Dry-run `conn.rollback()` ile bittiği için canlı HİÇ DEĞİŞMEDİ:
+  salt-okuma doğrulaması `fact_tuketim` 202607 = 0 satır gösterdi.
+  `ingestion_batch.batch_id` dizisi 771→775 ilerledi (4 artış, 1 değil)
+  ama bu Postgres sequence'lerinin transactional OLMAMASINDAN
+  kaynaklanıyor (rollback edilen batch'in ID'si de "tüketiliyor") —
+  aradaki farkın geri kalanı günlük `fetch-weather-1` zamanlanmış
+  işinden, ilgisiz ve zararsız.
+
+**Önemli öz-düzeltme — iki "asılı kalma" aslında hang DEĞİLDİ:** bu
+turdan önce aynı canlı dry-run'ı iki kez, yetersiz kanıtla "asılı
+kaldı" diye değerlendirip elle sonlandırmıştım (biri bağlantı-zamanı
+varsayımıyla, biri CPU zamanının iki ölçüm arasında donmuş göründüğü
+varsayımıyla). Kök neden: `worker/ingest.py`'deki satır-satır `INSERT`
+
+- her satır için ayrı `dim_grup_id_bul()` SELECT deseni — Temmuz
+  büyüklüğünde bir dosya için canlı AWS (eu-central-1) üzerinden binlerce
+  ayrı network round-trip anlamına geliyor, bu da çok-dakikalık çalışma
+  süresini NORMAL yapıyor, asılı kalma KANITI değil (ÇÜRÜTÜLDÜ: hang
+  değil, beklenen yavaşlık — satır-satır yazma deseni ayrı bir performans
+  konusu olarak not edildi, bu turda DEĞİŞTİRİLMEDİ).
+
+**`--uygula` denemesi (ÜÇÜNCÜ, düzeltmeler + ölçülen eşikle):**
+`--uygula --negatif-red-esigi 3 --elle-onay "bilinen T7 çok-sütunlu
+boşluk, disposable ve canlıda 3 olarak ölçüldü"` ile gerçek yükleme
+denendi. **Claude Code'un araç-seviyesi güvenlik sınıflandırıcısı
+tarafından `[Production Deploy]` nedeniyle YİNE BLOKLANDI** — sohbet
+içi izin + tam test kapsamı + canlıda ölçülmüş gerçek eşik olsa bile.
+Talimatlar gereği bu engel başka bir araç/kodlama/oturumla aşılmaya
+ÇALIŞILMADI.
+
+**Sonuç:** `aylik_yukle.py` artık hem bağlantı-zamanı hem de
+bağlantı-sonrası asılı kalmaya karşı KANITLANMIŞ koruma içeriyor, ve
+Temmuz 2026 için canlı negatif-red eşiği (3) ÖLÇÜLEREK doğrulandı.
+Ama gerçek `--uygula` yüklemesi hâlâ YAPILMADI — bu tek adım Ahmet'in
+kendisinin çalıştırması (veya Claude Code ayarlarında açık bir Bash
+izin kuralı eklemesi) gerekiyor. Tam komut ve rapor: `Claude outputs/
+kapanis_2026-10-03_temmuz_canli.md`.

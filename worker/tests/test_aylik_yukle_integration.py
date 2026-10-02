@@ -352,3 +352,80 @@ def test_main_bos_gerekceli_yedek_atla_reddedilir(monkeypatch, tmp_path: Path) -
         ["aylik_yukle.py", "--ay", "999801", "--yedek-atla", ""],
     )
     assert aylik_yukle.main() == 1
+
+
+# ---------------------------------------------------------------------------
+# baglan() — connect_timeout gerçekten çalışıyor mu (2026-10-03, bkz.
+# `Claude outputs/PROMPT_KAPANIS_TEMMUZ_2026-10-02.md` Bölüm 2 — önceki
+# turda canlı bağlantı SÜRESİZ sessizce asılı kalmıştı, elle sonlandırıldı)
+# ---------------------------------------------------------------------------
+
+
+def test_baglan_zaman_asimi_sessizce_asili_kalmaz() -> None:
+    """`10.255.255.1` (TEST-NET-3, yanıt vermeyen/yönlendirilemeyen bir
+    adres — standart "blackhole" test deseni) KISA bir `connect_timeout`
+    ile denenirse, `baglan()` SÜRESİZ beklemeden (duvar-saati sınırlı)
+    `DurdurmaHatasi` fırlatmalı ve mesajı 'zaman aşımı' içermeli — sessizce
+    asılı kalmanın TAM TERSİ."""
+    import time
+
+    sahte_url = "postgresql://kullanici:sifre@10.255.255.1:5432/postgres"
+    baslangic = time.monotonic()
+    with pytest.raises(aylik_yukle.DurdurmaHatasi, match="zaman aşımı"):
+        aylik_yukle.baglan(sahte_url)
+    gecen_sure = time.monotonic() - baslangic
+    # connect_timeout = _DB_BAGLANTI_ZAMAN_ASIMI_SN (15s) + bol pay — ama
+    # KESİNLİKLE "süresiz" DEĞİL (önceki turdaki gerçek arıza buydu).
+    assert gecen_sure < 30
+
+
+def test_zaman_asimiyla_calistir_baglanti_sonrasi_asili_kalirsa_da_durur(
+    monkeypatch,
+) -> None:
+    """`connect_timeout` yalnız İLK bağlantıyı sınırlar — bağlantı
+    kurulduktan SONRA asılı kalan bir çağrıyı (canlıda GERÇEKTEN ölçüldü:
+    `statement_timeout` bile sunucu tarafında gönderilen değeri almıyordu)
+    YAKALAMAZ. `_zaman_asimiyla_calistir()` bunu AYRI bir thread + toplam
+    duvar-saati sınırıyla kapatır — `_baglan_ve_calistir()`'in kendisi
+    SONSUZA kadar uyusa bile (`time.sleep` ile taklit edilir) çağıran
+    `DurdurmaHatasi` ile makul bir sürede geri dönmeli."""
+    import time
+
+    monkeypatch.setattr(aylik_yukle, "_GENEL_ISLEM_ZAMAN_ASIMI_SN", 1)
+
+    def _sonsuza_kadar_uyu(*args, **kwargs):  # type: ignore[no-untyped-def]
+        # Gerçek "sonsuza kadar" DEĞİL — sahte `_cik` gerçekten çıkmadığı
+        # için bu thread test SÜRECİNDE kalıcı olarak yaşar; test
+        # bitişinin sürece engel olmaması için kısa tutulur (üretimde
+        # gerçek `os._exit()` bu bekleyişi hiç önemsiz kılar).
+        time.sleep(5)
+
+    monkeypatch.setattr(aylik_yukle, "_baglan_ve_calistir", _sonsuza_kadar_uyu)
+
+    # GERÇEK `os._exit()` test SÜRECİNİ de öldürür — testte yalnız
+    # "çağrıldı mı" kaydedip NORMAL dönen sahte bir fonksiyon enjekte
+    # edilir (üretimde `os._exit()` ASLA geri dönmez, bu yüzden gerçek
+    # kullanımda hiç ulaşılmayan `raise DurdurmaHatasi` satırı buradan
+    # test edilebiliyor).
+    cik_cagrildi = []
+
+    def _sahte_cik(kod: int) -> None:
+        cik_cagrildi.append(kod)
+
+    baslangic = time.monotonic()
+    with pytest.raises(aylik_yukle.DurdurmaHatasi):
+        aylik_yukle._zaman_asimiyla_calistir(
+            "postgresql://irrelevant",
+            yol=Path("irrelevant"),
+            tarih_id=999801,
+            source_period="9998-01",
+            parser_version_override="x",
+            uygula=False,
+            negatif_red_esigi=0,
+            elle_onay=None,
+            actor="test-suite",
+            _cik=_sahte_cik,
+        )
+    gecen_sure = time.monotonic() - baslangic
+    assert gecen_sure < 10  # 1s'lik sahte eşiğe bol pay, "3600s" DEĞİL
+    assert cik_cagrildi == [1]  # _cik(1) GERÇEKTEN çağrıldı
