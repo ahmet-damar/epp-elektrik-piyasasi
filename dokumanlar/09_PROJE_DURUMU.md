@@ -304,6 +304,18 @@ TAMAMI taranıyor, sabit liste YOK) + her tablo için GENEL bir
 "RLS açık VE en az 1 policy var" kontrolü eklendi — kasıtlı bozuk
 örneklerle (RLS'siz tablo, politikasız tablo) ateşlediği KANITLANDI.
 
+## Temmuz 2026 yüklemesi — DISPOSABLE'da tam doğrulandı, CANLIYA HİÇ UYGULANMADI (2026-10-02)
+
+**Tarih çapası: 2026-10-02 itibarıyla canlı veri HÂLÂ 2026-06'da
+duruyor** — Temmuz yüklemesi disposable'da (Ocak-Temmuz'un TAMAMI,
+3 ayrı batch zinciri) uçtan uca doğrulandı (426/426 test idempotent,
+kalite kapısı temiz), ama canlıya yazma denemesi Claude Code'un kendi
+güvenlik sınıflandırıcısı tarafından ENGELLENDİ (`[P]roduction write`
+etiketi) — başka bir yoldan aşılmaya çalışılmadı. **Ahmet'in kendisi
+çalıştırması gerekiyor** (tam komut dizisi: `dokumanlar/06_canli_veri_
+operasyon_gunlugu.md`'nin 2026-10-02 kaydında). Detay ve "koruma
+sınavı" bulguları: `Claude outputs/kapanis_2026-10-02_temmuz_yukleme.md`.
+
 ## Test durumu (2026-09-07'de temiz bir kabukta yeniden doğrulandı)
 
 ```

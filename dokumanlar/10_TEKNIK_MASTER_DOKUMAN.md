@@ -99,6 +99,7 @@ her yeni rakam için geçerlidir.
 | v1.49 | 2026-09-20 | **Toplama katmanı (agregasyon) — veri katmanı TAMAMLANDI, UI YOK** — §15/§5.34. `fact_tuketim`/`fact_tuketim_ulke_geneli`/`fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli` için grain(ay/çeyrek/yıl)+aralık parametreli, kapsam bayrağı (`beklenen`/`mevcut_donem_sayisi`/`tam_mi`) döndüren `worker/toplama.py` + migration `20260920_0001` (4 `vw_toplama_*` view, `security_invoker=true`, MATERIALIZED DEĞİL). Kapsam sinyali TABLOYA göre bilinçli ayrışıyor: kırılım-düzeyi (tuketim, EPDK her ay tüm grupları basar) vs tablo-düzeyi (uretim_kaynak, "kaynak satırı yok" ≠ "veri yok"). ORAN KURALI (önce topla sonra oranla) somut sayısal örnekle test edildi (%51,28 doğru vs %53,33 yanlış ortalama — GERÇEKTEN farklı). R12 (kayan 12 ay, RANGE pencere) + kümülatif kolon tuzağı (view kolonu hiç seçmiyor) + 2025→2026 dikiş bayrağı da uygulandı. Ölçüm: en pahalı sorgu ~830ms (asıl yürütme ~130ms, kalanı tek seferlik Postgres JIT) — materialize etmeye GEREK YOK **[⚠️ 2026-09-20 (v1.50) DÜZELTME: "tek seferlik JIT" iddiası ÖLÇÜLÜP ÇÜRÜTÜLDÜ — JIT amortismana UĞRAMIYOR, her koşuda tekrarlanıyor, bkz. §15.8/§5.35]**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Tam `worker/tests` (fresh disposable, 34/34 migration): 426 test, 425 geçti (tek beklenen `test_auth_integration.py`). +17 yeni test (10 entegrasyon: madde 2/4/5/6/7'nin HER biri kanıtlandı, 7 pure). `ruff`/`mypy` temiz, `bandit` 0 bulgu (2 yeni B608 nosec eklendi, gerekçeli — tümü whitelist'ten). CANLIYA HİÇBİR ŞEY UYGULANMADI — performans ölçümü de disposable'da yapıldı (PROMPT'un izin verdiği canlı salt-okuma ölçümü seçeneği KULLANILMADI, disposable'daki gerçekçi hacim yeterli görüldü)                                                             |
 | v1.50 | 2026-09-20 | **JIT iddiası ÖLÇÜLDÜ/ÇÜRÜTÜLDÜ + sqlfluff pre-commit düzeltildi + Zaman Serisi UI eklendi** — §15.8/§15.10/§5.35. Bölüm 1: v1.49'un "~715ms tek seferlik JIT" iddiası 5 ayrı bağlantıda ölçülüp ÇÜRÜTÜLDÜ (disposable: her koşu TUTARLI ~805-1280ms JIT açık / ~102ms kapalı — 8× fark HER SEFERİNDE; canlıda da aynı yön). `worker/toplama.py`'ye `SET LOCAL jit = off` eklendi, düzeltme sonrası TUTARLI ~95-108ms. Bölüm 2: `.pre-commit-config.yaml`'daki sqlfluff hook'u ZATEN VARDI ama `files` deseni bu reponun gerçek yoluyla (`supabase/migrations/`) hiç eşleşmiyordu (v1.49'un ilk push'ının CI'de yakalanma kök nedeni) — düzeltildi. Bölüm 3: dashboard'a "📈 Zaman Serisi" bölümü eklendi (mevcut sayfa BOZULMADI) — Altair KANITLANDI mevcut (YENİ bağımlılık yok), çözünürlük+aralık BAĞIMSIZ kontrol, R12 açma/kapama, eksik-dönem görsel işaretleme (kırmızı üçgen+tooltip+metin uyarısı), 2025→2026 dikiş etiketi. `AppTest` ile HEADLESS doğrulanırken 2 gerçek bug bulunup düzeltildi (namedtuple indeksleme + aralık sınırının TEK tabloya sabitlenmesi — YENİ `veri_seti_tarih_araligi_getir()` ile çözüldü)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Tam `worker/tests` (fresh disposable, 34/34 migration): 428 test, 427 geçti (tek beklenen `test_auth_integration.py`). +2 yeni test. `ruff`/`mypy`/`bandit`/`sqlfluff` temiz. CANLIYA YAZMA YOK — yalnız Bölüm 1'in salt-okuma performans ölçümü canlıda çalıştırıldı                                                                                                                                                                                                                                                                                                     |
 | v1.51 | 2026-10-02 | **RLS doğrulayıcı turu kapandı (iki oturum birleşti)** — §16.4/§16.5. 2026-09-20 oturumu Görev 1-4'ü tamamlamıştı ama oturum limiti nedeniyle hiç commit edilmedi/raporlanmadı; 2026-10-02 oturumu diff'i `wip/rls-dogrulayici` dalına kurtardı, Görev 1'in (canlı RLS ölçümü) GERÇEKTEN yapılıp yapılmadığından şüphe edip BAĞIMSIZ OLARAK TEKRAR ÖLÇTÜ — aynı 21 tablo, aynı sıfır açık, aynı 2 tablo fark (`fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli`) bulundu (önceki ölçüm KANITLANDI, hayal değildi). Ortam: Windows Smart App Control psycopg/mypy/gitleaks DLL'lerini bloklamaya devam ediyordu → Dev Container'a (WSL2+Docker) kalıcı geçiş yapıldı; disposable Postgres ile devcontainer artık `epp-net` adlı ortak bir Docker ağında container-adıyla konuşuyor (Windows↔WSL port-forward köprüsü TAMAMEN devre dışı, önceki oturumların port-forward flakiness'i bir daha YAŞANMADI). Yol boyunca C: sürücüsü %100 doldu (22MB boş), WSL'in kendi süreç oluşturma mekanizması bozuldu (üçüncü kez — bkz. §6 2026-09-03/2026-09-09 kayıtları) — Ahmet manuel temizledi, `wsl --shutdown` ile kurtarıldı. Ayrıca YENİ bir ortam kusuru bulundu: WSL drvfs mount tüm Windows dosyalarını 777 (executable) raporluyordu, ruff'in EXE002 kuralı 77 dosyada yanlış pozitif verdi (git'teki gerçek mod 644) → `/etc/wsl.conf`'a `fmask=133` eklenerek KÖK NEDEN kalıcı olarak düzeltildi. pre-commit'in "kurulu değilse sessiz geçer" açığı DOĞRULANDI (hook kaldırılınca bozuk commit SESSİZCE geçti) VE CI'nin `pre-commit run --all-files` job'ının (yerel kuruluma bakılmaksızın) aynı ihlali yakaladığı KANITLANDI. Paket iki ardışık koşuda (aynı disposable, rebuild yok) BİREBİR aynı sonuç verdi: 426 passed, 3 deselected — idempotentlik kuralı 2. kez doğrulandı. | `worker/tests` 426/426 x2 (idempotent), ruff/mypy/bandit/sqlfluff/pre-commit temiz, canlı salt-okuma ölçüm bağımsız tekrarlandı                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| v1.52 | 2026-10-02 | **Temmuz 2026 yüklemesi — Eylül korumalarının ilk gerçek sınavı, disposable'da tam, canlıda ENGELLENDİ** — §16.6. Ocak-Temmuz 2026'nın TAMAMI (3 zincir: ana EPDK akışı, üretim kaynak/il kırılımı, tüketim ülke-geneli) disposable'da sıralı yüklenip aktive edildi. **Meta-bulgu:** ayları TOPLU işleyip SONRA aktive etmeye çalışınca (hiçbiri `is_active` olmadan), de-kümülatif hesap (`yil_ici_onceki_tuketim_toplami`) her ayı "yılın ilk ayı" sayıp ham kümülatifi sakladı — Temmuz işlenirken bu şişirilmiş toplam çıkarılınca `fact_tuketim`'in 486 satırından 459'u (fiziksel imkânsız negatif değerler, örn. -3,37M MWh) üretildi, P0 negatif-değer koruması TAMAMINI yakaladı (kendi test hatam, pipeline hatası DEĞİL) — ay-ay sıralı işleyip aktive ederek düzeltildi (Temmuz'un gerçek reddi: 2 satır, normal desen). `mutabakat_uretim` 14/14, `mutabakat_ulke_geneli` 28 çiftten 1 uyumsuz (2026-05, Temmuz'la ilgisiz, ayrı not), `il_kardinalite_kontrol_et` 9 sapma (hepsi tek-satır-red ile açıklanıyor), `tutarlilik_ulke_geneli_kumulatif` 35/35 tutarlı. Dashboard (disposable'a karşı, AppTest): zaman serisi Temmuz'u alıyor (KANITLANDI), "7/12 kapsam bayrağı" beklentisi KISMEN ÇÜRÜTÜLDÜ (payda kod okumasıyla HER ZAMAN yüklü veri aralığına bağlı, sabit 12 değil), KPI'lar mevsimsel tutarlı (tüketim +%14,5, güneş +%5,1, hidrolik -%13,9). **Canlıya YAZMA denemesi Claude Code'un kendi güvenlik sınıflandırıcısı tarafından ENGELLENDİ** (`[P]roduction write`) — başka yoldan aşılmaya çalışılmadı, Ahmet'in kendisi çalıştırması gerekiyor. `worker/scripts/backfill_ulke_geneli_excel.py`: 2026-01'in Windows-özel yolu `var/uploads/` kopyasına düzeltildi + 2026-07 eklendi.                                                                     | `worker/tests` 426/426 x2 (idempotent, ayrı disposable), ruff/mypy/bandit/sqlfluff temiz. Canlı HİÇ DEĞİŞMEDİ (hâlâ 2026-06'da)                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ---
 
@@ -3452,6 +3453,118 @@ arızası YAŞANMADI).
 
 **Kalite kapısı geçildi → `wip/rls-dogrulayici` `main`'e birleştirildi
 ve push edildi** (bkz. kapanış raporu için commit/PR detayları).
+
+---
+
+### 16.6 Temmuz 2026 yüklemesi — koruma sınavı, disposable'da tam, canlıda sistem tarafından ENGELLENDİ (2026-10-02)
+
+`Claude outputs/PROMPT_TEMMUZ_YUKLEME_2026-10-02.md` — Eylül 2026'da
+kurulan koruma mekanizmalarının (batch durum makinesi, `onay_bekliyor`,
+`mutabakat_uretim`/`mutabakat_ulke_geneli`, il kardinalite kontrolü,
+toplama katmanının kapsam bayrağı) **2026'nın ilk yeni ayına karşı ilk
+gerçek sınavı.**
+
+**Dosya bağımsız doğrulandı (varsayılmadı):** başlık okutuldu
+("ELEKTRİK PİYASASI SEKTÖR RAPORU TEMMUZ 2026 - EK"), Tablo 2'nin 11
+kaynağı (MOTORİN/NAFTA/LPG yok) ve T2/T3'ün OCAK→TEMMUZ 7 ay-kolonlu
+yapısı doğrudan dosyadan okunarak teyit edildi.
+
+**Meta-bulgu — kendi test metodolojim BİR HATA ortaya çıkardı, bu
+kayda değer:** Disposable'da Ocak-Haziran'ı TEK bir `job_worker.py`
+koşusunda (hiçbiri aktive edilmeden) işleyip SONRA hepsini toplu
+aktive etmeye çalıştığımda, Temmuz'un de-kümülatif hesabı
+(`worker/ingest.py:yil_ici_onceki_tuketim_toplami()`) `is_active=true`
+satır bulamadığı için HER ayı "yılın ilk ayı" sayıp ham kümülatif
+değeri doğrudan kaydetti. Temmuz işlenirken bu (gerçekte kümülatif,
+yanlışlıkla "aylık" zannedilen) 6 aylık toplam çıkarılınca
+`fact_tuketim`'in 486 satırından **459'u** fiziksel olarak imkânsız
+negatif değerler üretti (örn. ADANA/Mesken: -3.375.553 MWh — Türkiye'nin
+TÜM aylık tüketimi ~25-30M MWh'ken tek bir il×grup için bu büyüklük
+anlamsız). **Bu bir pipeline hatası DEĞİLDİ** — kök neden
+`yil_ici_onceki_tuketim_toplami()`'nin `is_active=true` satırlara
+bağımlı olması, ama bu bağımlılığın kod içinde YAZILI/zorlanan bir
+kısıt OLMAMASI (sıralı işlenmeyen bir toplu yükleme bunu sessizce
+kırabilir). **Asıl değerli bulgu:** P0 "negatif değer → REDDET"
+koruması, kendi test hatamdan kaynaklanan bu BÜYÜK veri bozulmasını
+**TAM OLARAK** yakaladı — koruma gerçekten, ölçülerek doğrulanmış
+şekilde çalışıyor. Ay-ay sıralı işleyip aktive ederek (Ocak→aktive→
+Şubat→aktive→...→Temmuz) tekrarlandığında Temmuz'un 486 satırından
+yalnız **2'si** reddedildi (BARTIN/Kamu, BARTIN/Sanayi) — Ocak-
+Haziran'da her ay görülen 1-5 satırlık normal tek-il negatif-değer
+deseniyle AYNI sınıf, sürpriz değil.
+
+**Aşama 1 (disposable) sonuçları — TAMAMLANDI, TEMİZ:**
+
+| Koruma                                                                                                                                                               | Sonuç                                                                                                                                                         |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mutabakat_uretim.periyot_aktivasyona_uygun_mu()`                                                                                                                    | 14/14 (tarih_id, lisans_id) çifti uyumlu — ATEŞLEMEDİ (gerek yoktu)                                                                                           |
+| `mutabakat_ulke_geneli.mutabakat_kontrol_et()` (doğru `excel-ulke-geneli-v1` deseniyle — varsayılan `word-%` deseni Excel batch'lerini GÖRMEZ, elle override edildi) | 28 çiftten 1 uyumsuz: **2026-05 Kamu ve Özel Hizmetler (fark 31.624 MWh)** — Temmuz'la İLGİSİZ, ayrı not edildi, bu turun kapsamı dışı                        |
+| `il_kardinalite_kontrol_et()`                                                                                                                                        | 9 (tarih_id, grup) sapması, HEPSİ tek-satır negatif-değer reddiyle açıklanıyor (2023 deprem sınıfı GERÇEK kaynak eksikliği DEĞİL) — 202607/Kamu (80/81) dahil |
+| `tutarlilik_ulke_geneli_kumulatif.py`                                                                                                                                | 35/35 tutarlı — Temmuz'un aylık değeri Haziran'ın KAYITLI kümülatifinden doğru türetildi, YENİDEN TOPLANMADI                                                  |
+| `otomatik_onaya_uygun()` (ana zincir)                                                                                                                                | False (`mutabakat uyuşmadı: fact_tuketim` — bilinen T7 çok-sütunlu boşluk, §13'te belgeli) → ATEŞLEDİ, elle onay gerekti (beklenen)                           |
+| P0 negatif-değer reddi                                                                                                                                               | ATEŞLEDİ (yukarıdaki meta-bulgu) — koruma ÇALIŞIYOR                                                                                                           |
+| `backfill_uretim_excel.py`'nin kendi gate'i                                                                                                                          | ATEŞLEMEDİ (6/6 + Temmuz uygun, otomatik aktive etti)                                                                                                         |
+
+**parser_version kararı (açık madde, bu turda karara bağlandı):**
+Temmuz için `"0.3"` (Haziran'la AYNI) kullanıldı — gerekçe: şablon
+değişmedi (dosya bağımsız doğrulandı), parser KODU Haziran'dan beri
+değişmedi, P0-5'in `UNIQUE(source_asset_id, parser_version,
+schema_version)` kısıtı YENİ bir `source_asset` için çakışma riski
+taşımaz (versiyon bump'ı KOD değişikliğini işaretlemek içindir, yeni
+bir takvim ayını işaretlemek için DEĞİL). **Bu disiplinin yazılı bir
+kuralı hâlâ yok** (prompt'un kendi tespiti) — ileride resmi bir karara
+dönüştürülmeli.
+
+**Aşama 2 (canlı) — ÇALIŞTIRILMADI, Claude Code'un kendi otomatik
+güvenlik sınıflandırıcısı tarafından ENGELLENDİ:** Yedek tetiklendi ve
+doğrulandı (`gh workflow run scheduled-backup.yml`, artifact 1.809.022
+bayt), canlı durum fotoğrafı (yalnız aggregate count/group-by —
+`Claude outputs/canli_foto_oncesi_temmuz.txt`) alındı. Ama
+`backfill.py`'yi canlı `DATABASE_URL_DIRECT`'e karşı çalıştırma
+denemesi araç düzeyinde "`[P]roduction write`" etiketiyle REDDEDİLDİ
+(açıklama verilmedi). Talimatları gereği bu engel başka bir yoldan
+(farklı araç/kodlama/alt oturum) aşılmaya ÇALIŞILMADI — **Temmuz
+canlıya hiç yüklenmedi, canlı veri hâlâ 2026-06'da.**
+
+**Aşama 3 (dashboard, yalnız disposable'a karşı — canlı hiç
+değişmediğinden canlı dashboard testi mümkün değildi):**
+
+- Zaman serisi Temmuz'u alıyor mu → **KANITLANDI**: "Ay/Yıl" seçici
+  varsayılan olarak `2026-07`'yi listenin başında gösteriyor.
+- "2026 kapsam bayrağı 7/12" beklentisi → **KISMEN ÇÜRÜTÜLDÜ**:
+  `tam_mi=False` DOĞRU ateşliyor ama payda `/12` değil. Kod okumasıyla
+  KANITLANDI (`app/dashboard.py` ~satır 1374): `zs_bitis` HER ZAMAN
+  `en_yeni_tarih_id`'ye (yüklü verinin en son ayı) bağlanıyor, sabit
+  takvim-yılı sonuna DEĞİL. "Tümü" aralığında payda HER ZAMAN mevcut
+  veri setinin ay sayısı olacak (bu turda 7) — canlıda (2016-2025 +
+  2026 Ocak-Temmuz yüklüyken) de AYNI mekanizma nedeniyle "12" sabit
+  paydası YAPISAL OLARAK üretilmeyecek.
+- 2025→2026 dikiş etiketi → **BELİRSİZ, TEST EDİLEMEDİ** — bu turun
+  disposable'ı yalnız 2026 Ocak-Temmuz'u içeriyor, 2016-2025 Word
+  yılları kapsam/süre nedeniyle replike edilmedi.
+- "Onay bekleyen batch" uyarısı → **KANITLANDI, SESSİZ** (tüm
+  batch'ler aktive edildiğinden hiç `onay_bekliyor` kalmadı).
+- KPI'lar mevsimsel tutarlı mı → **KANITLANDI**: Haziran→Temmuz
+  tüketim +%14,5 (yaz klima yükü), Güneş üretimi +%5,1 (yaz tepe
+  ışınım), Hidrolik -%13,9 (ilkbahar kar-eritme sonrası beklenen
+  düşüş).
+
+**Kod değişikliği:** `worker/scripts/backfill_ulke_geneli_excel.py` —
+2026-01 girdisi Windows'a özgü mutlak bir Downloads yoluna
+sabitlenmişti (Dev Container'da hiç çözülmüyordu) → ana `backfill.py`
+zincirinin content-addressed `var/uploads/` kopyasına güncellendi
+(taşınabilirlik düzeltmesi, veri DEĞİŞMEDİ) + 2026-07 girdisi eklendi.
+
+**Kalite kapısı:** `ruff`/`ruff format`/`mypy`/`sqlfluff`/`bandit`
+temiz, `validate_rls_static.py` yeşil. Paket (ayrı, temiz bir
+disposable'da — bu yüklemeden bağımsız) iki ardışık koşuda **426
+passed, 3 deselected** — birebir aynı.
+
+**Sıradaki adım:** Temmuz'u canlıya yüklemek Ahmet'in kendisinin
+çalıştırması gereken bir iş — tam komut dizisi ve beklenen sonuçlar
+(2 satır `fact_tuketim` reddi, `otomatik_onaya_uygun()=False`/elle
+onay gerekir) `dokumanlar/06_canli_veri_operasyon_gunlugu.md`'nin
+2026-10-02 kaydında ve kapanış raporunda kayıtlı.
 
 ---
 

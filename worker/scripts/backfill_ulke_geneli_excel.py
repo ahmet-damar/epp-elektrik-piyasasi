@@ -4,10 +4,13 @@ için ince bir CLI sarmalayıcı — Word yıllarındaki `word_20XX.py --ulke-ge
 deseninin Excel eşdeğeri. `fact_tuketim`'in kendi batch zincirine DOKUNMAZ,
 ayrı bir batch zinciri kurar (`parser_version='excel-ulke-geneli-v1'`).
 
-Kaynak dosyaların yerel diskteki konumu bu ortama özgü (bazıları
-`var/uploads/`de content-addressed, Ocak 2026 `EPDK Verileri/` klasöründe
-orijinal adıyla) — MANIFEST burada AÇIKÇA elle eşlenir, Word yıllarındaki
-MANIFEST_20XX desenine benzer.
+Kaynak dosyaların yerel diskteki konumu bu ortama özgü — hepsi
+`var/uploads/`de content-addressed (2026-10-02'den önce Ocak 2026 girdisi
+Windows'a özgü mutlak bir yola (Downloads klasörü) sabitlenmişti; Dev
+Container'a geçişle bu yol Linux'ta hiç çözülmüyordu — ana backfill.py
+zincirinin content-addressed kopyasına güncellendi, taşınabilirlik
+düzeltmesi, veri DEĞİŞMEDİ) — MANIFEST burada AÇIKÇA elle eşlenir, Word
+yıllarındaki MANIFEST_20XX desenine benzer.
 
 Kullanım:
     python -m worker.scripts.backfill_ulke_geneli_excel --dry-run
@@ -31,7 +34,7 @@ from worker.db import get_database_url
 
 MANIFEST: dict[int, Path] = {
     202601: Path(
-        r"C:\Users\adama\Downloads\EPDK Verileri\_PortalAdmin_Uploads_Content_FastAccess_8684c04c60369.xlsx"
+        "var/uploads/53a86270c1840a7d3fddc23c5c233a01ec77b429d68bf6df49f7786964a251c0.xlsx"
     ),
     202602: Path(
         "var/uploads/e0fb81994c83a55f1422a3ce12e5dd782ecef64356fefd6ecfa1d8323fed7c9a.xlsx"
@@ -47,6 +50,9 @@ MANIFEST: dict[int, Path] = {
     ),
     202606: Path(
         "var/uploads/c969785842e7c858f2e564b947937c8a8630ec7812155d0930f272cb722d9854.xlsx"
+    ),
+    202607: Path(
+        "var/uploads/a045617bc2f0f4b816f6036001cd5d6eefbf4ddd2fc380ef69c8be065795fd82.xlsx"
     ),
 }
 

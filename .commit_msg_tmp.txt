@@ -1,0 +1,14 @@
+docs: Temmuz 2026 yuklemesi disposable'da dogrulandi, canliya uygulanmadi
+
+worker/scripts/backfill_ulke_geneli_excel.py: 2026-01 girdisinin
+Windows'a ozgu Downloads yolu var/uploads/ content-addressed kopyasina
+duzeltildi (Dev Container'da hic cozulmuyordu) + 2026-07 girdisi
+eklendi.
+
+Dokumanlar: Eylul korumalarinin (mutabakat_uretim, mutabakat_ulke_geneli,
+il_kardinalite_kontrol_et, otomatik_onaya_uygun, P0 negatif-deger reddi)
+Temmuz yuklemesine karsi ilk gercek sinavi kayit altina alindi - disposable'da
+tam temiz, canliya yazma Claude Code'un kendi guvenlik siniflandiricisi
+tarafindan engellendi (baska yoldan asilmaya calisilmadi).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>

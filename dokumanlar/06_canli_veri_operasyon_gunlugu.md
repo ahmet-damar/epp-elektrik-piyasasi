@@ -3105,3 +3105,116 @@ hem "onay bekliyor" listesi boş.)
 Tam `worker/tests` (fresh disposable, 33/33 migration): 409 test, 408
 geçti (tek beklenen `test_auth_integration.py`). `ruff`/`mypy` temiz,
 `bandit` (CI komutuyla) 0 bulgu (severity-level medium).
+
+## 2026-10-02 — Temmuz 2026 yüklemesi: DISPOSABLE'da tam doğrulandı, CANLIYA UYGULANMADI (sistem engeli)
+
+`Claude outputs/PROMPT_TEMMUZ_YUKLEME_2026-10-02.md` — Eylül'de kurulan
+koruma mekanizmalarının (batch durum makinesi, `onay_bekliyor`,
+`mutabakat_uretim`/`mutabakat_ulke_geneli`, il kardinalite kontrolü,
+toplama katmanı kapsam bayrağı) 2026'nın İLK yeni ayına karşı sınavı.
+
+**Dosya bağımsız olarak doğrulandı:** `_PortalAdmin_Uploads_Content_
+FastAccess_63654e8122987.xlsx`'in başlığı okunarak "ELEKTRİK PİYASASI
+SEKTÖR RAPORU TEMMUZ 2026 - EK" olduğu, Tablo 2'de 11 kaynak olup
+MOTORİN/NAFTA/LPG'nin olmadığı, T2/T3'ün OCAK→TEMMUZ 7 ay-kolonlu
+olduğu KANITLANDI (varsayılmadı, ölçüldü).
+
+**Önemli meta-bulgu — kendi test metodolojim bir hata ortaya çıkardı:**
+Disposable'da Ocak-Haziran'ı TEK bir `job_worker.py` koşusunda (hiçbiri
+aktive edilmeden) işleyip SONRA toplu aktive etmeye çalıştığımda,
+Temmuz'un de-kümülatif hesaplaması (`ingest.yil_ici_onceki_tuketim_
+toplami()`, hâlâ `is_active=false` olan Ocak-Haziran satırlarını
+GÖRMEDİĞİ için) her ayı "yılın ilk ayı" gibi işleyip HAM KÜMÜLATİF
+değeri doğrudan sakladı — Temmuz işlenirken bu (gerçekte kümülatif,
+yanlışlıkla "aylık" sanılan) 6 aylık toplam ÇIKARILINCA
+`fact_tuketim`'in 486 satırından **459'u** (örn. ADANA/Mesken için
+-3.375.553 MWh gibi fiziksel olarak imkânsız değerler) NEGATİF ÇIKIP
+P0 "negatif değer → REDDET" kuralıyla REDDEDİLDİ. **Bu bir pipeline
+hatası DEĞİL** — kök neden, her ayın İŞLENİP AKTİVE EDİLMEDEN bir
+sonrakinin işlenmesiydi (de-kümülatif hesap `is_active=true` satırlara
+bağımlı, ama bu bağımlılık kod içinde YAZILI/zorlanan bir kısıt değil).
+**Asıl önemli bulgu:** P0 negatif-değer koruması, kendi test
+hatamdan kaynaklanan bu BÜYÜK veri bozulmasını TAM OLARAK yakaladı —
+koruma gerçekten çalışıyor. Ay-ay sıralı işleyip aktive ederek (Ocak→
+aktive→Şubat→aktive→...) tekrarlandığında Temmuz'un 486 satırından
+yalnız **2'si** reddedildi (BARTIN/Kamu, BARTIN/Sanayi — tek-il
+negatif-değer deseni, Ocak-Haziran'da her ay görülen 1-5 satırlık
+normal desenle AYNI sınıf).
+
+**Aşama 1 (disposable, canlıya dokunmadan) — TAMAMLANDI, TEMİZ:**
+
+- Ocak-Temmuz 2026'nın TAMAMI (3 ayrı zincir: ana EPDK akışı, üretim
+  kaynak/il kırılımı, tüketim ülke-geneli) sıralı olarak yüklendi ve
+  aktive edildi.
+- `mutabakat_uretim.py`: 14/14 (tarih_id, lisans_id) çifti uyumlu.
+- `mutabakat_ulke_geneli.py` (DOĞRU desenle, `excel-ulke-geneli-v1` —
+  script'in varsayılanı `word-%-ulke-geneli-v1` olduğundan Excel
+  batch'lerini GÖRMEZ, elle override edildi): 28 çift kontrol edildi,
+  **1 uyumsuz: 2026-05 Kamu ve Özel Hizmetler (fark 31.624 MWh)** —
+  bu TEMMUZ'LA İLGİSİZ, Mayıs'a özgü, bu turun kapsamı dışında, ayrı
+  not edildi.
+- `il_kardinalite_kontrol_et()`: 9 (tarih_id, grup) sapması, HEPSİ
+  ayrı ayrı tek-satır negatif-değer reddiyle açıklanıyor (2023 deprem
+  sınıfı GERÇEK kaynak-eksikliği DEĞİL) — 202607/Kamu (80/81) dahil.
+- `tutarlilik_ulke_geneli_kumulatif.py`: 35/35 (tarih_id, grup) çifti
+  tutarlı — Temmuz'un aylık değeri Haziran'ın KAYITLI (yeniden
+  toplanmamış) kümülatifinden doğru türetildiği KANITLANDI.
+- Kalite kapısı: `ruff`/`ruff format`/`mypy`/`sqlfluff`/`bandit`
+  temiz, `validate_rls_static.py` yeşil, paket (ayrı bir disposable'da,
+  bu yüklemeden bağımsız) iki ardışık koşuda **426 passed, 3
+  deselected** — birebir aynı.
+
+**Aşama 2 (canlı) — ÇALIŞTIRILMADI, Claude Code'un kendi otomatik
+güvenlik sınıflandırıcısı tarafından ENGELLENDİ:** `gh workflow run
+scheduled-backup.yml` başarıyla tetiklendi ve doğrulandı (artifact
+1.809.022 bayt), canlı durum fotoğrafı (yalnız aggregate count/group-by
+sorguları — bkz. `Claude outputs/canli_foto_oncesi_temmuz.txt`) alındı.
+Ama `worker/scripts/backfill.py`'yi canlı `DATABASE_URL_DIRECT`'e karşı
+çalıştırma denemesi "[P]roduction write" sınıflandırmasıyla araç
+düzeyinde REDDEDİLDİ (açıklama verilmedi, yalnız "dangerous" etiketi).
+Talimatları gereği bu engel BAŞKA bir yoldan (farklı araç/kodlama/alt
+oturum) aşılmaya ÇALIŞILMADI. **Temmuz canlıya hiç yüklenmedi —
+Ahmet'in kendisi çalıştırmalı veya bu izni açıkça vermelidir.**
+
+**Aşama 3 (dashboard) — yalnız DISPOSABLE'a karşı çalıştırıldı (canlı
+hiç değişmediği için canlı dashboard testi yapılamadı):**
+
+- Zaman serisi Temmuz'u alıyor mu → **KANITLANDI, EVET** ("Ay/Yıl"
+  seçici varsayılan olarak '2026-07'yi listenin başında gösteriyor).
+- "2026 kapsam bayrağı 7/12" → **KISMEN ÇÜRÜTÜLDÜ:** `tam_mi=False`
+  bayrağı 2026 için DOĞRU ateşliyor (Tarımsal/Kamu grupları eksik
+  işaretli), AMA payda `/12` değil — kod okumasıyla KANITLANDI
+  (`app/dashboard.py` zs_bitis HER ZAMAN `en_yeni_tarih_id`'ye, yani
+  YÜKLÜ VERİNİN en son ayına bağlanıyor, sabit takvim yılı sonuna
+  DEĞİL — bkz. satır ~1374). Bu yüzden "Tümü" aralığında payda HER
+  ZAMAN mevcut veri setinin ay sayısı olacak (bu turda 7), canlıda da
+  (2016-2025 + 2026 Ocak-Temmuz yüklüyken) AYNI mekanizma nedeniyle
+  "12" sabit paydası YAPISAL OLARAK üretilmeyecek — "7/12" beklentisi
+  mevcut implementasyonla uyuşmuyor.
+- 2025→2026 dikiş etiketi → **BELİRSİZ, TEST EDİLEMEDİ** — bu turun
+  disposable'ı yalnız 2026 Ocak-Temmuz'u içeriyor (2016-2025 Word
+  yılları hiç replike edilmedi, kapsam/süre nedeniyle), dikiş
+  mantığının tetiklenmesi için 2025 verisi gerekir.
+- "Onay bekleyen batch" uyarısı → **KANITLANDI, SESSİZ** (tüm
+  batch'ler aktive edildiğinden hiç `onay_bekliyor` kalmadı, uyarı hiç
+  görünmedi — doğru davranış).
+- KPI'lar Temmuz'la mevsimsel tutarlı mı → **KANITLANDI:** Haziran→
+  Temmuz tüketim +%14,5 (24.098.073→27.595.023 MWh, yaz klima yükü),
+  Güneş üretimi +%5,1 (4.721.079→4.960.931 MWh, yaz tepe ışınım),
+  Hidrolik -%13,9 (10.541.213→9.072.996 MWh, ilkbahar kar-eritme
+  sonrası beklenen düşüş) — üçü de gerçek mevsimsel desenle tutarlı.
+
+**Kod değişikliği:** `worker/scripts/backfill_ulke_geneli_excel.py`
+— 2026-01 girdisi Windows'a özgü mutlak bir Downloads yoluna
+sabitlenmişti (Dev Container'da hiç çözülmüyordu), ana `backfill.py`
+zincirinin content-addressed `var/uploads/` kopyasına güncellendi
+(taşınabilirlik düzeltmesi, veri DEĞİŞMEDİ) + 2026-07 girdisi eklendi.
+
+**Sıradaki adım:** Temmuz'u canlıya yüklemek için Ahmet'in kendisi
+`python worker/scripts/backfill.py --dizin "C:\Users\adama\Downloads\
+EPDK Verileri" --manifest <manifest> --parser-version 0.3` + `python
+-m worker.job_worker` + (gerekiyorsa) `onayla.py` ile elle onay +
+`backfill_uretim_excel.py`/`backfill_ulke_geneli_excel.py --ay 202607`
+zincirini çalıştırması gerekiyor — bu turun disposable doğrulaması
+tüm adımları ve beklenen sonuçları (2 satır fact_tuketim reddi,
+otomatik_onaya_uygun=False/elle onay gerekir) kayıt altına aldı.
