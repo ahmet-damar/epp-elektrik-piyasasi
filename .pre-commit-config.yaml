@@ -6,8 +6,12 @@
 #   pre-commit run --all-files
 # ============================================================================
 fail_fast: false
+# 2026-09-20: `python3.12` sabitliydi ama bu makinede yalnız 3.13 kurulu
+# (pre-commit run --all-files ilk gerçek koşusunda BULUNAMADI hatasıyla
+# patladı — bkz. Claude outputs/kapanis_2026-09-20_rls_gercegi.md) —
+# `python3`'e gevşetildi, hangi 3.x kuruluysa onu kullanır.
 default_language_version:
-  python: python3.12
+  python: python3
 
 repos:
   # 1) Genel hijyen
@@ -18,6 +22,13 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-json
+        # devcontainer.json JSONC'dir (// yorumları VS Code/Codespaces
+        # tarafından KASITLI olarak destekleniyor) - strict JSON
+        # ayrıştırıcısı bunu her zaman YANLIŞ pozitif olarak
+        # reddedecekti (ilk gerçek `pre-commit run --all-files`
+        # koşusunda bulundu, bkz. Claude outputs/kapanis_2026-09-20_
+        # rls_gercegi.md).
+        exclude: ^\.devcontainer/devcontainer\.json$
       - id: check-toml
       - id: check-added-large-files
         args: ["--maxkb=5120"]
@@ -34,21 +45,40 @@ repos:
       - id: gitleaks
 
   # 3) Python — Ruff (lint + format)
+  # 2026-09-20: v0.8.6 -> v0.16.6 — CI/requirements-dev.txt (`ruff>=0.6.9`,
+  # sürümsüz) HER ZAMAN en yeniyi çözer, bu pin ise DONMUŞTU. Sonuç:
+  # pre-commit'in E402 davranışı CI'dan FARKLIYDI (ilk gerçek `pre-commit
+  # run --all-files` koşusunda worker/jobs/fetch_weather.py'de sahte bir
+  # uyuşmazlık çıkardı — CI zaten temizdi). requirements-dev.txt sürümsüz
+  # kaldığı sürece bu ikisi yine ayrışabilir (`pre-commit autoupdate` ile
+  # periyodik senkron gerekir) — bkz. Claude outputs/kapanis_2026-09-20_
+  # rls_gercegi.md.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.6
+    rev: v0.16.6
     hooks:
       - id: ruff
         args: ["--fix"]
       - id: ruff-format
 
   # 4) Python — tip kontrolü
+  # 2026-09-20: CI'nin gerçek komutu `mypy app worker --ignore-missing-
+  # imports --explicit-package-bases` — bu hook `--explicit-package-
+  # bases` bayrağını hiç GEÇMİYORDU ("worker.kpi" iki farklı modül adı
+  # altında iki kez bulundu" hatasıyla patladı) VE yalnız `worker/`'ı
+  # tarıyordu, `app/`'ı HİÇ (ilk gerçek `pre-commit run --all-files`
+  # koşusunda bulundu, bkz. Claude outputs/kapanis_2026-09-20_rls_
+  # gercegi.md) — ikisi de CI ile AYNI komuta getirildi.
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.14.1
     hooks:
       - id: mypy
-        additional_dependencies: [pydantic, types-requests]
-        args: ["--ignore-missing-imports"]
-        files: ^worker/
+        # `supabase` requirements.txt ile AYNI alt sınır — pre-commit'in
+        # İZOLE ortamı bu paket olmadan `worker/db.py`'de sahte bir
+        # "no attribute 'create_client'" hatası veriyordu (proje venv'inde
+        # GERÇEKTEN kurulu olduğundan CI/yerel mypy hiç görmüyordu).
+        additional_dependencies: [pydantic, types-requests, "supabase>=2.9.0"]
+        args: ["--ignore-missing-imports", "--explicit-package-bases"]
+        files: ^(app|worker)/
 
   # 5) Web (TS/JS)
   - repo: https://github.com/pre-commit/mirrors-eslint

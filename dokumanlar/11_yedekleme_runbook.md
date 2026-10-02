@@ -17,12 +17,12 @@ karşılaşabilir).
 
 **Doğrulandı (Supabase resmî dokümantasyonu, 2026-09-07):**
 
-| Plan | Otomatik günlük yedek | Saklama | PITR |
-|---|---|---|---|
-| **Free (bu proje)** | **YOK** | — | — |
-| Pro | Var | Son 7 gün | Ek ücretli (~$100/ay, 7 gün) |
-| Team | Var | Son 14 gün | Ek ücretli (~$200/ay, 14 gün) |
-| Enterprise | Var | 30 güne kadar | Ek ücretli (~$400/ay, 28 gün) |
+| Plan                | Otomatik günlük yedek | Saklama       | PITR                          |
+| ------------------- | --------------------- | ------------- | ----------------------------- |
+| **Free (bu proje)** | **YOK**               | —             | —                             |
+| Pro                 | Var                   | Son 7 gün     | Ek ücretli (~$100/ay, 7 gün)  |
+| Team                | Var                   | Son 14 gün    | Ek ücretli (~$200/ay, 14 gün) |
+| Enterprise          | Var                   | 30 güne kadar | Ek ücretli (~$400/ay, 28 gün) |
 
 **Sonuç: Supabase bu proje için HİÇBİR otomatik yedek almıyor.** Tüm
 sorumluluk aşağıdaki elle prosedürdedir — bu C1'i projedeki **en yüksek
@@ -90,6 +90,7 @@ haftalık döngü o anı kaçırabilir.
 **Gerçek koşu ile UÇTAN UCA doğrulandı (2026-09-08).** İlk iki koşu
 GERÇEKTEN FAIL etti ve gerçek CI hatalarıyla düzeltildi — bu, teorik bir
 YAML değil, canlıya karşı çalışırken bulunmuş gerçek sorunlardı:
+
 1. **pg_dump sürüm uyumsuzluğu** (run 34192536197): `ubuntu-latest`
    `pg_dump 16.15` ile geliyor, canlı Supabase **PostgreSQL 17.6**
    çalıştırıyor — `pg_dump`, SUNUCUDAN DAHA ESKİYSE dump almayı REDDEDER
@@ -98,10 +99,10 @@ YAML değil, canlıya karşı çalışırken bulunmuş gerçek sorunlardı:
 2. **PATH sırası** (run 34192625670): kurulum "başarılı" oldu ama jenerik
    `pg_dump` symlink'i hâlâ runner'ın önceden kurulu 16.15'ini
    gösteriyordu (`pg_dump --version` hâlâ 16.15 bastı) — `/usr/lib/
-   postgresql/17/bin`, `$GITHUB_PATH` ile sonraki adımların PATH'inin
+postgresql/17/bin`, `$GITHUB_PATH` ile sonraki adımların PATH'inin
    BAŞINA eklenerek çözüldü.
 3. **Üçüncü koşu (run 34192746673) BAŞARILI**: dump 1.61 MB, `Dump
-   dosyası: yedekler/epp_data_20260908T055931Z.dump (1684116 bayt)`.
+dosyası: yedekler/epp_data_20260908T055931Z.dump (1684116 bayt)`.
 4. **Artifact indirilip GERÇEKTEN incelendi** (`gh run download` +
    `pg_restore --list`) — dump içinde beklenen TÜM tablolar (`fact_*`
    7 tablo, `dim_tarih`, `audit_log`, `ingestion_batch`, `source_asset`,
@@ -121,12 +122,13 @@ YAML değil, canlıya karşı çalışırken bulunmuş gerçek sorunlardı:
    bir yedek olduğu kanıtlandı.
 6. **100 KB eşiği de test edildi**: geçici olarak 5 MB'a yükseltilip
    gerçek dump (1.68 MB) ile job GERÇEKTEN FAIL ettirildi (`Dump dosyası
-   beklenenden çok küçük (1684116 bayt)`), `upload-artifact` adımının
+beklenenden çok küçük (1684116 bayt)`), `upload-artifact` adımının
    doğru şekilde ATLANDIĞI (başarısız dump artifact olarak saklanmadı)
    doğrulandı; sonra eşik gerçek değerine (100000) geri alındı ve son bir
    koşu (run 34193103617) yeniden yeşil çıktı.
 
 **Erişim ve saklama kararları (2026-09-08, bilinçli — kazara olmasın):**
+
 - **Bu repo PUBLIC** (`gh repo view --json visibility` ile doğrulandı).
   GitHub'da public repo'ların workflow artifact'ları **repoyu görebilen
   HERKES tarafından indirilebilir** — bu bir varsayım değil, GitHub'ın
@@ -192,27 +194,27 @@ eklenmesinin doğrudan sebebi oldu. Düzeltmeden sonra **ikinci deneme
 sıfır hatayla tamamlandı** ve restore edilen 19 tablonun **TAMAMI** canlı
 Supabase'deki gerçek `COUNT(*)` değerleriyle **birebir eşleşti**:
 
-| Tablo | Canlı Supabase | Restore edilen | Eşleşti mi |
-|---|---|---|---|
-| audit_log | 740 | 740 | ✅ |
-| dim_il | 81 | 81 (seed'den) | ✅ |
-| dim_kaynak | 13 | 13 (seed'den) | ✅ |
-| dim_lisans | 2 | 2 (seed'den) | ✅ |
-| dim_tarih | 128 | 128 | ✅ |
-| dim_tuketici_grubu | 5 | 5 (seed'den) | ✅ |
-| fact_abone | 25.110 | 25.110 | ✅ |
-| fact_hava_aylik | 10.368 | 10.368 | ✅ |
-| fact_hava_aylik_log | 10.611 | 10.611 | ✅ |
-| fact_serbest_tuketici | 9.348 | 9.348 | ✅ |
-| fact_tuketim | 44.458 | 44.458 | ✅ |
-| fact_tuketim_ulke_geneli | 599 | 599 | ✅ |
-| fact_uretim | 56.794 | 56.794 | ✅ |
-| ingestion_batch | 503 | 503 | ✅ |
-| job_status | 8 | 8 | ✅ |
-| kpi_esik | 6 | 6 (seed'den) | ✅ |
-| sistem_parametre | 4 | 4 (seed'den) | ✅ |
-| source_asset | 503 | 503 | ✅ |
-| veri_kapsam_disi | 311 | 311 | ✅ |
+| Tablo                    | Canlı Supabase | Restore edilen | Eşleşti mi |
+| ------------------------ | -------------- | -------------- | ---------- |
+| audit_log                | 740            | 740            | ✅         |
+| dim_il                   | 81             | 81 (seed'den)  | ✅         |
+| dim_kaynak               | 13             | 13 (seed'den)  | ✅         |
+| dim_lisans               | 2              | 2 (seed'den)   | ✅         |
+| dim_tarih                | 128            | 128            | ✅         |
+| dim_tuketici_grubu       | 5              | 5 (seed'den)   | ✅         |
+| fact_abone               | 25.110         | 25.110         | ✅         |
+| fact_hava_aylik          | 10.368         | 10.368         | ✅         |
+| fact_hava_aylik_log      | 10.611         | 10.611         | ✅         |
+| fact_serbest_tuketici    | 9.348          | 9.348          | ✅         |
+| fact_tuketim             | 44.458         | 44.458         | ✅         |
+| fact_tuketim_ulke_geneli | 599            | 599            | ✅         |
+| fact_uretim              | 56.794         | 56.794         | ✅         |
+| ingestion_batch          | 503            | 503            | ✅         |
+| job_status               | 8              | 8              | ✅         |
+| kpi_esik                 | 6              | 6 (seed'den)   | ✅         |
+| sistem_parametre         | 4              | 4 (seed'den)   | ✅         |
+| source_asset             | 503            | 503            | ✅         |
+| veri_kapsam_disi         | 311            | 311            | ✅         |
 
 **19/19 tablo eşleşti, 0 hata.** Bu, "denenmemiş yedek yedek değildir"
 ilkesinin bu proje için gerçekten karşılandığı anlamına gelir — teorik bir

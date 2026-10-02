@@ -1,9 +1,10 @@
 # 09 — Proje Durumu (GÜNCEL, DB'den doğrulandı — 2026-09-04, 2026-09-07'de
+
 fact_tuketim_ulke_geneli eklemesiyle, 2026-09-08'de Aşama 1 kapanışıyla
 güncellendi)
 
 > **STATUS: LIVE (güncel durum)** — bu dosya ve `10_TEKNIK_MASTER_
-> DOKUMAN.md`, değişen sayı/durumun YAŞADIĞI tek iki yerdir; diğer
+DOKUMAN.md`, değişen sayı/durumun YAŞADIĞI tek iki yerdir; diğer
 > `dokumanlar/` dosyaları yalnız değişmeyen sözleşmeyi tutar (bkz.
 > `10_TEKNIK_MASTER_DOKUMAN.md` → "Doküman Yönetim Kuralı" bölümü).
 
@@ -68,7 +69,7 @@ yansıtıldı.**
 - **Sanayi'nin Word kaynağında neden T11'e girmediği sorusu — KAPANDI.**
   Cevap: T11'in kendi Genel Toplam satırı zaten Sanayi dahil tüm
   grupların ülke geneli değerini veriyor (yukarıdaki madde) — `07_word_
-  parser_kapsam.md`'deki "ileride araştırılabilir" notu artık geçerli
+parser_kapsam.md`'deki "ileride araştırılabilir" notu artık geçerli
   değil, kapatıldı.
 - **Aşama 1 (operasyonel güvenlik, 2026-09-07) — TAMAMLANDI (C2/B2/C1/
   C3/C4).** Prod DB'ye karşı test guard'ı kod seviyesinde eklendi (C2),
@@ -96,7 +97,7 @@ yansıtıldı.**
   olduğu ve `audit_log`'da hassas veri OLMADIĞI doğrulanarak (bkz.
   `11_yedekleme_runbook.md`) şifrelemeden saklanmasına bilinçli karar
   verildi. `app_dashboard_service`'e `idle_in_transaction_session_
-  timeout=30min` **canlıya uygulandı** (2026-09-07'deki 3+ saatlik kilit
+timeout=30min` **canlıya uygulandı** (2026-09-07'deki 3+ saatlik kilit
   olayının TEKRARINA karşı) — gerçek bir kısa-timeout testiyle
   doğrulandı, normal kullanım etkilenmedi. (`app/dashboard.py`'nin bu
   hatayı otomatik yakalamadığı o turda bilinen bir sınırlama olarak not
@@ -165,23 +166,23 @@ yansıtıldı.**
   canlıya uygulandı). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.29, Sürüm
   Geçmişi v1.44.
   **2026-09-17'de bir DOĞRULAMA TURU yapıldı** (`dokumanlar/kapsam_
-  raporu_2026-09-16.md`'nin 5 maddesini ölçerek kesin sonuca bağlamak,
+raporu_2026-09-16.md`'nin 5 maddesini ölçerek kesin sonuca bağlamak,
   commit `8b0da0f`) — 4 madde KANITLANDI (batch 732'nin mutabakat
   tarafından gerçekten/doğru bloklandığı, Adıyaman+Kahramanmaraş'ın
   2023-01/02'de EPDK'nın kendi mücbir-sebep dipnotuyla gerçekten eksik
   olduğu — deprem, 2022-07'nin zaten kayıtlı olduğu), 1 madde (kaynak_id
   sapması) monotonik-genişleme hipotezini çürüttü ama tam kapsamda
   belirsiz kaldı. YENİ kalıcı script: `worker/scripts/running_batch_
-  kontrolu.py`. Detay orada, bu dosyada tekrarlanmıyor (D kuralı).
+kontrolu.py`. Detay orada, bu dosyada tekrarlanmıyor (D kuralı).
   **2026-09-18'de İş A (source_asset dedup) + İş C (mutabakat_reddedildi
   terminal durum) yapıldı** (`Claude outputs/PROMPT_A_C_2026-09-17.md`,
   kapanış raporu `Claude outputs/kapanis_2026-09-18_A_C.md` — BUNDAN
   SONRA kapanış raporları sohbete değil dosyaya yazılıyor, bkz. `.github/
-  copilot-instructions.md`). İş A: canlıda 126 mükerrer `file_hash`
+copilot-instructions.md`). İş A: canlıda 126 mükerrer `file_hash`
   grubu ÖLÇÜLDÜ, DURULDU (kullanıcı talimatı gereği — 125'i beklenen
   mimari, 1'i zaten temizlenmiş eski bir bug artığı), dedup migration'ı
   UYGULANMADI, 3 seçenek Ahmet'e sunuldu. İş C TAMAMLANDI: `ingestion_
-  batch.status`'a 7. terminal durum (`mutabakat_reddedildi`) eklendi
+batch.status`'a 7. terminal durum (`mutabakat_reddedildi`) eklendi
   (migration `20260918_0001`, yalnız disposable'da), blok yolları
   (`aktive_et_uretim_word.py`/`backfill_uretim_excel.py`) artık status
   SET edip `audit_log_yaz()` çağırıyor, geri dönülebilirlik uçtan uca
@@ -198,7 +199,7 @@ yansıtıldı.**
   ADIM 3 (batch 732) bu turda ÇALIŞTIRILMADI, batch 4-8'e dokunulmadı.
   **İş A kararı (Seçenek 3) kayda geçti, henüz uygulanmadı.** Detay:
   §5.31, Sürüm Geçmişi v1.46, `Claude outputs/kapanis_2026-09-19_
-  canli_C.md`.
+canli_C.md`.
   **Aynı gün (devam), batch 4-8 ölçüldü — KAPANDI, aksiyon gerekmiyor**
   (2026-02..06 gerçekten iki kez yüklenmiş, aktif veri ikinci
   yüklemeden geliyor, batch 4-8 zararsız/ölü, kök nedeni 2026-08-31'de
@@ -206,13 +207,13 @@ yansıtıldı.**
   formatı). **ADIM 3 (batch 732) de bu turda CANLIYA UYGULANDI:**
   `mutabakat_reddedildi`, audit_log +1, fact tablolarında 0 fark. **İş C
   TAMAMEN KAPANDI.** Detay: §5.32, Sürüm Geçmişi v1.47, `Claude
-  outputs/kapanis_2026-09-19_batch_4_8.md`.
+outputs/kapanis_2026-09-19_batch_4_8.md`.
   (bkz. "Sonraki Oturum Devam Noktası" — tam liste orada).
   ADIM 1: Excel T11'in Genel Toplam satırı KÜMÜLATİF,
   6/6 ay (202601-202606) gerçek dosyaya karşı test edildi — de-kümülatif
   edilince T7 ile 4/6 ay birebir, 2/6 ay <%0,02 fark; **T7 değil T11
   seçildi** (2016-2025 Word ile TEK tanım). ADIM 2: `fact_tuketim_
-  ulke_geneli` 2026-01..06'ya genişletildi (629 aktif satır — 599+30),
+ulke_geneli` 2026-01..06'ya genişletildi (629 aktif satır — 599+30),
   gerçek bir de-kümülatif bug'ı bulunup düzeltildi (regresyon testiyle).
   **KPI-13 artık gerçek değer üretiyor:** 2026-06↔2025-06 için **+%7,1**
   (önceden hep 'hesaplanamaz'). ADIM 3 madde 1: ADIM 2'nin "en son
@@ -224,7 +225,7 @@ yansıtıldı.**
   (`tuketim_mwh` değişmedi), mutabakat+tutarlılık canlıda YEŞİL. Detay:
   `10_TEKNIK_MASTER_DOKUMAN.md` §5.5-5.6, Sürüm Geçmişi v1.15-v1.16.
 - **Yan olay (2026-09-08):** yukarıdaki doğrulama sırasında `worker/tests/
-  conftest.py`'nin canlı-DB koruması 2026-09-02'deki İLE AYNI şekilde
+conftest.py`'nin canlı-DB koruması 2026-09-02'deki İLE AYNI şekilde
   atlandı (`.env`'in kontrolden SONRA yüklenmesi) ve pytest paketi yine
   canlıya karşı çalışıp `tarih_id=209912` test kirliliği bıraktı — TESPİT
   EDİLDİ, TEMİZLENDİ (85 fact + 3 batch + 3 source_asset + 1 dim_tarih,
@@ -234,18 +235,18 @@ yansıtıldı.**
 
 ## Tablo — Yıl × Tablo Aktivasyon Durumu
 
-| Yıl | T11 fact_tuketim | T10 fact_abone | T4 fact_uretim |
-|---|---|---|---|
-| 2016 | 12/12 aktif | 0/12 (kaynakta yok — tablo hiç basılmamış) | 12/12 aktif |
-| 2017 | 12/12 aktif | 0/12 (kaynakta yok — il-only) | 12/12 aktif |
-| 2018 | 12/12 aktif | 0/12 (kaynakta yok — il-only) | 12/12 aktif |
-| 2019 | 12/12 aktif | 0/12 (kaynakta yok — il-only) | 12/12 aktif |
-| 2020 | 12/12 aktif | 0/12 (kaynakta yok — il-only) | 12/12 aktif |
-| 2021 | 12/12 aktif | 2/12 (yalnız Kas-Ara; Oca-Eki kaynakta yok) | 12/12 aktif |
-| 2022 | 12/12 aktif | 12/12 aktif | 11/12 aktif (Temmuz kaynakta yok) |
-| 2023 | 12/12 aktif | 12/12 aktif | 12/12 aktif |
-| 2024 | 12/12 aktif | 12/12 aktif | 12/12 aktif |
-| 2025 | 12/12 aktif | 12/12 aktif | 12/12 aktif |
+| Yıl  | T11 fact_tuketim | T10 fact_abone                              | T4 fact_uretim                    |
+| ---- | ---------------- | ------------------------------------------- | --------------------------------- |
+| 2016 | 12/12 aktif      | 0/12 (kaynakta yok — tablo hiç basılmamış)  | 12/12 aktif                       |
+| 2017 | 12/12 aktif      | 0/12 (kaynakta yok — il-only)               | 12/12 aktif                       |
+| 2018 | 12/12 aktif      | 0/12 (kaynakta yok — il-only)               | 12/12 aktif                       |
+| 2019 | 12/12 aktif      | 0/12 (kaynakta yok — il-only)               | 12/12 aktif                       |
+| 2020 | 12/12 aktif      | 0/12 (kaynakta yok — il-only)               | 12/12 aktif                       |
+| 2021 | 12/12 aktif      | 2/12 (yalnız Kas-Ara; Oca-Eki kaynakta yok) | 12/12 aktif                       |
+| 2022 | 12/12 aktif      | 12/12 aktif                                 | 11/12 aktif (Temmuz kaynakta yok) |
+| 2023 | 12/12 aktif      | 12/12 aktif                                 | 12/12 aktif                       |
+| 2024 | 12/12 aktif      | 12/12 aktif                                 | 12/12 aktif                       |
+| 2025 | 12/12 aktif      | 12/12 aktif                                 | 12/12 aktif                       |
 
 Tüm "kaynakta yok" hücreleri `veri_kapsam_disi` tablosunda açık sebep
 metniyle işaretli VE artık panelde (Aşama 7 entegrasyonu) kullanıcıya
@@ -253,12 +254,12 @@ görünür şekilde açıklanıyor.
 
 ## Regresyon testleri — tam liste (10/10 yıl)
 
-| Dosya | Kapsam |
-|---|---|
-| `test_word_2016.py` … `test_word_2022.py` | Önceki oturumlarda yazıldı |
-| `test_word_2023.py` (13 test) | Bugün eklendi — 4 "Kamu/Özel" varyantı, ADIYAMAN* dipnotu, HAKKÂRİ inceltme işareti |
-| `test_word_2024.py` (11 test) | Bugün eklendi — tek şablon, Linyit dahil kaynak kolonları |
-| `test_word_2025.py` (12 test) | Bugün eklendi — tek şablon, Nisan 2025 Aydınlatma deseni notu |
+| Dosya                                     | Kapsam                                                                              |
+| ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| `test_word_2016.py` … `test_word_2022.py` | Önceki oturumlarda yazıldı                                                          |
+| `test_word_2023.py` (13 test)             | Bugün eklendi — 4 "Kamu/Özel" varyantı, ADIYAMAN* dipnotu, HAKKÂRİ inceltme işareti |
+| `test_word_2024.py` (11 test)             | Bugün eklendi — tek şablon, Linyit dahil kaynak kolonları                           |
+| `test_word_2025.py` (12 test)             | Bugün eklendi — tek şablon, Nisan 2025 Aydınlatma deseni notu                       |
 
 Hepsi `grup_esle_zorunlu`/`kaynak_esle_zorunlu`/`t11_oku`/`t10_oku`/
 `t4_oku` düzeyinde, synthetic in-memory docx tablolarıyla, `DATABASE_URL`
@@ -270,6 +271,7 @@ bağımsız — CI'nin 'Worker' job'ında (canlı DB yok) da çalışır.
 kullanımda (Streamlit Cloud'da admin girişiyle) `permission denied for
 table dim_tarih` ve ardından sessiz sıfır-satır sonuçları olarak ortaya
 çıktı. 4 ayrı migration'la kapatıldı:
+
 - `20260904_0001` — 5 `dim_*` tablosuna `data_operator`/`admin` için
   eksik `GRANT SELECT`.
 - `20260904_0002` — aynı 5 tabloda policy'siz açık kalmış RLS `DISABLE`.
@@ -278,9 +280,29 @@ table dim_tarih` ve ardından sessiz sıfır-satır sonuçları olarak ortaya
 - `20260904_0004` — bu 3 tabloda da bulunan AYNI policy'siz-RLS deseni
   `DISABLE`.
 
-Doğrulandı (bu turda yeniden sorgulandı): `public` şemasındaki 18
-tablonun hiçbiri artık ne grant'sız ne RLS-açık-policy'siz. Detay:
-`dokumanlar/06_canli_veri_operasyon_gunlugu.md`, 2026-09-04 girdisi.
+Doğrulandı (2026-09-04'te sorgulandı, o tarihte 18 tablo vardı): `public`
+şemasındaki tabloların hiçbiri ne grant'sız ne RLS-açık-policy'siz.
+
+## RLS gerçeği — canlıda İKİ KEZ, bağımsız olarak doğrulandı (2026-10-02 itibarıyla)
+
+**Tarih çapası:** 2026-10-02 itibarıyla canlı Supabase'de `public`
+şemasında **21 tablo** var (2026-09-04'teki 18'den artış — ara dönemde
+`fact_tuketim_ulke_geneli`, `fact_uretim_kaynak_geneli`,
+`fact_uretim_il_geneli` eklendi). Salt-okuma (`conn.read_only = True`)
+ile bu 21 tablonun **TAMAMI** RLS açık + en az 1 policy'e sahip —
+**RLS'siz veya politikasız hiçbir tablo YOK.** Bu ölçüm 2026-09-20 ve
+2026-10-02'de İKİ AYRI oturumda BAĞIMSIZ olarak çalıştırıldı, ikisi de
+BİREBİR aynı sonucu verdi (detay: `10_TEKNIK_MASTER_DOKUMAN.md` §16.4/
+§16.5, `Claude outputs/kapanis_2026-10-02_rls_devam.md`).
+
+`worker/validate_rls_static.py` (statik, DB bağımsız doğrulayıcı) daha
+önce yalnız 3 sabit dosyayı tarıyordu, 30+ migration'ı hiç GÖRMÜYORDU
+(fark tam 2 tablo: `fact_uretim_kaynak_geneli`, `fact_uretim_il_geneli`
+— şans eseri ikisi de doğru RLS'e sahipti, doğrulama eseri değil). Bu
+turda **dinamik** hale getirildi (`supabase/migrations/*.sql`'in
+TAMAMI taranıyor, sabit liste YOK) + her tablo için GENEL bir
+"RLS açık VE en az 1 policy var" kontrolü eklendi — kasıtlı bozuk
+örneklerle (RLS'siz tablo, politikasız tablo) ateşlediği KANITLANDI.
 
 ## Test durumu (2026-09-07'de temiz bir kabukta yeniden doğrulandı)
 
@@ -311,7 +333,7 @@ turlarda eklenen testler — tam kırılım doğrulanmadı, yalnız toplam 227
 2. **Faz 4 (Tahminleme) / Faz 5 (EPİAŞ)** — daha önce ertelenmişti,
    artık 10 yıl gerçek veri var, karar gözden geçirilebilir.
 3. **Sanayi'nin ülke geneli serisi — TAMAMEN TAMAMLANDI** (`fact_tuketim_
-   ulke_geneli`, 120/120 ay aktif, yukarıya bkz.). KPI-25/27'nin bu
+ulke_geneli`, 120/120 ay aktif, yukarıya bkz.). KPI-25/27'nin bu
    tabloyu kullanıp kullanmayacağı kararı da **2026-09-08'de (Aşama
    2/C5) verildi ve uygulandı** — yukarıdaki TL;DR maddesine bkz., bu
    madde artık açık değil.
@@ -341,7 +363,7 @@ sorgulandı:
   hatası değil — `dogrula_tuketim()`'in negatif değer reddinin il vs
   ülke seviyesinde bağımsız uygulanmasının beklenen sonucu), mutabakat
   sorgusu kalıcı olarak düzeltildi (`worker/scripts/mutabakat_ulke_
-  geneli.py`), kalan 39 ay (2016-12 hariç 4/5 grupla) aktive edildi →
+geneli.py`), kalan 39 ay (2016-12 hariç 4/5 grupla) aktive edildi →
   **120/120 ay aktif, 599 satır**. RLS admin+viewer JWT ile yeniden
   doğrulandı. Ayrıca 13-dokümanlık dış denetim (Aşama 0) ve Aşama 1'in
   büyük kısmı (C2/B2/C1/C3/C4) bu günde tamamlandı.
@@ -359,20 +381,21 @@ yerden devam edebilmeli.**
 
 **GÜNCEL (2026-09-20, gece) — en üst özet, aşağıdaki eski tarihli
 özetlerin YERİNE geçer:**
+
 - **Veri bütünlüğü arkı KAPANDI:** İş C (`mutabakat_reddedildi`)
   canlıda tam uygulandı; batch durum makinesi artık 9 değerde
   (`onay_bekliyor`/`onaylanmadi` dahil), batch 4-8 canlıda kapatıldı,
   `running_batch_kontrolu.py` TAMAMEN temiz (bkz. `10_TEKNIK_MASTER_
-  DOKUMAN.md` §5.33, `Claude outputs/kapanis_2026-09-19_batch_durum.md`).
+DOKUMAN.md` §5.33, `Claude outputs/kapanis_2026-09-19_batch_durum.md`).
 - **Toplama katmanı + Zaman Serisi UI TAMAMLANDI** (commit `7ac2cc9`,
   `a65b2b7`, `6e5b079` — `Claude outputs/kapanis_2026-09-19_toplama_
-  katmani.md` + `kapanis_2026-09-20_ui_zaman_serisi.md`, §15/§5.34/§5.35):
+katmani.md` + `kapanis_2026-09-20_ui_zaman_serisi.md`, §15/§5.34/§5.35):
   4 view + `worker/toplama.py` (8 fonksiyon) + dashboard'a "📈 Zaman
   Serisi" bölümü (mevcut sayfa BOZULMADI) — Altair ile çoklu-seri
   grafik, eksik-dönem işaretleme, dikiş etiketi.
 - **JIT bulgusu:** v1.49'un "tek seferlik JIT" iddiası ÖLÇÜLÜP
   ÇÜRÜTÜLDÜ (amortisman YOK, her koşuda tekrarlanıyor) — karar: `worker/
-  toplama.py`'nin TÜM sorgularına `SET LOCAL jit = off` eklendi (8×
+toplama.py`'nin TÜM sorgularına `SET LOCAL jit = off` eklendi (8×
   hızlanma, disposable'da ~830ms→~100ms).
 - **"Hiç çalışmayan kontrol" denetimi + test idempotentliği KAPANDI**
   (§16, §16.3): sqlfluff pre-commit + `.pre-commit-config.yaml`'ın hiç
@@ -397,27 +420,30 @@ yerden devam edebilmeli.**
      eklenmesi — ikisi de ÖNERİLDİ, uygulanmadı, ayrı birer tur.
 
 ### Bugün/bu gece (2026-09-07/08/09) ne kapandı — tek satır özet
+
 13-dokümanlık dış denetimin **tamamı** kapandı (2026-09-07/08, Aşama 0/1/2
-+ D kuralı). 2026-09-08 içinde Aşama 3 ADIM 1-2 + ADIM 3 madde 1 kapandı
-(commit `1232cb3`, `df616e6`). 2026-09-09 gecesi (gözetimsiz çalışma)
-ADIM 3'ün TAMAMI (madde 0-4, kod+disposable) + ADIM 5'in araştırma
-hazırlığı kapandı (commit'ler `a230614`→`cf5c9a1`, `7b76e3c`). **Aynı gün
-(2026-09-09) kullanıcı onayıyla ADIM 3 madde 2-4 CANLIYA UYGULANDI**
-(migration `20260909_0001` + `backfill_uretim_excel.py`, commit `2b3ecac`)
-ve **Bulgu C/D kararları verilip uygulandı** (migration `20260909_0002` +
-`veri_kapsam_disi` 48 satır + KPI-07 regresyon testi) — detay `10_TEKNIK_
+
+- D kuralı). 2026-09-08 içinde Aşama 3 ADIM 1-2 + ADIM 3 madde 1 kapandı
+  (commit `1232cb3`, `df616e6`). 2026-09-09 gecesi (gözetimsiz çalışma)
+  ADIM 3'ün TAMAMI (madde 0-4, kod+disposable) + ADIM 5'in araştırma
+  hazırlığı kapandı (commit'ler `a230614`→`cf5c9a1`, `7b76e3c`). **Aynı gün
+  (2026-09-09) kullanıcı onayıyla ADIM 3 madde 2-4 CANLIYA UYGULANDI**
+  (migration `20260909_0001` + `backfill_uretim_excel.py`, commit `2b3ecac`)
+  ve **Bulgu C/D kararları verilip uygulandı** (migration `20260909_0002` +
+  `veri_kapsam_disi` 48 satır + KPI-07 regresyon testi) — detay `10_TEKNIK_
 MASTER_DOKUMAN.md` §5.11. **Sonra ADIM 5 (KPI-02/03/05/06/07 bağlama)
-TAMAMLANDI** (commit `8afe19c`, §5.13) ve hemen ardından bir kontrol
-turunda **KPI-04'ün de aynı kaynağa (yeniden) bağlanması gerektiği
-bulunup düzeltildi** (bkz. "Açık madde" altındaki ADIM 5 kaydı ve §5.14) —
-Aşama 3'ün "boş KPI'ları aç" hedefi artık KPI-01..07'nin TAMAMI için
-gerçekleşmiş durumda (yalnız 2026-01'den itibaren; Word yılları ADIM 4'te).
+  TAMAMLANDI** (commit `8afe19c`, §5.13) ve hemen ardından bir kontrol
+  turunda **KPI-04'ün de aynı kaynağa (yeniden) bağlanması gerektiği
+  bulunup düzeltildi** (bkz. "Açık madde" altındaki ADIM 5 kaydı ve §5.14) —
+  Aşama 3'ün "boş KPI'ları aç" hedefi artık KPI-01..07'nin TAMAMI için
+  gerçekleşmiş durumda (yalnız 2026-01'den itibaren; Word yılları ADIM 4'te).
 
 ### Açık madde
 
 **GÜNCEL (2026-09-19, devam) — en öncelikli açık maddeler bunlar,
 aşağıdaki ADIM 3/4 tarihçesi TAMAMEN kapalı, yalnız referans için
 duruyor:**
+
 1. ~~**batch 4-8 — Ahmet'in kararı gerekiyor**~~ — **TAMAMEN KAPANDI
    (2026-09-19, batch durum makinesi turu), hem VERİ hem DURUM düzeyinde.**
    Ölçüldü: 2026-02..06 GERÇEKTEN iki kez yüklenmiş, canlıdaki AKTİF veri
@@ -458,7 +484,7 @@ duruyor:**
    Ölçüldü: batch 4-8→10-15 geçişinde ikinci (aktif, düzeltilmiş) yükleme
    `parser_version`'ı **`'0.1'`'den `'0.3'`'e bump edilmiş** (KANITLANDI —
    canlı veriden doğrudan okundu). Ama repoda (`dokumanlar/`, `.github/
-   copilot-instructions.md`) "parser davranışı değişince `parser_version`
+copilot-instructions.md`) "parser davranışı değişince `parser_version`
    bump edilir" diye YAZILI bir kural YOK — yalnız geçmiş `parser_version`
    değerlerinin tanımlayıcı kaydı var, hiçbir yerde ZORUNLU bir disiplin
    olarak yazılmamış (bu turda bump'ın kendisi ŞANSA/insan alışkanlığına
@@ -466,8 +492,8 @@ duruyor:**
    `.github/copilot-instructions.md`'ye (kod yazma kuralları bölümüne) tek
    satırlık bir madde: "Bir parser fonksiyonunun çıktısını etkileyen HER
    davranış değişikliğinde `parser_version` ARTIRILIR — aynı `parser_
-   version` iki farklı çıktı üretemez (P0-5'in `UNIQUE(source_asset_id,
-   parser_version, schema_version)` varsayımı buna dayanıyor)." **Neden
+version` iki farklı çıktı üretemez (P0-5'in `UNIQUE(source_asset_id,
+parser_version, schema_version)` varsayımı buna dayanıyor)." **Neden
    İş A Seçenek 3'ün ön koşulu:** Seçenek 3, "1 fiziksel dosya = 1
    `source_asset` satırı" mimarisine geçtiğinde, `parser_version` ARTIK
    TEK ayırt edici kolon olacak (bugünkü gibi `source_asset_id` DEĞİL) —
@@ -481,6 +507,7 @@ Dış denetim listesinin (A/B/C bölümleri) hiçbir maddesi açık değil.
 **Aşama 3 (boş KPI'ları açma) — ADIM 3'ün madde 1-4'ünün TAMAMI (kod +
 canlı) TAMAMLANDI, ADIM 5 (KPI bağlama, KPI-04 dahil) DE TAMAMLANDI —
 yalnız ADIM 4 (Word yılları) AÇIK:**
+
 - **ADIM 3 madde 1** (batch bağımlılığı düzeltmesi) — TAMAMLANDI, canlıda
   (2026-09-08, commit `df616e6`).
 - **ADIM 3 madde 2** (`fact_uretim_kaynak_geneli`/`fact_uretim_il_geneli`
@@ -500,15 +527,15 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     migration `20260909_0002` (`veri_kapsam_disi.fact_tablosu` CHECK
     genişletildi) + `pipeline.kapsam_disi_isaretle()` ile 48 satır
     (canlıda 48/48 doğrulandı). KPI-07 için ileriye dönük şart `04_kpi_
-    sozlesmeleri.md`'ye yazıldı + `kpi_07_lisanssiz_pay()`'in boş/tüm-NaN
+sozlesmeleri.md`'ye yazıldı + `kpi_07_lisanssiz_pay()`'in boş/tüm-NaN
     girdide `None` döndüğü yeni bir regresyon testiyle SABİTLENDİ.
-  Detay: `05_kaynak_dosya_sozlesmesi.md`, `12_word_uretim_envanteri.md`.
+    Detay: `05_kaynak_dosya_sozlesmesi.md`, `12_word_uretim_envanteri.md`.
 - **Yan bulgu (canlıya özgü, kod DEĞİŞTİRİLMEDİ):** `validate_role_
-  access.py`'nin `SET ROLE` adımı canlıda "permission denied" verdi —
+access.py`'nin `SET ROLE` adımı canlıda "permission denied" verdi —
   `postgres` rolünün `viewer`/`data_operator`/`admin`/`app_dashboard_
-  service`'e üyeliği `WITH INHERIT FALSE, SET FALSE` (PG16+ özelliği,
+service`'e üyeliği `WITH INHERIT FALSE, SET FALSE` (PG16+ özelliği,
   Supabase'in native rolleri — anon/authenticated/service_role — `SET
-  TRUE` ile granted, fark BURADA) — bu turun migration'larıyla İLGİSİZ,
+TRUE` ile granted, fark BURADA) — bu turun migration'larıyla İLGİSİZ,
   ÖNCEDEN VAR OLAN bir canlı-ortam karakteristiği (disposable'da AYNI
   script sorunsuz geçti). `validate_rls_static.py` (21/21) canlıda
   YEŞİL — dinamik SET ROLE testi ayrı bir araştırma konusu, kod/veri
@@ -535,10 +562,10 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
   kaldığı için atlanmıştı. Formülü (`Σ uretim(kaynak)/Σ uretim`) KPI-03/06
   ile YAPISAL OLARAK AYNI — kaynak DEĞİŞTİRİLİP `uretim_kaynak_geneli`'ye
   bağlandı (`app/dashboard.py`, `kpi.kpi_04_kaynak_payi(uretim_kaynak_
-  geneli)`). Canlı 2026-01..06 kaynak payları toplamı 6/6 ayda ~%100
+geneli)`). Canlı 2026-01..06 kaynak payları toplamı 6/6 ayda ~%100
   (99,9-100,2 — 1 ondalık yuvarlamadan kaynaklanan beklenen sapma)
   doğrulandı. Yeni regresyon assertion'ı `test_uretim_kaynak_geneli_
-  getir_sekil_ve_lisans_gorunumu`'a eklendi (payların toplamı %100'e
+getir_sekil_ve_lisans_gorunumu`'a eklendi (payların toplamı %100'e
   yakın olmalı). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.14.
 - **🟢 ADIM 4 devam ediyor (2026-09-13) — 2025 (T2+T3 Lisanslı + T5/T6
   Lisanssız kararı) TAMAMLANDI:**
@@ -582,7 +609,7 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     doğru şekilde yakaladı, ZORLA GEÇİRİLMEDİ, 202402 Lisanslı
     aktive edilmeden bırakıldı). Disposable: 12/12 ay yüklendi, mutabakat
     **11/12 uyumlu**. +5 test, 249/249 unit test yeşil. Detay: `12_word_
-    uretim_envanteri.md` Bulgu I/J, `10_TEKNIK_MASTER_DOKUMAN.md` §5.17,
+uretim_envanteri.md` Bulgu I/J, `10_TEKNIK_MASTER_DOKUMAN.md` §5.17,
     Sürüm Geçmişi v1.31.
     - **⚠️ Canlı backfill öncesi açık madde:** 202402'nin T3 verisi için
       karar gerekecek (olduğu gibi mi kabul, yoksa EPDK'nın olası bir
@@ -598,7 +625,7 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     (ilk yazılan migration taslağı redundant çıkıp silindi). Disposable:
     12/12 ay yüklendi, mutabakat **12/12 uyumlu** (2024'ün Bulgu J'si gibi
     bir sorun YOK). +4 test, 255/255 unit test yeşil. Detay: `12_word_
-    uretim_envanteri.md` Bulgu K, `10_TEKNIK_MASTER_DOKUMAN.md` §5.18,
+uretim_envanteri.md` Bulgu K, `10_TEKNIK_MASTER_DOKUMAN.md` §5.18,
     Sürüm Geçmişi v1.32.
   - **✅ Her iki açık karar SAYIYLA ölçülüp KAPATILDI (2026-09-13):**
     - **2024-02 (Bulgu J):** ÖLÇÜLDÜ — T2 (kaynak) Ocak/Şubat'ta 11/11
@@ -650,8 +677,8 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     hâlâ mevcut (`_STALE_IL_AYLAR`, commit `a103a03`), fresh disposable'a
     2024'ün 12 ayı yeniden yüklenip `mutabakat_kontrol_et()` çıktısı
     doğrudan sorgulandı — `{'tarih_id': 202402, 'durum':
-    'bir_taraf_eksik', 'il_toplami': None, 'kaynak_toplami':
-    25615763.19}`, beklenenle BİREBİR aynı. Bekleyen bir uygulama adımı
+'bir_taraf_eksik', 'il_toplami': None, 'kaynak_toplami':
+25615763.19}`, beklenenle BİREBİR aynı. Bekleyen bir uygulama adımı
     YOKTU.
   - **✅ 2019 TAMAMLANDI (2026-09-13):** T2+T3 (Lisanslı) yüklendi,
     Lisanssız (Bulgu L kararıyla) TÜM yıl kapsam dışı. **Bulgu N:**
@@ -660,7 +687,7 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     T2 dökümüyle tespit edildi, `t2_oku()` artık T4'ün established
     "TOPLA" ilkesiyle aynı kaynağa eşlenen satırları biriktirip TEK
     satır üretiyor (aksi halde `UNIQUE(tarih_id, kaynak_id, lisans_id,
-    batch_id)` kısıtı ihlal edilirdi). Disposable: 12/12 ay yüklendi
+batch_id)` kısıtı ihlal edilirdi). Disposable: 12/12 ay yüklendi
     (UNIQUE ihlali YOK), mutabakat 2024 ile birlikte 24 çift kontrol
     etti, **23/24 uyumlu** (tek uyumsuz beklenen 202402). +3 test
     (`test_word_2019.py`). Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.22,
@@ -730,7 +757,7 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     tek turda doğrulandı (2026-09-16):** fresh rebuild, 2016→2025
     sırasıyla yeniden yüklendi. `mutabakat_uretim.py`: **120 çift
     kontrol etti, 119 uyumlu, 1 BEKLENEN istisna (202402, `bir_taraf_
-    eksik`, Bulgu J)**. `fact_uretim_kaynak_geneli`: 1.393 satır
+eksik`, Bulgu J)**. `fact_uretim_kaynak_geneli`: 1.393 satır
     (120/120 ay). `fact_uretim_il_geneli`: 9.639 satır (119/120 ay).
     TÜM 120 batch `status='running'`, TÜM fact satırları
     `is_active=false` (gece-boyu kural — aktivasyon HİÇ çağrılmadı).
@@ -746,7 +773,7 @@ yalnız ADIM 4 (Word yılları) AÇIK:**
     EKLENMEDİ). Canlı satır sayıları disposable'la BİREBİR eşleşti.
     **Backfill SONRASI kritik bulgu, AYNI oturumda düzeltildi:** KPI-07
     Word yılları için sessizce yanlış '%0' döndürüyordu — `kpi_07_
-    lisanssiz_pay()`'e zorunlu `lisanssiz_kapsam_disi` parametresi
+lisanssiz_pay()`'e zorunlu `lisanssiz_kapsam_disi` parametresi
     eklenip düzeltildi, canlıda yeniden ölçülüp doğrulandı. KPI-03/06
     kontrol edildi, düzeltme gerekmedi (Lisanslı-only kapsamı captioned).
     Detay: `10_TEKNIK_MASTER_DOKUMAN.md` §5.27, Sürüm Geçmişi v1.42,
@@ -800,8 +827,9 @@ bulunmuştu — tam envanter çıkarıldı (workflow'lar, pre-commit, DB
 kısıtları, kapı fonksiyonları), her biri KANITLI ATEŞLER / SINANMAMIŞ /
 ATEŞLEYEMEZ diye işaretlendi. **2 YENİ ATEŞLEYEMEZ vaka bulundu, ikisi
 de kasıtlı bozuk örnekle KANITLANDI:**
+
 1. **`.pre-commit-config.yaml`'ın TÜMÜ (8 hook grubu)** — `.git/hooks/
-   pre-commit` hiç kurulmamış, `pre-commit` CLI kurulu değil, hiçbir CI
+pre-commit` hiç kurulmamış, `pre-commit` CLI kurulu değil, hiçbir CI
    job'ı çağırmıyor. Konfigürasyon var ama SIFIR koruma sağlıyor.
 2. **`worker/validate_rls_static.py`** — `SCHEMA_PATHS` 2026-08-19
    tarihli 3 dosyaya DONMUŞ, o tarihten sonraki 30+ migration'ı hiç
@@ -913,6 +941,7 @@ temiz, `bandit` 0 bulgu.
 raporu_2026-09-16.md`'nin 5 maddesi SALT OKUMA + gerçek EPDK .docx
 dosyaları açılarak ölçüldü. Tam bulgu/sayılar orada ("Doğrulama Turu"
 eki) — burada yalnız özet (D kuralı, tekrar yazılmaz):
+
 - Madde 1 (batch 732): **KANITLANDI** — mutabakat gerçekten çalıştı,
   doğru sebeple bloke etti; ama audit_log'da bu kararın izi YOKTU (yalnız
   yükleme olayı kayıtlıydı), UNIQUE kısıtı yeniden yüklemeyi şema
@@ -948,7 +977,7 @@ YENİ çalışma kuralı, `.github/copilot-instructions.md`):
   aynı parser_version) tekrar — ama bu 2026-08-31'de ZATEN belgelenip
   temizlenmiş bir idempotency-bug artığı (batch_id=19, sıfır aktif
   çift-satır kaldı). **Sonuç:** önerilen `UNIQUE(file_hash) WHERE
-  file_hash IS NOT NULL` tasarımı mevcut mimariyle UYUMSUZ (125
+file_hash IS NOT NULL` tasarımı mevcut mimariyle UYUMSUZ (125
   legitimate grubu da bloklardı) — dedup migration'ı (A2/A3) UYGULANMADI,
   3 tasarım seçeneği Ahmet'e sunuldu (bkz. kapanış raporu). **A4
   (dedup'tan bağımsız bir soru — bugünkü `batch_olustur()` davranışı)
@@ -959,7 +988,7 @@ YENİ çalışma kuralı, `.github/copilot-instructions.md`):
 - **İş C — TAMAMLANDI (kod+test+disposable, CANLIYA UYGULANMADI):**
   `ingestion_batch.status`'a 7. terminal durum `'mutabakat_reddedildi'`
   eklendi (migration `20260918_0001`). `mutabakat_uretim.
-  mutabakat_reddini_kaydet()` (YENİ) hem status SET eder hem
+mutabakat_reddini_kaydet()` (YENİ) hem status SET eder hem
   `audit_log_yaz()` çağırır. `aktive_et_uretim_word.py` +
   `backfill_uretim_excel.py`'nin blok yolları TARANDI ve güncellendi
   (`onayla.py`/`toplu_onayla_word.py` mutabakat'a hiç bakmıyor, insan
@@ -995,9 +1024,9 @@ kaydında.
    sarı≤10) gözlemlerin ~%90'ı "kırmızı" gösteriyordu. Yeni eşik:
    `yesil_alt=15,0`, `sari_alt=30,0` (KPI-13/25/27'nin izlediği
    ampirik-persentil yöntemi). Migration `20260916_0001_kpi_esik_kpi12_
-   yeniden_kalibrasyon.sql` — kilit ön kontrolü temiz, disposable'da
+yeniden_kalibrasyon.sql` — kilit ön kontrolü temiz, disposable'da
    (31/31) doğrulanıp **canlıya uygulandı**, canlıda `('KPI-12','v1',
-   15.000,30.000,None,'alcelik')` teyit edildi. KPI-11'i girdi alan
+15.000,30.000,None,'alcelik')` teyit edildi. KPI-11'i girdi alan
    başka bir eşik YOK (kontrol edildi) — KPI-11 için ayrı bir değişiklik
    gerekmedi.
 
@@ -1019,7 +1048,7 @@ sayılar `06_canli_veri_operasyon_gunlugu.md` 2026-09-16 (devam) kaydında
    `worker/analytics.py:_il_tuketim_hava_getir()` Sanayi'yi tutarsız
    kapsıyordu (Word yıllarında hiç yok — Karar 2 —, 2026'da var, ölçülen
    pay %40,2). Tercih sırasının 1. seçeneği (`fact_tuketim_ulke_
-   geneli`'ye taşıma) il-bazlı β/γ regresyon mimarisiyle GERÇEKTEN
+geneli`'ye taşıma) il-bazlı β/γ regresyon mimarisiyle GERÇEKTEN
    ÇAKIŞTI (il kırılımı yok) — 2. seçenek (her iki taraf Sanayi-hariç)
    uygulandı. Düzeltme SONRASI KPI-12 +%15,4'e düştü. +2 test.
 2. **job_status id=11 (8 gündür "retrying"de asılı):** araştırıldı —
@@ -1068,16 +1097,17 @@ DDL değişikliği YOK.**
 **2) Kaç ay/satır yüklenecek, hangi aylar kapsam dışı/aktive edilmeyecek?**
 Disposable'daki 120-ay doğrulama turunun BİREBİR AYNISI canlıda
 tekrarlanacak:
+
 - **Yüklenecek:** `fact_uretim_kaynak_geneli`'ne 120 ay (2016-01 →
   2025-12, ~1.393 satır), `fact_uretim_il_geneli`'ne 119 ay (2024-02
   HARİÇ, ~9.639 satır).
 - **Kapsam dışı (Lisanssız, T5/T6):** 120 ayın TAMAMI, HER İKİ tabloda
   — Bulgu D/L kararı (`karar_referansi='Bulgu L (2026-09-13, ölçümle
-  doğrulandı)'` veya yıla göre `'Karar 4 genişletildi'`), `nitelik=
-  'lisans_durumu=Lisanssız'`.
+doğrulandı)'` veya yıla göre `'Karar 4 genişletildi'`), `nitelik=
+'lisans_durumu=Lisanssız'`.
 - **Kapsam dışı (Lisanslı, TEK istisna):** 2024-02'nin `fact_uretim_il_
-  geneli` verisi — Bulgu J (`karar_referansi='Bulgu J (2026-09-13, EPDK
-  kaynak belge hatası)'`, `nitelik='lisans_durumu=Lisanslı'`) — T3'ün o
+geneli` verisi — Bulgu J (`karar_referansi='Bulgu J (2026-09-13, EPDK
+kaynak belge hatası)'`, `nitelik='lisans_durumu=Lisanslı'`) — T3'ün o
   ay Ocak'ın birebir kopyası olduğu ÖLÇÜLEREK doğrulandı, T2 (kaynak)
   sağlam, yalnız T2 yüklenecek.
 - **Aktive EDİLMEYECEK aylar:** hiçbiri otomatik aktive edilmeyecek —
@@ -1131,11 +1161,13 @@ yalnız salt-okunur bir SELECT çalıştırdığı için `pg_terminate_backend()
 ile güvenle sonlandırılmıştı. **Backfill YALNIZ veri yazıyor (DDL/ALTER
 TABLE YOK), o yüzden AYNI sınıf lock-timeout riski DAHA DÜŞÜK** ama
 YİNE DE ön kontrol önerilir: backfill'e başlamadan önce
+
 ```sql
 SELECT pid, usename, state, state_change, query
 FROM pg_stat_activity
 WHERE state = 'idle in transaction' AND state_change < now() - interval '10 minutes';
 ```
+
 ile uzun süredir asılı kalmış bağlantı VAR MI kontrol edilmeli — varsa,
 2026-09-07'deki AYNI karar kuralı uygulanır (yalnız salt-okunur/eski bir
 oturumsa `pg_terminate_backend()` ile güvenle sonlandırılır, YAZMA
@@ -1148,31 +1180,32 @@ sonucunu doğrula (madde 3) → yalnız uyumlu aylar için aktivasyon →
 canlı KPI-02/03/06/07'nin Word yılları için de doğru değer ürettiğini
 spot-check et (ADIM 5'in wiring'i zaten `tarih_id` parametrik, ekstra
 kod GEREKMEZ) → `09_PROJE_DURUMU.md`/ops log'a sonucu yaz.
-  - **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatan notlar
-    (hâlâ geçerli):**
-  - `lisans_id` çözümü: **DOĞRULANDI, 2025 için ÇALIŞTI** — `t2_oku()`/
-    `t3_oku()`/`t5_oku()` `"lisans"` alanını ("Lisanslı"/"Lisanssız")
-    kendi çıktılarına doğrudan gömüyor, `ingest.fact_uretim_kaynak_
-    geneli_yukle()`/`fact_uretim_il_geneli_yukle()` bunu (Excel'deki
-    AYNI şekilde) `dim_lisans_id_bul()` ile çözüyor — YENİ bir mekanizma
-    gerekmedi, tahmin doğru çıktı.
-  - **✅ KPI-07 'hesaplanamaz' geçişi — TAMAMLANDI ve DÜZELTİLDİ
-    (2026-09-16).** Bu maddenin ORİJİNAL (2026-09-09) hali YANLIŞ bir
-    varsayım içeriyordu: "`uretim_kaynak_geneli_getir()` kapsam dışı
-    yıllarda BOŞ DataFrame döner, `kpi_07_lisanssiz_pay()` zaten `None`
-    döner" diyordu. Canlı backfill SONRASI ÖLÇÜLDÜ — YANLIŞTI: Word
-    yıllarında Lisanslı veri VAR (boş DEĞİL), yalnız Lisanssız satırları
-    HİÇ YOK — eski kod bunu YAKALAMIYOR, sessizce yanlış bir '%0'
-    üretiyordu. Düzeltme: `kpi_07_lisanssiz_pay()` artık zorunlu
-    `lisanssiz_kapsam_disi` parametresi alıyor, `app/dashboard.py` bunu
-    `veri_kapsam_disi`'den (`analytics.kapsam_disi_getir()`) HER ZAMAN
-    hesaplayıp geçiriyor. Detay: `06_canli_veri_operasyon_gunlugu.md`
-    2026-09-16 (devam) kaydı, `04_kpi_sozlesmeleri.md` KPI-07 notu.
-  - `kapasite_faktoru_girdisi_getir()` Word yılları için de OLDUĞU GİBİ
-    çalışır (SQL sorguları `tarih_id` parametrik, tabloya Word verisi
-    hangi batch'ten gelirse gelsin AYNI filtre mantığı geçerli) — ADIM
-    4'te KPI-05 için ayrı bir wiring GEREKMEZ, yalnız veri dolunca
-    otomatik doğru değer üretir.
+
+- **ADIM 5'in wiring'i sırasında bulunan, ADIM 4'ü ucuzlatan notlar
+  (hâlâ geçerli):**
+- `lisans_id` çözümü: **DOĞRULANDI, 2025 için ÇALIŞTI** — `t2_oku()`/
+  `t3_oku()`/`t5_oku()` `"lisans"` alanını ("Lisanslı"/"Lisanssız")
+  kendi çıktılarına doğrudan gömüyor, `ingest.fact_uretim_kaynak_
+geneli_yukle()`/`fact_uretim_il_geneli_yukle()` bunu (Excel'deki
+  AYNI şekilde) `dim_lisans_id_bul()` ile çözüyor — YENİ bir mekanizma
+  gerekmedi, tahmin doğru çıktı.
+- **✅ KPI-07 'hesaplanamaz' geçişi — TAMAMLANDI ve DÜZELTİLDİ
+  (2026-09-16).** Bu maddenin ORİJİNAL (2026-09-09) hali YANLIŞ bir
+  varsayım içeriyordu: "`uretim_kaynak_geneli_getir()` kapsam dışı
+  yıllarda BOŞ DataFrame döner, `kpi_07_lisanssiz_pay()` zaten `None`
+  döner" diyordu. Canlı backfill SONRASI ÖLÇÜLDÜ — YANLIŞTI: Word
+  yıllarında Lisanslı veri VAR (boş DEĞİL), yalnız Lisanssız satırları
+  HİÇ YOK — eski kod bunu YAKALAMIYOR, sessizce yanlış bir '%0'
+  üretiyordu. Düzeltme: `kpi_07_lisanssiz_pay()` artık zorunlu
+  `lisanssiz_kapsam_disi` parametresi alıyor, `app/dashboard.py` bunu
+  `veri_kapsam_disi`'den (`analytics.kapsam_disi_getir()`) HER ZAMAN
+  hesaplayıp geçiriyor. Detay: `06_canli_veri_operasyon_gunlugu.md`
+  2026-09-16 (devam) kaydı, `04_kpi_sozlesmeleri.md` KPI-07 notu.
+- `kapasite_faktoru_girdisi_getir()` Word yılları için de OLDUĞU GİBİ
+  çalışır (SQL sorguları `tarih_id` parametrik, tabloya Word verisi
+  hangi batch'ten gelirse gelsin AYNI filtre mantığı geçerli) — ADIM
+  4'te KPI-05 için ayrı bir wiring GEREKMEZ, yalnız veri dolunca
+  otomatik doğru değer üretir.
 - **Sonrası — Faz 4 (Tahminleme):** ADIM 4 bittikten SONRA gündemde,
   kapsam kararı HÂLÂ bekliyor (aksiyon gerektirmiyor) — detay aşağıda
   "Faz 4 (Tahminleme)" bölümünde.
@@ -1182,6 +1215,7 @@ kod GEREKMEZ) → `09_PROJE_DURUMU.md`/ops log'a sonucu yaz.
   ve ✅ Kapandı olarak aşağıda listeli, tekrar açık madde değil.
 
 ### ✅ Kapandı — `conftest.py` canlı-DB koruması artık kendi regresyon testine sahip (2026-09-09, gece çalışması MADDE 0)
+
 Aynı koruma (`worker/tests/conftest.py:pytest_configure()`) daha önce
 **iki kez** atlanmıştı: 2026-09-02'de ilk kez (koruma o zaman hiç yoktu)
 ve 2026-09-08'de İKİNCİ kez (koruma VARDI ama `.env`'in `load_dotenv()`
@@ -1201,6 +1235,7 @@ dönülüp test'in kırıldığı görüldü, sonra düzeltme geri alındı), (3
 sessiz atlama artık pytest seviyesinde kilitli.
 
 ### C6 — ertelenmiş/değerlendirilmiş küçük maddeler (yalnız referans, aksiyon BEKLEMİYOR)
+
 - **MFA / merkezi rate-limit:** ertelendi (tek admin kullanıcı var).
 - **Veri girişi UI'ı + admin rol-atama UI'ı:** ertelendi (2026-09-05
   kararı, `data_operator`'ın RLS altyapısı hazır ama UI'ı yok, yeni
@@ -1219,6 +1254,7 @@ sessiz atlama artık pytest seviyesinde kilitli.
   REDDEDİLDİ/KAPANDI — yeniden açılmasın.
 
 ### Faz 4 (Tahminleme) — Aşama 3'ten SONRA, henüz başlamadı
+
 Kapsam kararı bekliyor. **Öneri (karar verilmedi, yalnız öneri):**
 Eskişehir pilotu + seasonal-naive baseline ile başla — küçük, tek-il
 kapsamlı bir kanıt-of-concept, tam bir tahminleme motoruna atlamadan
@@ -1226,6 +1262,7 @@ kapsamlı bir kanıt-of-concept, tam bir tahminleme motoruna atlamadan
 geçirmek için önceki turlarda "erken" denen gerekçe artık geçerli değil.
 
 ### ✅ Kapandı — İlk gerçek cron koşusu doğrulandı (2026-09-13)
+
 `scheduled-backup.yml`'in cron'u (`0 3 * * 0`) 2026-09-13 Pazar günü
 İLK KEZ `schedule` tetikleyicisiyle (elle `workflow_dispatch` DEĞİL)
 gerçekten koştu — run `34747084899`, `success`, artifact `epp-backup-

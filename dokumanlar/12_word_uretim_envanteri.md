@@ -14,12 +14,12 @@ spot-check'i — gerçek `.docx` dosyalarına karşı, kod yazılmadan.
 
 ## Kapsam — Excel karşılığı
 
-| Excel | Word'de arananlar |
-|---|---|
-| T2 (Lisanslı, kaynak bazında) | "...Lisanslı Elektrik Üretiminin Kaynak Bazında Dağılımı..." |
-| T3 (Lisanslı, il bazında) | "...Lisanslı Elektrik Üretiminin İl Bazında Dağılımı (MWh)..." |
+| Excel                          | Word'de arananlar                                                    |
+| ------------------------------ | -------------------------------------------------------------------- |
+| T2 (Lisanslı, kaynak bazında)  | "...Lisanslı Elektrik Üretiminin Kaynak Bazında Dağılımı..."         |
+| T3 (Lisanslı, il bazında)      | "...Lisanslı Elektrik Üretiminin İl Bazında Dağılımı (MWh)..."       |
 | T5 (Lisanssız, kaynak bazında) | "...Lisanssız Elektrik Üretimi[nin] ... Kaynaklara Göre Dağılımı..." |
-| T6 (Lisanssız, il bazında) | "...Lisanssız Elektrik Üretiminin İllere Göre Dağılımı (MWh-%)..." |
+| T6 (Lisanssız, il bazında)     | "...Lisanssız Elektrik Üretiminin İllere Göre Dağılımı (MWh-%)..."   |
 
 ## Bulgu A — Tablo numaralandırması yıl yıl (hatta bazı yıl İÇİNDE) kayıyor — METİN ARAMA ZORUNLU
 
@@ -27,20 +27,20 @@ Aynen `07_word_parser_kapsam.md` Bulgu 2/Bulgu 5'te T11/T10/T4 için
 kanıtlanan ilke, üretim tabloları için de GEÇERLİ — hiçbir sabit tablo
 numarasına güvenilemez:
 
-| Yıl | Kaynak (Lisanslı) | İl (Lisanslı) | Kaynak (Lisanssız) | İl (Lisanssız) | İl×Kaynak (Lisanssız, bkz. Bulgu C) |
-|---|---|---|---|---|---|
-| 2016 | Tablo-1.4 | Tablo-1.5 | Tablo 1.9 | Tablo 1.10 | Tablo 1.11 |
-| 2017 | Tablo-1.5 | Tablo-1.6 | Tablo 1.10 | Tablo 1.11 | Tablo 1.12 |
-| 2018 | Tablo-1.5 | Tablo-1.7 | Tablo 1.11 | Tablo 1.12 | Tablo 1.13 |
-| 2019 | Tablo-1.5 | Tablo-1.7 | Tablo 1.11 | Tablo 1.12 | Tablo 1.13 |
-| 2020 | Tablo-1.6 | Tablo-1.7 | Tablo 1.11 | Tablo 1.12 | Tablo 1.13 |
-| 2021 (Ocak) | **"Tablo ."** (numara boş) | "Tablo ." | "Tablo ." | "Tablo ." | "Tablo ." |
-| 2021 (Aralık) | Tablo 1.6 | Tablo 1.7 | Tablo 1.11 | Tablo 1.12 | Tablo 1.13 |
-| 2022 | Tablo 1.6 | Tablo 1.7 | Tablo 1.11 | Tablo 1.12 (yeniden adlandırılmış, bkz. Bulgu D) | Tablo 1.13 |
-| 2023 (Ocak) | **"Tablo ."** | "Tablo ." | "Tablo ." | "Tablo ." | "Tablo ." |
-| 2023 (Haziran/Aralık) | Tablo 1.6 | Tablo 1.7 | Tablo 1.11 | Tablo 1.12 (Haziran'da VAR, **Aralık'ta YOK** — bkz. Bulgu E) | Tablo 1.13 (Haziran'da VAR, **Aralık'ta YOK**) |
-| 2024 | Tablo 1.6 | Tablo 1.7 | Tablo 1.10 | **bulunamadı (bkz. Bulgu E)** | **bulunamadı (bkz. Bulgu E)** |
-| 2025 | Tablo 1.6 | Tablo 1.7 | Tablo 1.10 | **bulunamadı (bkz. Bulgu E)** | **bulunamadı (bkz. Bulgu E)** |
+| Yıl                   | Kaynak (Lisanslı)          | İl (Lisanslı) | Kaynak (Lisanssız) | İl (Lisanssız)                                                | İl×Kaynak (Lisanssız, bkz. Bulgu C)            |
+| --------------------- | -------------------------- | ------------- | ------------------ | ------------------------------------------------------------- | ---------------------------------------------- |
+| 2016                  | Tablo-1.4                  | Tablo-1.5     | Tablo 1.9          | Tablo 1.10                                                    | Tablo 1.11                                     |
+| 2017                  | Tablo-1.5                  | Tablo-1.6     | Tablo 1.10         | Tablo 1.11                                                    | Tablo 1.12                                     |
+| 2018                  | Tablo-1.5                  | Tablo-1.7     | Tablo 1.11         | Tablo 1.12                                                    | Tablo 1.13                                     |
+| 2019                  | Tablo-1.5                  | Tablo-1.7     | Tablo 1.11         | Tablo 1.12                                                    | Tablo 1.13                                     |
+| 2020                  | Tablo-1.6                  | Tablo-1.7     | Tablo 1.11         | Tablo 1.12                                                    | Tablo 1.13                                     |
+| 2021 (Ocak)           | **"Tablo ."** (numara boş) | "Tablo ."     | "Tablo ."          | "Tablo ."                                                     | "Tablo ."                                      |
+| 2021 (Aralık)         | Tablo 1.6                  | Tablo 1.7     | Tablo 1.11         | Tablo 1.12                                                    | Tablo 1.13                                     |
+| 2022                  | Tablo 1.6                  | Tablo 1.7     | Tablo 1.11         | Tablo 1.12 (yeniden adlandırılmış, bkz. Bulgu D)              | Tablo 1.13                                     |
+| 2023 (Ocak)           | **"Tablo ."**              | "Tablo ."     | "Tablo ."          | "Tablo ."                                                     | "Tablo ."                                      |
+| 2023 (Haziran/Aralık) | Tablo 1.6                  | Tablo 1.7     | Tablo 1.11         | Tablo 1.12 (Haziran'da VAR, **Aralık'ta YOK** — bkz. Bulgu E) | Tablo 1.13 (Haziran'da VAR, **Aralık'ta YOK**) |
+| 2024                  | Tablo 1.6                  | Tablo 1.7     | Tablo 1.10         | **bulunamadı (bkz. Bulgu E)**                                 | **bulunamadı (bkz. Bulgu E)**                  |
+| 2025                  | Tablo 1.6                  | Tablo 1.7     | Tablo 1.10         | **bulunamadı (bkz. Bulgu E)**                                 | **bulunamadı (bkz. Bulgu E)**                  |
 
 **Önemli:** numara-kaybı (field-code boş render) 2021 VE 2023'ün Ocak
 ayında görüldü ama AYNI yılın başka bir ayında (2021 Aralık, 2023
@@ -183,18 +183,18 @@ Bulgu E'nin (2024/2025 için tek-yıl bulgusu) sonucu, TÜM 10 yıl (2016-2025,
 öncesi Bulgu A'nın Haziran-ağırlıklı spot-check'inin (bazı yıllarda yalnız
 1 ay) yerini alır:
 
-| Yıl | T5 (Lisanssız, kaynak) | T6 (Lisanssız, il) |
-|---|---|---|
-| 2016 | VAR (12/12) | VAR (12/12) — "...Üretiminin İllere Göre Dağılımı" |
-| 2017 | VAR (12/12) | VAR (12/12) — aynı başlık |
-| 2018 | VAR (12/12), "Brüt Lisanssız Üretim Miktarı" kolonu VAR | VAR (12/12) |
-| 2019 | VAR (12/12) | VAR (12/12) |
-| 2020 | VAR (12/12) | VAR (12/12) |
-| 2021 | VAR (12/12) | VAR (12/12) |
-| 2022 | VAR (12/12) | VAR (12/12) **ama Haziran'dan itibaren yeniden adlandırıldı**: Ocak-Mayıs "...Üretiminin İllere Göre Dağılımı", Haziran-Aralık "...İHTİYAÇ FAZLASI SATIN ALINAN Lisanssız Elektrik Üretiminin İllere Göre Dağılımı" — Bulgu D'nin kaynak-seviyesi tanım sorununun İL seviyesinde bir tekrarı |
-| 2023 | VAR (12/12) | VAR yalnız Ocak-Haziran (eski başlığa DÖNDÜ — "İhtiyaç Fazlası" değil), **Temmuz-Aralık'ta YOK** (6/12) |
-| 2024 | VAR (12/12) | **YOK (0/12)** |
-| 2025 | VAR (12/12) | **YOK (0/12)** |
+| Yıl  | T5 (Lisanssız, kaynak)                                  | T6 (Lisanssız, il)                                                                                                                                                                                                                                                                           |
+| ---- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2016 | VAR (12/12)                                             | VAR (12/12) — "...Üretiminin İllere Göre Dağılımı"                                                                                                                                                                                                                                           |
+| 2017 | VAR (12/12)                                             | VAR (12/12) — aynı başlık                                                                                                                                                                                                                                                                    |
+| 2018 | VAR (12/12), "Brüt Lisanssız Üretim Miktarı" kolonu VAR | VAR (12/12)                                                                                                                                                                                                                                                                                  |
+| 2019 | VAR (12/12)                                             | VAR (12/12)                                                                                                                                                                                                                                                                                  |
+| 2020 | VAR (12/12)                                             | VAR (12/12)                                                                                                                                                                                                                                                                                  |
+| 2021 | VAR (12/12)                                             | VAR (12/12)                                                                                                                                                                                                                                                                                  |
+| 2022 | VAR (12/12)                                             | VAR (12/12) **ama Haziran'dan itibaren yeniden adlandırıldı**: Ocak-Mayıs "...Üretiminin İllere Göre Dağılımı", Haziran-Aralık "...İHTİYAÇ FAZLASI SATIN ALINAN Lisanssız Elektrik Üretiminin İllere Göre Dağılımı" — Bulgu D'nin kaynak-seviyesi tanım sorununun İL seviyesinde bir tekrarı |
+| 2023 | VAR (12/12)                                             | VAR yalnız Ocak-Haziran (eski başlığa DÖNDÜ — "İhtiyaç Fazlası" değil), **Temmuz-Aralık'ta YOK** (6/12)                                                                                                                                                                                      |
+| 2024 | VAR (12/12)                                             | **YOK (0/12)**                                                                                                                                                                                                                                                                               |
+| 2025 | VAR (12/12)                                             | **YOK (0/12)**                                                                                                                                                                                                                                                                               |
 
 **Not — 2016-2017 zaten kapsam dışı (Bulgu D/Karar 4):** bu iki yılın
 T6'sı yapısal olarak VAR ama Karar 4 zaten bu yılların Lisanssız verisini
@@ -241,7 +241,7 @@ baslikla_da_calisir`).
 fark** buldu — araştırıldı, ZORLA GEÇİRİLMEDİ:
 
 - Şubat 2024 dosyasının T3 tablosu (`Tablo 1.7 Şubat 2024 Döneminde
-  Lisanslı Elektrik Üretiminin İl Bazında Dağılımı`) **başlığı doğru
+Lisanslı Elektrik Üretiminin İl Bazında Dağılımı`) **başlığı doğru
   ayı gösteriyor** ama İÇERİĞİ (satır satır, ÇANAKKALE'den başlayarak)
   **Ocak 2024'ün T3 tablosuyla ondalık basamağa kadar BİREBİR AYNI**
   (kendi Genel Toplam'ı da 28.549.038,63 — Ocak'ın 28.549.038,81'ine
@@ -257,7 +257,7 @@ fark** buldu — araştırıldı, ZORLA GEÇİRİLMEDİ:
   yakaladığı bir örnek (T2 (kaynak) 6/7. bulgudaki parser bug'ından
   FARKLI olarak, burada BİZİM koddan değil KAYNAK belgeden kaynaklanan
   bir tutarsızlık). Zorla geçirilmedi — 202402 (Lisanslı) `mutabakat_
-  uretim.py` çıktısında UYUMSUZ olarak işaretli kalıyor, disposable'da
+uretim.py` çıktısında UYUMSUZ olarak işaretli kalıyor, disposable'da
   aktive edilmedi. Canlı backfill öncesi kullanıcı kararı gerekecek
   (T3'ü olduğu gibi mi kabul et, yoksa EPDK'nın olası bir düzeltme/
   yayımını mı bekle).
@@ -310,16 +310,16 @@ hâlâ eski/generic başlıkla) AYNI karşılaştırma tekrarlandı.
 **Sonuç — rename sınırında yapısal bir SIÇRAMA YOK, ama daha büyük bir
 gerçek ortaya çıktı:**
 
-| Ay | T6 (il) toplamı | Kaynak: İhtiyaç Fazlası | Kaynak: Brüt Üretim |
-|---|---|---|---|
-| 2022-03 | 888.156,30 | 888.156,28 | 893.552,01 |
-| 2022-04 | 1.166.160,66 | 1.166.160,68 | 1.200.804,97 |
-| 2022-05 | 1.305.964,33 | 1.305.964,34 | 1.339.669,14 |
-| 2022-06 (yeniden adlandırıldı) | 1.287.641,13 | 1.287.641,12 | 1.308.722,34 |
-| 2022-07 (yeniden adlandırıldı) | 1.545.064,55 | 1.545.064,61 | 1.716.220,82 |
-| 2022-08 (yeniden adlandırıldı) | 1.320.213,74 | 1.320.213,73 | 1.319.705,95 |
-| 2020-01 (eski/generic başlık) | 551.436,09 | 551.436,09 | 563.604,23 |
-| 2020-06 (eski/generic başlık) | 1.165.766,89 | 1.165.766,89 | 1.177.433,44 |
+| Ay                             | T6 (il) toplamı | Kaynak: İhtiyaç Fazlası | Kaynak: Brüt Üretim |
+| ------------------------------ | --------------- | ----------------------- | ------------------- |
+| 2022-03                        | 888.156,30      | 888.156,28              | 893.552,01          |
+| 2022-04                        | 1.166.160,66    | 1.166.160,68            | 1.200.804,97        |
+| 2022-05                        | 1.305.964,33    | 1.305.964,34            | 1.339.669,14        |
+| 2022-06 (yeniden adlandırıldı) | 1.287.641,13    | 1.287.641,12            | 1.308.722,34        |
+| 2022-07 (yeniden adlandırıldı) | 1.545.064,55    | 1.545.064,61            | 1.716.220,82        |
+| 2022-08 (yeniden adlandırıldı) | 1.320.213,74    | 1.320.213,73            | 1.319.705,95        |
+| 2020-01 (eski/generic başlık)  | 551.436,09      | 551.436,09              | 563.604,23          |
+| 2020-06 (eski/generic başlık)  | 1.165.766,89    | 1.165.766,89            | 1.177.433,44        |
 
 **T6'nın kendi il-toplamı, HER TEK AYDA (rename'den ÖNCE, SONRA, ve
 rename'den 2 yıl önce fark etmeksizin) kaynak tablosunun "İhtiyaç
@@ -462,22 +462,22 @@ dökümü alınarak İKİSİ de araştırıldı, İKİSİ de GERÇEK YOKLUK
 DEĞİL — arama metni yetersiz kaldığı için "bulunamadı" görünmüş:
 
 - **2016 Ocak/Şubat:** Tablo GERÇEKTEN var (`Tablo-1.4 Ocak 2016
-  Döneminde Elektrik Üretiminin Kaynak Bazında Dağılımı (MWh)`) — ama
+Döneminde Elektrik Üretiminin Kaynak Bazında Dağılımı (MWh)`) — ama
   başlıkta **"Lisanslı" kelimesi YOK** (Mart 2016'dan itibaren "...
   Döneminde **Lisanslı** Elektrik Üretiminin..." diye değişiyor). Aynı
   durum T3'ün karşılığı için de geçerli (`Tablo-1.5 ... Elektrik
-  Üretiminin İl Bazında Dağılımı`). İçerik doğrudan dökümlendi: Ocak
+Üretiminin İl Bazında Dağılımı`). İçerik doğrudan dökümlendi: Ocak
   2016'nın T2'si `['Kaynak Türü', 'Üretim Miktarı (MWh)', 'Oran (%)']`
   başlıklı, T3'ü `['İL', 'Üretim Miktarı (MWh)', 'Oran (%)', 'İL', ...]`
   (Şubat'ta "İLLER" — tekil/çoğul da ay ay değişiyor) — yani YAPI Mart-
   Aralık ile AYNI, yalnız İKİ AYIN başlık metni "Lisanslı"sız.
 - **2017 Kasım/Aralık:** Tablo GERÇEKTEN var (`Tablo-1.5 Kasım 2017
-  Döneminde Lisanslı Elektrik Üretiminin Kaynak Bazında Dağılımı Ve
-  2016 Yılı Kasım Ayı Değeriyle Karşılaştırılması`) — ama bu iki ayda
+Döneminde Lisanslı Elektrik Üretiminin Kaynak Bazında Dağılımı Ve
+2016 Yılı Kasım Ayı Değeriyle Karşılaştırılması`) — ama bu iki ayda
   EPDK AYRICA bir **YILLIK KÜMÜLATİF karşılaştırma tablosu** ekliyor
   (`Tablo-1.6 Ocak-Kasım 2017 Döneminde Lisanslı Elektrik Üretiminin
-  Kaynak Bazında Dağılımı Ve 2016 Yılı Ocak-Kasım Dönemi Değeriyle
-  Karşılaştırılması`) — bu YENİ tablo da AYNI arama alt-dizisini
+Kaynak Bazında Dağılımı Ve 2016 Yılı Ocak-Kasım Dönemi Değeriyle
+Karşılaştırılması`) — bu YENİ tablo da AYNI arama alt-dizisini
   ("Lisanslı Elektrik Üretiminin Kaynak Bazında Dağılımı") taşıdığından
   `tek_aday_bul()` İKİ ADAY bulup belirsizlik hatası fırlatıyor (kod
   bunu "BULUNAMADI" gibi YUTMUŞ, gerçek hatayı GÖSTERMEMİŞ — dry-run
@@ -566,14 +566,14 @@ KORUYOR, yeniden ölçüm gerekmedi (kullanıcının önceden verdiği kural).
 
 ### Özet — 2016-2017 uygulaması İÇİN gereken ek işler (karar DEĞİL, yalnız envanter)
 
-| Konu | 2016 | 2017 |
-|---|---|---|
-| T2 formatı | **BAŞKA** (tek-dönem, 3 kolon) — bespoke `t2_oku()` gerekir | Standart (2018-2025 ile AYNI, 6 kolon) |
-| Ocak/Şubat (2016) veya Kasım/Aralık (2017) arama metni | "Lisanslı" çıkarılmalı | `icermez=["Ocak-"]` (YTD tablosu dışlanmalı) |
-| Bulgu N (Hidrolik toplama) | GEREKİYOR, yeni alias GEREKMİYOR | GEREKİYOR, `"BARAJLI HİDROLİK"` alias'ı gerekiyor |
-| Bulgu I sınıfı (bölünmüş başlık) | Görülmedi | Yalnız Ekim'de var, established çözüm yeterli |
-| T3 il sayısı değişimi | Var (77-80), established desen | Var (76-80), established desen |
-| Lisanssız (T5/T6) | Bulgu D ile zaten kapsam dışı | Bulgu D ile zaten kapsam dışı |
+| Konu                                                   | 2016                                                        | 2017                                              |
+| ------------------------------------------------------ | ----------------------------------------------------------- | ------------------------------------------------- |
+| T2 formatı                                             | **BAŞKA** (tek-dönem, 3 kolon) — bespoke `t2_oku()` gerekir | Standart (2018-2025 ile AYNI, 6 kolon)            |
+| Ocak/Şubat (2016) veya Kasım/Aralık (2017) arama metni | "Lisanslı" çıkarılmalı                                      | `icermez=["Ocak-"]` (YTD tablosu dışlanmalı)      |
+| Bulgu N (Hidrolik toplama)                             | GEREKİYOR, yeni alias GEREKMİYOR                            | GEREKİYOR, `"BARAJLI HİDROLİK"` alias'ı gerekiyor |
+| Bulgu I sınıfı (bölünmüş başlık)                       | Görülmedi                                                   | Yalnız Ekim'de var, established çözüm yeterli     |
+| T3 il sayısı değişimi                                  | Var (77-80), established desen                              | Var (76-80), established desen                    |
+| Lisanssız (T5/T6)                                      | Bulgu D ile zaten kapsam dışı                               | Bulgu D ile zaten kapsam dışı                     |
 
 **2017 (T2+T3 Lisanslı) tamamlandı (2026-09-16):** Bulgu O'nun öngörüleri
 BİREBİR doğrulandı, YENİ bir sürpriz çıkmadı. `_KAYNAK_TAKMA_ADLAR`'a
@@ -650,34 +650,34 @@ kalan bulgu YOK.
 **10 yılın nihai durumu (T2+T3, yalnız Lisanslı — Lisanssız TÜM yıllarda
 Bulgu D/L ile kapsam dışı):**
 
-| Yıl | Format | Özel bulgular | Mutabakat | Test sayısı |
-|---|---|---|---|---|
-| 2025 | Standart (6 kolon) | Bulgu E (T5/T6 hiç yok, kaynak taraması) | 12/12 | 19 |
-| 2024 | Standart | Bulgu I (3 satır başlık) + Bulgu J (202402 T3 stale, kapsam dışı) | 11/12 (202402 beklenen istisna) | 17 |
-| 2023 | Standart | Bulgu K (LPG/Motorin) | 12/12 | 19 |
-| 2022 | Standart | Bulgu L'nin ölçüm yılı (T6 tanım testi) | 12/12 | 17 |
-| 2021 | Standart | Bulgu M (RÜZGÂR, Nisan) | 12/12 | 15 |
-| 2020 | Standart | Sürpriz yok | 12/12 | 12 |
-| 2019 | Standart | Bulgu N (Hidrolik bölünmesi, Ara hariç) | 12/12 | 13 |
-| 2018 | Standart | Bulgu N (TÜM 12 ay) + Bulgu I sınıfı (Tem-Ara) | 12/12 | 15 |
-| 2017 | Standart | Bulgu N (TÜM 12 ay) + Bulgu I sınıfı (yalnız Eki) + Kas/Ara arama ambiguity | 12/12 | 17 |
-| 2016 | **BESPOKE** (tek-dönem, 3 kolon) | Bulgu N ("Barajlı", alias'sız) + Oca/Şub arama farkı + kolon başlığı case-varyansı | 12/12 | 21 |
+| Yıl  | Format                           | Özel bulgular                                                                      | Mutabakat                       | Test sayısı |
+| ---- | -------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------- | ----------- |
+| 2025 | Standart (6 kolon)               | Bulgu E (T5/T6 hiç yok, kaynak taraması)                                           | 12/12                           | 19          |
+| 2024 | Standart                         | Bulgu I (3 satır başlık) + Bulgu J (202402 T3 stale, kapsam dışı)                  | 11/12 (202402 beklenen istisna) | 17          |
+| 2023 | Standart                         | Bulgu K (LPG/Motorin)                                                              | 12/12                           | 19          |
+| 2022 | Standart                         | Bulgu L'nin ölçüm yılı (T6 tanım testi)                                            | 12/12                           | 17          |
+| 2021 | Standart                         | Bulgu M (RÜZGÂR, Nisan)                                                            | 12/12                           | 15          |
+| 2020 | Standart                         | Sürpriz yok                                                                        | 12/12                           | 12          |
+| 2019 | Standart                         | Bulgu N (Hidrolik bölünmesi, Ara hariç)                                            | 12/12                           | 13          |
+| 2018 | Standart                         | Bulgu N (TÜM 12 ay) + Bulgu I sınıfı (Tem-Ara)                                     | 12/12                           | 15          |
+| 2017 | Standart                         | Bulgu N (TÜM 12 ay) + Bulgu I sınıfı (yalnız Eki) + Kas/Ara arama ambiguity        | 12/12                           | 17          |
+| 2016 | **BESPOKE** (tek-dönem, 3 kolon) | Bulgu N ("Barajlı", alias'sız) + Oca/Şub arama farkı + kolon başlığı case-varyansı | 12/12                           | 21          |
 
 **Tek disposable'da 10 yılın TAMAMI (120 ay) — tek doğrulama turu
 (2026-09-16, fresh rebuild, sırayla 2016→2025 yüklendi):**
 
-| Metrik | Değer |
-|---|---|
-| Toplam ay (10 yıl × 12 ay) | 120 |
-| `fact_uretim_kaynak_geneli`'ne yüklenen ay | 120/120 |
-| `fact_uretim_il_geneli`'ne yüklenen ay | 119/120 (202402 hariç — Bulgu J, kasıtlı) |
-| `mutabakat_uretim.py` kontrolü — uyumlu | 119/120 |
-| `mutabakat_uretim.py` kontrolü — uyumsuz | 1/120 (202402, `bir_taraf_eksik`, BEKLENEN/belgelenmiş) |
-| Lisanssız (T5/T6) kapsam dışı işaretlenen ay (her iki tablo) | 120/120 |
-| Lisanslı kapsam dışı işaretlenen ay (Bulgu J istisnası) | 1/120 (202402, yalnız `fact_uretim_il_geneli`) |
-| `fact_uretim_kaynak_geneli` toplam satır | 1.393 |
-| `fact_uretim_il_geneli` toplam satır | 9.639 |
-| Aktive edilen (`is_active=true`) batch/satır | **0** (gece-boyu kural — hiçbir script `pipeline.batch_onayla()` çağırmadı, TÜM batch'ler `running`/`is_active=false` — bu KASITLI, aktivasyon canlı backfill turunda AYRI bir adım) |
+| Metrik                                                       | Değer                                                                                                                                                                                |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Toplam ay (10 yıl × 12 ay)                                   | 120                                                                                                                                                                                  |
+| `fact_uretim_kaynak_geneli`'ne yüklenen ay                   | 120/120                                                                                                                                                                              |
+| `fact_uretim_il_geneli`'ne yüklenen ay                       | 119/120 (202402 hariç — Bulgu J, kasıtlı)                                                                                                                                            |
+| `mutabakat_uretim.py` kontrolü — uyumlu                      | 119/120                                                                                                                                                                              |
+| `mutabakat_uretim.py` kontrolü — uyumsuz                     | 1/120 (202402, `bir_taraf_eksik`, BEKLENEN/belgelenmiş)                                                                                                                              |
+| Lisanssız (T5/T6) kapsam dışı işaretlenen ay (her iki tablo) | 120/120                                                                                                                                                                              |
+| Lisanslı kapsam dışı işaretlenen ay (Bulgu J istisnası)      | 1/120 (202402, yalnız `fact_uretim_il_geneli`)                                                                                                                                       |
+| `fact_uretim_kaynak_geneli` toplam satır                     | 1.393                                                                                                                                                                                |
+| `fact_uretim_il_geneli` toplam satır                         | 9.639                                                                                                                                                                                |
+| Aktive edilen (`is_active=true`) batch/satır                 | **0** (gece-boyu kural — hiçbir script `pipeline.batch_onayla()` çağırmadı, TÜM batch'ler `running`/`is_active=false` — bu KASITLI, aktivasyon canlı backfill turunda AYRI bir adım) |
 
 **Sonuç:** ADIM 4'ün kod/disposable-doğrulama fazı TAMAMEN BİTTİ.
 Canlıya HİÇBİR Word üretim verisi (T2/T3/kapsam-dışı işaretleri) HENÜZ

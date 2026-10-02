@@ -23,7 +23,7 @@
 #   olmasın" riskine karşı bilinçli bir seçim, ileride sessizce değişmez).
 name: Scheduled Backup
 on:
-  schedule: [ { cron: "0 3 * * 0" } ]   # her Pazar 03:00 UTC (haftalık)
+  schedule: [{ cron: "0 3 * * 0" }] # her Pazar 03:00 UTC (haftalık)
   workflow_dispatch: {}
 permissions:
   contents: read
