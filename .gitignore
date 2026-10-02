@@ -35,3 +35,9 @@ Claude outputs/
 # worker/scripts/backup.py çıktısı — canlı veri dump'ı, git'e GİRMEZ
 yedekler/
 *.dump
+
+# Oturum-ici tek seferlik disposable Postgres kurulum script'leri —
+# asla commit edilmez (bkz. 10_TEKNIK_MASTER_DOKUMAN.md ortam notları)
+_rebuild_disposable_scratch.sh
+_scratch_*.py
+_gecici_*.py
