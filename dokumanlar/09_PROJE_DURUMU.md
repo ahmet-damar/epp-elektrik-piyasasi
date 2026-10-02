@@ -316,6 +316,14 @@ etiketi) — başka bir yoldan aşılmaya çalışılmadı. **Ahmet'in kendisi
 operasyon_gunlugu.md`'nin 2026-10-02 kaydında). Detay ve "koruma
 sınavı" bulguları: `Claude outputs/kapanis_2026-10-02_temmuz_yukleme.md`.
 
+**2026-10-02 (devam) — Ahmet'in açık canlı-yazma izni de yetmedi:**
+İKİNCİ bir denemede Ahmet sohbet içinde açık izin verdi, ama bu
+Claude Code'un araç-seviyesi güvenlik sınıflandırıcısını AŞMADI —
+canlı HÂLÂ 2026-06'da. Detay: `Claude outputs/kapanis_2026-10-02_
+temmuz_canli.md`. **Temmuz'u canlıya yüklemek artık yalnız Ahmet'in
+kendi elleriyle çalıştırmasıyla ya da Claude Code ayarlarına açık bir
+Bash izin kuralı eklemesiyle mümkün.**
+
 ## Test durumu (2026-09-07'de temiz bir kabukta yeniden doğrulandı)
 
 ```
