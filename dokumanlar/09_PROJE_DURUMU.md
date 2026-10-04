@@ -417,8 +417,38 @@ geneli.py`), kalan 39 ay (2016-12 hariç 4/5 grupla) aktive edildi →
 **Bu bölümü önce oku — bir sonraki oturum yalnız bunu okuyup kaldığı
 yerden devam edebilmeli.**
 
-**GÜNCEL (2026-10-04, gece yarısı, devam turu) — en üst özet, aşağıdaki
-eski tarihli özetlerin YERİNE geçer:**
+**GÜNCEL (2026-10-04, kapanış) — en üst özet, aşağıdaki eski tarihli
+özetlerin YERİNE geçer:**
+
+- **Canlıda eksik olan tek migration:** `20260920_0001_toplama_
+katmani_views.sql` (4 view + 4 index). Dashboard'un **Zaman Serisi**
+  bölümü bu yüzden canlıda hâlâ **bozuk** — Ay / Çeyrek / Yıl / Tümü
+  dördü de patlıyor.
+- **Araç hazır:** `migration_uygula.py` (`--tam`, `schema_migrations`,
+  hash kontrolü, kilit, `rls_canli_kontrol.py` entegre) — commit
+  `23265ad`, CI+Security yeşil, 7+ kasıtlı-bozuk senaryo kanıtlı.
+- **Tek engel:** `--tam --uygula` Claude Code'un araç-seviyesi
+  `[Production Deploy]` blokuna takılıyor. Aşılmaya **çalışılmadı** —
+  doğru davranış bu. Açılış adımı: Ahmet'in aşağıdaki **tek satırı**
+  çalıştırması:
+  ```
+  docker exec -w /workspace epp-devcontainer python -u -m worker.scripts.migration_uygula --tam --uygula 2>&1 | tee /tmp/migration_tam.log
+  ```
+  Öncesinde taze yedek: `gh workflow run scheduled-backup.yml` (script
+  bunu zaten kendi kapısında kontrol ediyor, başarısızsa durur).
+  Sonrasında doğrulanacaklar (yeni oturumun ilk görevi): (1) 4
+  `vw_toplama_*` view var mı + `security_invoker=true` mı, (2) 4 index
+  oluştu mu, (3) `rls_canli_kontrol.py` temiz mi (`schema_migrations`
+  dahil), (4) Dashboard `AppTest`: Ay/Çeyrek/Yıl/Tümü dördü de render
+  ediyor mu, (5) veri satırlarında 0 fark, Temmuz toplamı değişmedi.
+- **Açık maddeler (tek liste, dokunulmadı):** Görev 7 kararı
+  (`deploy.yml`'in `migrate` job'ı `if: false` yüzünden Faz 0'dan beri
+  hiç çalışmadı — öneri (B)+(C): uygulamayı elde tut, tespiti haftalık
+  zamanlanmış salt-okuma `--dry-run` ile otomatikleştir), harita v1,
+  Türkçe-I taraması, İş A dedup, `aylik_yukle.py`'de `connect_timeout`,
+  Faz 4 kapsamı.
+
+**GÜNCEL (2026-10-04, gece yarısı, devam turu) — eski özet, güncel durum için yukarıya bak:**
 
 - **Temmuz 2026 canlıda sağlam** (Ahmet'in kendisi yükledi) —
   `fact_tuketim` 202607 = 484 satır, **27.595.023,350 MWh** (27,595
