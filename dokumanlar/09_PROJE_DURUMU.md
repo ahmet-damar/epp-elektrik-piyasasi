@@ -417,8 +417,48 @@ geneli.py`), kalan 39 ay (2016-12 hariç 4/5 grupla) aktive edildi →
 **Bu bölümü önce oku — bir sonraki oturum yalnız bunu okuyup kaldığı
 yerden devam edebilmeli.**
 
-**GÜNCEL (2026-10-03, gece) — en üst özet, aşağıdaki eski
+**GÜNCEL (2026-10-04, gece) — en üst özet, aşağıdaki eski
 tarihli özetlerin YERİNE geçer:**
+
+- **Temmuz 2026 ARTIK CANLIDA** (Ahmet'in kendisi `aylik_yukle.py
+--uygula` ile yükledi, batch 782/783/784) — `fact_tuketim` 202607 =
+  484 satır, 27,595 TWh (≈27,60 — KANITLANDI, bu tur bağımsız olarak
+  salt-okuma ile doğrulandı). Önceki turların açık maddesi KAPANDI.
+- **YENİ arıza bulundu ve KISMEN kapatıldı:** dashboard Zaman Serisi
+  canlıda `UndefinedTable: vw_toplama_tuketim_aylik` ile patlıyor —
+  `20260920_0001_toplama_katmani_views.sql` disposable'da doğrulanıp
+  canlıya HİÇ UYGULANMAMIŞ. **Kök sebep tahminden daha temel:**
+  `deploy.yml`'in `migrate` job'ı `build-push`'a (`if: false`, KALICI
+  devre dışı) bağlı olduğundan HİÇBİR push'ta hiç çalışmıyor — Faz
+  0'dan beri TÜM migration'lar ELLE uygulanıyordu, kayıtsız. 20260920
+  bu zincirde unutulan İLK dosyaydı.
+- **Kalıcı çözüm YAZILDI, TEST EDİLDİ, CANLIDA KISMEN DENENDİ:**
+  `schema_migrations` tablosu (migration `20261004_0001`) +
+  `worker/scripts/migration_uygula.py` (`aylik_yukle.py` ile aynı
+  kalıp — dry-run varsayılan, hash kontrolü, advisory lock,
+  `--bootstrap`). Canlıda: taze yedek doğrulandı, `--bootstrap`
+  (dry-run) 34 migration'dan 33'ünü doğru "zaten uygulanmış" işaretledi
+  (nesne-varlık + supersession mantığı canlı gerçek veriyle KANITLANDI),
+  ama **`--bootstrap --uygula` `[Production Deploy]` ile BLOKLANDI**
+  — aynı N'inci tutarlı tekrar, aşılmaya çalışılmadı. Tam rapor:
+  `Claude outputs/kapanis_2026-10-04_migration_canli.md`, teknik
+  detay: `10_TEKNIK_MASTER_DOKUMAN.md` §16.8.
+- **Sıradaki adım — Ahmet'in kendisinin çalıştırması gereken İKİ komut**
+  (devcontainer içinde, `/workspace`):
+  ```
+  python -m worker.scripts.migration_uygula --bootstrap --uygula
+  python -m worker.scripts.migration_uygula --uygula
+  ```
+  İkinci komut `20260920_0001` (4 view + 4 index) VE YENİ
+  `20261004_0001`'i (schema_migrations'ın kendi RLS+politika+grant'i)
+  uygular. Sonra dashboard Zaman Serisi'nin düzeldiğini doğrulamak için
+  AppTest ile tekrar kontrol ETMEK gerekir (bu tur yalnız BOZUK hâli
+  kanıtladı, düzelmiş hâli henüz kanıtlanamadı — migration canlıya hiç
+  gitmedi).
+- **Açık maddeler (değişmedi):** harita turu (Ahmet'ten karar
+  bekleniyor), İş A/Seçenek 3 dedup (ertelendi, Faz 4).
+
+**GÜNCEL (2026-10-03, gece) — eski özet, güncel durum için yukarıya bak:**
 
 - **`worker/scripts/aylik_yukle.py` artık `connect_timeout` +
   duvar-saati zaman aşımı ile KANITLANDI, Temmuz 2026 CANLIYA HÂLÂ
