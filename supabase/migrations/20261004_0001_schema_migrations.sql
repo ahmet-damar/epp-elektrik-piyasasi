@@ -19,6 +19,15 @@ BEGIN;
 -- deseni (admin-only, append-only — SELECT/INSERT var, UPDATE/DELETE/
 -- TRUNCATE hiç kimseye açılmaz) — bu da bir operasyonel iz kaydı, veri
 -- tablosu değil.
+--
+-- **2026-10-04 (devam, `PROMPT_MIGRATION_KAPAT_2026-10-04.md`):**
+-- `migration_uygula.py`'nin kendisi, bu tabloyu bootstrap/dry-run
+-- sırasında SORGULAYABİLMEK için aynı DDL'i (tablo+RLS+politika+grant,
+-- TEK transaction'da) KENDİSİ de çalıştırıyor (`_tam_korumali_tablo_
+-- olustur()`) — bu dosya SONRADAN normal migration akışıyla da
+-- uygulandığında ÇAKIŞMASIN diye `CREATE POLICY`'ler `DROP POLICY IF
+-- EXISTS` ile ÖNCESİNDEN korunuyor (`CREATE POLICY`'nin kendi `IF NOT
+-- EXISTS`'i yok, iki kez çalıştırılırsa hata verirdi).
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
   dosya_adi TEXT PRIMARY KEY,
@@ -30,10 +39,12 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS admin_schema_migrations_select ON schema_migrations;
 CREATE POLICY admin_schema_migrations_select ON schema_migrations
   FOR SELECT TO admin
   USING (public.current_app_role() = 'admin');
 
+DROP POLICY IF EXISTS admin_schema_migrations_insert ON schema_migrations;
 CREATE POLICY admin_schema_migrations_insert ON schema_migrations
   FOR INSERT TO admin
   WITH CHECK (public.current_app_role() = 'admin');

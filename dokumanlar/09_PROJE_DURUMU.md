@@ -417,8 +417,56 @@ geneli.py`), kalan 39 ay (2016-12 hariç 4/5 grupla) aktive edildi →
 **Bu bölümü önce oku — bir sonraki oturum yalnız bunu okuyup kaldığı
 yerden devam edebilmeli.**
 
-**GÜNCEL (2026-10-04, gece) — en üst özet, aşağıdaki eski
-tarihli özetlerin YERİNE geçer:**
+**GÜNCEL (2026-10-04, gece yarısı, devam turu) — en üst özet, aşağıdaki
+eski tarihli özetlerin YERİNE geçer:**
+
+- **Temmuz 2026 canlıda sağlam** (Ahmet'in kendisi yükledi) —
+  `fact_tuketim` 202607 = 484 satır, **27.595.023,350 MWh** (27,595
+  TWh). Ayrıca `fact_tuketim_ulke_geneli` 202607 = **27.609.483,284
+  MWh** (27,609 TWh) — İKİSİ DE DOĞRU, farklı tablolar; aradaki
+  %0,0524 fark projenin ÖNCEDEN belgelenmiş il↔ülke-geneli mutabakat
+  toleransı (±%0,5) içinde, kod hatası DEĞİL (önceki "≈27,60" ifadesi
+  bu iki rakamı aynı yuvarlamaya düşürüp gizlemişti — KAPANDI).
+- **Dashboard Zaman Serisi hâlâ bozuk** (`UndefinedTable: vw_toplama_
+tuketim_aylik does not exist`, Ay/Çeyrek/Yıl/Tümü dördü de) —
+  `20260920_0001_toplama_katmani_views.sql` canlıya hâlâ uygulanmadı.
+- **Önceki turun "0 fark" iddiası ÇÜRÜTÜLDÜ, düzeltildi (önemli):**
+  `migration_uygula.py`'nin `schema_migrations` boş-kabuk oluşturma
+  adımı dry-run'da DAHİ koşulsuz commit ediyordu — canlıda GERÇEKTEN
+  bir tablo yarattı. **Ölçülen gerçek durum, ilk izlenimden farklı:**
+  RLS KAPALI değildi — Supabase'in platform-seviyesi `ensure_rls`
+  event trigger'ı RLS'i otomatik açmıştı, yalnız 0 politikayla
+  (fail-closed ama eksik). Yine de kod kendisi hiçbir şey garanti
+  etmiyordu (düz postgres'te bu event trigger yok) — düzeltildi:
+  tablo+RLS+2 politika+grant artık TEK transaction'da, idempotent.
+  Ayrıca yazım sırasında İKİNCİ bir gerçek kilitlenme bug'ı bulundu
+  (`kilit_conn`'un açık bıraktığı transaction, `schema_migrations`'ın
+  kendi migration'ı normal akışla uygulanırken `statement_timeout`'a
+  kadar GERÇEKTEN asılı kalıyordu) — düzeltildi, canlı veriyle
+  KANITLANDI. YENİ `worker/scripts/rls_canli_kontrol.py` (canlıyı okur,
+  dosyayı değil) artık her başarılı `--uygula`'nın SONUNDA otomatik
+  çalışıyor. YENİ `--tam` bayrağı Ahmet'in komutunu İKİDEN BİRE indirdi.
+  Tam rapor: `Claude outputs/kapanis_2026-10-04b_migration_kapat.md`,
+  teknik detay: `10_TEKNIK_MASTER_DOKUMAN.md` §16.9.
+- **Canlıda denendi, `--tam --uygula` yine `[Production Deploy]` ile
+  BLOKLANDI** — ama `--tam` dry-run'ının kendisi (koşulsuz commit eden
+  altyapı adımı sayesinde) `schema_migrations`'ın RLS/politika
+  eksiğini CANLIDA GERÇEKTEN DÜZELTTİ (doğrudan sorguyla KANITLANDI:
+  `relrowsecurity=true`, 2 politika, admin grant'i) — `rls_canli_
+kontrol.py` canlıda artık **[OK] temiz**.
+- **Sıradaki adım — Ahmet'in kendisinin çalıştırması gereken TEK komut**
+  (devcontainer içinde, `/workspace`):
+  ```
+  python -m worker.scripts.migration_uygula --tam --uygula
+  ```
+  Bu, `20260920_0001` (4 view + 4 index) VE `20261004_0001`'i (zaten
+  canlıda var olan RLS/politikayı dosya üzerinden de teyit eder) TEK
+  komutla uygular. Sonra dashboard Zaman Serisi'nin düzeldiğini
+  doğrulamak için AppTest ile tekrar kontrol ETMEK gerekir.
+- **Açık maddeler (değişmedi):** harita turu (Ahmet'ten karar
+  bekleniyor), İş A/Seçenek 3 dedup (ertelendi, Faz 4).
+
+**GÜNCEL (2026-10-04, gece, ilk tur) — eski özet, güncel durum için yukarıya bak:**
 
 - **Temmuz 2026 ARTIK CANLIDA** (Ahmet'in kendisi `aylik_yukle.py
 --uygula` ile yükledi, batch 782/783/784) — `fact_tuketim` 202607 =
@@ -443,18 +491,9 @@ tarihli özetlerin YERİNE geçer:**
   — aynı N'inci tutarlı tekrar, aşılmaya çalışılmadı. Tam rapor:
   `Claude outputs/kapanis_2026-10-04_migration_canli.md`, teknik
   detay: `10_TEKNIK_MASTER_DOKUMAN.md` §16.8.
-- **Sıradaki adım — Ahmet'in kendisinin çalıştırması gereken İKİ komut**
-  (devcontainer içinde, `/workspace`):
-  ```
-  python -m worker.scripts.migration_uygula --bootstrap --uygula
-  python -m worker.scripts.migration_uygula --uygula
-  ```
-  İkinci komut `20260920_0001` (4 view + 4 index) VE YENİ
-  `20261004_0001`'i (schema_migrations'ın kendi RLS+politika+grant'i)
-  uygular. Sonra dashboard Zaman Serisi'nin düzeldiğini doğrulamak için
-  AppTest ile tekrar kontrol ETMEK gerekir (bu tur yalnız BOZUK hâli
-  kanıtladı, düzelmiş hâli henüz kanıtlanamadı — migration canlıya hiç
-  gitmedi).
+  **[2026-10-04 DEVAM TURUNDA DÜZELTİLDİ — bkz. yukarıdaki GÜNCEL
+  blok: bu turun "0 fark" iddiası yanlıştı, schema_migrations canlıda
+  korumasız kalmıştı.]**
 - **Açık maddeler (değişmedi):** harita turu (Ahmet'ten karar
   bekleniyor), İş A/Seçenek 3 dedup (ertelendi, Faz 4).
 

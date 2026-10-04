@@ -59,6 +59,7 @@ import psycopg
 
 from worker import ingest
 from worker.db import get_database_url
+from worker.scripts import rls_canli_kontrol
 from worker.scripts.aylik_yukle import (
     DurdurmaHatasi,
     baglan,
@@ -227,29 +228,52 @@ def bootstrap_adaylarini_belirle(cur: psycopg.Cursor, dizin: Path) -> list[Path]
     return isaretlenecekler
 
 
-def _bare_tablo_olustur(conn: psycopg.Connection) -> None:
-    """`schema_migrations`'ın BOŞ KABUĞUNU (RLS'siz, salt sütun tanımları)
-    her modda (dry-run DAHİL) var olduğundan emin olur — bu saf ALTYAPI,
-    migration İÇERİĞİ değil; script'in "bekleyen ne var" sorgusu yapabilmesi
-    için GEREKLİ (gerçek araçların — Flyway/golang-migrate — hepsi aynı
-    desenle çalışır). RLS + politika + grant ise NORMAL migration dosyası
-    (`20261004_0001_schema_migrations.sql`) üzerinden, `--uygula`'da
-    GERÇEKTEN kalıcı olur, dry-run'da rollback edilir — burada TEKRAR
-    oluşturulmaz (`CREATE POLICY`'nin `IF NOT EXISTS`'i YOK, iki kez
-    çalıştırılırsa hata verir)."""
+_SCHEMA_MIGRATIONS_DDL = """
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  dosya_adi TEXT PRIMARY KEY,
+  dosya_hash TEXT NOT NULL,
+  uygulandi_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  uygulayan TEXT NOT NULL,
+  sure_ms BIGINT NOT NULL
+);
+ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS admin_schema_migrations_select ON schema_migrations;
+CREATE POLICY admin_schema_migrations_select ON schema_migrations
+  FOR SELECT TO admin
+  USING (public.current_app_role() = 'admin');
+DROP POLICY IF EXISTS admin_schema_migrations_insert ON schema_migrations;
+CREATE POLICY admin_schema_migrations_insert ON schema_migrations
+  FOR INSERT TO admin
+  WITH CHECK (public.current_app_role() = 'admin');
+GRANT SELECT, INSERT ON TABLE schema_migrations TO admin;
+"""
+
+
+def _tam_korumali_tablo_olustur(conn: psycopg.Connection) -> bool:
+    """`schema_migrations`'ı tablo+RLS+politika+grant TEK transaction'da,
+    idempotent olarak kurar — **korumasız bir ARA an hiç oluşmaz** (önce
+    tablo, SONRA RLS diye iki ayrı commit YOK). 2026-10-04 (`Claude
+    outputs/PROMPT_MIGRATION_KAPAT_2026-10-04.md`) — önceki yazım yalnız
+    boş kabuğu (RLS'siz) oluşturup commit ediyordu; canlıda Supabase'in
+    KENDİ `ensure_rls` event trigger'ı RLS'i otomatik açtı (ÖLÇÜLEREK
+    bulundu — `relrowsecurity=true` ama 0 politika), ama bu platforma
+    özel bir şans, kodun kendisi GARANTİ etmiyordu (düz `postgres:16`'da
+    — CI/disposable — bu event trigger YOK, gerçekten korumasız bir
+    tablo oluşurdu). `DROP POLICY IF EXISTS` + `CREATE POLICY` ile
+    idempotent (`CREATE POLICY`'nin kendi `IF NOT EXISTS`'i yok) — ikinci
+    çalıştırmada da patlamaz, politikaları TAZELER.
+
+    Döndürdüğü `bool`, tablonun bu çağrıdan ÖNCE canlıda hiç OLMADIĞINI
+    (yani şimdi YENİ oluşturulduğunu) söyler — çağıran bunu `[ALTYAPI]`
+    satırıyla AÇIKÇA bildirmek için kullanır (dry-run'ın "hiçbir şey
+    yazılmadı" derken sessizce DDL commit'lemesi, bu turun bulduğu
+    gerçek yanlış-raporlama hatasıydı)."""
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS schema_migrations (
-              dosya_adi TEXT PRIMARY KEY,
-              dosya_hash TEXT NOT NULL,
-              uygulandi_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-              uygulayan TEXT NOT NULL,
-              sure_ms BIGINT NOT NULL
-            )
-            """
-        )
+        cur.execute("SELECT 1 FROM pg_class WHERE relname = 'schema_migrations'")
+        zaten_var = cur.fetchone() is not None
+        cur.execute(_SCHEMA_MIGRATIONS_DDL)
     conn.commit()
+    return not zaten_var
 
 
 def uygulanmis_migrationlari_oku(conn: psycopg.Connection) -> dict[str, str]:
@@ -308,28 +332,28 @@ def _veri_farkini_dogrula(once: dict[str, Any], sonra: dict[str, Any]) -> list[s
     return sorunlar
 
 
-def _bootstrap_isle(
+def _bootstrap_core(
     database_url: str, kilit_conn: psycopg.Connection, args: argparse.Namespace
 ) -> int:
-    kayitli = uygulanmis_migrationlari_oku(kilit_conn)
-    if kayitli:
-        raise DurdurmaHatasi(
-            f"--bootstrap yalnız BOŞ bir schema_migrations'da çalışır — şu an "
-            f"{len(kayitli)} kayıt var. Bu bayrak yalnız BİR KEZ kullanılabilir."
-        )
+    """Asıl bootstrap mantığı — tablo BOŞ mu kontrolü HARİÇ (çağıran
+    sorumlu). Hem `--bootstrap` hem `--tam` tarafından kullanılır."""
     with kilit_conn.cursor() as cur:
         adaylar = bootstrap_adaylarini_belirle(cur, args.dizin)
+    kilit_conn.rollback()  # bkz. _normal_akis_isle'daki kilit notu
     tum_dosyalar = migration_listesi(args.dizin)
     aday_adlari = {y.name for y in adaylar}
     kalanlar = [y.name for y in tum_dosyalar if y.name not in aday_adlari]
 
-    print(f"[BOOTSTRAP] {len(adaylar)} dosya 'uygulanmış' olarak işaretlenecek:")
+    print(
+        f"[BOOTSTRAP] {len(adaylar)}/{len(tum_dosyalar)} dosya 'uygulanmış' "
+        "olarak işaretlenecek:"
+    )
     for yol in adaylar:
         print(f"  - {yol.name}")
     if kalanlar:
         print(
-            f"[BOOTSTRAP] İŞARETLENMEYECEK (normal --dry-run/--uygula akışına "
-            f"bırakılıyor): {kalanlar}"
+            f"[BOOTSTRAP] İŞARETLENMEYECEK ({len(kalanlar)}/{len(tum_dosyalar)} — "
+            f"normal --dry-run/--uygula akışına bırakılıyor): {kalanlar}"
         )
 
     if not args.uygula:
@@ -359,6 +383,73 @@ def _bootstrap_isle(
         conn.commit()
     print(f"\n=== BOOTSTRAP TAMAMLANDI — {len(adaylar)} dosya işaretlendi ===")
     return 0
+
+
+def _bootstrap_isle(
+    database_url: str, kilit_conn: psycopg.Connection, args: argparse.Namespace
+) -> int:
+    kayitli = uygulanmis_migrationlari_oku(kilit_conn)
+    if kayitli:
+        raise DurdurmaHatasi(
+            f"--bootstrap yalnız BOŞ bir schema_migrations'da çalışır — şu an "
+            f"{len(kayitli)} kayıt var. Bu bayrak yalnız BİR KEZ kullanılabilir."
+        )
+    return _bootstrap_core(database_url, kilit_conn, args)
+
+
+def _tam_isle(
+    database_url: str, kilit_conn: psycopg.Connection, args: argparse.Namespace
+) -> int:
+    """`--tam`: tablo boşsa bootstrap'ı yapar, ardından AYNI koşuda
+    bekleyen migration'ları uygular — Ahmet'in canlıda çalıştırması
+    gereken komutu ikiden bire indirir (2026-10-04, `Claude outputs/
+    PROMPT_MIGRATION_KAPAT_2026-10-04.md`). Bootstrap adımı patlarsa
+    (bir exception fırlatırsa veya 0'dan farklı dönerse) uygulama
+    adımına HİÇ GEÇİLMEZ. Tablo zaten doluysa bootstrap adımı sessizce
+    ATLANIR (hata YOK — `--tam` tekrar tekrar çalıştırılabilir olmalı)."""
+    kayitli = uygulanmis_migrationlari_oku(kilit_conn)
+    if kayitli:
+        print(
+            f"[TAM] schema_migrations zaten dolu ({len(kayitli)} kayıt) — "
+            "bootstrap adımı ATLANDI."
+        )
+        return _normal_akis_isle(database_url, kilit_conn, args)
+
+    if not args.uygula:
+        print("[TAM] schema_migrations BOŞ — bootstrap önizlemesi (dry-run):")
+        with kilit_conn.cursor() as cur:
+            adaylar = bootstrap_adaylarini_belirle(cur, args.dizin)
+        tum_dosyalar = migration_listesi(args.dizin)
+        print(
+            f"[BOOTSTRAP-ÖNİZLEME] {len(adaylar)}/{len(tum_dosyalar)} dosya "
+            "işaretlenecekti:"
+        )
+        for yol in adaylar:
+            print(f"  - {yol.name}")
+        print("[TAM] ardından (bootstrap'lanmış SAYILARAK) bekleyenler:")
+        return _normal_akis_isle(
+            database_url,
+            kilit_conn,
+            args,
+            ek_uygulanmis_adlar=frozenset(y.name for y in adaylar),
+        )
+
+    print("[TAM] schema_migrations BOŞ — bootstrap adımı uygulanıyor...")
+    try:
+        kod = _bootstrap_core(database_url, kilit_conn, args)
+    except DurdurmaHatasi as e:
+        print(f"[DURDU] bootstrap adımı patladı: {e}")
+        print("[TAM] uygulama adımına GEÇİLMEDİ.")
+        return 1
+    except Exception as e:  # noqa: BLE001 - kasıtlı: bootstrap'ın her hatası DURDU'ya çevrilir
+        print(f"[DURDU] bootstrap adımı patladı: {e}")
+        print("[TAM] uygulama adımına GEÇİLMEDİ.")
+        return 1
+    if kod != 0:
+        print("[DURDU] bootstrap adımı başarısız döndü — uygulama adımına GEÇİLMEDİ.")
+        return 1
+    print("[TAM] bootstrap adımı tamamlandı — uygulama adımına geçiliyor.")
+    return _normal_akis_isle(database_url, kilit_conn, args)
 
 
 def _tek_dosya_isle(
@@ -391,12 +482,34 @@ def _tek_dosya_isle(
 
 
 def _normal_akis_isle(
-    database_url: str, kilit_conn: psycopg.Connection, args: argparse.Namespace
+    database_url: str,
+    kilit_conn: psycopg.Connection,
+    args: argparse.Namespace,
+    *,
+    ek_uygulanmis_adlar: frozenset[str] = frozenset(),
 ) -> int:
+    """`ek_uygulanmis_adlar`: `--tam`'ın dry-run önizlemesinde, henüz
+    GERÇEKTEN yazılmamış (bootstrap dry-run'dan geçen) dosya adlarını
+    "zaten uygulanmış SAYARAK" `bekleyenler` listesinden çıkarmak için —
+    yoksa önizleme TÜM dosyaları bekleyen sayıp sıfırdan oynatmaya
+    çalışırdı (bkz. modül notu: bu YANLIŞ TEMSİL, bootstrap olmadan
+    migration geçmişini canlıya karşı tekrar oynatmak güvenli değil)."""
     kayitli = uygulanmis_migrationlari_oku(kilit_conn)
     hash_tutarliligini_dogrula(kayitli, args.dizin)
+    # `kilit_conn`'un bu SELECT'i AÇIK bir transaction'da tutması (advisory
+    # kilit SESSION-seviyeli, rollback'ten ETKİLENMEZ — bkz. kilidi_dene())
+    # — bekleyenlerden biri `schema_migrations`'ın KENDİSİNE `ALTER TABLE`/
+    # `CREATE POLICY` uygularsa (tam da `20261004_0001` dosyası), o DDL
+    # kilit_conn'un AccessShareLock'unu SERBEST BIRAKANA kadar BEKLER —
+    # `_normal_akis_isle` döngüsü bitene kadar kilit_conn hiç kapanmadığı
+    # için bu, statement_timeout'a kadar GERÇEKTEN asılı kalır (gerçek bir
+    # testle BULUNDU). Döngüden ÖNCE açıkça rollback.
+    kilit_conn.rollback()
 
-    bekleyenler = [y for y in migration_listesi(args.dizin) if y.name not in kayitli]
+    bilinen_adlar = set(kayitli) | ek_uygulanmis_adlar
+    bekleyenler = [
+        y for y in migration_listesi(args.dizin) if y.name not in bilinen_adlar
+    ]
     if not bekleyenler:
         print("[OK] Bekleyen migration yok — canlı güncel.")
         return 0
@@ -411,6 +524,7 @@ def _normal_akis_isle(
         print(f"  - {y.name}")
 
     once = durum_fotografi(kilit_conn)
+    kilit_conn.rollback()  # aynı sebep — bkz. yukarıdaki not
     uygulanan: list[str] = []
 
     if args.uygula:
@@ -487,6 +601,12 @@ def main() -> int:
         action="store_true",
         help="nesne-varlık kontrolüyle mevcut migration'ları işaretle (yalnız BİR KEZ, tablo boşken)",
     )
+    ap.add_argument(
+        "--tam",
+        action="store_true",
+        help="tablo boşsa --bootstrap'ı yapar, AYNI koşuda bekleyenleri uygular "
+        "(bootstrap patlarsa uygulamaya geçmez; tablo doluysa bootstrap'ı atlar)",
+    )
     ap.add_argument("--dizin", type=Path, default=MIGRATIONS_DIZIN_VARSAYILAN)
     ap.add_argument("--yedek-atla", default=None, metavar="GEREKÇE")
     ap.add_argument(
@@ -497,6 +617,11 @@ def main() -> int:
 
     if args.yedek_atla is not None and not args.yedek_atla.strip():
         print("HATA: --yedek-atla gerekçeli verilmeli (boş olamaz).")
+        return 1
+    if args.bootstrap and args.tam:
+        print(
+            "HATA: --bootstrap ve --tam birlikte verilemez (--tam zaten ikisini sırayla yapar)."
+        )
         return 1
 
     try:
@@ -527,12 +652,34 @@ def main() -> int:
                     "alınamadı) — eşzamanlı iki koşu aynı migration'ı uygulamasın"
                 )
             try:
-                _bare_tablo_olustur(kilit_conn)
+                if _tam_korumali_tablo_olustur(kilit_conn):
+                    print(
+                        "[ALTYAPI] schema_migrations oluşturuldu (RLS + "
+                        "politika + grant ile, TEK transaction'da)"
+                    )
                 if args.bootstrap:
-                    return _bootstrap_isle(database_url, kilit_conn, args)
-                return _normal_akis_isle(database_url, kilit_conn, args)
+                    sonuc = _bootstrap_isle(database_url, kilit_conn, args)
+                elif args.tam:
+                    sonuc = _tam_isle(database_url, kilit_conn, args)
+                else:
+                    sonuc = _normal_akis_isle(database_url, kilit_conn, args)
             finally:
                 kilidi_birak(kilit_conn)
+
+        if args.uygula and sonuc == 0:
+            # Migration uygulayan araç, arkasında korumasız (RLS'siz veya
+            # politikasız) bir tablo bırakıp bırakmadığını KENDİSİ söylemek
+            # zorunda (bkz. rls_canli_kontrol.py modül notu — bu kontrolün
+            # eklenme sebebi tam olarak bu script'in KENDİ önceki bir hatası).
+            print("\n[RLS-KONTROL] canlı RLS durumu doğrulanıyor...")
+            rls_sonuc = rls_canli_kontrol.main()
+            if rls_sonuc != 0:
+                print(
+                    "[DURDU] migration'lar uygulandı AMA canlıda RLS/politika "
+                    "eksiği bulundu — yukarıya bak."
+                )
+                return rls_sonuc
+        return sonuc
 
     except DurdurmaHatasi as e:
         print(f"\n[DURDU] {e}")
