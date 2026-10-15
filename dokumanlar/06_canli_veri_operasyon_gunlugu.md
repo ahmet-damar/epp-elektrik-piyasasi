@@ -3350,3 +3350,54 @@ Ama gerçek `--uygula` yüklemesi hâlâ YAPILMADI — bu tek adım Ahmet'in
 kendisinin çalıştırması (veya Claude Code ayarlarında açık bir Bash
 izin kuralı eklemesi) gerekiyor. Tam komut ve rapor: `Claude outputs/
 kapanis_2026-10-03_temmuz_canli.md`.
+
+## 2026-10-15 — `migration_uygula.py --tam --uygula` CANLIDA İLK GERÇEK KOŞUSU: 11 günlük Zaman Serisi arızası kapandı
+
+**Ahmet'in kendi terminalinden çalıştırdı** (Claude Code değil) —
+aşağıdakiler gerçek terminal çıktısı, tahmin değil. Komut dizisi
+`Claude outputs/kapanis_2026-10-04b_migration_kapat.md`/`09_PROJE_
+DURUMU.md`'nin "AÇILIŞTA" bölümünde bırakılan tek satırdı.
+
+**1. Yedek:** `scheduled-backup.yml` GitHub arayüzünden elle tetiklendi
+(`workflow_dispatch`) — **run #17, Success, 36sn, 1 artifact**, commit
+`7be8694` üzerinde.
+
+**2. Kuru koşu (`--tam`, bayraksız):** yedek tazeliği kapısı geçti.
+Bootstrap önizlemesi **33/35** dosya (Görev 1'in 2026-10-04'te bulduğu
+TAM AYNI 33) — bekleyen tam **2** dosya (`20260920_0001_toplama_
+katmani_views.sql`, `20261004_0001_schema_migrations.sql`), ikisi de
+gerçek bir transaction içinde çalışıp (204ms + 82ms) ROLLBACK edildi —
+"Veri satırlarında fark yok."
+
+**3. Gerçek koşu (`--tam --uygula`):**
+
+- Bootstrap: 34 migration'dan **33/35** dosya "uygulanmış" işaretlendi
+  (nesne-varlık + supersession mantığı — bkz. `10_TEKNIK_MASTER_
+DOKUMAN.md` §16.8/§16.9).
+- İşaretlenmeyen 2 dosya normal akışla uygulandı: `20260920_0001_
+toplama_katmani_views.sql` (186ms), `20261004_0001_schema_
+migrations.sql` (135ms).
+- **"[OK] Veri satırlarında fark yok."** — fact tablolarına, Temmuz
+  verisine HİÇ dokunulmadı.
+- **"[RLS-KONTROL] [OK] Canlıdaki tüm public tablolar RLS açık VE en
+  az 1 politikaya sahip."** — `rls_canli_kontrol.py`'nin otomatik
+  çağrısı canlıda İLK KEZ çalıştı ve yeşil verdi. 2026-10-04'te
+  dry-run'ın canlıda bıraktığı politikasız `schema_migrations` tablosu
+  (bkz. yukarıdaki o tarihli not — bu dosyada DEĞİL, `10_TEKNIK_MASTER_
+DOKUMAN.md` §16.9'da belgeliydi) bu koşuyla KAPANDI.
+
+**4. Dashboard canlıda doğrulandı (Ahmet tarayıcıdan baktı):** Zaman
+Serisi bölümü ÇALIŞIYOR — 2025-08 → 2026-07 kesintisiz seri çiziliyor,
+2026-01 dikiş çizgisi yerinde, kapsam üçgenleri görünüyor. 11 gündür
+süren `UndefinedTable: vw_toplama_tuketim_aylik` arızası **KAPANDI**.
+
+**Sonuç:** `migration_uygula.py` ilk gerçek canlı koşusunu BAŞARIYLA
+tamamladı — `schema_migrations` canlıda artık 35 dosyanın TAMAMINI
+içeriyor. Bu, 2026-10-02'den beri süren "Claude Code'un sınıflandırıcısı
+canlı yazmayı bloklar, Ahmet'in kendisi çalıştırması gerekir" zincirinin
+İLK başarılı sonucu — tüm önceki turlarda hazırlanan dry-run/hash/RLS/
+kilit koruma katmanları canlıda GERÇEKTEN sınandı ve tuttu.
+
+Bugün ekranda görülen üç yeni (dokunulmayan) bulgu + bir tasarım hatası
+(yedek takvimi/kapı eşiği uyuşmazlığı) `09_PROJE_DURUMU.md`'nin açık
+maddeler listesine eklendi — detay için oraya bakın.

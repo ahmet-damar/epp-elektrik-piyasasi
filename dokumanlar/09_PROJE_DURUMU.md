@@ -417,8 +417,65 @@ geneli.py`), kalan 39 ay (2016-12 hariç 4/5 grupla) aktive edildi →
 **Bu bölümü önce oku — bir sonraki oturum yalnız bunu okuyup kaldığı
 yerden devam edebilmeli.**
 
-**GÜNCEL (2026-10-04, kapanış) — en üst özet, aşağıdaki eski tarihli
+**GÜNCEL (2026-10-15, kapanış) — en üst özet, aşağıdaki eski tarihli
 özetlerin YERİNE geçer:**
+
+- **Zaman Serisi arızası KAPANDI (2026-10-15).** 11 gün açık kalan
+  tek engel — `20260920_0001_toplama_katmani_views.sql`'in canlıya
+  uygulanmamış olması — Ahmet'in kendi terminalinden `migration_
+uygula.py --tam --uygula` çalıştırmasıyla ortadan kalktı (Claude Code
+  değil — komutu Ahmet kendisi çalıştırdı, sınıflandırıcı hiç devreye
+  girmedi). Taze yedek (run #17, success) → `--tam` dry-run (33/35
+  bootstrap önizleme, 2 bekleyen, "0 fark") → `--tam --uygula` (33/35
+  işaretlendi, 2 dosya UYGULANDI, "0 fark", `[RLS-KONTROL] [OK]`).
+  `schema_migrations` canlıda artık 35 dosyanın TAMAMINI içeriyor.
+  Dashboard (Ahmet, tarayıcıdan) doğrulandı: Zaman Serisi çalışıyor —
+  2025-08→2026-07 kesintisiz seri, 2026-01 dikiş çizgisi yerinde,
+  kapsam üçgenleri görünür. Tam kayıt: `dokumanlar/06_canli_veri_
+operasyon_gunlugu.md` (2026-10-15 kaydı), `10_TEKNIK_MASTER_
+DOKUMAN.md` §16.10, rapor: `Claude outputs/kapanis_2026-10-15_
+migration_canli_uygulandi.md`.
+- **Canlıdaki son veri ayı hâlâ 2026-07** (Ağustos/Eylül EPDK
+  yayınladıysa canlıya yüklenmedi — açık madde, aşağıda).
+- **Açık maddeler (tek liste, bu turda DOKUNULMADI):**
+  1. **Ağustos + Eylül 2026 verisi canlıya yüklenmedi** (EPDK
+     yayınladıysa).
+  2. Görev 7 kararı — `deploy.yml`'in `migrate` job'ı `if: false`
+     yüzünden Faz 0'dan beri hiç çalışmadı; öneri (B)+(C): uygulamayı
+     elde tut (`migration_uygula.py --tam`), tespiti haftalık
+     zamanlanmış salt-okuma `--dry-run` ile otomatikleştir.
+  3. **(YENİ, 2026-10-15) Kapsam uyarısı mesajı yanlış sebep
+     gösteriyor** (orta öncelik) — "2026-07 (Kamu ve Özel Hizmetler:
+     1/1 dönem)" yazıyor, "1/1" tam gibi okunuyor; oysa bayrağı
+     (`toplama.py`: `tam_mi`) düşüren şey dönem sayısı değil İL
+     KARDİNALİTESİ. Bayrak DOĞRU, anlatım YANLIŞ — mesaj hangi şartın
+     düşürdüğünü (kaç il geldi/bekleniyordu) söylemeli.
+  4. **(YENİ, 2026-10-15) "Sanayi hariç" etiketli veri setinde Sanayi
+     serisi görünüyor** (önce ÖLÇ, sonra düzelt) — `app/dashboard.py:
+1301`'deki "Tüketim (il×grup, Sanayi hariç)" etiketi ile grafikte
+     görünen Sanayi serisi (2026-01'den itibaren en üstteki çizgi)
+     çelişiyor. İki ihtimal: etiket eskimiş (2026'dan itibaren Sanayi
+     seriye giriyor, dipnotta yazıyor) VEYA filtre uygulanmıyor —
+     tahmin etmeden ölç.
+  5. **(YENİ, 2026-10-15) Lejant iki kez çiziliyor** (kozmetik) —
+     "Kırılım" ve "grup_adi" aynı 5 kategoriyi farklı renklerle
+     listeliyor, Altair'in çizgi+nokta katmanlarının ayrı renk skalası
+     üretmesi.
+  6. **(YENİ, 2026-10-15, tasarım hatası — KANITLANDI) Yedek kapısı ile
+     yedek takvimi uyuşmuyor.** `scheduled-backup.yml` HAFTALIK
+     (`cron: 0 3 * * 0`, Pazar), ama `migration_uygula.py`/`aylik_
+yukle.py`'nin yedek-tazeliği kapısı 24 SAATLİK. 2026-10-15'te kapı
+     doğru ateşledi (yedek o gün tazeydi) ama bu TESADÜF — Pazar
+     dışındaki her gün bu kapı `--yedek-atla` gerektirecek. "Hiç
+     ateşlemeyen kontrol" sınıfının AYNA GÖRÜNTÜSÜ: her zaman ateşleyen
+     (ve rutin olarak atlanması gereken) bir kapı. Öneri: yedeği günlük
+     yap (`0 3 * * *`) — 90 günlük retention + ~36sn koşu süresi buna
+     müsait.
+  7. Harita v1, Türkçe-I taraması, İş A dedup, `aylik_yukle.py`'de
+     `connect_timeout` (zaten `ca6aa59`'da eklendi — bu madde listede
+     tarihsel bir kalıntı olabilir, doğrulanmadı), Faz 4 kapsamı.
+
+**GÜNCEL (2026-10-04, kapanış) — eski özet, güncel durum için yukarıya bak:**
 
 - **Canlıda eksik olan tek migration:** `20260920_0001_toplama_
 katmani_views.sql` (4 view + 4 index). Dashboard'un **Zaman Serisi**
@@ -429,18 +486,8 @@ katmani_views.sql` (4 view + 4 index). Dashboard'un **Zaman Serisi**
   `23265ad`, CI+Security yeşil, 7+ kasıtlı-bozuk senaryo kanıtlı.
 - **Tek engel:** `--tam --uygula` Claude Code'un araç-seviyesi
   `[Production Deploy]` blokuna takılıyor. Aşılmaya **çalışılmadı** —
-  doğru davranış bu. Açılış adımı: Ahmet'in aşağıdaki **tek satırı**
-  çalıştırması:
-  ```
-  docker exec -w /workspace epp-devcontainer python -u -m worker.scripts.migration_uygula --tam --uygula 2>&1 | tee /tmp/migration_tam.log
-  ```
-  Öncesinde taze yedek: `gh workflow run scheduled-backup.yml` (script
-  bunu zaten kendi kapısında kontrol ediyor, başarısızsa durur).
-  Sonrasında doğrulanacaklar (yeni oturumun ilk görevi): (1) 4
-  `vw_toplama_*` view var mı + `security_invoker=true` mı, (2) 4 index
-  oluştu mu, (3) `rls_canli_kontrol.py` temiz mi (`schema_migrations`
-  dahil), (4) Dashboard `AppTest`: Ay/Çeyrek/Yıl/Tümü dördü de render
-  ediyor mu, (5) veri satırlarında 0 fark, Temmuz toplamı değişmedi.
+  doğru davranış bu. **[2026-10-15'te Ahmet'in kendisi çalıştırdı,
+  engel kalktı — bkz. yukarıdaki GÜNCEL blok.]**
 - **Açık maddeler (tek liste, dokunulmadı):** Görev 7 kararı
   (`deploy.yml`'in `migrate` job'ı `if: false` yüzünden Faz 0'dan beri
   hiç çalışmadı — öneri (B)+(C): uygulamayı elde tut, tespiti haftalık
