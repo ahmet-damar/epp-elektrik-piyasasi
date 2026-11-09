@@ -4022,16 +4022,20 @@ serisi GÖRÜNÜYOR (2026-01'den itibaren en üstteki çizgi) — etiket
 eskimiş mi yoksa filtre mi uygulanmıyor, HENÜZ ÖLÇÜLMEDİ.
 (c) Lejant iki kez çiziliyor (Altair'in çizgi+nokta katmanlarının ayrı
 renk skalası üretmesi) — kozmetik.
-(d) **Tasarım hatası, bugün kanıtlandı:** `scheduled-backup.yml`
-HAFTALIK (`cron: 0 3 * * 0`), ama `migration_uygula.py`/`aylik_
-yukle.py`'nin yedek-tazeliği kapısı 24 SAATLİK — Pazar dışındaki her
-gün bu kapı `--yedek-atla` gerektirecek. Bugün kapı doğru ateşledi
-(yedek tazeydi) ama bu bir TESADÜF — kapı ile takvim yapısal olarak
-uyuşmuyor. "Hiç ateşlemeyen kontrol" sınıfının AYNA GÖRÜNTÜSÜ: HER
-ZAMAN ateşleyen (ve bu yüzden rutin olarak atlanması gereken) bir
-kapı. Düzeltme ÖNERİSİ (kod yazılmadı, bu turda dokunulmadı): yedeği
-günlük yap (`0 3 * * *`) — 90 günlük retention ve ~36sn koşu süresi
-buna fazlasıyla müsait.
+(d) **Tasarım hatası, 2026-10-15'te kanıtlandı, 2026-11-09'da ÇÖZÜLDÜ:**
+`scheduled-backup.yml` HAFTALIK'tı (`cron: 0 3 * * 0`), ama
+`migration_uygula.py`/`aylik_yukle.py`'nin yedek-tazeliği kapısı 24
+SAATLİK'ti — Pazar dışındaki her gün bu kapı `--yedek-atla`
+gerektiriyordu. 2026-10-15'te kapı doğru ateşledi (yedek tazeydi) ama bu
+bir TESADÜFTÜ — kapı ile takvim yapısal olarak uyuşmuyordu. "Hiç
+ateşlemeyen kontrol" sınıfının AYNA GÖRÜNTÜSÜ idi: HER ZAMAN ateşleyen
+(ve bu yüzden rutin olarak atlanması gereken) bir kapı.
+**2026-11-09'da çözüldü:** cron günlüğe alındı (`0 3 * * *`, ilk günlük
+koşu 2026-11-10 03:00 UTC'de beklenir) — 90 günlük retention ve ~36sn'lik
+koşu süresi buna fazlasıyla müsait. Aynı turda, iki script'te kopya
+tanımlı olan eşik sabiti (`_VARSAYILAN_YEDEK_MAX_YAS_SAAT`) tek yere
+(`aylik_yukle.py`) toplandı, `migration_uygula.py` oradan import eder
+hale getirildi.
 
 **Kalite kapısı:** bu tur yalnız DOKÜMANTASYON — kod/test/migration
 değişikliği YOK, bu yüzden ayrı bir kalite-kapısı koşusu gerekmedi.

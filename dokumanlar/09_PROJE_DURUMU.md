@@ -461,16 +461,19 @@ migration_canli_uygulandi.md`.
      "Kırılım" ve "grup_adi" aynı 5 kategoriyi farklı renklerle
      listeliyor, Altair'in çizgi+nokta katmanlarının ayrı renk skalası
      üretmesi.
-  6. **(YENİ, 2026-10-15, tasarım hatası — KANITLANDI) Yedek kapısı ile
-     yedek takvimi uyuşmuyor.** `scheduled-backup.yml` HAFTALIK
-     (`cron: 0 3 * * 0`, Pazar), ama `migration_uygula.py`/`aylik_
-yukle.py`'nin yedek-tazeliği kapısı 24 SAATLİK. 2026-10-15'te kapı
-     doğru ateşledi (yedek o gün tazeydi) ama bu TESADÜF — Pazar
-     dışındaki her gün bu kapı `--yedek-atla` gerektirecek. "Hiç
-     ateşlemeyen kontrol" sınıfının AYNA GÖRÜNTÜSÜ: her zaman ateşleyen
-     (ve rutin olarak atlanması gereken) bir kapı. Öneri: yedeği günlük
-     yap (`0 3 * * *`) — 90 günlük retention + ~36sn koşu süresi buna
-     müsait.
+  6. **(2026-10-15'te tasarım hatası KANITLANDI, 2026-11-09'da ÇÖZÜLDÜ)
+     Yedek kapısı ile yedek takvimi uyuşmuyordu.** `scheduled-backup.yml`
+     HAFTALIK'tı (`cron: 0 3 * * 0`, Pazar), ama `migration_uygula.py`/
+     `aylik_yukle.py`'nin yedek-tazeliği kapısı 24 SAATLİK'ti. 2026-10-15'te
+     kapı doğru ateşledi (yedek o gün tazeydi) ama bu TESADÜFTÜ — Pazar
+     dışındaki her gün bu kapı `--yedek-atla` gerektiriyordu. "Hiç
+     ateşlemeyen kontrol" sınıfının AYNA GÖRÜNTÜSÜ idi: her zaman
+     ateşleyen (ve rutin olarak atlanması gereken) bir kapı.
+     **2026-11-09'da çözüldü:** cron günlüğe alındı (`0 3 * * *`); ilk
+     günlük koşu 2026-11-10 03:00 UTC'de beklenir. Ayrıca eşik sabiti
+     (`_VARSAYILAN_YEDEK_MAX_YAS_SAAT`) iki script'te kopya tanımlıydı —
+     tek yerde (`aylik_yukle.py`) tanımlı kalacak şekilde birleştirildi,
+     `migration_uygula.py` oradan import ediyor.
   7. Harita v1, Türkçe-I taraması, İş A dedup, `aylik_yukle.py`'de
      `connect_timeout` (zaten `ca6aa59`'da eklendi — bu madde listede
      tarihsel bir kalıntı olabilir, doğrulanmadı), Faz 4 kapsamı.

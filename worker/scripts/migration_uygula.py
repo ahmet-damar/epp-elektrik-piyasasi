@@ -62,12 +62,12 @@ from worker.db import get_database_url
 from worker.scripts import rls_canli_kontrol
 from worker.scripts.aylik_yukle import (
     DurdurmaHatasi,
+    _VARSAYILAN_YEDEK_MAX_YAS_SAAT,
     baglan,
     durum_fotografi,
     son_basarili_yedek_yasi,
 )
 
-_VARSAYILAN_YEDEK_MAX_YAS_SAAT = 24
 _ADVISORY_LOCK_KEY = 847302001  # sabit, keyfi - epp_migration_uygula için ayrılmış
 
 MIGRATIONS_DIZIN_VARSAYILAN = (

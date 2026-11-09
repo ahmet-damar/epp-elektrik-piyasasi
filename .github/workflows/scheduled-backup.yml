@@ -1,6 +1,15 @@
 # ============================================================================
 # EPP Scheduled Backup — canlı Supabase'in public şema VERİSİNİ (DDL değil)
-# haftalık pg_dump'lar, workflow artifact olarak saklar.
+# günlük pg_dump'lar, workflow artifact olarak saklar.
+#
+# Cron GÜNLÜK (2026-11-09'da haftalıktan günlüğe çevrildi — bkz.
+# dokumanlar/09_PROJE_DURUMU.md ve 10_TEKNIK_MASTER_DOKUMAN.md ilgili
+# maddeler): migration_uygula.py/aylik_yukle.py'nin yedek-tazeliği kapısı
+# 24 SAATLİK, haftalık bir takvimle yapısal olarak UYUŞMUYORDU (Pazar
+# dışındaki her gün kapı kaçınılmaz olarak kapanıp --yedek-atla
+# gerektiriyordu — haftada 6 gün elle geçilen bir kapı kapı değildir).
+# Günlük koşu 90 günlük retention'ı ve ~36sn'lik koşu süresini fazlasıyla
+# karşılıyor.
 #
 # Neden bu workflow var: Supabase Free plan'de otomatik yedek YOK (bkz.
 # dokumanlar/11_yedekleme_runbook.md) - worker/scripts/backup.py + gerçek
@@ -23,7 +32,7 @@
 #   olmasın" riskine karşı bilinçli bir seçim, ileride sessizce değişmez).
 name: Scheduled Backup
 on:
-  schedule: [{ cron: "0 3 * * 0" }] # her Pazar 03:00 UTC (haftalık)
+  schedule: [{ cron: "0 3 * * *" }] # her gün 03:00 UTC (günlük)
   workflow_dispatch: {}
 permissions:
   contents: read
