@@ -69,7 +69,7 @@ def main() -> int:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    zaman_damgasi = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    zaman_damgasi = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
     hedef = out_dir / f"epp_data_{zaman_damgasi}.dump"
 
     # supabase/migrations/'daki seed migration'ları (20260819_0004,

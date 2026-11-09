@@ -61,8 +61,8 @@ from worker import ingest
 from worker.db import get_database_url
 from worker.scripts import rls_canli_kontrol
 from worker.scripts.aylik_yukle import (
-    DurdurmaHatasi,
     _VARSAYILAN_YEDEK_MAX_YAS_SAAT,
+    DurdurmaHatasi,
     baglan,
     durum_fotografi,
     son_basarili_yedek_yasi,

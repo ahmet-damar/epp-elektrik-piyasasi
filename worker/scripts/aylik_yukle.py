@@ -55,7 +55,7 @@ import concurrent.futures
 import os
 import sys
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -207,8 +207,8 @@ def son_basarili_yedek_yasi() -> timedelta | None:
         if not kosular:
             return None
         bitis_metni = kosular[0].get("updated_at") or kosular[0].get("created_at")
-        bitis = datetime.fromisoformat(bitis_metni.replace("Z", "+00:00"))
-        return datetime.now(timezone.utc) - bitis
+        bitis = datetime.fromisoformat(bitis_metni)
+        return datetime.now(UTC) - bitis
     except Exception:  # noqa: BLE001 - ağ/API hatası "doğrulanamadı" sayılır
         return None
 

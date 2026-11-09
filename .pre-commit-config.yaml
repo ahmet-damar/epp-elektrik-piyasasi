@@ -53,6 +53,12 @@ repos:
   # kaldığı sürece bu ikisi yine ayrışabilir (`pre-commit autoupdate` ile
   # periyodik senkron gerekir) — bkz. Claude outputs/kapanis_2026-09-20_
   # rls_gercegi.md.
+  # 2026-11-09: AYNI sınıf hata GERÇEKTEN tekrar oldu — requirements-dev.txt
+  # hâlâ sürümsüzdü (`ruff>=0.6.9`), ruff 0.6.9'dan sonra yeni kurallar
+  # (I001 davranışı + UP017/FURB162) ekledi, hiçbir kod değişmeden CI
+  # kırmızıya döndü. requirements-dev.txt bu rev'le (v0.16.6) AÇIKÇA
+  # eşitlendi — ikisi artık tek bir sürümü işaret ediyor, "autoupdate
+  # unutulursa ayrışır" riski kapatılmadı ama en azından ŞİMDİ eşitler.
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.16.6
     hooks:
