@@ -571,7 +571,12 @@ def _zs_donem_etiketi(donem_anahtari: int, grain: toplama.Grain) -> str:
 
 def _zs_grafik_ciz(
     df: pd.DataFrame, kirilim_kolonu: str, baslik_y: str, dikis_etiketi: str | None
-) -> alt.Chart:
+) -> alt.LayerChart | alt.FacetChart:
+    # Dönüş tipi `alt.layer()`'ın kendi stub'ıyla birebir — fonksiyon hep
+    # en az 2 katmanı `alt.layer(*katmanlar)` ile birleştirip döndürüyor,
+    # `alt.Chart` (tekil, katmansız) hiç üretmiyor. `st.altair_chart`
+    # çağrısı (çağıran) Chart'a özgü hiçbir şey yapmıyor, sadece render
+    # ediyor — bu birlik tipi doğru ve en dar olanı.
     """Ortak Altair çizim mantığı — 4 veri setinin (tüketim/tüketim ülke
     geneli/üretim kaynak/üretim il) TÜMÜ için kullanılır.
 
@@ -1504,7 +1509,12 @@ if gercek_veri_var:
                     "**R12** — her ay, o ay VE önceki 11 ayın toplamı (12 tam "
                     "ay yoksa ⚠ üçgenle işaretlenir, ay grain'inde çizilir)."
                 )
-                zs_r12_chart = (
+                # `+` ile katmanlanınca tip `Chart` değil `LayerChart |
+                # FacetChart` olur (alt.Chart.__add__'ın stub'ı) — ilk
+                # atamada birliği açıkça yazmak, koşullu yeniden atamayı
+                # mypy'ye göre GERÇEKTEN doğru kılıyor (sürüm toleransına
+                # bağlı bir kaçamak değil).
+                zs_r12_chart: alt.Chart | alt.LayerChart | alt.FacetChart = (
                     alt.Chart(zs_r12_df[zs_r12_df["tam_mi"]])
                     .mark_line(point=True, color="#2ca02c")
                     .encode(

@@ -75,14 +75,35 @@ repos:
   # koşusunda bulundu, bkz. Claude outputs/kapanis_2026-09-20_rls_
   # gercegi.md) — ikisi de CI ile AYNI komuta getirildi.
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.14.1
+    # requirements-dev.txt'teki `mypy==2.4.1` ile AYNI — sabitsiz mypy
+    # (önceki `>=1.11.0`) CI'da 2.4.1'e, burada pin'li v1.14.1'e
+    # çözülüyordu; 2026-11-10'da ikisi aynı kodda FARKLI hata sayısı
+    # verdi (bkz. Claude outputs/kapanis_2026-11-10_*.md). Ölçüldü: her
+    # iki sürüm de düzeltmeler sonrası 0 hata veriyor — 2.4.1'e
+    # sabitlendi (daha yeni, CI'nın zaten bugün kullandığı sürüm).
+    rev: v2.4.1
     hooks:
       - id: mypy
         # `supabase` requirements.txt ile AYNI alt sınır — pre-commit'in
         # İZOLE ortamı bu paket olmadan `worker/db.py`'de sahte bir
         # "no attribute 'create_client'" hatası veriyordu (proje venv'inde
         # GERÇEKTEN kurulu olduğundan CI/yerel mypy hiç görmüyordu).
-        additional_dependencies: [pydantic, types-requests, "supabase>=2.9.0"]
+        # 2026-11-10: `altair`, `pandas`, `streamlit` eklendi — bu liste
+        # `altair`'ı görmediği için app/dashboard.py:665'teki GERÇEK bir
+        # dönüş-tipi hatasını kaçırmıştı, CI yakaladı (bkz. CLAUDE.md /
+        # 09_PROJE_DURUMU.md: "pre-commit mypy otorite değildir" notu).
+        # `-r requirements.txt` denendi, pip'in çalışma dizini pre-commit'in
+        # kendi cache'i olduğundan relatif yol çözülmedi — elle liste
+        # kaçınılmaz.
+        additional_dependencies:
+          [
+            pydantic,
+            types-requests,
+            "supabase>=2.9.0",
+            altair,
+            pandas,
+            streamlit,
+          ]
         args: ["--ignore-missing-imports", "--explicit-package-bases"]
         files: ^(app|worker)/
 

@@ -560,6 +560,50 @@ refresh.yml` TÜMÜ `python-version: "3.12"` kullanıyor (ölçüldü —
       geliştirilen/test edilen kod, CI'nın kullandığından FARKLI bir
       Python minor sürümünde çalışıyor. Bu turda düzeltme yapılmadı,
       yalnız kayda geçirildi.
+  14. **(YENİ, 2026-11-10, ÇÖZÜLDÜ) "İş laptopunda psycopg kurulamaz"
+      varsayımı YANLIŞTI; mypy pre-commit hook'u CI'nın yakaladığı gerçek
+      bir hatayı kaçırdı.** Bu varsayım hiç test edilmemiş, EV
+      makinesinin Smart App Control geçmişinden iş laptopuna aktarılmıştı.
+      ÖLÇÜLDÜ: proje kökü dışında bir venv'de `requirements.txt` kuruldu —
+      `psycopg 3.3.8`, `numpy 2.5.4`, `lxml 6.1.3` SORUNSUZ kuruldu ve
+      import edildi, hiçbir SAC engeli yok. Bu makinede `.env` yok, yani
+      kurulum tek başına canlıya erişim açmıyor. Sonraki ölçüm: aynı
+      venv'de gerçek CI komutu (`mypy==1.14.1` + tüm bağımlılıklar)
+      koşturulduğunda `additional_dependencies`'teki `pydantic`/`types-
+requests` gereksiz çıktı (supabase'in transitive bağımlılığı zaten
+      geliyor) AMA bu turda KALDIRILMADI — ayrı, izole bir değişiklik
+      olarak bırakıldı (karıştırılırsa CI kırmızıya dönerse hangi
+      değişikliğin sebep olduğu belirsizleşir). `repo: local` + `pip
+install -r requirements.txt` denemesi YAPILDI, BAŞARISIZ oldu —
+      pre-commit'in hook kurulumu kendi cache dizininde (`~/.cache/
+pre-commit/repo*`) çalışıyor, relatif `requirements.txt` yolu orada
+      çözülemiyor (`ERROR: Could not open requirements file`). Asıl bulgu:
+      mevcut `additional_dependencies` listesinde `altair` YOKTU — bu
+      yüzden yerel mypy hook'u `app/dashboard.py:665`'teki gerçek bir
+      dönüş-tipi hatasını (`alt.layer()`'ın `LayerChart | FacetChart`
+      döndürdüğü, fonksiyonun ise `-> alt.Chart` ilan ettiği) hiç görmedi,
+      CI yakaladı. Düzeltme: (a) `_zs_grafik_ciz`'in dönüş tipi `->
+alt.LayerChart | alt.FacetChart` olarak düzeltildi (`alt.layer()`'ın
+      kendi stub'ıyla birebir); (b) `.pre-commit-config.yaml`'daki mypy
+      hook'unun `additional_dependencies`'ine `altair`, `pandas`,
+      `streamlit` eklendi. Bu ekleme yerelde İKİNCİ, önceden görünmeyen bir
+      hatayı açığa çıkardı: `zs_r12_chart` önce `alt.Chart` olarak atanıp
+      sonra koşullu `+` ile katmanlanıyordu (`Chart` → `LayerChart |
+FacetChart`, GERÇEK bir tip tutarsızlığı) — requirements-dev.txt'teki
+      sürümsüz `mypy>=1.11.0` CI'da 2.4.1'e çözülüp bunu KAÇIRIYOR,
+      `.pre-commit-config.yaml`'ın sabit `v1.14.1`'i ise YAKALIYORDU: aynı
+      kod, iki kapıda farklı sonuç. ÖLÇÜLDÜ: `zs_r12_chart`'ın ilk
+      atamasına `alt.Chart | alt.LayerChart | alt.FacetChart` tip
+      belirtimi eklenip düzeltildikten sonra hem mypy 1.14.1 hem 2.4.1 tüm
+      proje üzerinde (82 dosya) 0 hata veriyor — iki sürüm de artık eşit
+      güvenli, 2.4.1'e sabitlendi (daha yeni, CI'nın bugün zaten çözdüğü
+      sürüm, `requirements-dev.txt` VE `.pre-commit-config.yaml`
+      (`rev: v2.4.1`) birebir aynı). `sqlfluff` kontrol edildi, ikisinde de
+      zaten `3.3.0` — ek değişiklik gerekmedi. Kavram CLAUDE.md'ye iki not
+      olarak eklendi: (1) pre-commit'teki mypy hızlı bir yaklaşımdır,
+      otorite değildir — otorite CI'daki mypy'dir; (2) kalite kapısındaki
+      her araç iki dosyada da AYNI kesin sürüme sabitlenir (bugün ruff,
+      prettier, mypy olmak üzere üç kez yaşandı).
 
 **GÜNCEL (2026-10-04, kapanış) — eski özet, güncel durum için yukarıya bak:**
 
