@@ -492,13 +492,13 @@ migration_canli_uygulandi.md`.
      BULUNAMAMASI demek. Elle/cloud-okumayla taşıma süreci güvenilir
      değil; bir oturum kapanışı unutulursa o dosya kalıcı olarak kaybolur.
   10. **(YENİ, 2026-11-10, AÇIK) İş laptopunda Dev Container yok** —
-     WSL/Docker BT politikasıyla kurulamıyor. Kalite kapısı şu an yalnız
-     CI'da çalışıyor; bu makineye yerel `pre-commit` kurulması (psycopg/
-     requirements.txt GEREKMEDEN, yalnız lint hook'larıyla — ruff/mypy/
-     sqlfluff/prettier) 2026-11-10'da PLANLANDI, henüz kurulmadı. Kurulursa
-     bu, "Dev Container ZORUNLU, Windows `.venv` KULLANILMAYACAK"
-     kuralının (bkz. CLAUDE.md) bilinçli, iş-laptopu-özel bir istisnası
-     olacak; proje genelinde geçerli olmayacak.
+      WSL/Docker BT politikasıyla kurulamıyor. Kalite kapısı şu an yalnız
+      CI'da çalışıyor; bu makineye yerel `pre-commit` kurulması (psycopg/
+      requirements.txt GEREKMEDEN, yalnız lint hook'larıyla — ruff/mypy/
+      sqlfluff/prettier) 2026-11-10'da PLANLANDI, henüz kurulmadı. Kurulursa
+      bu, "Dev Container ZORUNLU, Windows `.venv` KULLANILMAYACAK"
+      kuralının (bkz. CLAUDE.md) bilinçli, iş-laptopu-özel bir istisnası
+      olacak; proje genelinde geçerli olmayacak.
 
 **GÜNCEL (2026-10-04, kapanış) — eski özet, güncel durum için yukarıya bak:**
 
