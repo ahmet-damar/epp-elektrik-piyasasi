@@ -477,6 +477,28 @@ migration_canli_uygulandi.md`.
   7. Harita v1, Türkçe-I taraması, İş A dedup, `aylik_yukle.py`'de
      `connect_timeout` (zaten `ca6aa59`'da eklendi — bu madde listede
      tarihsel bir kalıntı olabilir, doğrulanmadı), Faz 4 kapsamı.
+  8. **(YENİ, 2026-11-10, AÇIK) `_VARSAYILAN_YEDEK_MAX_YAS_SAAT` bağımlılık
+     yönü ters.** Madde 6'nın çözümünde sabit tekilleştirildi ama
+     `aylik_yukle.py`'de tanımlı kaldı, `migration_uygula.py` oradan
+     import ediyor — yani bir MİGRATİON aracı bir AYLIK YÜKLEME
+     script'ine bağımlı, mantıksız (ikisi de yedek-tazelik kontrolünü
+     kullanıyor, ama biri diğerinin "alt modülü" değil). Doğrusu: sabiti
+     (ve `son_basarili_yedek_yasi()`'ni) ortak bir modüle taşımak (örn.
+     `worker/scripts/yedek_kontrol.py`), ikisi de oradan import etsin.
+  9. **(YENİ, 2026-11-10, AÇIK) `Claude outputs/` prompt dosyalarının bir
+     kısmı git'e hiç işlenmemiş** — dizin `.gitignore`'da (bilinçli,
+     kota tasarrufu için), ama bu, yeni bir makinede klonlandığında
+     geçmiş prompt'ların (örn. `PROMPT_KAPANIS_2026-10-15.md`)
+     BULUNAMAMASI demek. Elle/cloud-okumayla taşıma süreci güvenilir
+     değil; bir oturum kapanışı unutulursa o dosya kalıcı olarak kaybolur.
+  10. **(YENİ, 2026-11-10, AÇIK) İş laptopunda Dev Container yok** —
+     WSL/Docker BT politikasıyla kurulamıyor. Kalite kapısı şu an yalnız
+     CI'da çalışıyor; bu makineye yerel `pre-commit` kurulması (psycopg/
+     requirements.txt GEREKMEDEN, yalnız lint hook'larıyla — ruff/mypy/
+     sqlfluff/prettier) 2026-11-10'da PLANLANDI, henüz kurulmadı. Kurulursa
+     bu, "Dev Container ZORUNLU, Windows `.venv` KULLANILMAYACAK"
+     kuralının (bkz. CLAUDE.md) bilinçli, iş-laptopu-özel bir istisnası
+     olacak; proje genelinde geçerli olmayacak.
 
 **GÜNCEL (2026-10-04, kapanış) — eski özet, güncel durum için yukarıya bak:**
 
