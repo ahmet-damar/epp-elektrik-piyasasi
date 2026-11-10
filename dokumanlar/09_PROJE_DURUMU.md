@@ -499,6 +499,18 @@ migration_canli_uygulandi.md`.
       bu, "Dev Container ZORUNLU, Windows `.venv` KULLANILMAYACAK"
       kuralının (bkz. CLAUDE.md) bilinçli, iş-laptopu-özel bir istisnası
       olacak; proje genelinde geçerli olmayacak.
+  11. **(YENİ, 2026-11-10, AÇIK) Devcontainer (3.11) ↔ CI (3.12) Python
+      sürümü çelişkisi.** `.devcontainer/devcontainer.json`:
+      `mcr.microsoft.com/devcontainers/python:1-3.11-bookworm` diyor,
+      ama `.github/workflows/ci.yml`/`security.yml`/`scheduled-
+refresh.yml` TÜMÜ `python-version: "3.12"` kullanıyor (ölçüldü —
+      `grep -rn python-version .github/workflows/*.yml`), ve
+      `dokumanlar/01_kavramsal_tasarim.md:57` de "Backend: Python 3.12"
+      diyor. "Her şeyi Dev Container'da çalıştır" kuralı (bkz. CLAUDE.md)
+      ile "CI'nın gerçekte test ettiği sürüm" ayrışmış — Dev Container'da
+      geliştirilen/test edilen kod, CI'nın kullandığından FARKLI bir
+      Python minor sürümünde çalışıyor. Bu turda düzeltme yapılmadı,
+      yalnız kayda geçirildi.
 
 **GÜNCEL (2026-10-04, kapanış) — eski özet, güncel durum için yukarıya bak:**
 

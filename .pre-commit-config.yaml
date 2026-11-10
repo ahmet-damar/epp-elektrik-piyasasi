@@ -93,11 +93,31 @@ repos:
       - id: eslint
         files: \.(ts|tsx|js|jsx)$
         additional_dependencies: [eslint@9.18.0, typescript@5.7.3]
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v4.0.0-alpha.8
+  # 2026-11-10: `pre-commit/mirrors-prettier` KALDIRILDI — upstream repo
+  # ARŞİVLENMİŞ (`archived: true`, son push 2024-04-11, kendi README'si
+  # "# archived - prettier made some changes that breaks plugins
+  # entirely" diyor, ölçüldü: `gh api repos/pre-commit/mirrors-prettier`).
+  # Tag geçmişi de bunu DOĞRULUYOR: `git ls-remote --tags` v3.1.0'dan
+  # SONRA doğrudan v4.0.0-alpha.0'a atlıyor, v3.2.0..v3.9.10 arası HİÇ
+  # tag YOK — yani "kararlı 3.x'e sabitle" isteği bu mirror'la pratikte
+  # YAPILAMAZDI (`rev: v3.9.10` diye bir tag mirror'da mevcut değil).
+  # `repo: local` + `language: node` + `additional_dependencies` ile
+  # DOĞRUDAN npm'den gerçek stabil `prettier@3.9.10`'u kuruyoruz — bu,
+  # mirror'ın kendi `.pre-commit-hooks.yaml`'ındaki `entry`/`language`
+  # desenini AYNEN taklit ediyor (ölçüldü:
+  # `.pre-commit-hooks.yaml@v4.0.0-alpha.8`), tek fark paket sürümü.
+  # Alpha sürümün CLI'si zaten KENDİ İÇİNDE 3.9.10'u motor olarak
+  # TAŞIYOR (`node_modules/prettier/node_modules/prettier/package.json`)
+  # — yani biçimlendirme davranışı DEĞİŞMİYOR, yalnız "hangi sürüm commit
+  # geçer/geçmez'e karar veriyor" sorusu alpha'dan stabil'e taşınıyor.
+  - repo: local
     hooks:
       - id: prettier
+        name: prettier
+        entry: prettier --write --ignore-unknown
+        language: node
         files: \.(ts|tsx|js|jsx|json|css|md|yaml|yml)$
+        additional_dependencies: ["prettier@3.9.10"]
 
   # 6) SQL (migration) — Postgres
   # 2026-09-20: `files` deseni ESKİDEN `^(db|migrations)/.*\.sql$` idi —
