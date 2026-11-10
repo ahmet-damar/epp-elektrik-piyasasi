@@ -4012,16 +4012,28 @@ tuketim_aylik` arızası (§16.8/§16.9'da teşhis edilen) **KAPANDI**.
 hatası** (tam liste `09_PROJE_DURUMU.md`'nin açık maddeler
 bölümünde):
 
-(a) Kapsam uyarısı mesajı yanlış sebep gösteriyor — bayrak (`tam_mi`)
-DOĞRU çalışıyor (`toplama.py`: `beklenen_donem_sayisi = mevcut_donem_
-sayisi AND <il_tam_ifadesi>`), ama mesaj "1/1 dönem" yazıp hangi
-şartın (il kardinalitesi) düşürdüğünü SÖYLEMİYOR — anlatım hatası, kod
-hatası değil.
-(b) "Tüketim (il×grup, **Sanayi hariç**)" etiketli veri setinde Sanayi
-serisi GÖRÜNÜYOR (2026-01'den itibaren en üstteki çizgi) — etiket
-eskimiş mi yoksa filtre mi uygulanmıyor, HENÜZ ÖLÇÜLMEDİ.
-(c) Lejant iki kez çiziliyor (Altair'in çizgi+nokta katmanlarının ayrı
-renk skalası üretmesi) — kozmetik.
+(a) **ÇÖZÜLDÜ (2026-11-10):** Kapsam uyarısı mesajı yanlış sebep
+gösteriyordu — bayrak (`tam_mi`) DOĞRU çalışıyor (`toplama.py`:
+`beklenen_donem_sayisi = mevcut_donem_sayisi AND <il_tam_ifadesi>`), ama
+mesaj "1/1 dönem" yazıp hangi şartın (il kardinalitesi) düşürdüğünü
+SÖYLEMİYORDU — anlatım hatasıydı, kod hatası değildi. `app/
+dashboard.py`'ye `_zs_eksik_sebebi()` eklendi: mesaj artık dönem sayısı
+VE/VEYA il sayısı şartından hangisi düştüyse (`il_sayisi_min` vs
+`BEKLENEN_IL_SAYISI=81`) açıkça yazıyor.
+(b) **ÇÖZÜLDÜ (2026-11-10):** "Tüketim (il×grup, **Sanayi hariç**)"
+etiketli veri setinde Sanayi serisi GÖRÜNÜYORDU (2026-01'den itibaren en
+üstteki çizgi). ÖLÇÜLDÜ: `vw_toplama_tuketim_aylik` view'inde (migration
+`20260920_0001`) grup_adi'a göre hiçbir filtre yok — kod hatası DEĞİL.
+Etiket eskimiş: Sanayi `toplama.py` madde 8'in (Karar 2) belgelediği
+üzere 2026'dan itibaren `fact_tuketim`'e fiilen giriyor, Word yıllarında
+(2016-2025) hiç yoktu. Etiket "Tüketim (il×grup, Sanayi hariç)" →
+"Tüketim (il×grup, 2016-2025 Sanayi hariç)" yapıldı.
+(c) **ÇÖZÜLDÜ (2026-11-10):** Lejant iki kez çiziliyordu. ÖLÇÜLDÜ
+(Vega-Lite spec karşılaştırması): `_zs_grafik_ciz()`'teki
+`.resolve_scale(color="independent")`, aynı alanı renklendiren `cizgi`
+ve `noktalar_tam` katmanlarını ZORLA iki ayrı renk skalasına/lejantına
+bölüyordu; diğer katmanların rengi mark-seviyesinde sabit olduğundan bu
+çağrıya hiç ihtiyaç yoktu. Satır kaldırıldı, tek lejant kalıyor.
 (d) **Tasarım hatası, 2026-10-15'te kanıtlandı, 2026-11-09'da ÇÖZÜLDÜ:**
 `scheduled-backup.yml` HAFTALIK'tı (`cron: 0 3 * * 0`), ama
 `migration_uygula.py`/`aylik_yukle.py`'nin yedek-tazeliği kapısı 24
@@ -4037,8 +4049,31 @@ tanımlı olan eşik sabiti (`_VARSAYILAN_YEDEK_MAX_YAS_SAAT`) tek yere
 (`aylik_yukle.py`) toplandı, `migration_uygula.py` oradan import eder
 hale getirildi.
 
-**Kalite kapısı:** bu tur yalnız DOKÜMANTASYON — kod/test/migration
-değişikliği YOK, bu yüzden ayrı bir kalite-kapısı koşusu gerekmedi.
+**(2026-11-10) Yerel kalite kapısı altyapısı:** iş laptopunda Dev
+Container kurulamadığı için (BT politikası, WSL/Docker engelli) Python
+3.12.10 + `pre-commit` 4.7.0 doğrudan Windows'a kuruldu — YALNIZ lint
+hook'ları için (psycopg/requirements.txt gerekmiyor), pytest/entegrasyon
+hâlâ yalnız CI'da. Hem `pre-commit` hem `commit-msg` hook tipi
+kaydedildi; kasıtlı bozuk markdown VE Python örnekleriyle hook'ların
+GERÇEKTEN engellediği kanıtlandı. Ayrıca iki kalite-kapısı
+sürüm-sürüklenmesi kapatıldı: `ruff` artık `requirements-dev.txt`'de de
+`==0.16.6`'ya sabit (önceki sürümsüzlük hiçbir kod değişmeden CI'yı
+kırmıştı); arşivlenmiş `pre-commit/mirrors-prettier` yerine `repo: local`
+
+- `additional_dependencies: ["prettier@3.9.10"]` ile gerçek stabil
+  sürüm kuruldu (biçimlendirme davranışı değişmedi, doğrulandı — hiçbir
+  dosya yeniden biçimlendirilmedi). Son olarak `.gitattributes`'a `eol=lf`
+  eklendi: bu makinenin sistem seviyesi `core.autocrlf=true`'su
+  `mixed-line-ending` hook'uyla çelişip her `--all-files` koşusunda 167
+  dosyayı gürültülü biçimde değiştiriyordu — `eol=lf` makineden bağımsız
+  olarak checkout'ta LF'yi zorunlu kılıyor, sorunu repoya (kalıcı) değil
+  makineye (geçici) bağlı olmaktan çıkarıyor. Tüm detaylar `09_PROJE_
+DURUMU.md`'nin madde 10/12/13'ünde.
+
+**Kalite kapısı:** yukarıdaki üç dashboard bulgusu için yerel
+`pre-commit run --all-files` çalıştırıldı (ruff/ruff-format/mypy/
+prettier dahil) — temiz. Satır-sonu/sürüm-sabitleme değişiklikleri
+kendi kapsamlarında ayrıca doğrulandı (bkz. yukarı).
 
 ---
 

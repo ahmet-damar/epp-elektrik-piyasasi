@@ -444,23 +444,36 @@ migration_canli_uygulandi.md`.
      yüzünden Faz 0'dan beri hiç çalışmadı; öneri (B)+(C): uygulamayı
      elde tut (`migration_uygula.py --tam`), tespiti haftalık
      zamanlanmış salt-okuma `--dry-run` ile otomatikleştir.
-  3. **(YENİ, 2026-10-15) Kapsam uyarısı mesajı yanlış sebep
-     gösteriyor** (orta öncelik) — "2026-07 (Kamu ve Özel Hizmetler:
-     1/1 dönem)" yazıyor, "1/1" tam gibi okunuyor; oysa bayrağı
-     (`toplama.py`: `tam_mi`) düşüren şey dönem sayısı değil İL
-     KARDİNALİTESİ. Bayrak DOĞRU, anlatım YANLIŞ — mesaj hangi şartın
-     düşürdüğünü (kaç il geldi/bekleniyordu) söylemeli.
-  4. **(YENİ, 2026-10-15) "Sanayi hariç" etiketli veri setinde Sanayi
-     serisi görünüyor** (önce ÖLÇ, sonra düzelt) — `app/dashboard.py:
-1301`'deki "Tüketim (il×grup, Sanayi hariç)" etiketi ile grafikte
-     görünen Sanayi serisi (2026-01'den itibaren en üstteki çizgi)
-     çelişiyor. İki ihtimal: etiket eskimiş (2026'dan itibaren Sanayi
-     seriye giriyor, dipnotta yazıyor) VEYA filtre uygulanmıyor —
-     tahmin etmeden ölç.
-  5. **(YENİ, 2026-10-15) Lejant iki kez çiziliyor** (kozmetik) —
-     "Kırılım" ve "grup_adi" aynı 5 kategoriyi farklı renklerle
-     listeliyor, Altair'in çizgi+nokta katmanlarının ayrı renk skalası
-     üretmesi.
+  3. **(2026-10-15'te tespit edildi, 2026-11-10'da ÇÖZÜLDÜ) Kapsam
+     uyarısı mesajı yanlış sebep gösteriyordu.** "2026-07 (Kamu ve Özel
+     Hizmetler: 1/1 dönem)" yazıyordu, "1/1" tam gibi okunuyordu; ÖLÇÜLDÜ:
+     bayrak (`toplama.py`: `tam_mi`) DOĞRU çalışıyordu, ama mesaj yalnız
+     `mevcut/beklenen_donem_sayisi`'ni yazıyor, bayrağı asıl düşüren İL
+     KARDİNALİTESİ'ni (`il_sayisi_min` vs `BEKLENEN_IL_SAYISI=81`) hiç
+     göstermiyordu. `app/dashboard.py`'de `_zs_eksik_sebebi()` eklendi —
+     mesaj artık hangi şartın (dönem sayısı VE/VEYA il sayısı) düştüğünü
+     açıkça yazıyor.
+  4. **(2026-10-15'te tespit edildi, 2026-11-10'da ÇÖZÜLDÜ) "Sanayi
+     hariç" etiketli veri setinde Sanayi serisi görünüyordu.** ÖLÇÜLDÜ:
+     filtre eksikliği DEĞİL — `vw_toplama_tuketim_aylik` view'inde
+     (migration `20260920_0001`) hiçbir grup_adi filtresi yok, yani kod
+     YANLIŞ değil. Etiket eskimişti: `toplama.py` madde 8'in (Karar 2)
+     belgelediği gibi Sanayi 2026'dan itibaren `fact_tuketim`'e fiilen
+     giriyor, Word yıllarında (2016-2025) hiç yoktu. `app/dashboard.py:
+1301`'deki etiket "Tüketim (il×grup, Sanayi hariç)" → "Tüketim
+     (il×grup, 2016-2025 Sanayi hariç)" yapıldı — artık 2026+ için
+     yanlış bir evrensel iddia taşımıyor (var olan 2025↔2026 dikiş
+     dipnotu sınır-aşan seçimlerde zaten bunu ayrıca açıklıyor).
+  5. **(2026-10-15'te tespit edildi, 2026-11-10'da ÇÖZÜLDÜ) Lejant iki
+     kez çiziliyordu.** ÖLÇÜLDÜ (Vega-Lite spec'i sentetik veriyle
+     karşılaştırılarak): sebep `_zs_grafik_ciz()`'in son satırındaki
+     `.resolve_scale(color="independent")` — `cizgi` ve `noktalar_tam`
+     katmanları AYNI alanı (kırılım kolonu) renklendiriyordu ama bu çağrı
+     onları ZORLA iki ayrı renk skalasına/lejantına bölüyordu (spec'te
+     `resolve.scale.color` anahtarı VARKEN 2 skala, YOKKEN paylaşılan 1
+     skala — ölçüldü). Diğer katmanların (`noktalar_eksik`, dikiş
+     çizgisi/metni) rengi `.encode()` değil mark-seviyesinde sabit, bu
+     kaldırmadan etkilenmiyor. Satır kaldırıldı — tek lejant kalıyor.
   6. **(2026-10-15'te tasarım hatası KANITLANDI, 2026-11-09'da ÇÖZÜLDÜ)
      Yedek kapısı ile yedek takvimi uyuşmuyordu.** `scheduled-backup.yml`
      HAFTALIK'tı (`cron: 0 3 * * 0`, Pazar), ama `migration_uygula.py`/
@@ -491,15 +504,51 @@ migration_canli_uygulandi.md`.
      geçmiş prompt'ların (örn. `PROMPT_KAPANIS_2026-10-15.md`)
      BULUNAMAMASI demek. Elle/cloud-okumayla taşıma süreci güvenilir
      değil; bir oturum kapanışı unutulursa o dosya kalıcı olarak kaybolur.
-  10. **(YENİ, 2026-11-10, AÇIK) İş laptopunda Dev Container yok** —
-      WSL/Docker BT politikasıyla kurulamıyor. Kalite kapısı şu an yalnız
-      CI'da çalışıyor; bu makineye yerel `pre-commit` kurulması (psycopg/
-      requirements.txt GEREKMEDEN, yalnız lint hook'larıyla — ruff/mypy/
-      sqlfluff/prettier) 2026-11-10'da PLANLANDI, henüz kurulmadı. Kurulursa
-      bu, "Dev Container ZORUNLU, Windows `.venv` KULLANILMAYACAK"
-      kuralının (bkz. CLAUDE.md) bilinçli, iş-laptopu-özel bir istisnası
-      olacak; proje genelinde geçerli olmayacak.
-  11. **(YENİ, 2026-11-10, AÇIK) Devcontainer (3.11) ↔ CI (3.12) Python
+  10. **(YENİ, 2026-11-10, ÇÖZÜLDÜ) İş laptopunda Dev Container yok** —
+      WSL/Docker BT politikasıyla kurulamıyor. Kalite kapısı eskiden yalnız
+      CI'da çalışıyordu; bu makineye Python 3.12.10 (winget) + yerel
+      `pre-commit` 4.7.0 KURULDU (psycopg/requirements.txt GEREKMEDEN,
+      yalnız lint hook'larıyla — ruff/mypy/sqlfluff/prettier/eslint/
+      gitleaks/hadolint/commitizen), `--hook-type commit-msg` dahil.
+      Kasıtlı bozuk markdown VE Python örnekleriyle hook'ların GERÇEKTEN
+      engellediği KANITLANDI (bkz. `Claude outputs/kapanis_2026-11-10_
+altyapi_ve_dashboard.md`). Bu, "Dev Container ZORUNLU, Windows
+      `.venv` KULLANILMAYACAK" kuralının (bkz. CLAUDE.md) bilinçli,
+      iş-laptopu-özel bir istisnasıdır (yalnız lint, pytest/psycopg hâlâ
+      yalnız CI'da) — proje genelinde geçerli değildir.
+  11. **(YENİ, 2026-11-10, ÇÖZÜLDÜ) `pre-commit run --all-files`'ta 167
+      dosyanın satır sonu her koşuda CRLF→LF değişiyordu** (semptom),
+      sebep bu makinenin SİSTEM seviyesi `core.autocrlf=true`'su (Git for
+      Windows kurulum varsayılanı) ile `.gitattributes`'ın yalnız
+      `* text=auto` taşıması — autocrlf checkout'ta CRLF yazıyor,
+      `mixed-line-ending` hook'u LF'ye geri çeviriyor, her koşuda gürültü
+      üretiyordu. ÖLÇÜLDÜ: repoda CRLF gerektiren dosya yok (`.bat/.cmd/
+.ps1/.sln/.vcxproj` — hiçbiri yok), CI (Ubuntu) zaten LF kullanıyor.
+      Çözüm makineye değil REPOYA yazıldı: `.gitattributes`'a `eol=lf`
+      eklendi (`* text=auto eol=lf`) — `core.autocrlf` ne olursa olsun
+      checkout'ta LF zorunlu kılınıyor, yeni bir klonda/makinede tekrar
+      etmez. `git add --renormalize .` ile diğer 167 dosyada hiçbir fark
+      olmadığı doğrulandı (blob'lar zaten LF), `git rm --cached -r . &&
+git reset --hard` ile çalışma ağacı fiilen LF'ye getirildi,
+      `pre-commit run --all-files` tekrar koşturulup 0 dosyanın
+      değiştiği KANITLANDI (commit `3b60f20`).
+  12. **(2026-11-09/10, ÇÖZÜLDÜ) Kalite kapısı sürüm sürüklenmesi
+      kapatıldı.** (a) `ruff`: `requirements-dev.txt` sürümsüzdü
+      (`>=0.6.9`), `.pre-commit-config.yaml` ise `v0.16.6`'ya sabitti —
+      ikisi ayrışınca hiçbir kod değişmeden CI kırmızıya dönüyordu
+      (I001/UP017/FURB162). `requirements-dev.txt` da `==0.16.6`'ya
+      sabitlendi (commit `0328938`). (b) `prettier`: `pre-commit/mirrors-
+prettier` ARŞİVLENMİŞ (ölçüldü — `archived: true`, son push
+      2024-04-11) ve tag geçmişinde v3.1.0→v4.0.0-alpha.0 arasında HİÇ
+      kararlı 3.x tag'i yok — `rev: v3.9.10` o mirror'da MEVCUT DEĞİL.
+      `repo: local` + `language: node` + `additional_dependencies:
+["prettier@3.9.10"]` ile DOĞRUDAN npm'den gerçek stabil 3.9.10
+      kuruluyor (bu, alpha sarmalayıcının zaten İÇİNDE taşıdığı motorla
+      AYNI — biçimlendirme davranışı değişmedi, yalnız hangi sürümün
+      commit'e karar verdiği netleşti). Lokal doğrulama: değişiklik
+      hiçbir dosyayı yeniden biçimlendirmedi (byte-birebir aynı çıktı,
+      commit `09ace8c`).
+  13. **(YENİ, 2026-11-10, AÇIK) Devcontainer (3.11) ↔ CI (3.12) Python
       sürümü çelişkisi.** `.devcontainer/devcontainer.json`:
       `mcr.microsoft.com/devcontainers/python:1-3.11-bookworm` diyor,
       ama `.github/workflows/ci.yml`/`security.yml`/`scheduled-

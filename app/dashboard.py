@@ -653,7 +653,16 @@ def _zs_grafik_ciz(
         )
         katmanlar.extend([dikis_kural, dikis_metin])
 
-    return alt.layer(*katmanlar).resolve_scale(color="independent").interactive()
+    # 2026-10-15 bulgusu: `resolve_scale(color="independent")` KALDIRILDI —
+    # `cizgi` ve `noktalar_tam` katmanları AYNI alanı (kirilim_kolonu)
+    # renklendiriyor; "independent" bu ikisini ZORLA ayrı skalaya/lejanta
+    # bölüyordu (ölçüldü: Vega-Lite spec'inde `resolve.scale.color`
+    # varken 2 ayrı renk skalası, yokken paylaşılan TEK skala — bkz.
+    # `Claude outputs/kapanis_2026-11-10_altyapi_ve_dashboard.md`).
+    # `noktalar_eksik`/dikiş katmanlarının rengi `.encode()` içinde değil
+    # mark düzeyinde sabit (`color="#d62728"` vb.) — skala/lejant üretmez,
+    # bu kaldırmadan etkilenmez.
+    return alt.layer(*katmanlar).interactive()
 
 
 @st.cache_data
@@ -1298,7 +1307,7 @@ if gercek_veri_var:
     )
 
     _ZS_VERI_SETLERI: dict[str, dict[str, str]] = {
-        "Tüketim (il×grup, Sanayi hariç)": {
+        "Tüketim (il×grup, 2016-2025 Sanayi hariç)": {
             "fonksiyon": "tuketim",
             "kirilim": "grup_adi",
             "birim": "Tüketim (MWh)",
@@ -1446,9 +1455,28 @@ if gercek_veri_var:
         zs_eksikler = zs_df.loc[~zs_df["tam_mi"]]
         if not zs_eksikler.empty:
             zs_kirilim_kolonu = zs_secim["kirilim"]
+            zs_il_var = "il_sayisi_min" in zs_df.columns
+
+            # 2026-10-15 bulgusu: `tam_mi` iki ayrı şarttan DÜŞEBİLİR (dönem
+            # sayısı VEYA il kardinalitesi, bkz. toplama.py:_kapsam_ve_deger_
+            # df() docstring'i) ama mesaj eskiden SADECE dönem sayısını
+            # yazıyordu — "1/1 dönem" tam gibi okunup kullanıcıyı yanıltıyordu
+            # (bayrağı asıl düşüren il eksikliği görünmezdi). Şimdi hangi şart
+            # düştüyse AÇIKÇA o yazılır.
+            def _zs_eksik_sebebi(r: Any) -> str:
+                sebepler = []
+                if int(r.mevcut_donem_sayisi) != int(r.beklenen_donem_sayisi):
+                    sebepler.append(
+                        f"{int(r.mevcut_donem_sayisi)}/{int(r.beklenen_donem_sayisi)} dönem"
+                    )
+                if zs_il_var and int(r.il_sayisi_min) != toplama.BEKLENEN_IL_SAYISI:
+                    sebepler.append(
+                        f"{int(r.il_sayisi_min)}/{toplama.BEKLENEN_IL_SAYISI} il"
+                    )
+                return ", ".join(sebepler) if sebepler else "bilinmeyen sebep"
+
             zs_eksik_liste = ", ".join(
-                f"{r.donem_etiketi} ({getattr(r, zs_kirilim_kolonu)}: "
-                f"{int(r.mevcut_donem_sayisi)}/{int(r.beklenen_donem_sayisi)} dönem)"
+                f"{r.donem_etiketi} ({getattr(r, zs_kirilim_kolonu)}: {_zs_eksik_sebebi(r)})"
                 for r in zs_eksikler.itertuples()
             )
             st.warning(f"⚠️ Eksik kapsamlı dönemler (üçgen işaretli): {zs_eksik_liste}")
