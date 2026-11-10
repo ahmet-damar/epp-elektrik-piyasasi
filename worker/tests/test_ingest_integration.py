@@ -106,6 +106,84 @@ def test_tuketim_yukle_ve_p0_4_aktivasyon(conn) -> None:  # type: ignore[no-unty
         assert cur.fetchall() == []
 
 
+def test_fact_tuketim_yukle_bos_hucre_ve_beklenmeyen_icerik_farkli_yollara_gider(  # type: ignore[no-untyped-def]
+    conn,
+) -> None:
+    """2026-11-10 bulgusu (Batman/Tarımsal + Bartın/Kamu ve Özel Hizmetler):
+    `parser.tablo11_tuketim_oku()`'nun ürettiği `ham_sinif`/`ham_metin`
+    kolonlarıyla üç satır — biri dolu, biri boş hücre ('-'), biri
+    beklenmeyen içerik ('#REF!') — kasıtlı olarak kuruluyor ve üçünün
+    GERÇEKTEN farklı yollara gittiği doğrulanıyor: dolu → fact_tuketim'e
+    yazılır; boş hücre → `atlanan_hucre`'ye ('bos_hucre') YAZILIR ve
+    `veri_kapsam_disi`'ye de YANSITILIR; beklenmeyen içerik → `atlanan_
+    hucre`'ye ('beklenmeyen_icerik') YAZILIR ama `veri_kapsam_disi`'ye
+    BİLİNÇLİ OLARAK yansıtılmaz (gerçek bir sorun olarak görünür kalmalı)."""
+    ingest.dim_tarih_getir_veya_olustur(conn, 202602)
+    df = pd.DataFrame(
+        [
+            {
+                "il": "Ankara",
+                "il_kodu": 6,
+                "tarih_id": 202602,
+                "grup": "Mesken",
+                "baglanti": "dagitim",
+                "tuketim_mwh": None,
+                "ham_sinif": "bos_hucre",
+                "ham_metin": "-",
+            },
+            {
+                "il": "Antalya",
+                "il_kodu": 7,
+                "tarih_id": 202602,
+                "grup": "Mesken",
+                "baglanti": "dagitim",
+                "tuketim_mwh": None,
+                "ham_sinif": "beklenmeyen_icerik",
+                "ham_metin": "#REF!",
+            },
+            {
+                "il": "Artvin",
+                "il_kodu": 8,
+                "tarih_id": 202602,
+                "grup": "Mesken",
+                "baglanti": "dagitim",
+                "tuketim_mwh": 12.5,
+                "ham_sinif": "dolu",
+                "ham_metin": None,
+            },
+        ]
+    )
+
+    batch = _yeni_batch(conn, "test-sinifli-v1")
+    yuklenen, atlanan = ingest.fact_tuketim_yukle(conn, df, batch)
+    assert yuklenen == 1
+    assert atlanan == 2
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT il_kodu, ham_sinif, ham_metin FROM atlanan_hucre
+            WHERE ingestion_batch_id = %s ORDER BY il_kodu
+            """,
+            (batch,),
+        )
+        satirlar = cur.fetchall()
+    assert satirlar == [(6, "bos_hucre", "-"), (7, "beklenmeyen_icerik", "#REF!")]
+
+    mesken_grup_id = ingest.dim_grup_id_bul(conn, "Mesken")
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT nitelik, sebep FROM veri_kapsam_disi WHERE tarih_id = %s AND fact_tablosu = 'fact_tuketim'",
+            (202602,),
+        )
+        kapsam_disi_satirlar = cur.fetchall()
+    assert len(kapsam_disi_satirlar) == 1
+    nitelik, sebep = kapsam_disi_satirlar[0]
+    assert nitelik == f"il_kodu=6,grup_id={mesken_grup_id},baglanti=dagitim"
+    assert "boş/tire" in sebep
+    assert "#REF!" not in str(kapsam_disi_satirlar)  # beklenmeyen_icerik yansımadı
+
+
 def test_batch_dolu_tablolari_bul_yalniz_veri_yazilan_tablolari_dondurur(  # type: ignore[no-untyped-def]
     conn,
 ) -> None:

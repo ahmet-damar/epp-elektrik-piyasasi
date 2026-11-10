@@ -604,6 +604,82 @@ FacetChart`, GERÇEK bir tip tutarsızlığı) — requirements-dev.txt'teki
       otorite değildir — otorite CI'daki mypy'dir; (2) kalite kapısındaki
       her araç iki dosyada da AYNI kesin sürüme sabitlenir (bugün ruff,
       prettier, mypy olmak üzere üç kez yaşandı).
+  15. **(YENİ, 2026-11-10, KISMEN ÇÖZÜLDÜ) Kapsam uyarısının "1/1 dönem"
+      örüntüsü araştırıldı — Türkçe-I hipotezi ÇÜRÜTÜLDÜ, gözlemlenebilirlik
+      açığı KAPATILDI, kaynak-yokluğu hipotezi henüz KESİNLEŞMEDİ.**
+
+      **Ölçüldü (Supabase, salt okuma, canlıya hiç yazılmadı):**
+      Tarımsal × Batman (il 72) 2026-01→05 arası BEŞ bağımsız ay/batch'te
+      (3,10,12,13,14 — beş farklı fiziksel Excel) tutarlı şekilde yok,
+      2026-06'da (batch 15) ilk kez çok küçük bir değerle (1406 MWh)
+      beliriyor — **il bazlı bir parser hizalama hatası aya göre
+      DEĞİŞMEZDİ, bu kadar çok bağımsız dosyada aynı il+grup'un düşmesi
+      kaynak-yokluğu lehine kanıt.** Kamu ve Özel Hizmetler × Bartın
+      (il 74) 2026-04'ten (batch 13) itibaren DÖRT ardışık ay/batch'te
+      (13,14,15,782) tutarlı şekilde yok, 2026-07'ye kadar hiç geri
+      gelmiyor.
+
+      **Hipotez (Türkçe-I casefold hatası): ÇÜRÜTÜLDÜ.**
+      `worker/parser.py:normalize_label()` İ/I/ı/i'yi ZATEN tek bir ASCII
+      'I'ya eşliyor (`_TR_SADE` çeviri tablosu), `IL_PLAKA` sözlüğü bu
+      normalize ile üretiliyor — "Bartın"/"Batman"/"Siirt" üçü de doğru
+      plaka koduna eşleniyor. "Batman"/"Siirt"te zaten problemli bir
+      Türkçe karakter yok.
+
+      **Gerçek mekanizma (ölçüldü):** satırlar eşleşmede kaybolmuyor —
+      `worker/parser.py:parse_sayi()` (eski hali) boş hücre/tire/n-a VE
+      "ne boş ne sayı" (garbled metin) durumlarını AYNI `None`'da
+      birleştiriyordu; `worker/ingest.py:fact_tuketim_yukle()` bu `None`'ı
+      görünce satırı hiç DB'ye yazmadan yalnız bir SAYAÇ'a (`atlanan`)
+      ekliyordu — hangi (il, dönem, grup) satırının NEDEN atlandığı
+      hiçbir yerde kayıtlı değildi.
+
+      **Düzeltildi (bu turda, canlıya yazma YOK — kod+migration+test):**
+      1. `worker/parser.py:parse_sayi_sinifli()` eklendi — `parse_sayi()`
+         artık buna delege ediyor (davranış DEĞİŞMEDİ, geriye dönük
+         uyumlu). Üç sınıf döner: `dolu`/`bos_hucre`/`beklenmeyen_icerik`.
+         `tablo11_tuketim_oku()` (T11/fact_tuketim'in Excel/2026+
+         kaynağı) artık `ham_sinif`/`ham_metin` kolonlarını da taşıyor.
+      2. `worker/ingest.py:fact_tuketim_yukle()` artık her atlanan
+         satırı migration `20261110_0001_atlanan_hucre.sql`'in yeni
+         `atlanan_hucre` tablosuna (append-only teşhis günlüğü — hangi
+         tablo/il/dönem/grup/batch, hangi sınıf, ham metin ne) yazıyor.
+         `ham_sinif='bos_hucre'` olanlar AYRICA mevcut `veri_kapsam_disi`
+         mekanizmasına (`kapsam_disi_isaretle()`, 2026-11-10'da
+         `pipeline.py`'den `ingest.py`'ye taşındı — döngüsel import'tan
+         kaçınmak için; `pipeline.kapsam_disi_isaretle` artık bir takma ad,
+         30+ çağrı yeri değişmedi) yansıtılıyor; `beklenmeyen_icerik`
+         BİLİNÇLİ OLARAK yansıtılmıyor (gerçek bir sorun olarak görünür
+         kalmalı — madde 2'nin ayrımı). Word yılları (2016-2025) bu
+         kolonları taşımadığından `"bilinmiyor"` sınıfıyla düşer — eski
+         davranışla (yalnız sayaç) aynı bilgi düzeyi, hiç geriye dönük
+         kayıp yok.
+      3. **Kanıt (kasıtlı bozuk örnek):**
+         `test_fact_tuketim_yukle_bos_hucre_ve_beklenmeyen_icerik_
+farkli_yollara_gider` (`worker/tests/test_ingest_integration.py`)
+         — boş hücreli ('-') ve bozuk içerikli ('#REF!') iki satır + bir
+         dolu kontrol satırıyla üçünün GERÇEKTEN farklı yollara gittiğini
+         doğruluyor: dolu → `fact_tuketim`'e yazılır; boş hücre →
+         `atlanan_hucre`'ye YAZILIR VE `veri_kapsam_disi`'ye YANSIR;
+         beklenmeyen içerik → `atlanan_hucre`'ye yazılır ama `veri_
+kapsam_disi`'ye YANSIMAZ. Bu test yerelde çalıştırılAMADI (bu
+         makinede Docker yok, CI'nın disposable postgres:16'sı gerekiyor)
+         — CI'da doğrulanacak, push öncesi mypy/ruff/sqlfluff yerelde
+         temiz.
+
+      **EV MAKİNESİNDE (devcontainer, ham Excel'e erişimi olan) yapılacak
+      TEK kalan soru — Batman/Bartın konusunu KESİN kapatmak için:**
+      "2026-07 dosyasında Tablo 11 altında 'Kamu ve Özel Hizmetler'
+      sütununda BARTIN satırı var mı, varsa hücre içeriği ne (boş/tire/
+      sayı/başka)?" Bu soru yalnız BİR KEZ ham dosyaya bakılarak
+      cevaplanacak — madde 1/2 YÜRÜRLÜĞE GİRDİKTEN (bir sonraki gerçek
+      ingest/reprocess'te) SONRA, aynı soru bir daha ham dosya
+      gerektirmeyecek (`atlanan_hucre`/`veri_kapsam_disi`'den
+      okunabilecek). NOT: mevcut `atlanan_hucre`/`veri_kapsam_disi`
+      kayıtları GEÇMİŞE DÖNÜK doldurulmadı (canlıya yazma yok kuralı) —
+      bu yalnız BUNDAN SONRAKİ ingest/reprocess çalışmalarını kapsar;
+      Ocak-Temmuz 2026'nın geçmiş atlamaları için hâlâ ham dosya
+      gerekiyor, bu YUKARIDAKİ tek soru dışında.
 
 **GÜNCEL (2026-10-04, kapanış) — eski özet, güncel durum için yukarıya bak:**
 

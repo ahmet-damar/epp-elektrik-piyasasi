@@ -358,6 +358,113 @@ def _sayisal_temiz(deger: object) -> float | None:
     return float(deger)  # type: ignore[arg-type]
 
 
+def kapsam_disi_isaretle(
+    conn: Connection,
+    *,
+    tarih_id: int,
+    fact_tablosu: str,
+    sebep: str,
+    karar_referansi: str,
+    nitelik: str = "(tumu)",
+) -> None:
+    """Karar 1 (T13/fact_serbest_tuketici) ve Karar 3 (T1/fact_uretim
+    Lisanslı) — dokumanlar/07_word_parser_kapsam.md — için beklenen
+    "kaynakta yok" işaretleme mekanizması (migration 20260819_0012,
+    `veri_kapsam_disi` tablosu).
+
+    2026-11-10'da `worker/pipeline.py`'den BURAYA taşındı (`pipeline.py`
+    hâlâ `kapsam_disi_isaretle = ingest.kapsam_disi_isaretle` ile aynı
+    adı dışa veriyor — 30+ çağrı yeri DEĞİŞMEDİ) — `fact_tuketim_yukle()`
+    artık boş-hücre atlamalarını otomatik bu tabloya yazıyor, `pipeline.py`
+    `ingest.py`'yi import ediyor ama tersi değil, döngüsel import'tan
+    kaçınmak için fonksiyonun GERÇEK gövdesi yönün "düşük seviye" ucunda
+    olan bu modülde kalmalı.
+
+    `ingestion_batch`'ten BİLİNÇLİ OLARAK bağımsızdır — bir dönem için o
+    fact tablosunda hiçbir batch/yükleme girişimi bile olmayabilir (Word
+    kaynağında T13 hiç aranmıyor, T1 için Word'de il×kaynak birleşik
+    tablo hiç yok). Amaç: "parser hatası yüzünden 0 satır" ile "kaynakta
+    gerçekten yok" durumunu KPI/dashboard seviyesinde her zaman ayırt
+    edebilmek (bkz. Karar 1'in orijinal gerekçesi).
+
+    `fact_tablosu` DB'deki CHECK kısıtıyla (aynı 4'lü whitelist —
+    `worker/ingest.py`'nin `_DOGAL_ANAHTAR`'ıyla aynı tablolar) doğrulanır;
+    burada AYRICA bir Python-taraflı liste TUTULMAZ (tek doğruluk kaynağı
+    DB'de — Karar 1'in "paralel yol icat etme" ilkesi).
+
+    `nitelik`: aynı fact tablosunun İÇİNDE kısmi kapsam dışılık olabilir
+    (örn. Karar 3 — fact_uretim'in yalnız Lisanslı kesiti yok, Lisanssız
+    var); varsayılan `'(tumu)'` tüm tablo bu dönem için kapsam dışı demektir.
+
+    Aynı `(tarih_id, fact_tablosu, nitelik)` için İKİNCİ bir çağrı HATA
+    FIRLATMAZ — UPSERT yapar (`sebep`/`karar_referansi` güncellenir,
+    `created_at` yenilenir). Neden: bu fonksiyon tipik olarak bir backfill
+    script'i içinde AYNI dönem için tekrar tekrar çağrılabilir (örn. bir
+    yılın 12 ayı için döngüde) — "zaten var" durumunda patlamak yerine
+    fikrini güncelleyebilmek (örn. gerekçe metni netleştiğinde) daha
+    kullanışlı; bu tablo `ingestion_batch` gibi versiyonlu/append-only bir
+    audit izi DEĞİL, GÜNCEL bir "durum" kaydı."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO veri_kapsam_disi
+                (tarih_id, fact_tablosu, nitelik, sebep, karar_referansi)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (tarih_id, fact_tablosu, nitelik) DO UPDATE SET
+                sebep = EXCLUDED.sebep,
+                karar_referansi = EXCLUDED.karar_referansi,
+                created_at = now()
+            """,
+            (tarih_id, fact_tablosu, nitelik, sebep, karar_referansi),
+        )
+
+
+def atlanan_hucre_yaz(
+    conn: Connection,
+    *,
+    fact_tablosu: str,
+    tarih_id: int,
+    ingestion_batch_id: int,
+    ham_sinif: str,
+    il_kodu: int | None = None,
+    grup_id: int | None = None,
+    baglanti: str | None = None,
+    ham_metin: str | None = None,
+) -> None:
+    """2026-11-10 bulgusu (Batman/Tarımsal + Bartın/Kamu ve Özel Hizmetler,
+    bkz. `Claude outputs/kapanis_2026-11-10_altyapi_ve_dashboard.md`):
+    `fact_*_yukle()` fonksiyonları bir satırı `tuketim_mwh IS NULL` diye
+    atladığında eskiden yalnız bir SAYAÇ (`atlanan`) artıyordu — HANGİ
+    (il, dönem, grup) satırının NEDEN atlandığı hiçbir yerde kalmıyordu,
+    bu yüzden "kaynakta gerçekten yok mu, yoksa parser mı kaçırdı" sorusu
+    her sorulduğunda ham Excel dosyasına yeniden gidilmesi gerekiyordu.
+
+    Bu fonksiyon o satırı migration 20261110_0001'in `atlanan_hucre`
+    tablosuna yapılandırılmış olarak yazar (append-only teşhis günlüğü —
+    `veri_kapsam_disi`'nin AKSİNE bir "güncel durum" değil, HER deneme/
+    batch için ayrı bir kayıt: aynı hücre farklı batch'lerde tekrar tekrar
+    boş çıkarsa her biri görünür kalır)."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO atlanan_hucre
+                (fact_tablosu, tarih_id, il_kodu, grup_id, baglanti,
+                 ingestion_batch_id, ham_sinif, ham_metin)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                fact_tablosu,
+                tarih_id,
+                il_kodu,
+                grup_id,
+                baglanti,
+                ingestion_batch_id,
+                ham_sinif,
+                ham_metin,
+            ),
+        )
+
+
 def yil_ici_onceki_tuketim_toplami(
     conn: Connection, yil: int, tarih_id: int
 ) -> pd.DataFrame:
@@ -439,16 +546,62 @@ def onceki_ay_kumulatif_ulke_geneli_getir(
 def fact_tuketim_yukle(
     conn: Connection, df: pd.DataFrame, batch_id: int
 ) -> tuple[int, int]:
-    """Kabul edilen tüketim satırlarını is_active=false yazar. (yuklenen, atlanan_null) döner."""
+    """Kabul edilen tüketim satırlarını is_active=false yazar. (yuklenen, atlanan_null) döner.
+
+    2026-11-10: bir satır atlandığında (`tuketim_mwh IS NULL`) artık yalnız
+    sayılmıyor, `atlanan_hucre_yaz()` ile yapılandırılmış olarak kaydediliyor.
+    `ham_sinif`/`ham_metin` kolonları `df`'de VARSA (bugün yalnız
+    `parser.tablo11_tuketim_oku()`'nun ürettiği Excel/2026+ yolu) gerçek
+    sınıf kullanılır; YOKSA (Word yılları 2016-2025 — bu turda dokunulmadı,
+    kapsam dışı) `"bilinmiyor"` yazılır — eski davranışla (yalnız sayaç)
+    aynı bilgi düzeyi, hiçbir geriye dönük uyumluluk kaybı yok.
+    `ham_sinif="bos_hucre"` ise AYRICA `kapsam_disi_isaretle()` ile
+    `veri_kapsam_disi`'ye yansıtılır (madde 2 — "kaynakta boş/tire" ile
+    "beklenmeyen içerik" ayrımı burada netleşir; ikincisi bilerek
+    `veri_kapsam_disi`'ye YAZILMAZ, gerçek bir sorun olarak görünür kalır)."""
     yuklenen = 0
     atlanan = 0
+    ham_sinif_var = "ham_sinif" in df.columns
+    ham_metin_var = "ham_metin" in df.columns
     with conn.cursor() as cur:
         for satir in df.itertuples(index=False):
+            grup_id = dim_grup_id_bul(conn, satir.grup)
             deger = _sayisal_temiz(satir.tuketim_mwh)
             if deger is None:  # fact_tuketim.tuketim_mwh NOT NULL
                 atlanan += 1
+                ham_sinif = str(satir.ham_sinif) if ham_sinif_var else "bilinmiyor"
+                ham_metin = (
+                    (None if pd.isna(satir.ham_metin) else str(satir.ham_metin))
+                    if ham_metin_var
+                    else None
+                )
+                atlanan_hucre_yaz(
+                    conn,
+                    fact_tablosu="fact_tuketim",
+                    tarih_id=satir.tarih_id,
+                    il_kodu=satir.il_kodu,
+                    grup_id=grup_id,
+                    baglanti=satir.baglanti,
+                    ingestion_batch_id=batch_id,
+                    ham_sinif=ham_sinif,
+                    ham_metin=ham_metin,
+                )
+                if ham_sinif == "bos_hucre":
+                    kapsam_disi_isaretle(
+                        conn,
+                        tarih_id=satir.tarih_id,
+                        fact_tablosu="fact_tuketim",
+                        nitelik=(
+                            f"il_kodu={satir.il_kodu},grup_id={grup_id},"
+                            f"baglanti={satir.baglanti}"
+                        ),
+                        sebep=(
+                            "Kaynak hücre boş/tire (otomatik tespit, "
+                            f"ham_metin={ham_metin!r}, batch={batch_id})"
+                        ),
+                        karar_referansi="Otomatik (bos hücre tespiti, 2026-11-10)",
+                    )
                 continue
-            grup_id = dim_grup_id_bul(conn, satir.grup)
             cur.execute(
                 """
                 INSERT INTO fact_tuketim

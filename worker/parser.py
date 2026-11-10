@@ -92,20 +92,42 @@ def _sade_anahtar(deger: object) -> str:
     return normalize_label(deger).replace(" ", "")
 
 
+_BOS_HUCRE_ISARETLERI = ("", "-", "—", "n/a", "N/A")
+
+
+def parse_sayi_sinifli(deger: object) -> tuple[float | None, str, str | None]:
+    """`parse_sayi()` ile AYNI ayrıştırma, ek olarak NEDEN None döndüğünü
+    kaybetmeden taşır (2026-11-10, Batman/Tarımsal + Bartın/Kamu bulgusu —
+    `parse_sayi()` tek başına "boş hücre" ile "ne boş ne sayı" durumunu
+    aynı None'da birleştiriyordu, bu ikisi arasında ayrım kaynağa gidilmeden
+    asla yeniden kurulamıyordu).
+
+    Döner: (deger, sinif, ham_metin).
+    - `sinif="dolu"`: sayı okundu, `ham_metin=None`.
+    - `sinif="bos_hucre"`: hücre gerçekten boş ya da bilinen bir "veri yok"
+      işareti (tire/n-a) — kaynakta muhtemelen gerçekten yok.
+    - `sinif="beklenmeyen_icerik"`: ne boş ne sayı (garbled metin, formül
+      hatası vb.) — GERÇEK bir ayrıştırma sorunu, kaynakta yok sayılamaz.
+    `ham_metin` teşhis için orijinal hücre içeriğinin `str()` hali —
+    yalnız `sinif != "dolu"` iken dolu (boş hücrenin kendisi de "" olarak
+    yazılır, None ile karıştırılmasın diye)."""
+    if deger is None:
+        return None, "bos_hucre", ""
+    if isinstance(deger, int | float):
+        return float(deger), "dolu", None
+    metin = str(deger).strip()
+    if metin in _BOS_HUCRE_ISARETLERI:
+        return None, "bos_hucre", metin
+    normalize_edilmis = metin.replace(".", "").replace(",", ".")
+    try:
+        return float(normalize_edilmis), "dolu", None
+    except ValueError:
+        return None, "beklenmeyen_icerik", metin
+
+
 def parse_sayi(deger: object) -> float | None:
     """'1.432,404' → 1432.404. Boş hücre → None (0 DEĞİL)."""
-    if deger is None:
-        return None
-    if isinstance(deger, int | float):
-        return float(deger)
-    metin = str(deger).strip()
-    if metin in ("", "-", "—", "n/a", "N/A"):
-        return None
-    metin = metin.replace(".", "").replace(",", ".")
-    try:
-        return float(metin)
-    except ValueError:
-        return None
+    return parse_sayi_sinifli(deger)[0]
 
 
 # ---------------------------------------------------------------------------
@@ -439,12 +461,25 @@ def tablo11_tuketim_oku(
 
     P0-2: Sanayi-DAĞITIM ve Sanayi-İLETİM AYRI satır (grup='Sanayi', baglanti farklı).
     Tek başına yeterli (T8 ile aynı il×grup verisini, ayrıca sanayi ayrımıyla verir).
+
+    `ham_sinif`/`ham_metin` (2026-11-10): `tuketim_mwh` None olduğunda NEDENİNİ
+    taşır — `parse_sayi_sinifli()` docstring'ine bkz. `worker/ingest.py:
+    fact_tuketim_yukle()` bu iki kolonu okuyup hem yapılandırılmış bir log
+    hem (boş hücre ise) `veri_kapsam_disi` kaydı üretir.
     """
+    kolonlar = [
+        "il",
+        "il_kodu",
+        "tarih_id",
+        "grup",
+        "baglanti",
+        "tuketim_mwh",
+        "ham_sinif",
+        "ham_metin",
+    ]
     konum = _il_matrisi_oku(ws, tablo_etiketi)
     if konum is None:
-        return pd.DataFrame(
-            columns=["il", "il_kodu", "tarih_id", "grup", "baglanti", "tuketim_mwh"]
-        )
+        return pd.DataFrame(columns=kolonlar)
     baslik_satir, il_sutun = konum
 
     kolon_indeksleri = [
@@ -457,7 +492,9 @@ def tablo11_tuketim_oku(
         for kolon, grup, baglanti in kolon_indeksleri:
             if kolon is None:
                 continue
-            deger = parse_sayi(ws.cell(row=satir_no, column=kolon).value)
+            deger, ham_sinif, ham_metin = parse_sayi_sinifli(
+                ws.cell(row=satir_no, column=kolon).value
+            )
             satirlar.append(
                 {
                     "il": il_adi,
@@ -466,12 +503,11 @@ def tablo11_tuketim_oku(
                     "grup": grup,
                     "baglanti": baglanti,
                     "tuketim_mwh": deger,
+                    "ham_sinif": ham_sinif,
+                    "ham_metin": ham_metin,
                 }
             )
-    return pd.DataFrame(
-        satirlar,
-        columns=["il", "il_kodu", "tarih_id", "grup", "baglanti", "tuketim_mwh"],
-    )
+    return pd.DataFrame(satirlar, columns=kolonlar)
 
 
 def tablo11_genel_toplam_satiri_oku(
